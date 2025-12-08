@@ -20,6 +20,8 @@ import {
   ListMusic,
   Info,
   Trash2,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
 import { Track, Playlist } from "@/types/music";
 
@@ -39,6 +41,9 @@ interface TrackContextMenuProps {
   onShowInFolder?: () => void;
   onShowInfo?: () => void;
   onRemoveFromPlaylist?: () => void;
+  onUploadToCloudinary?: () => void;
+  canUploadToCloudinary?: boolean;
+  isUploading?: boolean;
 }
 
 export const TrackContextMenu = ({
@@ -57,6 +62,9 @@ export const TrackContextMenu = ({
   onShowInFolder,
   onShowInfo,
   onRemoveFromPlaylist,
+  onUploadToCloudinary,
+  canUploadToCloudinary = false,
+  isUploading = false,
 }: TrackContextMenuProps) => {
   return (
     <ContextMenu>
@@ -135,6 +143,28 @@ export const TrackContextMenu = ({
             <Info className="w-4 h-4 mr-2" />
             Propriétés
           </ContextMenuItem>
+        )}
+
+        {onUploadToCloudinary && canUploadToCloudinary && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem 
+              onClick={onUploadToCloudinary}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Cloud className="w-4 h-4 mr-2 animate-pulse" />
+                  Upload en cours...
+                </>
+              ) : (
+                <>
+                  <Cloud className="w-4 h-4 mr-2" />
+                  Uploader vers Cloudinary
+                </>
+              )}
+            </ContextMenuItem>
+          </>
         )}
 
         {onRemoveFromPlaylist && (

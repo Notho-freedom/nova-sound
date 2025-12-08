@@ -74,6 +74,7 @@ export interface ElectronAPI {
   // File system
   fileExists: (filePath: string) => Promise<boolean>;
   getAudioDuration: (filePath: string) => Promise<number>;
+  readFileAsBase64: (filePath: string) => Promise<string>;
 }
 
 declare global {

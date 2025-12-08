@@ -12,7 +12,9 @@ import {
   Heart,
   MoreHorizontal,
   Shuffle,
-  Trash2
+  Trash2,
+  Cloud,
+  ListMusic,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useCloudSync } from "@/hooks/useCloudSync";
+import { usePlaylists } from "@/hooks/usePlaylists";
+import { useFavorites } from "@/hooks/useFavorites";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -132,6 +139,18 @@ export const LibraryView = ({
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  
+  // Cloudinary upload
+  const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
+  const { cloudinaryConfigured, nexusIsPro } = useCloudSync();
+  const playlistsResult = usePlaylists();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  
+  // Ensure playlists is always an array
+  const playlists = playlistsResult?.playlists ?? [];
+  const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
+  
+  const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
 
   const sortedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
@@ -536,17 +555,52 @@ export const LibraryView = ({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                          <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover" />
+                      <TrackContextMenu
+                        track={track}
+                        playlists={playlists}
+                        isFavorite={isFavorite(track.id)}
+                        onPlay={() => onTrackSelect(actualIndex)}
+                        onPlayNext={() => {}}
+                        onAddToQueue={() => {}}
+                        onAddToPlaylist={(playlistId) => {}}
+                        onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                        onToggleFavorite={() => toggleFavorite(track.id)}
+                        onUploadToCloudinary={() => uploadTrack(track)}
+                        canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                        isUploading={getTrackProgress(track.id)?.status === 'uploading'}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
+                            <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover" />
+                            {/* Upload progress overlay */}
+                            {getTrackProgress(track.id) && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <div className="text-center">
+                                  <Cloud className="w-4 h-4 text-white mb-1 mx-auto" />
+                                  <span className="text-[10px] text-white font-medium">
+                                    {getTrackProgress(track.id)?.progress || 0}%
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            {/* Progress bar */}
+                            {getTrackProgress(track.id)?.status === 'uploading' && (
+                              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30">
+                                <div 
+                                  className="h-full bg-primary transition-all duration-300"
+                                  style={{ width: `${getTrackProgress(track.id)?.progress || 0}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                              {track.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                            {track.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-                        </div>
-                      </div>
+                      </TrackContextMenu>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <p className="text-sm text-muted-foreground truncate">{track.album}</p>
@@ -562,32 +616,24 @@ export const LibraryView = ({
                       <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Heart className="w-4 h-4 mr-2" />
-                            Ajouter aux favoris
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <List className="w-4 h-4 mr-2" />
-                            Ajouter à une playlist
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <Disc3 className="w-4 h-4 mr-2" />
-                            Voir l'album
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <User className="w-4 h-4 mr-2" />
-                            Voir l'artiste
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <TrackContextMenu
+                        track={track}
+                        playlists={playlists}
+                        isFavorite={isFavorite(track.id)}
+                        onPlay={() => onTrackSelect(actualIndex)}
+                        onPlayNext={() => {}}
+                        onAddToQueue={() => {}}
+                        onAddToPlaylist={(playlistId) => {}}
+                        onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                        onToggleFavorite={() => toggleFavorite(track.id)}
+                        onUploadToCloudinary={() => uploadTrack(track)}
+                        canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                        isUploading={getTrackProgress(track.id)?.status === 'uploading'}
+                      >
+                        <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </TrackContextMenu>
                     </td>
                   </tr>
                 );
@@ -602,27 +648,65 @@ export const LibraryView = ({
             const isCurrentTrack = currentTrackIndex === actualIndex;
 
             return (
-              <button
+              <TrackContextMenu
                 key={track.id}
-                onClick={() => onTrackSelect(actualIndex)}
-                className={cn(
-                  "group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50",
-                  isCurrentTrack && "ring-2 ring-primary"
-                )}
+                track={track}
+                playlists={playlists}
+                isFavorite={isFavorite(track.id)}
+                onPlay={() => onTrackSelect(actualIndex)}
+                onPlayNext={() => {}}
+                onAddToQueue={() => {}}
+                onAddToPlaylist={(playlistId) => {}}
+                onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                onToggleFavorite={() => toggleFavorite(track.id)}
+                onUploadToCloudinary={() => uploadTrack(track)}
+                canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                isUploading={getTrackProgress(track.id)?.status === 'uploading'}
               >
-                <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
-                  <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                      <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
-                    </div>
+                <button
+                  onClick={() => onTrackSelect(actualIndex)}
+                  className={cn(
+                    "group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50 w-full",
+                    isCurrentTrack && "ring-2 ring-primary"
+                  )}
+                >
+                  <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+                    <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    {/* Upload progress overlay */}
+                    {getTrackProgress(track.id) && (
+                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
+                        <div className="text-center">
+                          <Cloud className="w-6 h-6 text-white mb-2 mx-auto" />
+                          <span className="text-xs text-white font-medium">
+                            {getTrackProgress(track.id)?.progress || 0}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {/* Progress bar */}
+                    {getTrackProgress(track.id)?.status === 'uploading' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/30 z-10">
+                        <div 
+                          className="h-full bg-primary transition-all duration-300"
+                          style={{ width: `${getTrackProgress(track.id)?.progress || 0}%` }}
+                        />
+                      </div>
+                    )}
+                    {/* Play button overlay */}
+                    {!getTrackProgress(track.id) && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                          <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                  {track.title}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-              </button>
+                  <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                    {track.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                </button>
+              </TrackContextMenu>
             );
           })}
         </div>

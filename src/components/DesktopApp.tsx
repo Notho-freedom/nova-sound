@@ -17,6 +17,7 @@ import { useLibrary } from "@/hooks/useLibrary";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { getAudioSrc } from "@/lib/audio";
 import type { Track } from "@/types/music";
 
@@ -24,7 +25,12 @@ export const DesktopApp = () => {
   const { tracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory } = usePlayHistory();
-  const { overallProgress, isUploading } = useCloudSync();
+  const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
+  const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
+  
+  // Combined upload progress (Cloudinary or Nexus)
+  const overallProgress = cloudinaryUploading ? cloudinaryProgress : (cloudSyncUploading ? cloudSyncProgress : undefined);
+  const isUploading = cloudinaryUploading || cloudSyncUploading;
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>("home");

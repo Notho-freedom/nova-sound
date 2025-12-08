@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File system
   fileExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   getAudioDuration: (filePath) => ipcRenderer.invoke('audio:duration', filePath),
+  readFileAsBase64: (filePath) => ipcRenderer.invoke('file:readAsBase64', filePath),
 });
 
 console.log('Preload script loaded successfully');

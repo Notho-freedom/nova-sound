@@ -474,5 +474,5 @@ class FirebaseService {
 }
 
 export const firebaseService = new FirebaseService();
-export { auth, db };
+export { auth, db, app as firebaseApp };
 
