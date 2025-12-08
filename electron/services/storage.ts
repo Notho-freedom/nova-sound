@@ -52,6 +52,7 @@ export interface EqualizerPreset {
 
 export interface Settings {
   musicDirectories: string[];
+  videoDirectories?: string[];
   equalizerEnabled: boolean;
   equalizerPreset: string;
   customEqualizer: number[];
@@ -75,12 +76,27 @@ export interface Settings {
   autoScanOnStartup: boolean;
 }
 
+export interface StoredVideo {
+  id: string;
+  filePath: string;
+  title: string;
+  duration: number;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+  format: string;
+  fileSize: number;
+  addedAt: string;
+  lastModified: string;
+}
+
 // Storage paths
 const DATA_DIR = path.join(app.getPath('userData'), 'nexus-data');
 const ARTWORK_DIR = path.join(DATA_DIR, 'artwork');
 
 const PATHS = {
   library: path.join(DATA_DIR, 'library.json'),
+  videos: path.join(DATA_DIR, 'videos.json'),
   playlists: path.join(DATA_DIR, 'playlists.json'),
   favorites: path.join(DATA_DIR, 'favorites.json'),
   history: path.join(DATA_DIR, 'history.json'),
@@ -212,6 +228,39 @@ class Storage {
       library[index] = { ...library[index], ...track };
       await this.saveLibrary(library);
     }
+  }
+
+  // Videos
+  async getVideos(): Promise<StoredVideo[]> {
+    return readJSON<StoredVideo[]>(PATHS.videos, []);
+  }
+
+  async saveVideos(videos: StoredVideo[]): Promise<void> {
+    await writeJSON(PATHS.videos, videos);
+  }
+
+  async addVideos(videos: StoredVideo[]): Promise<void> {
+    const existing = await this.getVideos();
+    const existingPaths = new Set(existing.map(v => v.filePath));
+    
+    for (const video of videos) {
+      if (!existingPaths.has(video.filePath)) {
+        existing.push(video);
+      }
+    }
+    
+    await this.saveVideos(existing);
+  }
+
+  async getVideo(videoId: string): Promise<StoredVideo | null> {
+    const videos = await this.getVideos();
+    return videos.find(v => v.id === videoId) || null;
+  }
+
+  async removeVideoByPath(filePath: string): Promise<void> {
+    const videos = await this.getVideos();
+    const filtered = videos.filter(v => v.filePath !== filePath);
+    await this.saveVideos(filtered);
   }
 
   // Artwork

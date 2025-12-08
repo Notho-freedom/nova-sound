@@ -10,6 +10,7 @@ import type {
   ScrobbleTrack,
   ScrobblerStatus,
   ScanProgress,
+  Video,
 } from './music';
 
 export interface ElectronAPI {
@@ -26,6 +27,11 @@ export interface ElectronAPI {
   scanLibrary: (directories: string[]) => Promise<void>;
   getLibrary: () => Promise<Track[]>;
   onScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
+
+  // Video library
+  scanVideos: (directories: string[]) => Promise<void>;
+  getVideos: () => Promise<Video[]>;
+  onVideoScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
 
   // Track metadata
   getTrackMetadata: (filePath: string) => Promise<TrackMetadata>;

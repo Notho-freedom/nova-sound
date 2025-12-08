@@ -15,21 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-interface VideoFile {
-  id: string;
-  name: string;
-  path: string;
-  duration: number;
-  thumbnail?: string;
-  size: number;
-  addedAt: string;
-}
-
-interface VideosViewProps {
-  videos?: VideoFile[];
-  onSelectFolder?: () => void;
-}
+import { useVideos } from "@/hooks/useVideos";
+import type { Video } from "@/types/music";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -48,45 +35,18 @@ const formatSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 };
 
-// Mock data for demo
-const mockVideos: VideoFile[] = [
-  {
-    id: "1",
-    name: "Cyberpunk City Ambience.mp4",
-    path: "/videos/cyberpunk.mp4",
-    duration: 3600,
-    size: 1024 * 1024 * 500,
-    addedAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Synthwave Music Video.mkv",
-    path: "/videos/synthwave.mkv",
-    duration: 240,
-    size: 1024 * 1024 * 150,
-    addedAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Lo-Fi Beats Visualizer.webm",
-    path: "/videos/lofi.webm",
-    duration: 7200,
-    size: 1024 * 1024 * 800,
-    addedAt: new Date().toISOString(),
-  },
-];
-
-export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => {
+export const VideosView = () => {
+  const { videos, loading } = useVideos();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const displayVideos = useMemo(() => {
-    if (!searchQuery.trim()) return videos.length > 0 ? videos : [];
+    if (!searchQuery.trim()) return videos;
     const query = searchQuery.toLowerCase();
     return videos.filter(video =>
-      video.name.toLowerCase().includes(query) ||
-      video.path.toLowerCase().includes(query)
+      video.title.toLowerCase().includes(query) ||
+      video.filePath.toLowerCase().includes(query)
     );
   }, [videos, searchQuery]);
 
@@ -107,7 +67,7 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
           <div className="w-full max-w-4xl aspect-video bg-muted rounded-lg flex items-center justify-center">
             <div className="text-center">
               <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg font-medium mb-2">{selectedVideo.name}</p>
+              <p className="text-lg font-medium mb-2">{selectedVideo.title}</p>
               <p className="text-sm text-muted-foreground mb-4">
                 Lecteur vidéo en développement
               </p>
@@ -121,9 +81,9 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
         <div className="p-4 border-t border-border/30 bg-card/50">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium">{selectedVideo.name}</h3>
+              <h3 className="font-medium">{selectedVideo.title}</h3>
               <p className="text-sm text-muted-foreground">
-                {formatTime(selectedVideo.duration)} • {formatSize(selectedVideo.size)}
+                {selectedVideo.duration > 0 ? formatTime(selectedVideo.duration) : "-"} • {formatSize(selectedVideo.fileSize)}
               </p>
             </div>
             <div className="flex gap-2">
@@ -195,7 +155,7 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
           </div>
 
       {/* Empty State */}
-      {displayVideos.length === 0 && (
+      {!loading && displayVideos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
             <Video className="w-10 h-10 text-muted-foreground" />
@@ -204,10 +164,6 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
           <p className="text-muted-foreground text-sm max-w-md mb-6">
             Ajoutez des dossiers contenant des vidéos dans les paramètres pour les voir ici.
           </p>
-          <Button onClick={onSelectFolder}>
-            <Plus className="w-4 h-4 mr-2" />
-            Ajouter des vidéos
-          </Button>
 
           {/* Feature Preview */}
           <div className="mt-12 p-6 rounded-xl bg-card/30 border border-border/30 max-w-lg">
@@ -251,10 +207,10 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
               className="group text-left p-3 rounded-xl hover:bg-card/50 transition-colors"
             >
               <div className="aspect-video rounded-lg overflow-hidden mb-3 relative bg-muted">
-                {video.thumbnail ? (
+                {video.thumbnailUrl ? (
                   <img
-                    src={video.thumbnail}
-                    alt={video.name}
+                    src={video.thumbnailUrl}
+                    alt={video.title}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -267,12 +223,14 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
                     <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
                   </div>
                 </div>
-                <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-xs text-white font-mono">
-                  {formatTime(video.duration)}
-                </div>
+                {video.duration > 0 && (
+                  <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-xs text-white font-mono">
+                    {formatTime(video.duration)}
+                  </div>
+                )}
               </div>
-              <p className="text-sm font-medium truncate">{video.name}</p>
-              <p className="text-xs text-muted-foreground">{formatSize(video.size)}</p>
+              <p className="text-sm font-medium truncate">{video.title}</p>
+              <p className="text-xs text-muted-foreground">{formatSize(video.fileSize)}</p>
             </button>
           ))}
         </div>
@@ -309,27 +267,27 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-16 h-9 rounded overflow-hidden bg-muted flex items-center justify-center">
-                        {video.thumbnail ? (
+                        {video.thumbnailUrl ? (
                           <img
-                            src={video.thumbnail}
-                            alt={video.name}
+                            src={video.thumbnailUrl}
+                            alt={video.title}
                             className="w-full h-full object-cover"
                           />
                         ) : (
                           <Film className="w-6 h-6 text-muted-foreground" />
                         )}
                       </div>
-                      <p className="text-sm font-medium truncate">{video.name}</p>
+                      <p className="text-sm font-medium truncate">{video.title}</p>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="w-4 h-4" />
-                      {formatTime(video.duration)}
+                      {video.duration > 0 ? formatTime(video.duration) : "-"}
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className="text-sm text-muted-foreground">{formatSize(video.size)}</span>
+                    <span className="text-sm text-muted-foreground">{formatSize(video.fileSize)}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">

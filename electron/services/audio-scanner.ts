@@ -155,7 +155,9 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
   }
 
   isScanning = true;
-  const tracks: ScannedTrack[] = [];
+  const newTracks: ScannedTrack[] = [];
+  const existingTracks = await storage.getLibrary();
+  const existingPaths = new Set(existingTracks.map(t => t.filePath));
 
   try {
     // Phase 1: Scan directories for audio files
@@ -180,15 +182,23 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
         phase: 'extracting',
       });
 
+      // Skip if already exists
+      if (existingPaths.has(filePath)) {
+        continue;
+      }
+
       const track = await processAudioFile(filePath);
       if (track) {
-        tracks.push(track);
+        newTracks.push(track);
       }
     }
 
-    // Phase 3: Save to storage
+    // Phase 3: Merge with existing tracks and save to storage
     sendProgress({ current: total, total, file: '', phase: 'indexing' });
-    await storage.saveLibrary(tracks);
+    if (newTracks.length > 0) {
+      const allTracks = [...existingTracks, ...newTracks];
+      await storage.saveLibrary(allTracks);
+    }
 
     // Phase 4: Complete
     sendProgress({ current: total, total, file: '', phase: 'complete' });
@@ -197,7 +207,7 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
     isScanning = false;
   }
 
-  return tracks;
+  return newTracks;
 }
 
 /**

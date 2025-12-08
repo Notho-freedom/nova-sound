@@ -192,3 +192,18 @@ export interface PlayerState {
   repeatMode: 'off' | 'all' | 'one';
   queue: QueueState;
 }
+
+export interface Video {
+  id: string;
+  filePath: string;
+  title: string;
+  duration: number;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+  format?: string;
+  fileSize: number;
+  addedAt: string;
+  lastPlayedAt?: string;
+  playCount?: number;
+}

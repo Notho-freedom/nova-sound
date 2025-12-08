@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/hooks/useLibrary";
+import { useVideos } from "@/hooks/useVideos";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { authService } from "@/services/auth";
 import { useTheme } from "@/hooks/useTheme";
@@ -100,6 +101,7 @@ const ConfigAlert = ({ configured, service }: { configured: boolean; service: st
 
 export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders } = useLibrary();
+  const { videos, scanning: scanningVideos, scanProgress: videoScanProgress, scanVideos, selectVideoFolders } = useVideos();
   const { theme, setTheme } = useTheme();
   const { enabled: notificationsEnabled, setEnabled: setNotificationsEnabled, notifySuccess, notifyError } = useNotifications();
   const {
@@ -237,7 +239,30 @@ export const SettingsView = () => {
       const newDirs = [...(settings.musicDirectories || []), ...folders];
       await updateSetting("musicDirectories", newDirs);
       notifySuccess(`${folders.length} dossier(s) ajouté(s)`);
+      // Déclencher le scan automatique
+      await scanLibrary(newDirs);
     }
+  };
+
+  const handleAddVideoFolder = async () => {
+    const folders = await selectVideoFolders();
+    if (folders.length > 0) {
+      const newDirs = [...(settings.videoDirectories || []), ...folders];
+      await updateSetting("videoDirectories", newDirs);
+      notifySuccess(`${folders.length} dossier(s) vidéo ajouté(s)`);
+      // Déclencher le scan automatique
+      await scanVideos(newDirs);
+    }
+  };
+
+  const handleRemoveVideoFolder = async (folder: string) => {
+    const newDirs = (settings.videoDirectories || []).filter((d) => d !== folder);
+    await updateSetting("videoDirectories", newDirs);
+    notifySuccess("Dossier vidéo retiré");
+  };
+
+  const handleScanVideos = async () => {
+    await scanVideos(settings.videoDirectories);
   };
 
   const handleRemoveMusicFolder = async (folder: string) => {

@@ -5,6 +5,7 @@ import * as fs from 'fs';
 
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
+import { initVideoScanner } from './services/video-scanner.js';
 import { initMetadataExtractor } from './services/metadata-extractor.js';
 import { initStorage, storage } from './services/storage.js';
 import { initPlaylistManager } from './services/playlist-manager.js';
@@ -79,6 +80,7 @@ function initServices() {
   // Initialize other services
   initMetadataExtractor();
   initAudioScanner();
+  initVideoScanner();
   initPlaylistManager();
   initEqualizer();
   initLyricsProvider();

@@ -7,6 +7,7 @@ const DATA_DIR = path.join(app.getPath('userData'), 'nexus-data');
 const ARTWORK_DIR = path.join(DATA_DIR, 'artwork');
 const PATHS = {
     library: path.join(DATA_DIR, 'library.json'),
+    videos: path.join(DATA_DIR, 'videos.json'),
     playlists: path.join(DATA_DIR, 'playlists.json'),
     favorites: path.join(DATA_DIR, 'favorites.json'),
     history: path.join(DATA_DIR, 'history.json'),
@@ -122,6 +123,32 @@ class Storage {
             library[index] = { ...library[index], ...track };
             await this.saveLibrary(library);
         }
+    }
+    // Videos
+    async getVideos() {
+        return readJSON(PATHS.videos, []);
+    }
+    async saveVideos(videos) {
+        await writeJSON(PATHS.videos, videos);
+    }
+    async addVideos(videos) {
+        const existing = await this.getVideos();
+        const existingPaths = new Set(existing.map(v => v.filePath));
+        for (const video of videos) {
+            if (!existingPaths.has(video.filePath)) {
+                existing.push(video);
+            }
+        }
+        await this.saveVideos(existing);
+    }
+    async getVideo(videoId) {
+        const videos = await this.getVideos();
+        return videos.find(v => v.id === videoId) || null;
+    }
+    async removeVideoByPath(filePath) {
+        const videos = await this.getVideos();
+        const filtered = videos.filter(v => v.filePath !== filePath);
+        await this.saveVideos(filtered);
     }
     // Artwork
     async saveArtwork(artwork, sourceFilePath) {
