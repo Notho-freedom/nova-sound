@@ -224,19 +224,29 @@
   }
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling - ultra thin */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 3px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, hsl(var(--neon-cyan) / 0.6), hsl(var(--neon-magenta) / 0.6));
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to bottom, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)));
-  border-radius: 3px;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--neon-cyan) / 0.6) transparent;
 }
 
 /* Animations */
