@@ -1,5 +1,5 @@
 import { loadStripe, Stripe } from "@stripe/stripe-js";
-import { firebaseService } from "./firebase";
+import { authService } from "./auth";
 
 // Stripe configuration
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
@@ -56,7 +56,7 @@ class StripeService {
 
   // Create checkout session for Pro subscription
   async createCheckoutSession(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<string> {
-    const idToken = await firebaseService.getIdToken();
+    const accessToken = await authService.getAccessToken();
     if (!idToken) {
       throw new Error("User not authenticated");
     }
@@ -65,7 +65,7 @@ class StripeService {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         priceId,
@@ -91,7 +91,7 @@ class StripeService {
 
   // Create billing portal session
   async createPortalSession(): Promise<string> {
-    const idToken = await firebaseService.getIdToken();
+    const accessToken = await authService.getAccessToken();
     if (!idToken) {
       throw new Error("User not authenticated");
     }
@@ -100,7 +100,7 @@ class StripeService {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         returnUrl: `${window.location.origin}/settings`,
@@ -124,7 +124,7 @@ class StripeService {
 
   // Get subscription status
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
-    const idToken = await firebaseService.getIdToken();
+    const accessToken = await authService.getAccessToken();
     if (!idToken) {
       return {
         isActive: false,
@@ -138,7 +138,7 @@ class StripeService {
     try {
       const response = await fetch(`${API_BASE_URL}/api/stripe/subscription-status`, {
         headers: {
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -161,7 +161,7 @@ class StripeService {
 
   // Handle post-checkout success
   async handleCheckoutSuccess(sessionId: string): Promise<void> {
-    const idToken = await firebaseService.getIdToken();
+    const accessToken = await authService.getAccessToken();
     if (!idToken) {
       throw new Error("User not authenticated");
     }
@@ -170,7 +170,7 @@ class StripeService {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ sessionId }),
     });
@@ -180,7 +180,7 @@ class StripeService {
     }
 
     // Refresh user profile
-    const user = firebaseService.getCurrentUser();
+    const user = authService.getCurrentUser();
     if (user) {
       await firebaseService.updateProfile({ plan: "pro", subscriptionStatus: "active" });
     }

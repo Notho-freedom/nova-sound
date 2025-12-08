@@ -88,8 +88,19 @@ class FirebaseService {
       onAuthStateChanged(auth, async (user) => {
         this.currentUser = user;
         if (user) {
+          console.log("Auth state changed: user signed in", user.email);
+          
+          // Verify token is available
+          try {
+            const token = await user.getIdToken();
+            console.log("Token available after auth state change:", token ? "✓" : "✗");
+          } catch (tokenError) {
+            console.error("Error getting token after auth state change:", tokenError);
+          }
+          
           await this.loadUserProfile(user.uid);
         } else {
+          console.log("Auth state changed: user signed out");
           this.userProfile = null;
         }
         // Notify listeners
@@ -105,9 +116,24 @@ class FirebaseService {
     try {
       const result = await getRedirectResult(auth);
       if (result && result.user) {
+        console.log("Redirect result received, user:", result.user.email);
+        
+        // Set current user
+        this.currentUser = result.user;
+        
+        // Get and verify token is available
+        try {
+          const token = await result.user.getIdToken();
+          console.log("ID token retrieved after redirect:", token ? "✓ Token length: " + token.length : "✗");
+        } catch (tokenError) {
+          console.error("Error getting token after redirect:", tokenError);
+        }
+        
         const profile = await this.createOrUpdateProfile(result.user);
+        
         // Force notify listeners
         this.authStateListeners.forEach((listener) => listener(result.user));
+        
         return profile;
       }
     } catch (error) {
@@ -292,9 +318,37 @@ class FirebaseService {
   }
 
   // Get ID token for backend calls
-  async getIdToken(): Promise<string | null> {
-    if (!this.currentUser) return null;
-    return this.currentUser.getIdToken();
+  async getIdToken(forceRefresh: boolean = false): Promise<string | null> {
+    if (!this.currentUser) {
+      console.warn("getIdToken: No current user available");
+      return null;
+    }
+    
+    try {
+      console.log("getIdToken: Requesting token (forceRefresh:", forceRefresh, ")");
+      const token = await this.currentUser.getIdToken(forceRefresh);
+      
+      if (token) {
+        console.log("getIdToken: Token retrieved successfully, length:", token.length);
+        return token;
+      } else {
+        console.error("getIdToken: Token is null or empty");
+        return null;
+      }
+    } catch (error) {
+      console.error("getIdToken: Error getting token:", error);
+      // Try to refresh if first attempt failed
+      if (!forceRefresh) {
+        console.log("getIdToken: Retrying with force refresh...");
+        return this.getIdToken(true);
+      }
+      return null;
+    }
+  }
+  
+  // Refresh ID token
+  async refreshIdToken(): Promise<string | null> {
+    return this.getIdToken(true);
   }
 }
 

@@ -1,4 +1,4 @@
-import { firebaseService, UserProfile } from "./firebase";
+import { authService, UserProfile } from "./auth";
 import { stripeService } from "./stripe";
 
 export type { UserProfile as NexusUser };
@@ -21,38 +21,32 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 class NexusServerService {
   // Check if authenticated
   isAuthenticated(): boolean {
-    return firebaseService.getCurrentUser() !== null;
+    return authService.isAuthenticated();
   }
 
   // Check if pro user
   isPro(): boolean {
-    return firebaseService.isPro();
+    return authService.isPro();
   }
 
   // Get current user profile
   getUser(): UserProfile | null {
-    return firebaseService.getUserProfile();
+    return authService.getUserProfile();
   }
 
   // Subscribe to auth state changes
   onAuthStateChange(callback: (user: UserProfile | null) => void): () => void {
-    return firebaseService.onAuthStateChange((user) => {
-      if (user) {
-        callback(firebaseService.getUserProfile());
-      } else {
-        callback(null);
-      }
-    });
+    return authService.onAuthStateChange(callback);
   }
 
   // Login with Google
-  async loginWithGoogle(): Promise<UserProfile> {
-    return firebaseService.signInWithGoogle();
+  async loginWithGoogle(): Promise<void> {
+    await authService.signInWithGoogle();
   }
 
   // Logout
   async logout(): Promise<void> {
-    await firebaseService.signOut();
+    await authService.signOut();
   }
 
   // Upgrade to Pro (redirect to Stripe Checkout)
@@ -76,14 +70,18 @@ class NexusServerService {
     fileName: string,
     onProgress?: (progress: number) => void
   ): Promise<UploadResult> {
-    const idToken = await firebaseService.getIdToken();
-    if (!idToken) {
-      throw new Error("Not authenticated");
+    console.log("Upload file: Getting access token...");
+    const accessToken = await authService.getAccessToken();
+    console.log("Access token received:", accessToken ? "✓ Token length: " + accessToken.length : "✗ No token");
+    
+    if (!accessToken) {
+      console.error("No access token available. Current user:", authService.getCurrentUser()?.email);
+      throw new Error("Not authenticated - no token available");
     }
 
     // Check if user is pro for unlimited storage
-    const userProfile = firebaseService.getUserProfile();
-    if (!firebaseService.isPro() && userProfile) {
+    const userProfile = authService.getUserProfile();
+    if (!authService.isPro() && userProfile) {
       const storageLimit = 1024 * 1024 * 1024; // 1GB for free users
       if (userProfile.storageUsed + file.size > storageLimit) {
         throw new Error("Limite de stockage atteinte. Passez au Pro pour un stockage illimité.");
@@ -135,15 +133,15 @@ class NexusServerService {
       });
 
       xhr.open("POST", `${API_BASE_URL}/api/storage/upload`);
-      xhr.setRequestHeader("Authorization", `Bearer ${idToken}`);
+      xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
       xhr.send(formData);
     });
   }
 
   // Download file from Nexus servers
   async downloadFile(fileId: string, onProgress?: (progress: number) => void): Promise<Blob> {
-    const idToken = await firebaseService.getIdToken();
-    if (!idToken) {
+    const accessToken = await authService.getAccessToken();
+    if (!accessToken) {
       throw new Error("Not authenticated");
     }
 
@@ -170,15 +168,15 @@ class NexusServerService {
       });
 
       xhr.open("GET", `${API_BASE_URL}/api/storage/download/${fileId}`);
-      xhr.setRequestHeader("Authorization", `Bearer ${idToken}`);
+      xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
       xhr.send();
     });
   }
 
   // Get sync status
   async getSyncStatus(): Promise<SyncStatus> {
-    const idToken = await firebaseService.getIdToken();
-    if (!idToken) {
+    const accessToken = await authService.getAccessToken();
+    if (!accessToken) {
       return {
         lastSyncAt: "",
         tracksUploaded: 0,
@@ -190,7 +188,7 @@ class NexusServerService {
     try {
       const response = await fetch(`${API_BASE_URL}/api/sync/status`, {
         headers: {
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -206,15 +204,15 @@ class NexusServerService {
         lastSyncAt: localStorage.getItem("nexus-last-sync") || "",
         tracksUploaded: parseInt(localStorage.getItem("nexus-tracks-uploaded") || "0"),
         tracksDownloaded: parseInt(localStorage.getItem("nexus-tracks-downloaded") || "0"),
-        totalStorage: firebaseService.getUserProfile()?.storageUsed || 0,
+        totalStorage: authService.getUserProfile()?.storageUsed || 0,
       };
     }
   }
 
   // Start sync
   async startSync(): Promise<void> {
-    const idToken = await firebaseService.getIdToken();
-    if (!idToken) {
+    const accessToken = await authService.getAccessToken();
+    if (!accessToken) {
       throw new Error("Not authenticated");
     }
 
@@ -222,7 +220,7 @@ class NexusServerService {
       const response = await fetch(`${API_BASE_URL}/api/sync/start`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -240,15 +238,15 @@ class NexusServerService {
 
   // Get file list from server
   async getFileList(): Promise<Array<{ id: string; name: string; size: number; uploadedAt: string }>> {
-    const idToken = await firebaseService.getIdToken();
-    if (!idToken) {
+    const accessToken = await authService.getAccessToken();
+    if (!accessToken) {
       return [];
     }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/storage/files`, {
         headers: {
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -265,8 +263,8 @@ class NexusServerService {
 
   // Delete file from server
   async deleteFile(fileId: string): Promise<void> {
-    const idToken = await firebaseService.getIdToken();
-    if (!idToken) {
+    const accessToken = await authService.getAccessToken();
+    if (!accessToken) {
       throw new Error("Not authenticated");
     }
 

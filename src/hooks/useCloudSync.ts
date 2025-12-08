@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { cloudinaryService, CloudinaryConfig, UploadProgress } from "@/services/cloudinary";
 import { nexusServerService } from "@/services/nexus-server";
-import { firebaseService, UserProfile } from "@/services/firebase";
+import { authService, UserProfile } from "@/services/auth";
 import { stripeService } from "@/services/stripe";
 import { toast } from "sonner";
 
 interface UseCloudSyncReturn {
-  // Firebase status
-  firebaseInitialized: boolean;
+  // Auth status
+  firebaseInitialized: boolean; // Keep name for compatibility (always true now)
   stripeInitialized: boolean;
 
   // Cloudinary
@@ -43,7 +43,7 @@ interface UseCloudSyncReturn {
 
 export function useCloudSync(): UseCloudSyncReturn {
   // Service status
-  const [firebaseInitialized] = useState(firebaseService.isInitialized());
+  const [authInitialized] = useState(true); // Auth service is always initialized
   const [stripeInitialized] = useState(stripeService.isInitialized());
 
   // Cloudinary state
@@ -77,12 +77,12 @@ export function useCloudSync(): UseCloudSyncReturn {
     // Handle redirect result on mount (if user just came back from Google auth)
     const initRedirect = async () => {
       try {
-        const profile = await firebaseService.handleRedirectResult();
+        const profile = await authService.handleCallback();
         if (profile) {
           // User just authenticated via redirect
           setNexusUser(profile);
           setNexusAuthenticated(true);
-          setNexusIsPro(firebaseService.isPro());
+          setNexusIsPro(authService.isPro());
           
           // Show success message
           toast.success("Connecté avec succès", {
@@ -103,24 +103,22 @@ export function useCloudSync(): UseCloudSyncReturn {
     };
     initRedirect();
 
-    // Subscribe to Firebase auth state changes
-    const unsubscribeAuth = firebaseService.onAuthStateChange(async (user) => {
+    // Subscribe to auth state changes
+    const unsubscribeAuth = authService.onAuthStateChange(async (user) => {
       if (user) {
-        // Wait a bit for profile to be loaded from Firestore
-        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log("useCloudSync: Auth state changed, user:", user.email);
         
-        // Get profile - if not loaded yet, wait a bit more
-        let profile = firebaseService.getUserProfile();
-        let retries = 0;
-        while (!profile && retries < 5) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-          profile = firebaseService.getUserProfile();
-          retries++;
+        // Verify token is available
+        try {
+          const token = await authService.getAccessToken();
+          console.log("useCloudSync: Token available:", token ? "✓" : "✗");
+        } catch (tokenError) {
+          console.error("useCloudSync: Error getting token:", tokenError);
         }
         
-        setNexusUser(profile);
+        setNexusUser(user);
         setNexusAuthenticated(true);
-        setNexusIsPro(firebaseService.isPro());
+        setNexusIsPro(authService.isPro());
 
         // Load sync status
         nexusServerService.getSyncStatus().then((status) => {
@@ -167,22 +165,24 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfigured(false);
   }, []);
 
-  // Nexus methods - Google login via Firebase
+  // Nexus methods - Google login
   const nexusLoginWithGoogle = useCallback(async () => {
-    if (!firebaseInitialized) {
-      toast.error("Firebase non configuré", {
-        description: "Vérifiez votre fichier .env",
+    // Check if Google OAuth Client ID is configured
+    const clientId = authService.getGoogleClientId();
+    if (!clientId) {
+      toast.error("Google OAuth non configuré", {
+        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez VITE_GOOGLE_OAUTH_CLIENT_ID dans .env",
       });
       return;
     }
 
     try {
       // signInWithGoogle may redirect, so it doesn't return a profile
-      await firebaseService.signInWithGoogle();
+      await authService.signInWithGoogle();
       
       // If we get here without redirect, the popup worked
       // The profile will be set via onAuthStateChange
-      const profile = firebaseService.getUserProfile();
+      const profile = authService.getUserProfile();
       if (profile) {
         setNexusUser(profile);
         setNexusAuthenticated(true);
@@ -206,11 +206,11 @@ export function useCloudSync(): UseCloudSyncReturn {
       });
       throw error;
     }
-  }, [firebaseInitialized]);
+  }, [authInitialized]);
 
   const nexusLogout = useCallback(async () => {
     try {
-      await firebaseService.signOut();
+      await authService.signOut();
       setNexusUser(null);
       setNexusAuthenticated(false);
       setNexusIsPro(false);
@@ -273,9 +273,9 @@ export function useCloudSync(): UseCloudSyncReturn {
   }, [stripeInitialized, nexusAuthenticated]);
 
   const refreshUser = useCallback(() => {
-    const profile = firebaseService.getUserProfile();
+    const profile = authService.getUserProfile();
     setNexusUser(profile);
-    setNexusIsPro(firebaseService.isPro());
+    setNexusIsPro(authService.isPro());
   }, []);
 
   // Sync methods
@@ -314,7 +314,7 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   return {
     // Service status
-    firebaseInitialized,
+    firebaseInitialized: authInitialized,
     stripeInitialized,
 
     // Cloudinary

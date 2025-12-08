@@ -1,0 +1,569 @@
+// Service d'authentification manuel avec Google OAuth
+// Ne dépend pas de Firebase Auth
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string | null;
+  plan: "free" | "pro";
+  subscriptionStatus?: "active" | "canceled" | "past_due" | null;
+  storageUsed: number;
+  createdAt: string;
+  lastLoginAt: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken?: string;
+  idToken?: string;
+  expiresAt: number;
+}
+
+const STORAGE_KEYS = {
+  USER_PROFILE: "nexus-user-profile",
+  AUTH_TOKENS: "nexus-auth-tokens",
+  GOOGLE_CLIENT_ID: "nexus-google-client-id",
+};
+
+// Google OAuth Configuration
+const GOOGLE_OAUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";
+
+// Backend proxy endpoint (optional - if not set, will try direct OAuth)
+const OAUTH_PROXY_ENDPOINT = import.meta.env.VITE_OAUTH_PROXY_URL || null;
+
+// Client secret (optional - for Desktop/Electron apps only, not recommended for web)
+// Should only be used in Electron/Desktop apps where the secret is bundled
+const GOOGLE_CLIENT_SECRET = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_SECRET || null;
+
+class AuthService {
+  private currentUser: UserProfile | null = null;
+  private authTokens: AuthTokens | null = null;
+  private authStateListeners: Set<(user: UserProfile | null) => void> = new Set();
+  private googleClientId: string | null = null;
+
+  constructor() {
+    // Load persisted data
+    this.loadFromStorage();
+    
+    // Check if tokens are expired
+    if (this.authTokens && this.authTokens.expiresAt < Date.now()) {
+      console.log("Tokens expired, attempting refresh...");
+      this.refreshAccessToken().catch((error) => {
+        console.error("Failed to refresh token:", error);
+        this.signOut();
+      });
+    }
+  }
+
+  // Load data from localStorage
+  private loadFromStorage(): void {
+    try {
+      const profileStr = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      if (profileStr) {
+        this.currentUser = JSON.parse(profileStr);
+      }
+
+      const tokensStr = localStorage.getItem(STORAGE_KEYS.AUTH_TOKENS);
+      if (tokensStr) {
+        this.authTokens = JSON.parse(tokensStr);
+      }
+
+      this.googleClientId = localStorage.getItem(STORAGE_KEYS.GOOGLE_CLIENT_ID);
+    } catch (error) {
+      console.error("Error loading from storage:", error);
+      this.clearStorage();
+    }
+  }
+
+  // Save data to localStorage
+  private saveToStorage(): void {
+    try {
+      if (this.currentUser) {
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(this.currentUser));
+      }
+      if (this.authTokens) {
+        localStorage.setItem(STORAGE_KEYS.AUTH_TOKENS, JSON.stringify(this.authTokens));
+      }
+    } catch (error) {
+      console.error("Error saving to storage:", error);
+    }
+  }
+
+  // Clear storage
+  private clearStorage(): void {
+    localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKENS);
+  }
+
+  // Set Google OAuth Client ID
+  setGoogleClientId(clientId: string): void {
+    this.googleClientId = clientId;
+    localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
+  }
+
+  // Get Google OAuth Client ID
+  getGoogleClientId(): string | null {
+    return this.googleClientId || import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || null;
+  }
+
+  // Generate code verifier and challenge for PKCE
+  private async generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
+    // Generate code verifier (random string)
+    const codeVerifier = this.generateRandomString(128);
+    
+    // Generate code challenge (SHA256 hash of verifier, base64url encoded)
+    const encoder = new TextEncoder();
+    const data = encoder.encode(codeVerifier);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    const codeChallenge = this.base64URLEncode(new Uint8Array(hash));
+    
+    return { codeVerifier, codeChallenge };
+  }
+
+  // Generate random string
+  private generateRandomString(length: number): string {
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+    let result = "";
+    const randomValues = new Uint8Array(length);
+    crypto.getRandomValues(randomValues);
+    for (let i = 0; i < length; i++) {
+      result += charset[randomValues[i] % charset.length];
+    }
+    return result;
+  }
+
+  // Base64 URL encode
+  private base64URLEncode(array: Uint8Array): string {
+    return btoa(String.fromCharCode(...array))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
+  }
+
+  // Build Google OAuth URL with PKCE
+  private async buildAuthUrl(): Promise<string> {
+    const clientId = this.getGoogleClientId();
+    if (!clientId) {
+      throw new Error(
+        "Google OAuth Client ID not configured. " +
+        "Please set it in settings or add VITE_GOOGLE_OAUTH_CLIENT_ID to .env"
+      );
+    }
+
+    const redirectUri = window.location.origin + window.location.pathname;
+    const state = this.generateState();
+    const { codeVerifier, codeChallenge } = await this.generatePKCE();
+    
+    // Store code verifier and state in session storage
+    sessionStorage.setItem("oauth_state", state);
+    sessionStorage.setItem("oauth_code_verifier", codeVerifier);
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "openid profile email",
+      access_type: "offline",
+      prompt: "select_account",
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    });
+
+    return `${GOOGLE_OAUTH_ENDPOINT}?${params.toString()}`;
+  }
+
+  // Generate random state for OAuth
+  private generateState(): string {
+    return this.generateRandomString(32);
+  }
+
+  // Exchange authorization code for tokens with PKCE
+  private async exchangeCodeForTokens(code: string): Promise<AuthTokens> {
+    const clientId = this.getGoogleClientId();
+    if (!clientId) {
+      throw new Error("Google OAuth Client ID not configured");
+    }
+
+    // Get code verifier from session storage
+    const codeVerifier = sessionStorage.getItem("oauth_code_verifier");
+    if (!codeVerifier) {
+      throw new Error("Code verifier not found. Please try signing in again.");
+    }
+
+    const redirectUri = window.location.origin + window.location.pathname;
+
+    // Try using backend proxy if available (handles client_secret securely)
+    if (OAUTH_PROXY_ENDPOINT) {
+      try {
+        const response = await fetch(`${OAUTH_PROXY_ENDPOINT}/oauth/token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            code,
+            redirect_uri: redirectUri,
+            code_verifier: codeVerifier,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          sessionStorage.removeItem("oauth_code_verifier");
+          
+          const expiresIn = data.expires_in || 3600;
+          const expiresAt = Date.now() + expiresIn * 1000;
+
+          return {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            idToken: data.id_token,
+            expiresAt: expiresAt,
+          };
+        }
+      } catch (error) {
+        console.warn("OAuth proxy failed, trying direct OAuth:", error);
+      }
+    }
+
+    // Direct OAuth with PKCE
+    // If client_secret is available (for Electron/Desktop apps), include it
+    // Otherwise, try without it (for Desktop app type OAuth clients)
+    const tokenParams: Record<string, string> = {
+      client_id: clientId,
+      code: code,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+      code_verifier: codeVerifier,
+    };
+
+    // Add client_secret if available (for Electron/Desktop apps)
+    if (GOOGLE_CLIENT_SECRET) {
+      tokenParams.client_secret = GOOGLE_CLIENT_SECRET;
+    }
+
+    const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(tokenParams),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      // Clear stored values on error
+      sessionStorage.removeItem("oauth_code_verifier");
+      
+      // Provide helpful error message
+      try {
+        const errorObj = JSON.parse(error);
+        if (errorObj.error === "invalid_request" && errorObj.error_description?.includes("client_secret")) {
+          throw new Error(
+            "OAuth configuration error: " +
+            (GOOGLE_CLIENT_SECRET 
+              ? "The provided client_secret is invalid. Please check VITE_GOOGLE_OAUTH_CLIENT_SECRET in your .env file."
+              : "Your Google OAuth client requires a client_secret. " +
+                "For Electron/Desktop apps, add VITE_GOOGLE_OAUTH_CLIENT_SECRET to your .env file. " +
+                "For web apps, use a backend proxy (VITE_OAUTH_PROXY_URL) or configure as 'Desktop app' type in Google Cloud Console.")
+          );
+        }
+      } catch (parseError) {
+        // Error is not JSON, use as-is
+      }
+      
+      throw new Error(`Token exchange failed: ${error}`);
+    }
+
+    const data = await response.json();
+    
+    // Clear code verifier after successful exchange
+    sessionStorage.removeItem("oauth_code_verifier");
+    
+    // Calculate expiration time (default to 1 hour if not provided)
+    const expiresIn = data.expires_in || 3600;
+    const expiresAt = Date.now() + expiresIn * 1000;
+
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      idToken: data.id_token,
+      expiresAt: expiresAt,
+    };
+  }
+
+  // Refresh access token
+  private async refreshAccessToken(): Promise<AuthTokens> {
+    if (!this.authTokens?.refreshToken) {
+      throw new Error("No refresh token available");
+    }
+
+    const clientId = this.getGoogleClientId();
+    if (!clientId) {
+      throw new Error("Google OAuth Client ID not configured");
+    }
+
+    const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        refresh_token: this.authTokens.refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Token refresh failed");
+    }
+
+    const data = await response.json();
+    const expiresIn = data.expires_in || 3600;
+    const expiresAt = Date.now() + expiresIn * 1000;
+
+    this.authTokens = {
+      ...this.authTokens,
+      accessToken: data.access_token,
+      idToken: data.id_token,
+      expiresAt: expiresAt,
+    };
+
+    this.saveToStorage();
+    return this.authTokens;
+  }
+
+  // Get user info from Google
+  private async getUserInfo(accessToken: string): Promise<any> {
+    const response = await fetch(GOOGLE_USERINFO_ENDPOINT, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to get user info:", response.status, errorText);
+      throw new Error(`Failed to get user info: ${response.status}`);
+    }
+
+    // Check if response is JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Unexpected response type:", contentType, text.substring(0, 200));
+      throw new Error("Invalid response format from Google API");
+    }
+
+    return response.json();
+  }
+
+  // Handle OAuth callback
+  async handleCallback(): Promise<UserProfile | null> {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+    const state = urlParams.get("state");
+    const error = urlParams.get("error");
+
+    if (error) {
+      throw new Error(`OAuth error: ${error}`);
+    }
+
+    if (!code || !state) {
+      return null;
+    }
+
+    // Verify state
+    const savedState = sessionStorage.getItem("oauth_state");
+    if (state !== savedState) {
+      throw new Error("Invalid state parameter");
+    }
+    sessionStorage.removeItem("oauth_state");
+
+    try {
+      // Exchange code for tokens
+      const tokens = await this.exchangeCodeForTokens(code);
+      this.authTokens = tokens;
+      this.saveToStorage();
+
+      // Get user info - try multiple methods
+      let userInfo: any;
+      try {
+        userInfo = await this.getUserInfo(tokens.accessToken);
+      } catch (error) {
+        console.error("Error getting user info from Google API:", error);
+        // If we have an idToken, decode it to get user info
+        if (tokens.idToken) {
+          try {
+            // Decode JWT idToken (base64url decode the payload)
+            const parts = tokens.idToken.split(".");
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+              userInfo = {
+                id: payload.sub,
+                sub: payload.sub,
+                email: payload.email,
+                name: payload.name,
+                picture: payload.picture,
+              };
+            } else {
+              throw new Error("Invalid idToken format");
+            }
+          } catch (decodeError) {
+            console.error("Error decoding idToken:", decodeError);
+            throw new Error("Failed to get user information. Please try signing in again.");
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      // Create or update profile
+      const profile: UserProfile = {
+        uid: userInfo.id || userInfo.sub || `user_${Date.now()}`,
+        email: userInfo.email || "",
+        displayName: userInfo.name || userInfo.email?.split("@")[0] || "Utilisateur",
+        photoURL: userInfo.picture || null,
+        plan: "free",
+        storageUsed: 0,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+
+      this.currentUser = profile;
+      this.saveToStorage();
+
+      // Notify listeners
+      this.authStateListeners.forEach((listener) => listener(profile));
+
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      return profile;
+    } catch (error) {
+      console.error("Error handling OAuth callback:", error);
+      throw error;
+    }
+  }
+
+  // Sign in with Google
+  async signInWithGoogle(): Promise<void> {
+    const authUrl = await this.buildAuthUrl();
+    window.location.href = authUrl;
+  }
+
+  // Sign out
+  async signOut(): Promise<void> {
+    this.currentUser = null;
+    this.authTokens = null;
+    this.clearStorage();
+    
+    // Notify listeners
+    this.authStateListeners.forEach((listener) => listener(null));
+  }
+
+  // Get current user
+  getCurrentUser(): UserProfile | null {
+    return this.currentUser;
+  }
+
+  // Get user profile
+  getUserProfile(): UserProfile | null {
+    return this.currentUser;
+  }
+
+  // Check if authenticated
+  isAuthenticated(): boolean {
+    return this.currentUser !== null && this.authTokens !== null;
+  }
+
+  // Get access token (with auto-refresh if needed)
+  async getAccessToken(): Promise<string | null> {
+    if (!this.authTokens) {
+      return null;
+    }
+
+    // Check if token is expired or will expire soon (within 5 minutes)
+    if (this.authTokens.expiresAt < Date.now() + 5 * 60 * 1000) {
+      if (this.authTokens.refreshToken) {
+        try {
+          await this.refreshAccessToken();
+        } catch (error) {
+          console.error("Failed to refresh token:", error);
+          this.signOut();
+          return null;
+        }
+      } else {
+        // No refresh token, token expired
+        this.signOut();
+        return null;
+      }
+    }
+
+    return this.authTokens.accessToken;
+  }
+
+  // Get ID token (for backend API calls)
+  async getIdToken(): Promise<string | null> {
+    if (!this.authTokens) {
+      return null;
+    }
+
+    // Refresh if needed
+    const accessToken = await this.getAccessToken();
+    if (!accessToken) {
+      return null;
+    }
+
+    // If we have an idToken, return it
+    if (this.authTokens.idToken) {
+      return this.authTokens.idToken;
+    }
+
+    // Otherwise, use access token
+    return accessToken;
+  }
+
+  // Subscribe to auth state changes
+  onAuthStateChange(callback: (user: UserProfile | null) => void): () => void {
+    this.authStateListeners.add(callback);
+    
+    // Call immediately with current state
+    callback(this.currentUser);
+    
+    return () => this.authStateListeners.delete(callback);
+  }
+
+  // Check if user is pro
+  isPro(): boolean {
+    return (
+      this.currentUser?.plan === "pro" &&
+      this.currentUser?.subscriptionStatus === "active"
+    );
+  }
+
+  // Update user profile
+  async updateProfile(data: Partial<UserProfile>): Promise<void> {
+    if (!this.currentUser) {
+      throw new Error("Not authenticated");
+    }
+
+    this.currentUser = {
+      ...this.currentUser,
+      ...data,
+    };
+
+    this.saveToStorage();
+    
+    // Notify listeners
+    this.authStateListeners.forEach((listener) => listener(this.currentUser));
+  }
+}
+
+export const authService = new AuthService();
+

@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { authService } from "@/services/auth";
 import { useTheme } from "@/hooks/useTheme";
 import { useNotifications } from "@/hooks/useNotifications";
 import { toast } from "sonner";
@@ -284,11 +285,13 @@ export const SettingsView = () => {
     notifySuccess("Configuration Cloudinary supprimée");
   };
 
-  // Google Sign In with Firebase
+  // Google Sign In
   const handleGoogleSignIn = async () => {
-    if (!firebaseInitialized) {
-      toast.error("Firebase non configuré", {
-        description: "Ajoutez les variables VITE_FIREBASE_* dans .env",
+    // Check if Google OAuth Client ID is configured
+    const clientId = authService.getGoogleClientId();
+    if (!clientId) {
+      toast.error("Google OAuth non configuré", {
+        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez VITE_GOOGLE_OAUTH_CLIENT_ID dans .env",
       });
       return;
     }
@@ -732,7 +735,7 @@ export const SettingsView = () => {
 
               {/* Nexus Server with Firebase Auth */}
               <SettingsCard title="Serveur NEXUS" icon={Shield}>
-                <ConfigAlert configured={firebaseInitialized} service="Firebase" />
+                <ConfigAlert configured={!!authService.getGoogleClientId()} service="Google OAuth" />
                 
                 <div className="space-y-4">
                   <div className="p-3 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
@@ -801,7 +804,7 @@ export const SettingsView = () => {
                           size="sm" 
                           className="w-full gap-2"
                           onClick={handleGoogleSignIn}
-                          disabled={authLoading || !firebaseInitialized}
+                          disabled={authLoading || !authService.getGoogleClientId()}
                         >
                           {authLoading ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -965,8 +968,8 @@ export const SettingsView = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Firebase</span>
-                    <span className={cn("text-sm", firebaseInitialized ? "text-green-500" : "text-yellow-500")}>
-                      {firebaseInitialized ? "Connecté" : "Non configuré"}
+                    <span className={cn("text-sm", authService.getGoogleClientId() ? "text-green-500" : "text-yellow-500")}>
+                      {authService.getGoogleClientId() ? "Configuré" : "Non configuré"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

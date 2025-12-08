@@ -38,7 +38,7 @@ function createWindow() {
     });
     // Load the app
     if (isDev) {
-        mainWindow.loadURL('http://localhost:8080');
+        mainWindow.loadURL('http://localhost:3000');
         mainWindow.webContents.openDevTools();
     }
     else {
