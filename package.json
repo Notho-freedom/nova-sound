@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently -k \"vite\" \"npm run electron:dev\"",
-    "electron:dev": "tsc -p electron/tsconfig.json && electron .",
+    "electron:dev": "tsc -p electron/tsconfig.json && copy electron\\preload.cjs dist-electron\\preload.cjs && electron .",
     "build": "vite build",
     "build:electron": "npm run build && tsc -p electron/tsconfig.json",
     "electron": "electron .",

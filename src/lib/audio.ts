@@ -1,0 +1,46 @@
+import { DEFAULT_COVER } from "@/data/tracks";
+
+/**
+ * Get album cover URL with fallback to default
+ */
+export function getCoverUrl(coverUrl?: string): string {
+  if (!coverUrl || coverUrl === '') {
+    return DEFAULT_COVER;
+  }
+  return coverUrl;
+}
+
+/**
+ * Format duration in seconds to MM:SS
+ */
+export function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Get audio source URL for playback
+ * Handles both local files (Electron) and web URLs
+ */
+export function getAudioSrc(filePath?: string): string | null {
+  if (!filePath) return null;
+  
+  // Check if it's already a URL
+  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {
+    return filePath;
+  }
+  
+  // Check if already using local-audio protocol
+  if (filePath.startsWith('local-audio://')) {
+    return filePath;
+  }
+  
+  // Local file path - convert to local-audio:// URL for Electron
+  // This uses our custom protocol registered in main.ts
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const encodedPath = encodeURIComponent(normalizedPath);
+  
+  return `local-audio://${encodedPath}`;
+}
+

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 import { Track } from "@/types/music";
 
 interface NowPlayingBarProps {
@@ -80,7 +81,7 @@ export const NowPlayingBar = ({
       <div className="w-72 flex items-center gap-3">
         <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group">
           <img 
-            src={currentTrack.coverUrl || "/placeholder.svg"} 
+            src={getCoverUrl(currentTrack.coverUrl)} 
             alt={currentTrack.album}
             className="w-full h-full object-cover"
           />

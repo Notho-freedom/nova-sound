@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
@@ -10,10 +10,16 @@ import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
 import { SettingsView } from "./views/SettingsView";
 import { BackgroundEffects } from "./BackgroundEffects";
-import { demoTracks } from "@/data/tracks";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLibrary } from "@/hooks/useLibrary";
+import { useFavorites } from "@/hooks/useFavorites";
+import { getAudioSrc, getCoverUrl } from "@/lib/audio";
+import type { Track } from "@/types/music";
 
 export const DesktopApp = () => {
+  const { tracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
+  const { favorites, isFavorite } = useFavorites();
+  
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>("home");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -26,16 +32,98 @@ export const DesktopApp = () => {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const currentTrack = demoTracks[currentTrackIndex];
+  // Audio element ref for real playback
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Get current track safely
+  const currentTrack: Track | null = tracks.length > 0 ? tracks[currentTrackIndex] || tracks[0] : null;
 
   // Loading complete handler
   const handleLoadComplete = useCallback(() => {
     setIsLoading(false);
   }, []);
 
-  // Simulate playback progress
+  // Initialize audio element
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.volume = volume / 100;
+    }
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update audio source when track changes
+  useEffect(() => {
+    if (!audioRef.current || !currentTrack) return;
+
+    // Check if we have a real file path (Electron mode)
+    if (currentTrack.filePath) {
+      const audioSrc = getAudioSrc(currentTrack.filePath);
+      if (audioSrc) {
+        console.log('Loading audio:', audioSrc);
+        audioRef.current.src = audioSrc;
+        audioRef.current.load();
+        if (isPlaying) {
+          audioRef.current.play().catch((err) => {
+            console.error('Failed to play audio:', err);
+          });
+        }
+      }
+    }
+  }, [currentTrack?.id]);
+
+  // Handle play/pause
+  useEffect(() => {
+    if (!audioRef.current || !currentTrack?.filePath) return;
+
+    if (isPlaying) {
+      audioRef.current.play().catch(console.error);
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying, currentTrack?.filePath]);
+
+  // Handle volume changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
+    }
+  }, [volume, isMuted]);
+
+  // Update current time from audio element
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    const handleTimeUpdate = () => {
+      if (audioRef.current) {
+        setCurrentTime(Math.floor(audioRef.current.currentTime));
+      }
+    };
+
+    const handleEnded = () => {
+      handleNext();
+    };
+
+    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('ended', handleEnded);
+      }
+    };
+  }, []);
+
+  // Fallback: Simulate playback progress when no real audio file
+  useEffect(() => {
+    if (!isPlaying || !currentTrack || currentTrack.filePath) return;
 
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
@@ -48,12 +136,11 @@ export const DesktopApp = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack.duration]);
+  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -112,41 +199,56 @@ export const DesktopApp = () => {
   const handlePlayPause = () => setIsPlaying(!isPlaying);
 
   const handlePrevious = useCallback(() => {
+    if (tracks.length === 0) return;
+    
     if (currentTime > 3) {
       setCurrentTime(0);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
     } else {
       setCurrentTrackIndex((prev) =>
-        prev === 0 ? demoTracks.length - 1 : prev - 1
+        prev === 0 ? tracks.length - 1 : prev - 1
       );
       setCurrentTime(0);
     }
-  }, [currentTime]);
+  }, [currentTime, tracks.length]);
 
   const handleNext = useCallback(() => {
+    if (tracks.length === 0) return;
+
     if (repeatMode === "one") {
       setCurrentTime(0);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(console.error);
+      }
       return;
     }
 
     if (isShuffle) {
       let randomIndex;
       do {
-        randomIndex = Math.floor(Math.random() * demoTracks.length);
-      } while (randomIndex === currentTrackIndex && demoTracks.length > 1);
+        randomIndex = Math.floor(Math.random() * tracks.length);
+      } while (randomIndex === currentTrackIndex && tracks.length > 1);
       setCurrentTrackIndex(randomIndex);
     } else {
       setCurrentTrackIndex((prev) => {
-        if (prev === demoTracks.length - 1) {
+        if (prev === tracks.length - 1) {
           return repeatMode === "all" ? 0 : prev;
         }
         return prev + 1;
       });
     }
     setCurrentTime(0);
-  }, [repeatMode, isShuffle, currentTrackIndex]);
+  }, [repeatMode, isShuffle, currentTrackIndex, tracks.length]);
 
   const handleSeek = (value: number[]) => {
-    setCurrentTime(value[0]);
+    const newTime = value[0];
+    setCurrentTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
   };
 
   const handleVolumeChange = (value: number[]) => {
@@ -166,12 +268,18 @@ export const DesktopApp = () => {
     setIsPlaying(true);
   };
 
+  // Get favorite tracks
+  const favoriteTracks = tracks.filter(track => isFavorite(track.id));
+
+  // Get recently played (use history or just first few for demo)
+  const recentTracks = tracks.slice(0, 10);
+
   const renderView = () => {
     switch (currentView) {
       case "home":
         return (
           <HomeView
-            tracks={demoTracks}
+            tracks={tracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -180,7 +288,7 @@ export const DesktopApp = () => {
       case "search":
         return (
           <SearchView
-            tracks={demoTracks}
+            tracks={tracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -189,7 +297,7 @@ export const DesktopApp = () => {
       case "library":
         return (
           <LibraryView
-            tracks={demoTracks}
+            tracks={tracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -198,17 +306,21 @@ export const DesktopApp = () => {
       case "favorites":
         return (
           <LibraryView
-            tracks={demoTracks.slice(0, 3)}
+            tracks={favoriteTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
-            onTrackSelect={handleTrackSelect}
+            onTrackSelect={(index) => {
+              const track = favoriteTracks[index];
+              const realIndex = tracks.findIndex(t => t.id === track.id);
+              if (realIndex !== -1) handleTrackSelect(realIndex);
+            }}
             title="Favoris"
           />
         );
       case "playlists":
         return (
           <LibraryView
-            tracks={demoTracks}
+            tracks={tracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -218,17 +330,21 @@ export const DesktopApp = () => {
       case "recent":
         return (
           <LibraryView
-            tracks={demoTracks.slice(0, 4)}
+            tracks={recentTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
-            onTrackSelect={handleTrackSelect}
+            onTrackSelect={(index) => {
+              const track = recentTracks[index];
+              const realIndex = tracks.findIndex(t => t.id === track.id);
+              if (realIndex !== -1) handleTrackSelect(realIndex);
+            }}
             title="Écouté récemment"
           />
         );
       case "albums":
         return (
           <LibraryView
-            tracks={demoTracks}
+            tracks={tracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -238,7 +354,7 @@ export const DesktopApp = () => {
       case "artists":
         return (
           <LibraryView
-            tracks={demoTracks}
+            tracks={tracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -266,10 +382,28 @@ export const DesktopApp = () => {
     return <LoadingScreen onLoadComplete={handleLoadComplete} />;
   }
 
+  // Show message if no tracks
+  const noTracksMessage = tracks.length === 0 && !libraryLoading && (
+    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+      <div className="glass rounded-xl p-8 text-center max-w-md pointer-events-auto">
+        <h2 className="font-display text-xl mb-3">Bibliothèque vide</h2>
+        <p className="text-muted-foreground mb-4">
+          Ajoutez des dossiers de musique dans les Paramètres pour commencer à écouter.
+        </p>
+        <button 
+          onClick={() => setCurrentView("settings")}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          Ouvrir les Paramètres
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {/* Fullscreen Player */}
-      {isFullscreen && (
+      {isFullscreen && currentTrack && (
         <FullscreenPlayer
           currentTrack={currentTrack}
           isPlaying={isPlaying}
@@ -298,10 +432,16 @@ export const DesktopApp = () => {
         <BackgroundEffects />
 
         {/* Sidebar */}
-        <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+        <Sidebar 
+          currentView={currentView} 
+          onViewChange={setCurrentView}
+          favoritesCount={favoriteTracks.length}
+        />
 
         {/* Content Area */}
         <div className="flex-1 flex overflow-hidden relative z-10">
+          {noTracksMessage}
+          
           <ScrollArea className="flex-1">
             {renderView()}
           </ScrollArea>
@@ -309,7 +449,7 @@ export const DesktopApp = () => {
           {/* Queue Panel */}
           {isQueueOpen && (
             <QueuePanel
-              tracks={demoTracks}
+              tracks={tracks}
               currentTrackIndex={currentTrackIndex}
               isPlaying={isPlaying}
               onTrackSelect={handleTrackSelect}
@@ -320,26 +460,43 @@ export const DesktopApp = () => {
       </div>
 
       {/* Now Playing Bar */}
-      <NowPlayingBar
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        isShuffle={isShuffle}
-        repeatMode={repeatMode}
-        volume={volume}
-        isMuted={isMuted}
-        onPlayPause={handlePlayPause}
-        onPrevious={handlePrevious}
-        onNext={handleNext}
-        onShuffle={() => setIsShuffle(!isShuffle)}
-        onRepeat={handleRepeat}
-        onSeek={handleSeek}
-        onVolumeChange={handleVolumeChange}
-        onMuteToggle={() => setIsMuted(!isMuted)}
-        onToggleQueue={() => setIsQueueOpen(!isQueueOpen)}
-        onFullscreen={() => setIsFullscreen(true)}
-        isQueueOpen={isQueueOpen}
-      />
+      {currentTrack && (
+        <NowPlayingBar
+          currentTrack={currentTrack}
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          isShuffle={isShuffle}
+          repeatMode={repeatMode}
+          volume={volume}
+          isMuted={isMuted}
+          onPlayPause={handlePlayPause}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onShuffle={() => setIsShuffle(!isShuffle)}
+          onRepeat={handleRepeat}
+          onSeek={handleSeek}
+          onVolumeChange={handleVolumeChange}
+          onMuteToggle={() => setIsMuted(!isMuted)}
+          onToggleQueue={() => setIsQueueOpen(!isQueueOpen)}
+          onFullscreen={() => setIsFullscreen(true)}
+          isQueueOpen={isQueueOpen}
+        />
+      )}
+
+      {/* Scan progress indicator */}
+      {scanning && scanProgress && (
+        <div className="fixed bottom-20 right-4 glass rounded-lg p-4 z-50 max-w-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div>
+              <p className="text-sm font-medium">Scan en cours...</p>
+              <p className="text-xs text-muted-foreground">
+                {scanProgress.current}/{scanProgress.total} fichiers
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

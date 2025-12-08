@@ -1,13 +1,15 @@
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 
 interface AlbumArtProps {
-  src: string;
+  src?: string;
   alt: string;
   isPlaying: boolean;
   className?: string;
 }
 
 export const AlbumArt = ({ src, alt, isPlaying, className }: AlbumArtProps) => {
+  const coverUrl = getCoverUrl(src);
   return (
     <div className={cn("relative group", className)}>
       {/* Outer glow ring */}
@@ -44,7 +46,7 @@ export const AlbumArt = ({ src, alt, isPlaying, className }: AlbumArtProps) => {
         )}
       >
         <img
-          src={src}
+          src={coverUrl}
           alt={alt}
           className={cn(
             "w-full h-full object-cover transition-transform duration-[20000ms] ease-linear",

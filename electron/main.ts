@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as fs from 'fs';
 
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
@@ -34,21 +35,13 @@ function createWindow() {
     backgroundColor: '#0a0a0f',
     icon: path.join(__dirname, '../public/favicon.ico'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      webSecurity: true,
+      webSecurity: false, // Allow loading local files
     },
   });
-
-  // Allow loading local file:// URLs for album artwork
-  mainWindow.webContents.session.webRequest.onBeforeRequest(
-    { urls: ['file://*'] },
-    (details, callback) => {
-      callback({ cancel: false });
-    }
-  );
 
   // Load the app
   if (isDev) {
@@ -142,8 +135,44 @@ ipcMain.handle('dialog:openPlaylist', async () => {
   return result.filePaths;
 });
 
+// Register custom protocol for local audio files
+function registerLocalAudioProtocol() {
+  protocol.handle('local-audio', async (request) => {
+    const filePath = decodeURIComponent(request.url.replace('local-audio://', ''));
+    try {
+      const data = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      
+      const mimeTypes: Record<string, string> = {
+        '.mp3': 'audio/mpeg',
+        '.flac': 'audio/flac',
+        '.ogg': 'audio/ogg',
+        '.wav': 'audio/wav',
+        '.m4a': 'audio/mp4',
+        '.aac': 'audio/aac',
+        '.opus': 'audio/opus',
+        '.wma': 'audio/x-ms-wma',
+        '.aiff': 'audio/aiff',
+      };
+      
+      return new Response(data, {
+        headers: {
+          'Content-Type': mimeTypes[ext] || 'audio/mpeg',
+          'Content-Length': data.length.toString(),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to load audio file:', filePath, error);
+      return new Response('File not found', { status: 404 });
+    }
+  });
+}
+
 // App lifecycle
 app.whenReady().then(async () => {
+  // Register custom protocol
+  registerLocalAudioProtocol();
+  
   // Initialize storage and services
   await storage.init();
   initServices();

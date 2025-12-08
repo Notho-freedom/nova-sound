@@ -1,6 +1,9 @@
 import { Track } from "@/types/music";
 import albumCover1 from "@/assets/album-cover-1.jpg";
 
+// Export default cover for use elsewhere
+export const DEFAULT_COVER = albumCover1;
+
 export const demoTracks: Track[] = [
   {
     id: "1",

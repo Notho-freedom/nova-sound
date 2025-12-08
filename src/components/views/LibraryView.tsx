@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Play, Grid, List, SortAsc, Filter } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -175,7 +176,7 @@ export const LibraryView = ({
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
                           <img
-                            src={track.coverUrl || "/placeholder.svg"}
+                            src={getCoverUrl(track.coverUrl)}
                             alt={track.album}
                             className="w-full h-full object-cover"
                           />
@@ -227,7 +228,7 @@ export const LibraryView = ({
               >
                 <div className="aspect-square rounded-lg overflow-hidden mb-3 relative">
                   <img
-                    src={track.coverUrl || "/placeholder.svg"}
+                    src={getCoverUrl(track.coverUrl)}
                     alt={track.album}
                     className="w-full h-full object-cover"
                   />

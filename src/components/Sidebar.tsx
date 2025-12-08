@@ -36,6 +36,7 @@ type ViewType =
 interface SidebarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
+  favoritesCount?: number;
 }
 
 const mainNavItems = [
@@ -99,7 +100,7 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   </h3>
 );
 
-export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
+export const Sidebar = ({ currentView, onViewChange, favoritesCount }: SidebarProps) => {
   const [playlists] = useState([
     { id: 1, name: "Cyberpunk Mix", count: 24 },
     { id: 2, name: "Night Drive", count: 18 },
@@ -135,7 +136,7 @@ export const Sidebar = ({ currentView, onViewChange }: SidebarProps) => {
                   label={item.label}
                   isActive={currentView === item.id}
                   onClick={() => onViewChange(item.id)}
-                  badge={item.id === "favorites" ? 12 : undefined}
+                  badge={item.id === "favorites" ? favoritesCount : undefined}
                 />
               ))}
             </div>

@@ -2,6 +2,7 @@ import { X, GripVertical, Play, Pause } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 
 interface QueuePanelProps {
   tracks: Track[];
@@ -53,7 +54,7 @@ export const QueuePanel = ({
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
                   <img
-                    src={tracks[currentTrackIndex]?.coverUrl || "/placeholder.svg"}
+                    src={getCoverUrl(tracks[currentTrackIndex]?.coverUrl)}
                     alt=""
                     className="w-full h-full object-cover"
                   />
@@ -98,7 +99,7 @@ export const QueuePanel = ({
                       <GripVertical className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
                       <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
                         <img
-                          src={track.coverUrl || "/placeholder.svg"}
+                          src={getCoverUrl(track.coverUrl)}
                           alt=""
                           className="w-full h-full object-cover"
                         />
@@ -136,7 +137,7 @@ export const QueuePanel = ({
                   >
                     <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
                       <img
-                        src={track.coverUrl || "/placeholder.svg"}
+                        src={getCoverUrl(track.coverUrl)}
                         alt=""
                         className="w-full h-full object-cover"
                       />

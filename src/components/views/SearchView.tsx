@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Search, Play, X } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 import { Input } from "@/components/ui/input";
 
 interface SearchViewProps {
@@ -96,7 +97,7 @@ export const SearchView = ({
                   >
                     <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
                       <img
-                        src={track.coverUrl || "/placeholder.svg"}
+                        src={getCoverUrl(track.coverUrl)}
                         alt={track.album}
                         className="w-full h-full object-cover"
                       />

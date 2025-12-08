@@ -20,6 +20,7 @@ import { AudioVisualizer } from "./AudioVisualizer";
 import { BackgroundEffects } from "./BackgroundEffects";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 
 interface FullscreenPlayerProps {
   currentTrack: Track;
@@ -80,7 +81,7 @@ export const FullscreenPlayer = ({
       <div 
         className="absolute inset-0 opacity-30 blur-3xl scale-150"
         style={{
-          backgroundImage: `url(${currentTrack.coverUrl})`,
+          backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -117,7 +118,7 @@ export const FullscreenPlayer = ({
       <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-8">
         {/* Album Art */}
         <AlbumArt
-          src={currentTrack.coverUrl || "/placeholder.svg"}
+          src={getCoverUrl(currentTrack.coverUrl)}
           alt={currentTrack.album}
           isPlaying={isPlaying}
           className="w-72 h-72 md:w-80 md:h-80 lg:w-96 lg:h-96 mb-8"
