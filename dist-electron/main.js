@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
+import { createReadStream } from 'fs';
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
 import { initVideoScanner } from './services/video-scanner.js';
@@ -183,9 +184,22 @@ function registerLocalAudioProtocol() {
 // Register custom protocol for local video files
 function registerLocalVideoProtocol() {
     protocol.handle('local-video', async (request) => {
-        const filePath = decodeURIComponent(request.url.replace('local-video://', ''));
+        let filePath = request.url.replace('local-video://', '');
+        // Decode URI component
         try {
-            const data = fs.readFileSync(filePath);
+            filePath = decodeURIComponent(filePath);
+        }
+        catch (e) {
+            console.error('Failed to decode video path:', filePath, e);
+        }
+        console.log('Loading video file:', filePath);
+        try {
+            // Check if file exists
+            if (!fs.existsSync(filePath)) {
+                console.error('Video file not found:', filePath);
+                return new Response('File not found', { status: 404 });
+            }
+            const stats = fs.statSync(filePath);
             const ext = path.extname(filePath).toLowerCase();
             const mimeTypes = {
                 '.mp4': 'video/mp4',
@@ -199,17 +213,63 @@ function registerLocalVideoProtocol() {
                 '.3gp': 'video/3gpp',
                 '.ogv': 'video/ogg',
             };
-            return new Response(data, {
+            // Handle Range requests for video seeking
+            const rangeHeader = request.headers.get('range');
+            if (rangeHeader) {
+                // Parse range header (e.g., "bytes=0-1023")
+                const matches = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+                if (matches) {
+                    const start = parseInt(matches[1], 10);
+                    const end = matches[2] ? parseInt(matches[2], 10) : stats.size - 1;
+                    const chunkSize = end - start + 1;
+                    // Read only the requested range
+                    const buffer = Buffer.alloc(chunkSize);
+                    const fd = fs.openSync(filePath, 'r');
+                    fs.readSync(fd, buffer, 0, chunkSize, start);
+                    fs.closeSync(fd);
+                    return new Response(buffer, {
+                        status: 206, // Partial Content
+                        headers: {
+                            'Content-Type': mimeTypes[ext] || 'video/mp4',
+                            'Content-Length': chunkSize.toString(),
+                            'Content-Range': `bytes ${start}-${end}/${stats.size}`,
+                            'Accept-Ranges': 'bytes',
+                            'Cache-Control': 'no-cache',
+                        },
+                    });
+                }
+            }
+            // No range request - return full file using stream
+            // Convert Node.js stream to Web ReadableStream
+            const nodeStream = createReadStream(filePath);
+            const webStream = new ReadableStream({
+                start(controller) {
+                    nodeStream.on('data', (chunk) => {
+                        controller.enqueue(chunk);
+                    });
+                    nodeStream.on('end', () => {
+                        controller.close();
+                    });
+                    nodeStream.on('error', (err) => {
+                        controller.error(err);
+                    });
+                },
+                cancel() {
+                    nodeStream.destroy();
+                },
+            });
+            return new Response(webStream, {
                 headers: {
                     'Content-Type': mimeTypes[ext] || 'video/mp4',
-                    'Content-Length': data.length.toString(),
+                    'Content-Length': stats.size.toString(),
                     'Accept-Ranges': 'bytes',
+                    'Cache-Control': 'no-cache',
                 },
             });
         }
         catch (error) {
             console.error('Failed to load video file:', filePath, error);
-            return new Response('File not found', { status: 404 });
+            return new Response(`Error loading video: ${error instanceof Error ? error.message : String(error)}`, { status: 500 });
         }
     });
 }

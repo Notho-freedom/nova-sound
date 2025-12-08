@@ -41,11 +41,30 @@ export function useVideoPlayer(videos: Video[] = []): UseVideoPlayerReturn {
 
   // Get video source URL
   const getVideoSource = (video: Video): string => {
-    if (!isElectron || !video.filePath) {
+    if (!video.filePath) {
       return "";
     }
-    // Use custom protocol for local videos
-    return `local-video://${encodeURIComponent(video.filePath)}`;
+    
+    // Check if it's already a URL (web video)
+    if (video.filePath.startsWith('http://') || video.filePath.startsWith('https://') || video.filePath.startsWith('blob:')) {
+      return video.filePath;
+    }
+    
+    // Check if already using local-video protocol
+    if (video.filePath.startsWith('local-video://')) {
+      return video.filePath;
+    }
+    
+    if (!isElectron) {
+      return "";
+    }
+    
+    // Local file path - convert to local-video:// URL for Electron
+    // Normalize path (replace backslashes with forward slashes)
+    const normalizedPath = video.filePath.replace(/\\/g, '/');
+    const encodedPath = encodeURIComponent(normalizedPath);
+    
+    return `local-video://${encodedPath}`;
   };
 
   // Define playVideo before using it in useEffect
@@ -152,34 +171,65 @@ export function useVideoPlayer(videos: Video[] = []): UseVideoPlayerReturn {
     setCurrentTime(0);
     setDuration(0);
     const source = getVideoSource(currentVideo);
-    if (source) {
-      video.src = source;
-      video.load();
-      
-      // Auto-play after video is ready to play
-      const handleCanPlay = () => {
-        if (isPlaying) {
-          video.play().catch((err) => {
-            // Ignore AbortError - it's normal when video is paused/removed
-            if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
-              console.error('Error playing video:', err);
-            }
-          });
-        }
-      };
-      
-      // Try to play when video can play
-      if (video.readyState >= 3) {
-        // Video already has enough data
-        handleCanPlay();
-      } else {
-        video.addEventListener('canplay', handleCanPlay, { once: true });
-      }
-      
-      return () => {
-        video.removeEventListener('canplay', handleCanPlay);
-      };
+    
+    if (!source) {
+      console.warn('No video source available for:', currentVideo);
+      setIsLoading(false);
+      return;
     }
+    
+    console.log('Loading video source:', source);
+    video.src = source;
+    video.load();
+    
+    // Auto-play after video is ready to play
+    const handleCanPlay = () => {
+      console.log('Video can play, isPlaying:', isPlaying);
+      if (isPlaying) {
+        video.play().catch((err) => {
+          // Ignore AbortError - it's normal when video is paused/removed
+          if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+            console.error('Error playing video:', err);
+          } else {
+            console.log('Play interrupted (normal):', err.name);
+          }
+        });
+      }
+    };
+    
+    const handleLoadedMetadata = () => {
+      console.log('Video metadata loaded');
+      setIsLoading(false);
+    };
+    
+    const handleError = (e: Event) => {
+      console.error('Video error:', e);
+      setIsLoading(false);
+      const videoEl = e.target as HTMLVideoElement;
+      if (videoEl.error) {
+        console.error('Video error details:', {
+          code: videoEl.error.code,
+          message: videoEl.error.message,
+        });
+      }
+    };
+    
+    // Try to play when video can play
+    if (video.readyState >= 3) {
+      // Video already has enough data
+      handleCanPlay();
+    } else {
+      video.addEventListener('canplay', handleCanPlay, { once: true });
+    }
+    
+    video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+    video.addEventListener('error', handleError);
+    
+    return () => {
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('error', handleError);
+    };
   }, [currentVideo, isElectron, isPlaying]);
 
   // Update volume
