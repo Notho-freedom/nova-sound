@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
-import { Minus, Square, X, Music, Copy, Settings, Cloud, Bell } from "lucide-react";
+import { Minus, Square, X, Music, Copy, Settings, Cloud, Bell, User, LogOut, Crown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useCloudSync } from "@/hooks/useCloudSync";
 import { cn } from "@/lib/utils";
 
 interface TitleBarProps {
@@ -18,10 +28,15 @@ export const TitleBar = ({
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
+  const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync();
 
   useEffect(() => {
     setIsElectron(!!window.electronAPI);
   }, []);
+
+  const handleLogout = async () => {
+    await nexusLogout();
+  };
 
   const handleMinimize = async () => {
     await window.electronAPI?.minimize();
@@ -100,6 +115,72 @@ export const TitleBar = ({
             </TooltipTrigger>
             <TooltipContent>Notifications</TooltipContent>
           </Tooltip>
+
+          {/* User Avatar */}
+          {nexusAuthenticated && nexusUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group">
+                  <Avatar className="w-6 h-6 border border-border/50">
+                    <AvatarImage src={nexusUser.photoURL || undefined} alt={nexusUser.displayName || ""} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                      {nexusUser.displayName?.charAt(0).toUpperCase() || <User className="w-3.5 h-3.5" />}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src={nexusUser.photoURL || undefined} alt={nexusUser.displayName || ""} />
+                      <AvatarFallback className="bg-primary/20 text-primary">
+                        {nexusUser.displayName?.charAt(0).toUpperCase() || <User className="w-4 h-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{nexusUser.displayName || "Utilisateur"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{nexusUser.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    {nexusIsPro ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/20 text-primary">
+                        <Crown className="w-3 h-3" />
+                        Pro
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
+                        Gratuit
+                      </span>
+                    )}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onOpenSettings} className="cursor-pointer">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Paramètres
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Se déconnecter
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onOpenSettings}
+                  className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group"
+                >
+                  <User className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Se connecter</TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Settings */}
           <Tooltip delayDuration={0}>
