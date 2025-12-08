@@ -35,5 +35,16 @@ server/*.log
 *.njsproj
 *.sln
 *.sw?
-client_secret_925746643102-12b1lokc63s21fjm3sq25dprc0embfbo.apps.googleusercontent.com.json
+# Google OAuth client secrets
+client_secret_*.json
+*client_secret*.json
+
+# Firebase Admin SDK keys (sensitive - contains private keys)
+*-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.*.json
 

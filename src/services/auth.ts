@@ -11,6 +11,7 @@ export interface UserProfile {
   storageUsed: number;
   createdAt: string;
   lastLoginAt: string;
+  isAnonymous?: boolean; // Indique si l'utilisateur est anonyme
 }
 
 export interface AuthTokens {
@@ -45,16 +46,23 @@ class AuthService {
   private googleClientId: string | null = null;
 
   constructor() {
-    // Load persisted data
+    // Load persisted data (only for manual OAuth users, not Firebase anonymous)
     this.loadFromStorage();
     
     // Check if tokens are expired
     if (this.authTokens && this.authTokens.expiresAt < Date.now()) {
       console.log("Tokens expired, attempting refresh...");
-      this.refreshAccessToken().catch((error) => {
-        console.error("Failed to refresh token:", error);
-        this.signOut();
-      });
+      // Only try to refresh if not anonymous (anonymous users don't have refresh tokens)
+      if (!this.currentUser?.isAnonymous) {
+        this.refreshAccessToken().catch((error) => {
+          console.error("Failed to refresh token:", error);
+          // If refresh fails and user is not anonymous, sign out
+          // If anonymous, just keep the anonymous user
+          if (!this.currentUser?.isAnonymous) {
+            this.signOut();
+          }
+        });
+      }
     }
   }
 
@@ -77,6 +85,8 @@ class AuthService {
       this.clearStorage();
     }
   }
+
+  // Note: Anonymous user restoration is handled by Firebase, not this service
 
   // Save data to localStorage
   private saveToStorage(): void {
@@ -423,23 +433,37 @@ class AuthService {
         }
       }
 
-      // Create or update profile
-      const profile: UserProfile = {
-        uid: userInfo.id || userInfo.sub || `user_${Date.now()}`,
-        email: userInfo.email || "",
-        displayName: userInfo.name || userInfo.email?.split("@")[0] || "Utilisateur",
-        photoURL: userInfo.picture || null,
-        plan: "free",
-        storageUsed: 0,
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-      };
+      // Check if we're linking an anonymous Firebase account
+      const linkingAnonymousUid = sessionStorage.getItem("linking_anonymous_uid");
+      
+      if (linkingAnonymousUid) {
+        // Try to link with Firebase anonymous user
+        try {
+          const { firebaseService } = await import("./firebase");
+          const firebaseUser = firebaseService.getCurrentUser();
+          
+          if (firebaseUser && firebaseUser.isAnonymous && firebaseUser.uid === linkingAnonymousUid) {
+            // Link Firebase anonymous user with Google credential
+            const linkedProfile = await firebaseService.linkWithGoogleCredential(
+              tokens.idToken || "",
+              tokens.accessToken
+            );
+            
+            sessionStorage.removeItem("linking_anonymous_uid");
+            
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            return linkedProfile;
+          }
+        } catch (linkError) {
+          console.error("Error linking with Firebase:", linkError);
+          // Fall through to create new profile
+        }
+      }
 
-      this.currentUser = profile;
-      this.saveToStorage();
-
-      // Notify listeners
-      this.authStateListeners.forEach((listener) => listener(profile));
+      // Create new Google profile (manual OAuth, not Firebase)
+      const profile = this.createGoogleProfile(userInfo, tokens);
 
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -451,10 +475,44 @@ class AuthService {
     }
   }
 
-  // Sign in with Google
+  // Note: signInAnonymously is handled by Firebase, not this service
+  // This service only handles manual Google OAuth
+
+  // Sign in with Google (or link if anonymous user exists)
   async signInWithGoogle(): Promise<void> {
+    // If there's an anonymous user, we'll link the account after OAuth
+    const isLinking = this.currentUser?.isAnonymous === true;
+    
+    if (isLinking) {
+      // Store anonymous UID to link later
+      sessionStorage.setItem("linking_anonymous_uid", this.currentUser.uid);
+    }
+
     const authUrl = await this.buildAuthUrl();
     window.location.href = authUrl;
+  }
+
+  // Create new Google profile (manual OAuth, not Firebase)
+  private createGoogleProfile(userInfo: any, tokens: AuthTokens): UserProfile {
+    const profile: UserProfile = {
+      uid: userInfo.id || userInfo.sub || `user_${Date.now()}`,
+      email: userInfo.email || "",
+      displayName: userInfo.name || userInfo.email?.split("@")[0] || "Utilisateur",
+      photoURL: userInfo.picture || null,
+      plan: "free",
+      storageUsed: 0,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+
+    this.currentUser = profile;
+    this.authTokens = tokens;
+    this.saveToStorage();
+
+    // Notify listeners
+    this.authStateListeners.forEach((listener) => listener(profile));
+
+    return profile;
   }
 
   // Sign out

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { cloudinaryService, CloudinaryConfig, UploadProgress } from "@/services/cloudinary";
 import { nexusServerService } from "@/services/nexus-server";
 import { authService, UserProfile } from "@/services/auth";
+import { firebaseService } from "@/services/firebase";
 import { stripeService } from "@/services/stripe";
 import { toast } from "sonner";
 
@@ -74,12 +75,188 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfig(config);
     setCloudinaryConfigured(cloudinaryService.isConfigured());
 
+    // Initialize Firebase anonymous user if no user is authenticated
+    // If a Google user exists locally, merge it with Firebase anonymous user
+    const initAnonymousUser = async () => {
+      try {
+        // Check Firebase first (for anonymous auth)
+        if (firebaseService.isInitialized()) {
+          const firebaseUser = firebaseService.getCurrentUser();
+          
+          // Check if there's a Google user in local storage (from manual OAuth)
+          const localGoogleUser = authService.getCurrentUser();
+          
+          if (!firebaseUser) {
+            // No Firebase user, create anonymous user
+            try {
+              const anonymousProfile = await firebaseService.signInAnonymously();
+              
+              // If there's a local Google user, merge it with the anonymous Firebase user
+              if (localGoogleUser && localGoogleUser.email) {
+                console.log("🔄 Merging local Google user with Firebase anonymous user (Google data takes priority)");
+                try {
+                  const accessToken = await authService.getAccessToken();
+                  const idToken = await authService.getIdToken();
+                  
+                  if (accessToken && idToken) {
+                    // Pass Google user data to prioritize it during merge
+                    const googleUserData = {
+                      email: localGoogleUser.email,
+                      displayName: localGoogleUser.displayName,
+                      photoURL: localGoogleUser.photoURL || undefined,
+                    };
+                    
+                  // Link Google account to anonymous Firebase user (Google data takes priority)
+                  const mergedProfile = await firebaseService.linkWithGoogleCredential(
+                    idToken, 
+                    accessToken,
+                    googleUserData
+                  );
+                  
+                  // Wait a bit for Firestore to update and Firebase listeners to trigger
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  
+                  // Get the latest profile from Firestore (to ensure we have the merged data)
+                  const latestProfile = firebaseService.getUserProfile();
+                  const profileToUse = latestProfile || mergedProfile;
+                  
+                  // Update UI with merged profile from Firestore (Google data is prioritized)
+                  setNexusUser(profileToUse);
+                  // Now authenticated because Google account is linked (not anonymous anymore)
+                  setNexusAuthenticated(true);
+                  setNexusIsPro(firebaseService.isPro());
+                  console.log("✅ Google user merged with Firebase anonymous user. Profile (Google data):", profileToUse);
+                  
+                  // Clear local Google user data (now merged in Firebase)
+                  await authService.signOut();
+                  return;
+                  }
+                } catch (mergeError: any) {
+                  console.error("Error merging Google user:", mergeError);
+                  // If merge fails, keep the anonymous user
+                  setNexusUser(anonymousProfile);
+                  setNexusAuthenticated(true);
+                  setNexusIsPro(false);
+                  return;
+                }
+              }
+              
+              setNexusUser(anonymousProfile);
+              // Anonymous user is NOT considered authenticated (only Google users are)
+              setNexusAuthenticated(false);
+              setNexusIsPro(false);
+              console.log("✅ Firebase anonymous user initialized (not authenticated - waiting for Google)");
+              return;
+            } catch (anonError: any) {
+              // Check if anonymous auth is disabled
+              if (anonError.code === "auth/admin-restricted-operation") {
+                console.warn("⚠️ Firebase Anonymous Authentication is disabled. Please enable it in Firebase Console > Authentication > Sign-in method > Anonymous");
+                // Don't show error to user, just log it
+                return;
+              }
+              throw anonError;
+            }
+          } else if (firebaseUser.isAnonymous) {
+            // Firebase anonymous user exists
+            const profile = firebaseService.getUserProfile();
+            
+            // If there's a local Google user, merge it (Google data takes priority)
+            if (localGoogleUser && localGoogleUser.email && profile) {
+              console.log("🔄 Merging local Google user with existing Firebase anonymous user (Google data takes priority)");
+              try {
+                const accessToken = await authService.getAccessToken();
+                const idToken = await authService.getIdToken();
+                
+                if (accessToken && idToken) {
+                  // Pass Google user data to prioritize it during merge
+                  const googleUserData = {
+                    email: localGoogleUser.email,
+                    displayName: localGoogleUser.displayName,
+                    photoURL: localGoogleUser.photoURL || undefined,
+                  };
+                  
+                  // Link Google account to anonymous Firebase user (Google data takes priority)
+                  const mergedProfile = await firebaseService.linkWithGoogleCredential(
+                    idToken, 
+                    accessToken,
+                    googleUserData
+                  );
+                  
+                  // Wait a bit for Firestore to update and Firebase listeners to trigger
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  
+                  // Get the latest profile from Firestore (to ensure we have the merged data)
+                  const latestProfile = firebaseService.getUserProfile();
+                  const profileToUse = latestProfile || mergedProfile;
+                  
+                  // Update UI with merged profile from Firestore (Google data is prioritized)
+                  setNexusUser(profileToUse);
+                  // Now authenticated because Google account is linked (not anonymous anymore)
+                  setNexusAuthenticated(true);
+                  setNexusIsPro(firebaseService.isPro());
+                  console.log("✅ Google user merged with Firebase anonymous user. Profile (Google data):", profileToUse);
+                  
+                  // Clear local Google user data (now merged in Firebase)
+                  await authService.signOut();
+                  return;
+                }
+              } catch (mergeError: any) {
+                console.error("Error merging Google user:", mergeError);
+                // If merge fails, use the existing anonymous profile
+              }
+            }
+            
+            // Load existing anonymous profile
+            if (profile) {
+              setNexusUser(profile);
+              // Anonymous user is NOT considered authenticated (only Google users are)
+              setNexusAuthenticated(false);
+              setNexusIsPro(false);
+              console.log("✅ Firebase anonymous user restored (not authenticated - waiting for Google)");
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing Firebase anonymous user:", error);
+        // Don't show error to user if it's just anonymous auth disabled
+        const authError = error as { code?: string };
+        if (authError.code !== "auth/admin-restricted-operation") {
+          // Only log other errors, don't show to user
+          console.warn("Could not initialize anonymous user:", error);
+        }
+      }
+    };
+
     // Handle redirect result on mount (if user just came back from Google auth)
     const initRedirect = async () => {
       try {
+        // First, check Firebase redirect (if using Firebase Google auth)
+        if (firebaseService.isInitialized()) {
+          const firebaseProfile = await firebaseService.handleRedirectResult();
+          if (firebaseProfile) {
+            setNexusUser(firebaseProfile);
+            setNexusAuthenticated(true);
+            setNexusIsPro(firebaseService.isPro());
+            
+            toast.success("Connecté avec succès", {
+              description: `Bienvenue ${firebaseProfile.displayName}!`,
+            });
+            
+            const status = await nexusServerService.getSyncStatus();
+            setSyncStatus({
+              lastSyncAt: status.lastSyncAt || null,
+              tracksUploaded: status.tracksUploaded,
+              tracksDownloaded: status.tracksDownloaded,
+            });
+            return;
+          }
+        }
+
+        // Then check manual OAuth callback
         const profile = await authService.handleCallback();
         if (profile) {
-          // User just authenticated via redirect
+          // User just authenticated via manual OAuth redirect
           setNexusUser(profile);
           setNexusAuthenticated(true);
           setNexusIsPro(authService.isPro());
@@ -96,24 +273,82 @@ export function useCloudSync(): UseCloudSyncReturn {
             tracksUploaded: status.tracksUploaded,
             tracksDownloaded: status.tracksDownloaded,
           });
+        } else {
+          // No redirect, check if we need to create anonymous user
+          await initAnonymousUser();
         }
       } catch (error) {
         console.error("Error handling redirect:", error);
+        // Try to create anonymous user on error
+        await initAnonymousUser();
       }
     };
     initRedirect();
 
-    // Subscribe to auth state changes
+    // Subscribe to Firebase auth state changes (priority - uses merged Google data from Firestore)
+    let unsubscribeFirebase: (() => void) | null = null;
+    if (firebaseService.isInitialized()) {
+      unsubscribeFirebase = firebaseService.onAuthStateChange(async (firebaseUser) => {
+        if (firebaseUser) {
+          // Always get the latest profile from Firestore (contains merged Google data with priority)
+          const profile = firebaseService.getUserProfile();
+          if (profile) {
+            const userType = firebaseUser.isAnonymous ? "Anonymous" : (firebaseUser.email || profile.displayName || "User");
+            console.log("useCloudSync: Firebase auth state changed, user:", userType, "Profile (Google data prioritized):", profile);
+            
+            // Update UI with profile from Firestore (Google data is prioritized during merge)
+            setNexusUser(profile);
+            // Only consider authenticated if user is NOT anonymous (has Google account)
+            setNexusAuthenticated(!firebaseUser.isAnonymous);
+            setNexusIsPro(firebaseService.isPro());
+            
+            // Load sync status (only for non-anonymous users)
+            if (!firebaseUser.isAnonymous) {
+              try {
+                const status = await nexusServerService.getSyncStatus();
+                setSyncStatus({
+                  lastSyncAt: status.lastSyncAt || null,
+                  tracksUploaded: status.tracksUploaded,
+                  tracksDownloaded: status.tracksDownloaded,
+                });
+              } catch (error) {
+                console.error("Error loading sync status:", error);
+                setSyncStatus({
+                  lastSyncAt: null,
+                  tracksUploaded: 0,
+                  tracksDownloaded: 0,
+                });
+              }
+            }
+          }
+        } else {
+          // Firebase user signed out
+          setNexusUser(null);
+          setNexusAuthenticated(false);
+          setNexusIsPro(false);
+          setSyncStatus({
+            lastSyncAt: null,
+            tracksUploaded: 0,
+            tracksDownloaded: 0,
+          });
+        }
+      });
+    }
+
+    // Subscribe to manual auth state changes (fallback for non-Firebase users)
     const unsubscribeAuth = authService.onAuthStateChange(async (user) => {
-      if (user) {
-        console.log("useCloudSync: Auth state changed, user:", user.email);
+      // Only handle if Firebase is not initialized or no Firebase user exists
+      if (user && (!firebaseService.isInitialized() || !firebaseService.getCurrentUser())) {
+        console.log("useCloudSync: Manual auth state changed, user:", user.email || user.displayName || "Anonymous");
         
-        // Verify token is available
-        try {
-          const token = await authService.getAccessToken();
-          console.log("useCloudSync: Token available:", token ? "✓" : "✗");
-        } catch (tokenError) {
-          console.error("useCloudSync: Error getting token:", tokenError);
+        // Verify token is available (only for non-anonymous users)
+        if (!user.isAnonymous) {
+          try {
+            const token = await authService.getAccessToken();
+            console.log("useCloudSync: Token available:", token ? "✓" : "✗");
+          } catch (tokenError) {
+            console.error("useCloudSync: Error getting token:", tokenError);
+          }
         }
         
         setNexusUser(user);
@@ -129,14 +364,14 @@ export function useCloudSync(): UseCloudSyncReturn {
           });
         }).catch((error) => {
           console.error("Error loading sync status:", error);
-          // Set default sync status on error
           setSyncStatus({
             lastSyncAt: null,
             tracksUploaded: 0,
             tracksDownloaded: 0,
           });
         });
-      } else {
+      } else if (!user && (!firebaseService.isInitialized() || !firebaseService.getCurrentUser())) {
+        // Only clear if no Firebase user exists
         setNexusUser(null);
         setNexusAuthenticated(false);
         setNexusIsPro(false);
@@ -155,6 +390,9 @@ export function useCloudSync(): UseCloudSyncReturn {
     });
 
     return () => {
+      if (unsubscribeFirebase) {
+        unsubscribeFirebase();
+      }
       unsubscribeAuth();
       unsubscribeProgress();
     };

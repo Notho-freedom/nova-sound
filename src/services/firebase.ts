@@ -7,6 +7,9 @@ import {
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
+  signInAnonymously as firebaseSignInAnonymously,
+  linkWithCredential,
+  OAuthCredential,
   User,
   Auth,
 } from "firebase/auth";
@@ -88,23 +91,33 @@ class FirebaseService {
       onAuthStateChanged(auth, async (user) => {
         this.currentUser = user;
         if (user) {
-          console.log("Auth state changed: user signed in", user.email);
+          const userType = user.isAnonymous ? "anonymous" : (user.email || "authenticated");
+          console.log("Auth state changed: user signed in", userType, user.uid);
           
-          // Verify token is available
-          try {
-            const token = await user.getIdToken();
-            console.log("Token available after auth state change:", token ? "✓" : "✗");
-          } catch (tokenError) {
-            console.error("Error getting token after auth state change:", tokenError);
+          // Verify token is available (only for non-anonymous users)
+          if (!user.isAnonymous) {
+            try {
+              const token = await user.getIdToken();
+              console.log("Token available after auth state change:", token ? "✓" : "✗");
+            } catch (tokenError) {
+              console.error("Error getting token after auth state change:", tokenError);
+            }
           }
           
+          // Load profile - this will use Firebase user data (which includes Google data after merge)
           await this.loadUserProfile(user.uid);
+          
+          // Force notify listeners with updated profile (so UI uses correct data from Firestore)
+          if (this.userProfile) {
+            // Notify with User object (for Firebase listeners)
+            this.authStateListeners.forEach((listener) => listener(user));
+          }
         } else {
           console.log("Auth state changed: user signed out");
           this.userProfile = null;
+          // Notify listeners
+          this.authStateListeners.forEach((listener) => listener(null));
         }
-        // Notify listeners
-        this.authStateListeners.forEach((listener) => listener(user));
       });
     }
   }
@@ -163,6 +176,86 @@ class FirebaseService {
     // Call immediately with current state
     callback(this.currentUser);
     return () => this.authStateListeners.delete(callback);
+  }
+
+  // Sign in anonymously (Firebase handles persistence automatically)
+  async signInAnonymously(): Promise<UserProfile> {
+    if (!auth) {
+      throw new Error("Firebase not initialized. Check your configuration.");
+    }
+
+    try {
+      const userCredential = await firebaseSignInAnonymously(auth);
+      const user = userCredential.user;
+      
+      console.log("✅ Firebase anonymous user created:", user.uid);
+      
+      // Create or update profile
+      const profile = await this.createOrUpdateProfile(user);
+      return profile;
+    } catch (error: unknown) {
+      console.error("Error signing in anonymously:", error);
+      const authError = error as { code?: string; message?: string };
+      throw new Error(authError.message || "Erreur lors de la connexion anonyme");
+    }
+  }
+
+  // Link Google account to anonymous user (using manual OAuth credential)
+  // Google data takes priority over anonymous data
+  // Step 1: Update Firebase profile with Google data BEFORE linking
+  // Step 2: Link the Google credential to the anonymous user
+  async linkWithGoogleCredential(idToken: string, accessToken: string, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
+    if (!auth || !this.currentUser) {
+      throw new Error("Firebase not initialized or no user signed in");
+    }
+
+    if (!this.currentUser.isAnonymous) {
+      throw new Error("Current user is not anonymous. Cannot link account.");
+    }
+
+    if (!googleUserData || !googleUserData.email) {
+      throw new Error("Google user data is required to link account");
+    }
+
+    try {
+      // STEP 1: Update Firebase profile with Google data BEFORE linking
+      console.log("📝 Step 1: Updating anonymous profile with Google data before linking...");
+      await this.createOrUpdateProfile(this.currentUser, googleUserData);
+      console.log("✅ Profile updated with Google data:", this.userProfile);
+      
+      // STEP 2: Link the Google credential to the anonymous user
+      console.log("🔗 Step 2: Linking Google credential to anonymous user...");
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
+      const userCredential = await linkWithCredential(this.currentUser, credential);
+      const user = userCredential.user;
+      
+      console.log("✅ Firebase anonymous user linked with Google account:", user.uid);
+      
+      // Force reload profile from Firestore to ensure we have the latest merged data
+      await this.loadUserProfile(user.uid);
+      
+      // Notify listeners with updated profile (triggers UI update)
+      this.authStateListeners.forEach((listener) => listener(user));
+      
+      // Return the updated profile
+      if (!this.userProfile) {
+        throw new Error("Failed to load user profile after merge");
+      }
+      
+      console.log("✅ Final profile with Google data:", this.userProfile);
+      return this.userProfile;
+    } catch (error: unknown) {
+      console.error("Error linking Google account:", error);
+      const authError = error as { code?: string; message?: string };
+      
+      if (authError.code === "auth/credential-already-in-use") {
+        throw new Error("Ce compte Google est déjà utilisé par un autre utilisateur.");
+      } else if (authError.code === "auth/email-already-in-use") {
+        throw new Error("Cet email est déjà utilisé par un autre compte.");
+      }
+      
+      throw new Error(authError.message || "Erreur lors de la liaison du compte");
+    }
   }
 
   // Sign in with Google
@@ -235,7 +328,10 @@ class FirebaseService {
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
-        this.userProfile = userSnap.data() as UserProfile;
+        const profileData = userSnap.data() as UserProfile;
+        // Ensure we have the latest data from Firestore
+        this.userProfile = profileData;
+        console.log("📥 Profile loaded from Firestore:", this.userProfile);
       } else {
         // Profile doesn't exist, create it from current user
         await this.createOrUpdateProfile(this.currentUser);
@@ -254,7 +350,8 @@ class FirebaseService {
   }
 
   // Create or update user profile
-  private async createOrUpdateProfile(user: User): Promise<UserProfile> {
+  // googleUserData takes priority over Firebase user data when provided
+  private async createOrUpdateProfile(user: User, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
     if (!db) {
       throw new Error("Firestore not initialized");
     }
@@ -262,28 +359,52 @@ class FirebaseService {
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
 
+    // Priority: googleUserData > user (Firebase) > existing profile
+    const email = googleUserData?.email || user.email || "";
+    const displayName = googleUserData?.displayName || user.displayName || 
+      (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
+    const photoURL = googleUserData?.photoURL || user.photoURL || null;
+
     if (userSnap.exists()) {
-      // Update last login
+      // Update last login and merge data (Google data takes priority)
       const existingProfile = userSnap.data() as UserProfile;
-      await updateDoc(userRef, {
+      
+      // Merge: Google data > Firebase user data > existing profile data
+      // Firestore doesn't accept undefined, so we need to filter it out or use null
+      const mergedProfile: Partial<UserProfile> = {
         lastLoginAt: new Date().toISOString(),
-        displayName: user.displayName || existingProfile.displayName,
-        photoURL: user.photoURL || existingProfile.photoURL,
-      });
+        // Google data takes priority
+        ...(email && { email }),
+        ...(displayName && { displayName }),
+        ...(photoURL !== null && { photoURL }),
+        // Keep existing plan and subscription if not provided
+        plan: existingProfile.plan || "free",
+        storageUsed: existingProfile.storageUsed || 0,
+      };
+      
+      // Only include subscriptionStatus if it exists and is not undefined
+      if (existingProfile.subscriptionStatus !== undefined && existingProfile.subscriptionStatus !== null) {
+        mergedProfile.subscriptionStatus = existingProfile.subscriptionStatus;
+      }
+      
+      // Remove undefined values (Firestore doesn't accept them)
+      const cleanedProfile = Object.fromEntries(
+        Object.entries(mergedProfile).filter(([_, v]) => v !== undefined)
+      ) as Partial<UserProfile>;
+      
+      await updateDoc(userRef, cleanedProfile);
       
       this.userProfile = {
         ...existingProfile,
-        lastLoginAt: new Date().toISOString(),
-        displayName: user.displayName || existingProfile.displayName,
-        photoURL: user.photoURL || existingProfile.photoURL,
+        ...cleanedProfile,
       };
     } else {
-      // Create new profile
+      // Create new profile with Google data priority
       const newProfile: UserProfile = {
         uid: user.uid,
-        email: user.email || "",
-        displayName: user.displayName || "Utilisateur",
-        photoURL: user.photoURL,
+        email,
+        displayName,
+        photoURL,
         plan: "free",
         storageUsed: 0,
         createdAt: new Date().toISOString(),
@@ -294,7 +415,7 @@ class FirebaseService {
       this.userProfile = newProfile;
     }
 
-    return this.userProfile;
+    return this.userProfile!;
   }
 
   // Update user profile
