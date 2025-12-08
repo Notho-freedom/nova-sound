@@ -9,6 +9,8 @@ interface UseVideosReturn {
   error: string | null;
   scanVideos: (directories?: string[]) => Promise<void>;
   selectVideoFolders: () => Promise<string[]>;
+  addVideoFiles: (filePaths: string[]) => Promise<void>;
+  addVideoFromUrl: (url: string, title?: string) => Promise<void>;
   refreshVideos: () => Promise<void>;
 }
 
@@ -33,10 +35,12 @@ export function useVideos(): UseVideosReturn {
 
       try {
         const videoLibrary = await window.electronAPI!.getVideos();
-        setVideos(videoLibrary);
+        console.log("Loaded videos from Electron:", videoLibrary);
+        setVideos(videoLibrary || []);
       } catch (err) {
         console.error("Failed to load videos:", err);
         setError("Erreur lors du chargement des vidéos");
+        setVideos([]);
       } finally {
         setLoading(false);
       }
@@ -45,21 +49,40 @@ export function useVideos(): UseVideosReturn {
     loadVideos();
   }, [isElectron]);
 
-  // Listen for scan progress
+  // Listen for scan progress and video updates
   useEffect(() => {
     if (!isElectron) return;
 
-    const unsubscribe = window.electronAPI!.onVideoScanProgress((progress) => {
+    const unsubscribeProgress = window.electronAPI!.onVideoScanProgress((progress) => {
       setScanProgress(progress);
+      setScanning(progress.phase !== "complete" && progress.phase !== "indexing");
       if (progress.phase === "complete") {
         setScanning(false);
         setScanProgress(null);
-        // Reload videos after scan
-        window.electronAPI!.getVideos().then(setVideos);
+        // Reload videos after scan to ensure we have all videos
+        window.electronAPI!.getVideos().then(setVideos).catch(console.error);
       }
     });
 
-    return unsubscribe;
+    const unsubscribeAdded = window.electronAPI!.onVideoAdded((video) => {
+      setVideos((prev) => {
+        // Prevent duplicates
+        if (prev.some(v => v.id === video.id || v.filePath === video.filePath)) {
+          return prev;
+        }
+        return [...prev, video];
+      });
+    });
+
+    const unsubscribeRemoved = window.electronAPI!.onVideoRemoved((filePath) => {
+      setVideos((prev) => prev.filter((v) => v.filePath !== filePath));
+    });
+
+    return () => {
+      unsubscribeProgress();
+      unsubscribeAdded();
+      unsubscribeRemoved();
+    };
   }, [isElectron]);
 
   // Select video folders
@@ -122,6 +145,36 @@ export function useVideos(): UseVideosReturn {
     }
   }, [isElectron, selectVideoFolders]);
 
+  // Add video files
+  const addVideoFiles = useCallback(async (filePaths: string[]) => {
+    if (!isElectron || filePaths.length === 0) return;
+
+    try {
+      await window.electronAPI!.addVideoFiles?.(filePaths);
+      // Refresh videos list
+      const videoLibrary = await window.electronAPI!.getVideos();
+      setVideos(videoLibrary);
+    } catch (err) {
+      console.error("Failed to add video files:", err);
+      setError("Erreur lors de l'ajout des vidéos");
+    }
+  }, [isElectron]);
+
+  // Add video from URL
+  const addVideoFromUrl = useCallback(async (url: string, title?: string) => {
+    if (!isElectron || !url.trim()) return;
+
+    try {
+      await window.electronAPI!.addVideoFromUrl?.(url, title);
+      // Refresh videos list
+      const videoLibrary = await window.electronAPI!.getVideos();
+      setVideos(videoLibrary);
+    } catch (err) {
+      console.error("Failed to add video from URL:", err);
+      setError("Erreur lors de l'ajout de la vidéo depuis l'URL");
+    }
+  }, [isElectron]);
+
   // Refresh videos
   const refreshVideos = useCallback(async () => {
     if (!isElectron) return;
@@ -146,6 +199,8 @@ export function useVideos(): UseVideosReturn {
     error,
     scanVideos,
     selectVideoFolders,
+    addVideoFiles,
+    addVideoFromUrl,
     refreshVideos,
   };
 }

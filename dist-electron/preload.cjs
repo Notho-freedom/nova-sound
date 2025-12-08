@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   openFile: (filters) =>
     ipcRenderer.invoke('dialog:openFile', filters),
+  openVideoFile: (multiSelect) =>
+    ipcRenderer.invoke('dialog:openVideoFile', multiSelect),
 
   // Audio library
   scanLibrary: (directories) => ipcRenderer.invoke('library:scan', directories),
@@ -24,10 +26,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Video library
   scanVideos: (directories) => ipcRenderer.invoke('videos:scan', directories),
   getVideos: () => ipcRenderer.invoke('videos:get'),
+  getVideo: (videoId) => ipcRenderer.invoke('videos:getVideo', videoId),
+  updateVideoMetadata: (videoId, metadata) => ipcRenderer.invoke('videos:updateMetadata', videoId, metadata),
+  addVideoFiles: (filePaths) => ipcRenderer.invoke('videos:addFiles', filePaths),
+  addVideoFromUrl: (url, title) => ipcRenderer.invoke('videos:addFromUrl', url, title),
   onVideoScanProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('videos:scan-progress', listener);
     return () => ipcRenderer.removeListener('videos:scan-progress', listener);
+  },
+  onVideoAdded: (callback) => {
+    const listener = (_event, video) => callback(video);
+    ipcRenderer.on('videos:new', listener);
+    return () => ipcRenderer.removeListener('videos:new', listener);
+  },
+  onVideoRemoved: (callback) => {
+    const listener = (_event, filePath) => callback(filePath);
+    ipcRenderer.on('videos:removed', listener);
+    return () => ipcRenderer.removeListener('videos:removed', listener);
   },
 
   // Track metadata
@@ -87,6 +103,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fileExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   getAudioDuration: (filePath) => ipcRenderer.invoke('audio:duration', filePath),
   readFileAsBase64: (filePath) => ipcRenderer.invoke('file:readAsBase64', filePath),
+  openPath: (filePath) => ipcRenderer.invoke('fs:openPath', filePath),
 });
 
 console.log('Preload script loaded successfully');

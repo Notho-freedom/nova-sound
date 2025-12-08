@@ -445,7 +445,13 @@ class FirebaseSyncService {
   // Helper methods for localStorage
   private saveToLocalStorage<T>(key: string, value: T): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      // For string values (like theme), save as plain string to match useTheme.ts behavior
+      // For complex objects, save as JSON
+      if (typeof value === 'string') {
+        localStorage.setItem(key, value);
+      } else {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
     } catch (error) {
       console.error(`Error saving to localStorage (${key}):`, error);
     }
@@ -454,7 +460,16 @@ class FirebaseSyncService {
   private loadFromLocalStorage<T>(key: string): T | null {
     try {
       const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : null;
+      if (!item) return null;
+      
+      // Try to parse as JSON first
+      try {
+        return JSON.parse(item) as T;
+      } catch {
+        // If parsing fails, it might be a plain string (like "dark" for theme)
+        // Return it as-is if it's a string value
+        return item as unknown as T;
+      }
     } catch (error) {
       console.error(`Error loading from localStorage (${key}):`, error);
       return null;

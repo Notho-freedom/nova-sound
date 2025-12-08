@@ -10,12 +10,16 @@ import {
   Film,
   Plus,
   Search,
-  X
+  X,
+  FileVideo,
+  Link,
+  Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useVideos } from "@/hooks/useVideos";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import type { Video } from "@/types/music";
 
 const formatTime = (seconds: number) => {
@@ -36,10 +40,16 @@ const formatSize = (bytes: number) => {
 };
 
 export const VideosView = () => {
-  const { videos, loading } = useVideos();
+  const { videos, loading, error, addVideoFiles, addVideoFromUrl, selectVideoFolders, scanVideos } = useVideos();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showUrlDialog, setShowUrlDialog] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [urlTitle, setUrlTitle] = useState("");
+
+  // Debug: log videos
+  console.log("VideosView - videos:", videos, "loading:", loading, "error:", error);
 
   const displayVideos = useMemo(() => {
     if (!searchQuery.trim()) return videos;
@@ -52,48 +62,37 @@ export const VideosView = () => {
 
   // Video Player View
   if (selectedVideo) {
-    return (
-      <div className="h-full flex flex-col animate-in fade-in duration-300">
-        <div className="p-4 border-b border-border/30">
-          <button
-            onClick={() => setSelectedVideo(null)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            ← Retour aux vidéos
-          </button>
-        </div>
-        
-        <div className="flex-1 flex items-center justify-center p-6 bg-black">
-          <div className="w-full max-w-4xl aspect-video bg-muted rounded-lg flex items-center justify-center">
-            <div className="text-center">
-              <Film className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg font-medium mb-2">{selectedVideo.title}</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Lecteur vidéo en développement
-              </p>
-              <Button onClick={() => setSelectedVideo(null)}>
-                Fermer
-              </Button>
-            </div>
-          </div>
-        </div>
+    const currentIndex = displayVideos.findIndex(v => v.id === selectedVideo.id);
+    const handleNext = () => {
+      if (currentIndex >= 0 && currentIndex < displayVideos.length - 1) {
+        setSelectedVideo(displayVideos[currentIndex + 1]);
+      }
+    };
+    const handlePrevious = () => {
+      if (currentIndex > 0) {
+        setSelectedVideo(displayVideos[currentIndex - 1]);
+      }
+    };
+    const handleOpenFolder = async () => {
+      if (window.electronAPI && selectedVideo.filePath) {
+        const path = require('path');
+        const folderPath = path.dirname(selectedVideo.filePath);
+        await window.electronAPI.openPath?.(folderPath);
+      }
+    };
 
-        <div className="p-4 border-t border-border/30 bg-card/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium">{selectedVideo.title}</h3>
-              <p className="text-sm text-muted-foreground">
-                {selectedVideo.duration > 0 ? formatTime(selectedVideo.duration) : "-"} • {formatSize(selectedVideo.fileSize)}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <FolderOpen className="w-4 h-4 mr-2" />
-                Ouvrir le dossier
-              </Button>
-            </div>
-          </div>
-        </div>
+    return (
+      <div className="h-full flex flex-col animate-in fade-in duration-300 bg-black">
+        <VideoPlayer
+          video={selectedVideo}
+          videos={displayVideos}
+          onClose={() => setSelectedVideo(null)}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          className="flex-1"
+          showControls={true}
+          autoPlay={true}
+        />
       </div>
     );
   }
@@ -154,51 +153,169 @@ export const VideosView = () => {
             )}
           </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-muted-foreground">Chargement des vidéos...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+            <Video className="w-10 h-10 text-destructive" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">Erreur</h3>
+          <p className="text-muted-foreground text-sm max-w-md mb-6">{error}</p>
+        </div>
+      )}
+
       {/* Empty State */}
-      {!loading && displayVideos.length === 0 && (
+      {!loading && !error && displayVideos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
             <Video className="w-10 h-10 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium mb-2">Aucune vidéo</h3>
           <p className="text-muted-foreground text-sm max-w-md mb-6">
-            Ajoutez des dossiers contenant des vidéos dans les paramètres pour les voir ici.
+            Ajoutez des vidéos depuis votre ordinateur ou une URL pour commencer.
           </p>
 
-          {/* Feature Preview */}
-          <div className="mt-12 p-6 rounded-xl bg-card/30 border border-border/30 max-w-lg">
-            <h4 className="font-medium mb-3 flex items-center gap-2">
-              <Film className="w-5 h-5 text-primary" />
-              Fonctionnalités vidéo (bientôt)
-            </h4>
-            <ul className="space-y-2 text-sm text-muted-foreground text-left">
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Support MP4, MKV, WebM, AVI
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Génération automatique des vignettes
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Lecteur vidéo intégré avec contrôles
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Organisation par dossier
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Plein écran et picture-in-picture
-              </li>
-            </ul>
+          {/* Action Buttons */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 max-w-2xl w-full px-4">
+            <Button
+              onClick={async () => {
+                const folders = await selectVideoFolders();
+                if (folders.length > 0) {
+                  await scanVideos(folders);
+                }
+              }}
+              className="flex-1"
+              size="lg"
+            >
+              <FolderOpen className="w-5 h-5 mr-2" />
+              Ouvrir un dossier
+            </Button>
+            
+            <Button
+              onClick={async () => {
+                if (window.electronAPI?.openVideoFile) {
+                  const files = await window.electronAPI.openVideoFile(false);
+                  if (files.length > 0) {
+                    await addVideoFiles(files);
+                  }
+                }
+              }}
+              variant="outline"
+              className="flex-1"
+              size="lg"
+            >
+              <FileVideo className="w-5 h-5 mr-2" />
+              Ouvrir un fichier
+            </Button>
+            
+            <Button
+              onClick={async () => {
+                if (window.electronAPI?.openVideoFile) {
+                  const files = await window.electronAPI.openVideoFile(true);
+                  if (files.length > 0) {
+                    await addVideoFiles(files);
+                  }
+                }
+              }}
+              variant="outline"
+              className="flex-1"
+              size="lg"
+            >
+              <Upload className="w-5 h-5 mr-2" />
+              Ouvrir des fichiers
+            </Button>
+            
+            <Button
+              onClick={() => setShowUrlDialog(true)}
+              variant="outline"
+              className="flex-1"
+              size="lg"
+            >
+              <Link className="w-5 h-5 mr-2" />
+              Depuis une URL
+            </Button>
           </div>
         </div>
       )}
 
+      {/* URL Dialog */}
+      {showUrlDialog && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Ajouter une vidéo depuis une URL</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">URL de la vidéo</label>
+                <Input
+                  type="url"
+                  placeholder="https://example.com/video.mp4"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Titre (optionnel)</label>
+                <Input
+                  type="text"
+                  placeholder="Titre de la vidéo"
+                  value={urlTitle}
+                  onChange={(e) => setUrlTitle(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowUrlDialog(false);
+                  setUrlInput("");
+                  setUrlTitle("");
+                }}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (urlInput.trim()) {
+                    await addVideoFromUrl(urlInput.trim(), urlTitle.trim() || undefined);
+                    setShowUrlDialog(false);
+                    setUrlInput("");
+                    setUrlTitle("");
+                  }
+                }}
+                disabled={!urlInput.trim()}
+                className="flex-1"
+              >
+                Ajouter
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="p-4 bg-muted/30 rounded-lg text-xs font-mono">
+          <p>Videos count: {videos.length}</p>
+          <p>Display videos count: {displayVideos.length}</p>
+          <p>Loading: {loading ? 'true' : 'false'}</p>
+          <p>Error: {error || 'none'}</p>
+        </div>
+      )}
+
       {/* Video Grid */}
-      {displayVideos.length > 0 && viewMode === "grid" && (
+      {!loading && !error && displayVideos.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {displayVideos.map((video) => (
             <button
@@ -237,7 +354,7 @@ export const VideosView = () => {
       )}
 
       {/* Video List */}
-      {displayVideos.length > 0 && viewMode === "list" && (
+      {!loading && !error && displayVideos.length > 0 && viewMode === "list" && (
         <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 relative">
           <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
             <table className="w-full">

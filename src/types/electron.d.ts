@@ -22,6 +22,7 @@ export interface ElectronAPI {
   // File dialogs
   openDirectory: () => Promise<string[]>;
   openFile: (filters?: { name: string; extensions: string[] }[]) => Promise<string[]>;
+  openVideoFile?: (multiSelect?: boolean) => Promise<string[]>;
 
   // Audio library
   scanLibrary: (directories: string[]) => Promise<void>;
@@ -29,9 +30,15 @@ export interface ElectronAPI {
   onScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
 
   // Video library
-  scanVideos: (directories: string[]) => Promise<void>;
+  scanVideos: (directories: string[]) => Promise<Video[]>;
   getVideos: () => Promise<Video[]>;
+  getVideo?: (videoId: string) => Promise<Video | null>;
+  updateVideoMetadata?: (videoId: string, metadata: Partial<Video>) => Promise<Video | null>;
+  addVideoFiles?: (filePaths: string[]) => Promise<Video[]>;
+  addVideoFromUrl?: (url: string, title?: string) => Promise<Video>;
   onVideoScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
+  onVideoAdded: (callback: (video: Video) => void) => () => void;
+  onVideoRemoved: (callback: (filePath: string) => void) => () => void;
 
   // Track metadata
   getTrackMetadata: (filePath: string) => Promise<TrackMetadata>;
@@ -81,6 +88,7 @@ export interface ElectronAPI {
   fileExists: (filePath: string) => Promise<boolean>;
   getAudioDuration: (filePath: string) => Promise<number>;
   readFileAsBase64: (filePath: string) => Promise<string>;
+  openPath?: (filePath: string) => Promise<void>;
 }
 
 declare global {

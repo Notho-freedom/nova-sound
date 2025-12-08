@@ -263,6 +263,16 @@ class Storage {
     await this.saveVideos(filtered);
   }
 
+  async updateVideoByPath(filePath: string, video: Partial<StoredVideo>): Promise<void> {
+    const videos = await this.getVideos();
+    const index = videos.findIndex(v => v.filePath === filePath);
+    
+    if (index >= 0) {
+      videos[index] = { ...videos[index], ...video };
+      await this.saveVideos(videos);
+    }
+  }
+
   // Artwork
   async saveArtwork(artwork: ArtworkData, sourceFilePath: string): Promise<string> {
     await ensureDir(ARTWORK_DIR);

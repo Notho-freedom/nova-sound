@@ -44,3 +44,28 @@ export function getAudioSrc(filePath?: string): string | null {
   return `local-audio://${encodedPath}`;
 }
 
+/**
+ * Get video source URL for playback
+ * Handles both local files (Electron) and web URLs
+ */
+export function getVideoSrc(filePath?: string): string | null {
+  if (!filePath) return null;
+  
+  // Check if it's already a URL
+  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {
+    return filePath;
+  }
+  
+  // Check if already using local-video protocol
+  if (filePath.startsWith('local-video://')) {
+    return filePath;
+  }
+  
+  // Local file path - convert to local-video:// URL for Electron
+  // This uses our custom protocol registered in main.ts
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const encodedPath = encodeURIComponent(normalizedPath);
+  
+  return `local-video://${encodedPath}`;
+}
+

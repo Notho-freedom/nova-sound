@@ -159,7 +159,20 @@ async function scanVideos(directories) {
             phase: 'indexing',
         });
         if (allVideos.length > 0) {
+            console.log(`Adding ${allVideos.length} videos to storage`);
             await storage.addVideos(allVideos);
+            console.log('Videos added to storage successfully');
+            // Notify renderer of all new videos
+            const windows = BrowserWindow.getAllWindows();
+            allVideos.forEach(video => {
+                windows.forEach(window => {
+                    window.webContents.send('videos:new', video);
+                });
+            });
+            console.log(`Sent ${allVideos.length} video:new events to renderer`);
+        }
+        else {
+            console.log('No new videos to add');
         }
         sendProgress({
             current: allVideos.length,
@@ -233,10 +246,23 @@ export function initVideoScanner() {
         return videos;
     });
     ipcMain.handle('videos:get', async () => {
-        return storage.getVideos();
+        const storedVideos = await storage.getVideos();
+        // Convert StoredVideo to Video format (remove lastModified if needed, ensure format is optional)
+        return storedVideos.map(({ lastModified, ...video }) => ({
+            ...video,
+            format: video.format || path.extname(video.filePath).substring(1),
+        }));
     });
     ipcMain.handle('videos:getVideo', async (_event, videoId) => {
         return storage.getVideo(videoId);
+    });
+    ipcMain.handle('videos:updateMetadata', async (_event, videoId, metadata) => {
+        const video = await storage.getVideo(videoId);
+        if (!video)
+            return null;
+        const updated = { ...video, ...metadata };
+        await storage.updateVideoByPath(video.filePath, updated);
+        return updated;
     });
     ipcMain.handle('videos:rescan', async () => {
         const settings = await storage.getSettings();
@@ -244,6 +270,51 @@ export function initVideoScanner() {
             return scanVideos(settings.videoDirectories);
         }
         return [];
+    });
+    // Add videos from file paths
+    ipcMain.handle('videos:addFiles', async (_event, filePaths) => {
+        const newVideos = [];
+        const existingVideos = await storage.getVideos();
+        const existingPaths = new Set(existingVideos.map(v => v.filePath));
+        for (const filePath of filePaths) {
+            if (isVideoFile(filePath) && !existingPaths.has(filePath)) {
+                const video = await processVideoFile(filePath);
+                if (video) {
+                    newVideos.push(video);
+                }
+            }
+        }
+        if (newVideos.length > 0) {
+            await storage.addVideos(newVideos);
+            // Notify renderer
+            const windows = BrowserWindow.getAllWindows();
+            newVideos.forEach(video => {
+                windows.forEach(window => {
+                    window.webContents.send('videos:new', video);
+                });
+            });
+        }
+        return newVideos;
+    });
+    // Add video from URL
+    ipcMain.handle('videos:addFromUrl', async (_event, url, title) => {
+        const video = {
+            id: uuidv4(),
+            filePath: url, // Store URL as filePath for web videos
+            title: title || `Vidéo depuis URL`,
+            duration: 0,
+            format: 'url',
+            fileSize: 0,
+            addedAt: new Date().toISOString(),
+            lastModified: new Date().toISOString(),
+        };
+        await storage.addVideos([video]);
+        // Notify renderer
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(window => {
+            window.webContents.send('videos:new', video);
+        });
+        return video;
     });
 }
 export { scanVideos, startWatching, stopWatching };

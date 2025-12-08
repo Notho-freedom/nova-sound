@@ -109,6 +109,16 @@ ipcMain.handle('dialog:openFile', async (_event, filters) => {
     });
     return result.filePaths;
 });
+// Video file dialog
+ipcMain.handle('dialog:openVideoFile', async (_event, multiSelect = false) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: multiSelect ? ['openFile', 'multiSelections'] : ['openFile'],
+        filters: [
+            { name: 'Video Files', extensions: ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'ogv'] },
+        ],
+    });
+    return result.filePaths;
+});
 // Read file as base64 for blob creation
 ipcMain.handle('file:readAsBase64', async (_event, filePath) => {
     try {
@@ -128,6 +138,16 @@ ipcMain.handle('dialog:openPlaylist', async () => {
         ],
     });
     return result.filePaths;
+});
+// Open file/folder in system file manager
+ipcMain.handle('fs:openPath', async (_event, filePath) => {
+    try {
+        shell.showItemInFolder(filePath);
+    }
+    catch (error) {
+        console.error('Failed to open path:', filePath, error);
+        throw error;
+    }
 });
 // Register custom protocol for local audio files
 function registerLocalAudioProtocol() {
@@ -160,10 +180,44 @@ function registerLocalAudioProtocol() {
         }
     });
 }
+// Register custom protocol for local video files
+function registerLocalVideoProtocol() {
+    protocol.handle('local-video', async (request) => {
+        const filePath = decodeURIComponent(request.url.replace('local-video://', ''));
+        try {
+            const data = fs.readFileSync(filePath);
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes = {
+                '.mp4': 'video/mp4',
+                '.avi': 'video/x-msvideo',
+                '.mkv': 'video/x-matroska',
+                '.mov': 'video/quicktime',
+                '.wmv': 'video/x-ms-wmv',
+                '.flv': 'video/x-flv',
+                '.webm': 'video/webm',
+                '.m4v': 'video/mp4',
+                '.3gp': 'video/3gpp',
+                '.ogv': 'video/ogg',
+            };
+            return new Response(data, {
+                headers: {
+                    'Content-Type': mimeTypes[ext] || 'video/mp4',
+                    'Content-Length': data.length.toString(),
+                    'Accept-Ranges': 'bytes',
+                },
+            });
+        }
+        catch (error) {
+            console.error('Failed to load video file:', filePath, error);
+            return new Response('File not found', { status: 404 });
+        }
+    });
+}
 // App lifecycle
 app.whenReady().then(async () => {
-    // Register custom protocol
+    // Register custom protocols
     registerLocalAudioProtocol();
+    registerLocalVideoProtocol();
     // Initialize storage and services
     await storage.init();
     initServices();

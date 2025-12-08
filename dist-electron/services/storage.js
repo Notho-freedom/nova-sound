@@ -150,6 +150,14 @@ class Storage {
         const filtered = videos.filter(v => v.filePath !== filePath);
         await this.saveVideos(filtered);
     }
+    async updateVideoByPath(filePath, video) {
+        const videos = await this.getVideos();
+        const index = videos.findIndex(v => v.filePath === filePath);
+        if (index >= 0) {
+            videos[index] = { ...videos[index], ...video };
+            await this.saveVideos(videos);
+        }
+    }
     // Artwork
     async saveArtwork(artwork, sourceFilePath) {
         await ensureDir(ARTWORK_DIR);
