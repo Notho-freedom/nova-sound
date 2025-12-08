@@ -74,10 +74,50 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfig(config);
     setCloudinaryConfigured(cloudinaryService.isConfigured());
 
+    // Handle redirect result on mount (if user just came back from Google auth)
+    const initRedirect = async () => {
+      try {
+        const profile = await firebaseService.handleRedirectResult();
+        if (profile) {
+          // User just authenticated via redirect
+          setNexusUser(profile);
+          setNexusAuthenticated(true);
+          setNexusIsPro(firebaseService.isPro());
+          
+          // Show success message
+          toast.success("Connecté avec succès", {
+            description: `Bienvenue ${profile.displayName}!`,
+          });
+          
+          // Load sync status
+          const status = await nexusServerService.getSyncStatus();
+          setSyncStatus({
+            lastSyncAt: status.lastSyncAt || null,
+            tracksUploaded: status.tracksUploaded,
+            tracksDownloaded: status.tracksDownloaded,
+          });
+        }
+      } catch (error) {
+        console.error("Error handling redirect:", error);
+      }
+    };
+    initRedirect();
+
     // Subscribe to Firebase auth state changes
-    const unsubscribeAuth = firebaseService.onAuthStateChange((user) => {
+    const unsubscribeAuth = firebaseService.onAuthStateChange(async (user) => {
       if (user) {
-        const profile = firebaseService.getUserProfile();
+        // Wait a bit for profile to be loaded from Firestore
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Get profile - if not loaded yet, wait a bit more
+        let profile = firebaseService.getUserProfile();
+        let retries = 0;
+        while (!profile && retries < 5) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          profile = firebaseService.getUserProfile();
+          retries++;
+        }
+        
         setNexusUser(profile);
         setNexusAuthenticated(true);
         setNexusIsPro(firebaseService.isPro());

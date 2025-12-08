@@ -56,6 +56,10 @@ if (isConfigValid) {
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope("profile");
 googleProvider.addScope("email");
+// Set custom parameters for better redirect handling
+googleProvider.setCustomParameters({
+  prompt: "select_account",
+});
 
 // User profile interface
 export interface UserProfile {
@@ -81,9 +85,6 @@ class FirebaseService {
   constructor() {
     // Listen for auth state changes
     if (auth) {
-      // Check for redirect result on initialization
-      this.handleRedirectResult();
-
       onAuthStateChanged(auth, async (user) => {
         this.currentUser = user;
         if (user) {
@@ -97,18 +98,22 @@ class FirebaseService {
     }
   }
 
-  // Handle redirect result after Google sign-in
-  private async handleRedirectResult(): Promise<void> {
-    if (!auth) return;
+  // Handle redirect result after Google sign-in (call this on app initialization)
+  async handleRedirectResult(): Promise<UserProfile | null> {
+    if (!auth) return null;
 
     try {
       const result = await getRedirectResult(auth);
       if (result && result.user) {
-        await this.createOrUpdateProfile(result.user);
+        const profile = await this.createOrUpdateProfile(result.user);
+        // Force notify listeners
+        this.authStateListeners.forEach((listener) => listener(result.user));
+        return profile;
       }
     } catch (error) {
       console.error("Error handling redirect result:", error);
     }
+    return null;
   }
 
   // Check if Firebase is initialized
@@ -134,35 +139,37 @@ class FirebaseService {
     return () => this.authStateListeners.delete(callback);
   }
 
-  // Sign in with Google (uses redirect to avoid popup blocking)
+  // Sign in with Google
   async signInWithGoogle(): Promise<void> {
     if (!auth) {
       throw new Error("Firebase not initialized. Check your configuration.");
     }
 
+    // Check if we're in Electron (better to use popup in Electron)
+    const isElectron = typeof window !== "undefined" && window.electronAPI;
+
     try {
-      // Try popup first (better UX if it works)
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-        await this.createOrUpdateProfile(user);
-        return;
-      } catch (popupError: unknown) {
-        // If popup is blocked or fails, fallback to redirect
-        const error = popupError as { code?: string; message?: string };
-        if (
-          error.code === "auth/popup-blocked" ||
-          error.code === "auth/popup-closed-by-user" ||
-          error.code === "auth/cancelled-popup-request"
-        ) {
-          console.log("Popup blocked or cancelled, using redirect...");
-          // Use redirect instead
-          await signInWithRedirect(auth, googleProvider);
-          // The redirect will happen, and handleRedirectResult will process it
+      if (isElectron) {
+        // In Electron, always use popup (works better)
+        try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const user = result.user;
+          await this.createOrUpdateProfile(user);
           return;
+        } catch (popupError: unknown) {
+          const error = popupError as { code?: string; message?: string };
+          if (error.code === "auth/popup-blocked") {
+            // Fallback to redirect in Electron if popup is blocked
+            await signInWithRedirect(auth, googleProvider);
+            return;
+          }
+          throw popupError;
         }
-        // Re-throw other errors
-        throw popupError;
+      } else {
+        // In browser, use redirect (more reliable, avoids popup blocking)
+        await signInWithRedirect(auth, googleProvider);
+        // The redirect will happen, handleRedirectResult will process it on return
+        return;
       }
     } catch (error: unknown) {
       console.error("Google sign in error:", error);
@@ -171,13 +178,11 @@ class FirebaseService {
       if (authError.code === "auth/popup-closed-by-user") {
         throw new Error("Connexion annulée");
       } else if (authError.code === "auth/popup-blocked") {
-        // This shouldn't happen now as we use redirect, but just in case
-        throw new Error("Popup bloqué. Utilisation de la redirection...");
+        // Fallback to redirect
+        await signInWithRedirect(auth, googleProvider);
+        return;
       } else if (authError.code === "auth/network-request-failed") {
         throw new Error("Erreur réseau. Vérifiez votre connexion.");
-      } else if (authError.code === "auth/cancelled-popup-request") {
-        // Multiple popup requests, redirect will be used
-        return;
       }
       
       throw new Error(authError.message || "Erreur d'authentification");
@@ -197,7 +202,7 @@ class FirebaseService {
 
   // Load user profile from Firestore
   private async loadUserProfile(uid: string): Promise<void> {
-    if (!db) return;
+    if (!db || !this.currentUser) return;
 
     try {
       const userRef = doc(db, "users", uid);
@@ -205,9 +210,20 @@ class FirebaseService {
 
       if (userSnap.exists()) {
         this.userProfile = userSnap.data() as UserProfile;
+      } else {
+        // Profile doesn't exist, create it from current user
+        await this.createOrUpdateProfile(this.currentUser);
       }
     } catch (error) {
       console.error("Error loading user profile:", error);
+      // If loading fails, try to create profile from current user
+      if (this.currentUser) {
+        try {
+          await this.createOrUpdateProfile(this.currentUser);
+        } catch (createError) {
+          console.error("Error creating profile:", createError);
+        }
+      }
     }
   }
 
