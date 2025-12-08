@@ -3,7 +3,10 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { watch } from 'chokidar';
 import { v4 as uuidv4 } from 'uuid';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { storage } from './storage.js';
+const execAsync = promisify(exec);
 // Supported video formats
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ogv'];
 let watcher = null;
@@ -55,6 +58,53 @@ async function getFileStats(filePath) {
     }
 }
 /**
+ * Generate thumbnail for video using ffmpeg
+ */
+async function generateThumbnail(filePath) {
+    try {
+        // Check if thumbnail already exists
+        const existingThumbnail = await storage.getThumbnailPath(filePath);
+        if (existingThumbnail) {
+            return existingThumbnail;
+        }
+        // Try to use ffmpeg to extract a frame
+        // Extract frame at 1 second (or 10% of duration if available)
+        const thumbnailPath = path.join(path.dirname(filePath), `temp_thumb_${Date.now()}.jpg`);
+        try {
+            // Try ffmpeg command
+            await execAsync(`ffmpeg -i "${filePath}" -ss 00:00:01 -vframes 1 -vf "scale=320:-1" "${thumbnailPath}"`);
+            // Read the generated thumbnail
+            const thumbnailData = await fs.readFile(thumbnailPath);
+            // Save to storage
+            const savedUrl = await storage.saveThumbnail(thumbnailData, filePath);
+            // Clean up temp file
+            try {
+                await fs.unlink(thumbnailPath);
+            }
+            catch {
+                // Ignore cleanup errors
+            }
+            return savedUrl;
+        }
+        catch (ffmpegError) {
+            // ffmpeg not available or failed
+            console.log(`ffmpeg not available for ${filePath}, skipping thumbnail generation`);
+            // Clean up temp file if it exists
+            try {
+                await fs.unlink(thumbnailPath);
+            }
+            catch {
+                // Ignore cleanup errors
+            }
+            return null;
+        }
+    }
+    catch (error) {
+        console.error(`Error generating thumbnail for ${filePath}:`, error);
+        return null;
+    }
+}
+/**
  * Extract basic video metadata (simplified - could use ffprobe in the future)
  */
 async function extractVideoMetadata(filePath) {
@@ -62,9 +112,12 @@ async function extractVideoMetadata(filePath) {
     // In the future, this could use ffprobe or similar tools
     const basename = path.basename(filePath, path.extname(filePath));
     const ext = path.extname(filePath).toLowerCase();
+    // Generate thumbnail
+    const thumbnailUrl = await generateThumbnail(filePath);
     return {
         title: basename,
         format: ext.substring(1), // Remove the dot
+        thumbnailUrl: thumbnailUrl || undefined,
     };
 }
 /**

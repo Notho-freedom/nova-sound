@@ -93,6 +93,7 @@ export interface StoredVideo {
 // Storage paths
 const DATA_DIR = path.join(app.getPath('userData'), 'nexus-data');
 const ARTWORK_DIR = path.join(DATA_DIR, 'artwork');
+const THUMBNAILS_DIR = path.join(DATA_DIR, 'thumbnails');
 
 const PATHS = {
   library: path.join(DATA_DIR, 'library.json'),
@@ -172,6 +173,7 @@ class Storage {
     
     await ensureDir(DATA_DIR);
     await ensureDir(ARTWORK_DIR);
+    await ensureDir(THUMBNAILS_DIR);
     
     // Initialize files with defaults if they don't exist
     const settings = await this.getSettings();
@@ -287,6 +289,34 @@ class Storage {
     
     // Return file:// URL for Electron
     return `file://${artworkPath.replace(/\\/g, '/')}`;
+  }
+
+  // Video Thumbnails
+  async saveThumbnail(thumbnailData: Buffer, sourceFilePath: string): Promise<string> {
+    await ensureDir(THUMBNAILS_DIR);
+    
+    // Generate unique filename based on source file hash
+    const hash = crypto.createHash('md5').update(sourceFilePath).digest('hex');
+    const filename = `${hash}.jpg`;
+    const thumbnailPath = path.join(THUMBNAILS_DIR, filename);
+    
+    await fs.writeFile(thumbnailPath, thumbnailData);
+    
+    // Return file:// URL for Electron
+    return `file://${thumbnailPath.replace(/\\/g, '/')}`;
+  }
+
+  async getThumbnailPath(sourceFilePath: string): Promise<string | null> {
+    const hash = crypto.createHash('md5').update(sourceFilePath).digest('hex');
+    const filename = `${hash}.jpg`;
+    const thumbnailPath = path.join(THUMBNAILS_DIR, filename);
+    
+    try {
+      await fs.access(thumbnailPath);
+      return `file://${thumbnailPath.replace(/\\/g, '/')}`;
+    } catch {
+      return null;
+    }
   }
 
   // Playlists
