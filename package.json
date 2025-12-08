@@ -1,12 +1,23 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "nexus-audio",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "NEXUS - Futuristic Audio Player",
+  "author": "NEXUS Team",
+  "license": "MIT",
   "type": "module",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
+    "dev:electron": "concurrently -k \"vite\" \"npm run electron:dev\"",
+    "electron:dev": "tsc -p electron/tsconfig.json && electron .",
     "build": "vite build",
-    "build:dev": "vite build --mode development",
+    "build:electron": "npm run build && tsc -p electron/tsconfig.json",
+    "electron": "electron .",
+    "package": "npm run build:electron && electron-builder",
+    "package:win": "npm run build:electron && electron-builder --win",
+    "package:mac": "npm run build:electron && electron-builder --mac",
+    "package:linux": "npm run build:electron && electron-builder --linux",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -63,7 +74,10 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "chokidar": "^4.0.3",
+    "music-metadata": "^10.6.4",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
@@ -71,8 +85,12 @@
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -83,5 +101,42 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
+  },
+  "build": {
+    "appId": "com.nexus.audio",
+    "productName": "NEXUS Audio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "public/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "public/favicon.ico",
+      "category": "public.app-category.music"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "public/favicon.ico",
+      "category": "Audio"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
