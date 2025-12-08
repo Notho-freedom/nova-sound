@@ -29,7 +29,7 @@ export const QueuePanel = ({
   const history = tracks.slice(0, currentTrackIndex);
 
   return (
-    <div className="w-80 h-full bg-card border-l border-border flex flex-col">
+    <div className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl">
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h2 className="font-display text-sm tracking-wider text-foreground">

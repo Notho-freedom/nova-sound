@@ -19,6 +19,7 @@ import { usePlayHistory } from "@/hooks/usePlayHistory";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { getAudioSrc } from "@/lib/audio";
+import { cn } from "@/lib/utils";
 import type { Track } from "@/types/music";
 
 export const DesktopApp = () => {
@@ -562,7 +563,7 @@ export const DesktopApp = () => {
           <div className="flex-1 flex overflow-hidden relative z-10">
             {noTracksMessage}
             
-            <ScrollArea className="flex-1">
+            <ScrollArea className={cn("flex-1 transition-all duration-300", isQueueOpen && "mr-80")}>
               <div className="animate-in fade-in duration-200">
                 {renderView()}
               </div>
@@ -570,13 +571,15 @@ export const DesktopApp = () => {
 
             {/* Queue Panel */}
             {isQueueOpen && (
-              <QueuePanel
-                tracks={tracks}
-                currentTrackIndex={currentTrackIndex}
-                isPlaying={isPlaying}
-                onTrackSelect={handleTrackSelect}
-                onClose={() => setIsQueueOpen(false)}
-              />
+              <div className="absolute right-0 top-0 bottom-0 z-20 animate-in slide-in-from-right duration-300">
+                <QueuePanel
+                  tracks={tracks}
+                  currentTrackIndex={currentTrackIndex}
+                  isPlaying={isPlaying}
+                  onTrackSelect={handleTrackSelect}
+                  onClose={() => setIsQueueOpen(false)}
+                />
+              </div>
             )}
           </div>
         </div>
