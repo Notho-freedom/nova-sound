@@ -14,12 +14,24 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
-  Music
+  Music,
+  MoreVertical,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { usePlaylists } from "@/hooks/usePlaylists";
+import { CreatePlaylistModal } from "@/components/PlaylistModal";
+import { toast } from "sonner";
 
 export type ViewType = 
   | "home" 
@@ -146,7 +158,9 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? internalCollapsed;
-  const { playlists } = usePlaylists();
+  const { playlists, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
 
   const handleCollapsedChange = (value: boolean) => {
     if (onCollapsedChange) {
@@ -197,6 +211,9 @@ export const Sidebar = ({
 
       <ScrollArea className="flex-1">
         <div className={cn("p-2 space-y-4", collapsed && "px-1.5")}>
+          {/* Spacing from top */}
+          <div className="pt-4" />
+          
           {/* Main Navigation */}
           <div className="space-y-1">
             {mainNavItems.map((item) => (
@@ -272,7 +289,10 @@ export const Sidebar = ({
                 </h3>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
-                    <button className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-primary transition-colors">
+                    <button 
+                      onClick={() => setCreateModalOpen(true)}
+                      className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-primary transition-colors"
+                    >
                       <Plus className="w-4 h-4" />
                     </button>
                   </TooltipTrigger>
@@ -281,19 +301,58 @@ export const Sidebar = ({
               </div>
               <div className="space-y-1">
                 {playlists.slice(0, 5).map((playlist) => (
-                  <button
+                  <div
                     key={playlist.id}
-                    onClick={() => onViewChange("playlists")}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 group"
+                    className="w-full flex items-center gap-2 group"
                   >
-                    <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all">
-                      <Music className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="text-sm truncate">{playlist.name}</p>
-                      <p className="text-xs text-muted-foreground">{playlist.trackIds.length} titres</p>
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => onViewChange("playlists")}
+                      className="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
+                    >
+                      <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all">
+                        <Music className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="text-sm truncate">{playlist.name}</p>
+                        <p className="text-xs text-muted-foreground">{playlist.trackIds.length} titres</p>
+                      </div>
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingPlaylist({ id: playlist.id, name: playlist.name });
+                          }}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Renommer
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
+                              await deletePlaylist(playlist.id);
+                              toast.success("Playlist supprimée");
+                            }
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 ))}
                 {playlists.length === 0 && (
                   <p className="px-3 py-2 text-xs text-muted-foreground italic">
@@ -335,6 +394,64 @@ export const Sidebar = ({
           )}
         </div>
       </ScrollArea>
+
+      {/* Create Playlist Modal */}
+      <CreatePlaylistModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onCreatePlaylist={async (name, trackIds) => {
+          const playlist = await createPlaylist(name, trackIds);
+          if (playlist) {
+            toast.success("Playlist créée");
+            setCreateModalOpen(false);
+          }
+        }}
+      />
+
+      {/* Edit Playlist Name Dialog */}
+      {editingPlaylist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Renommer la playlist</h3>
+            <input
+              type="text"
+              value={editingPlaylist.name}
+              onChange={(e) => setEditingPlaylist({ ...editingPlaylist, name: e.target.value })}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && editingPlaylist.name.trim()) {
+                  updatePlaylist(editingPlaylist.id, { name: editingPlaylist.name.trim() });
+                  toast.success("Playlist renommée");
+                  setEditingPlaylist(null);
+                } else if (e.key === "Escape") {
+                  setEditingPlaylist(null);
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setEditingPlaylist(null)}
+                className="px-4 py-2 text-sm rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  if (editingPlaylist.name.trim()) {
+                    await updatePlaylist(editingPlaylist.id, { name: editingPlaylist.name.trim() });
+                    toast.success("Playlist renommée");
+                    setEditingPlaylist(null);
+                  }
+                }}
+                className="px-4 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

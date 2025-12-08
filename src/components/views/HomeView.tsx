@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
 import { useState, useMemo } from "react";
+import { useCloudSync } from "@/hooks/useCloudSync";
 
 interface HomeViewProps {
   tracks: Track[];
@@ -74,18 +75,29 @@ export const HomeView = ({
     return "Bonsoir";
   };
 
+  const { nexusUser, nexusAuthenticated } = useCloudSync();
+  const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
+
   return (
     <div className="p-6 space-y-8 animate-in fade-in duration-300">
+      {/* Spacing from top */}
+      <div className="pt-4" />
+      
       {/* Welcome Section */}
       <div>
         <h1 className="font-display text-3xl font-bold mb-2 text-foreground">
-          {getGreeting()}, bienvenue sur <span className="text-primary">NEXUS</span>
+          {getGreeting()}{userName ? `, ${userName}` : ""}, bienvenue sur <span className="text-primary">NEXUS</span>
         </h1>
         <p className="text-muted-foreground">
           {tracks.length > 0 
             ? `${tracks.length} pistes disponibles dans votre bibliothèque`
             : "Votre système audio futuriste personnel"
           }
+          {nexusAuthenticated && nexusUser && (
+            <span className="ml-2 text-xs">
+              • {nexusUser.subscriptionStatus === "active" ? "Pro" : "Gratuit"}
+            </span>
+          )}
         </p>
       </div>
 
