@@ -2,6 +2,8 @@ import { initializeApp, FirebaseApp } from "firebase/app";
 import {
   getAuth,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
@@ -79,6 +81,9 @@ class FirebaseService {
   constructor() {
     // Listen for auth state changes
     if (auth) {
+      // Check for redirect result on initialization
+      this.handleRedirectResult();
+
       onAuthStateChanged(auth, async (user) => {
         this.currentUser = user;
         if (user) {
@@ -89,6 +94,20 @@ class FirebaseService {
         // Notify listeners
         this.authStateListeners.forEach((listener) => listener(user));
       });
+    }
+  }
+
+  // Handle redirect result after Google sign-in
+  private async handleRedirectResult(): Promise<void> {
+    if (!auth) return;
+
+    try {
+      const result = await getRedirectResult(auth);
+      if (result && result.user) {
+        await this.createOrUpdateProfile(result.user);
+      }
+    } catch (error) {
+      console.error("Error handling redirect result:", error);
     }
   }
 
@@ -115,31 +134,53 @@ class FirebaseService {
     return () => this.authStateListeners.delete(callback);
   }
 
-  // Sign in with Google
-  async signInWithGoogle(): Promise<UserProfile> {
+  // Sign in with Google (uses redirect to avoid popup blocking)
+  async signInWithGoogle(): Promise<void> {
     if (!auth) {
       throw new Error("Firebase not initialized. Check your configuration.");
     }
 
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      // Create or update user profile in Firestore
-      const profile = await this.createOrUpdateProfile(user);
-      return profile;
-    } catch (error) {
+      // Try popup first (better UX if it works)
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        await this.createOrUpdateProfile(user);
+        return;
+      } catch (popupError: unknown) {
+        // If popup is blocked or fails, fallback to redirect
+        const error = popupError as { code?: string; message?: string };
+        if (
+          error.code === "auth/popup-blocked" ||
+          error.code === "auth/popup-closed-by-user" ||
+          error.code === "auth/cancelled-popup-request"
+        ) {
+          console.log("Popup blocked or cancelled, using redirect...");
+          // Use redirect instead
+          await signInWithRedirect(auth, googleProvider);
+          // The redirect will happen, and handleRedirectResult will process it
+          return;
+        }
+        // Re-throw other errors
+        throw popupError;
+      }
+    } catch (error: unknown) {
       console.error("Google sign in error:", error);
+      const authError = error as { code?: string; message?: string };
       
-      if (error.code === "auth/popup-closed-by-user") {
+      if (authError.code === "auth/popup-closed-by-user") {
         throw new Error("Connexion annulée");
-      } else if (error.code === "auth/popup-blocked") {
-        throw new Error("Popup bloqué par le navigateur");
-      } else if (error.code === "auth/network-request-failed") {
+      } else if (authError.code === "auth/popup-blocked") {
+        // This shouldn't happen now as we use redirect, but just in case
+        throw new Error("Popup bloqué. Utilisation de la redirection...");
+      } else if (authError.code === "auth/network-request-failed") {
         throw new Error("Erreur réseau. Vérifiez votre connexion.");
+      } else if (authError.code === "auth/cancelled-popup-request") {
+        // Multiple popup requests, redirect will be used
+        return;
       }
       
-      throw new Error(error.message || "Erreur d'authentification");
+      throw new Error(authError.message || "Erreur d'authentification");
     }
   }
 

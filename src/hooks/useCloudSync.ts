@@ -137,13 +137,30 @@ export function useCloudSync(): UseCloudSyncReturn {
     }
 
     try {
-      const profile = await firebaseService.signInWithGoogle();
-      setNexusUser(profile);
-      setNexusAuthenticated(true);
-      setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");
-      toast.success("Connecté avec succès");
+      // signInWithGoogle may redirect, so it doesn't return a profile
+      await firebaseService.signInWithGoogle();
+      
+      // If we get here without redirect, the popup worked
+      // The profile will be set via onAuthStateChange
+      const profile = firebaseService.getUserProfile();
+      if (profile) {
+        setNexusUser(profile);
+        setNexusAuthenticated(true);
+        setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");
+        toast.success("Connecté avec succès");
+      } else {
+        // Redirect is happening, show info message
+        toast.info("Redirection vers Google...");
+      }
     } catch (error: any) {
       console.error("Login error:", error);
+      
+      // Don't show error if it's just a redirect
+      if (error.message && error.message.includes("redirection")) {
+        toast.info("Redirection vers Google...");
+        return;
+      }
+      
       toast.error("Erreur de connexion", {
         description: error.message,
       });
