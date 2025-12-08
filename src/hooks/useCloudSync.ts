@@ -127,6 +127,14 @@ export function useCloudSync(): UseCloudSyncReturn {
             tracksUploaded: status.tracksUploaded,
             tracksDownloaded: status.tracksDownloaded,
           });
+        }).catch((error) => {
+          console.error("Error loading sync status:", error);
+          // Set default sync status on error
+          setSyncStatus({
+            lastSyncAt: null,
+            tracksUploaded: 0,
+            tracksDownloaded: 0,
+          });
         });
       } else {
         setNexusUser(null);

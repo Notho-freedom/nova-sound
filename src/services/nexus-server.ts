@@ -193,12 +193,25 @@ class NexusServerService {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get sync status");
+        throw new Error(`Failed to get sync status: ${response.status}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.warn("Backend API not available or not configured. Using local storage for sync status.");
+        // Return data from localStorage as fallback
+        return {
+          lastSyncAt: localStorage.getItem("nexus-last-sync") || "",
+          tracksUploaded: parseInt(localStorage.getItem("nexus-tracks-uploaded") || "0"),
+          tracksDownloaded: parseInt(localStorage.getItem("nexus-tracks-downloaded") || "0"),
+          totalStorage: authService.getUserProfile()?.storageUsed || 0,
+        };
       }
 
       return response.json();
     } catch (error) {
-      console.error("Error getting sync status:", error);
+      console.warn("Error getting sync status (backend may not be configured):", error);
       // Return data from localStorage as fallback
       return {
         lastSyncAt: localStorage.getItem("nexus-last-sync") || "",
@@ -271,7 +284,7 @@ class NexusServerService {
     const response = await fetch(`${API_BASE_URL}/api/storage/files/${fileId}`, {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${idToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 

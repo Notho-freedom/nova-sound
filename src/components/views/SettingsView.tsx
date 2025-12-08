@@ -17,6 +17,8 @@ import {
   CreditCard,
   Shield,
   Sparkles,
+  Crown,
+  Calendar,
   Download,
   Upload,
   Check,
@@ -41,6 +43,10 @@ import { useTheme } from "@/hooks/useTheme";
 import { useNotifications } from "@/hooks/useNotifications";
 import { toast } from "sonner";
 import type { Settings } from "@/types/music";
+import { stripeService, PRICE_IDS } from "@/services/stripe";
+import type { SubscriptionStatus } from "@/services/stripe";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 interface SettingRowProps {
   label: string;
@@ -117,6 +123,8 @@ export const SettingsView = () => {
     syncLoading,
   } = useCloudSync();
 
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [settings, setSettings] = useState<Partial<Settings>>({
     musicDirectories: [],
     crossfadeDuration: 5,
@@ -175,6 +183,24 @@ export const SettingsView = () => {
     loadSettings();
   }, [isElectron, cloudinaryConfig]);
 
+  // Load subscription status
+  useEffect(() => {
+    const loadSubscriptionStatus = async () => {
+      if (nexusAuthenticated && stripeInitialized) {
+        setSubscriptionLoading(true);
+        try {
+          const status = await stripeService.getSubscriptionStatus();
+          setSubscriptionStatus(status);
+        } catch (error) {
+          console.error("Error loading subscription status:", error);
+        } finally {
+          setSubscriptionLoading(false);
+        }
+      }
+    };
+    loadSubscriptionStatus();
+  }, [nexusAuthenticated, stripeInitialized]);
+
   // Handle URL params for Stripe success/cancel
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -185,6 +211,10 @@ export const SettingsView = () => {
       toast.success("Paiement réussi !", {
         description: "Bienvenue dans le plan Pro !",
       });
+      // Reload subscription status
+      if (nexusAuthenticated && stripeInitialized) {
+        stripeService.getSubscriptionStatus().then(setSubscriptionStatus);
+      }
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (canceled === "true") {
@@ -332,6 +362,50 @@ export const SettingsView = () => {
     await nexusManageBilling();
   };
 
+  // Handle upgrade to monthly
+  const handleUpgradeMonthly = async () => {
+    if (!stripeInitialized) {
+      toast.error("Stripe non configuré");
+      return;
+    }
+    if (!nexusAuthenticated) {
+      toast.error("Connectez-vous d'abord");
+      return;
+    }
+    try {
+      setSubscriptionLoading(true);
+      toast.info("Redirection vers Stripe...");
+      await stripeService.redirectToCheckout(PRICE_IDS.PRO_MONTHLY);
+    } catch (error: any) {
+      console.error("Upgrade error:", error);
+      toast.error("Erreur", { description: error.message });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  // Handle upgrade to yearly
+  const handleUpgradeYearly = async () => {
+    if (!stripeInitialized) {
+      toast.error("Stripe non configuré");
+      return;
+    }
+    if (!nexusAuthenticated) {
+      toast.error("Connectez-vous d'abord");
+      return;
+    }
+    try {
+      setSubscriptionLoading(true);
+      toast.info("Redirection vers Stripe...");
+      await stripeService.redirectToCheckout(PRICE_IDS.PRO_YEARLY);
+    } catch (error: any) {
+      console.error("Upgrade error:", error);
+      toast.error("Erreur", { description: error.message });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
   // Handle sync
   const handleStartSync = async () => {
     await startSync();
@@ -378,6 +452,10 @@ export const SettingsView = () => {
             <TabsTrigger value="cloud" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Cloud className="w-4 h-4" />
               Cloud
+            </TabsTrigger>
+            <TabsTrigger value="subscription" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+              <Crown className="w-4 h-4" />
+              Abonnements
             </TabsTrigger>
             <TabsTrigger value="account" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <User className="w-4 h-4" />
@@ -884,6 +962,180 @@ export const SettingsView = () => {
                     </p>
                   )}
                 </div>
+              </SettingsCard>
+            </div>
+          </TabsContent>
+
+          {/* Subscription Tab */}
+          <TabsContent value="subscription" className="mt-6 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SettingsCard title="Plan actuel" icon={Crown}>
+                {subscriptionLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : subscriptionStatus ? (
+                  <div className="space-y-4">
+                    <div className="text-center py-4">
+                      <div className={cn(
+                        "inline-block px-4 py-2 rounded-lg text-sm font-medium mb-3",
+                        subscriptionStatus.isActive && subscriptionStatus.plan === "pro"
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      )}>
+                        {subscriptionStatus.isActive && subscriptionStatus.plan === "pro" ? "Plan Pro" : "Plan Gratuit"}
+                      </div>
+                      {subscriptionStatus.isActive && subscriptionStatus.currentPeriodEnd && (
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            <span>
+                              Prochain renouvellement: {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("fr-FR")}
+                            </span>
+                          </div>
+                          {subscriptionStatus.cancelAtPeriodEnd && (
+                            <div className="flex items-center justify-center gap-2 text-sm text-yellow-500">
+                              <AlertCircle className="w-4 h-4" />
+                              <span>Annulation programmée à la fin de la période</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {subscriptionStatus.isActive && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleManageBilling}
+                        disabled={subscriptionLoading}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Gérer l'abonnement
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground">
+                      {nexusAuthenticated
+                        ? "Chargement du statut d'abonnement..."
+                        : "Connectez-vous pour voir votre abonnement"}
+                    </p>
+                  </div>
+                )}
+              </SettingsCard>
+
+              <SettingsCard title="Passer au Pro" icon={Sparkles}>
+                {!nexusAuthenticated ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Connectez-vous pour accéder aux plans Pro
+                    </p>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleGoogleSignIn}
+                      disabled={authLoading}
+                    >
+                      Se connecter
+                    </Button>
+                  </div>
+                ) : !stripeInitialized ? (
+                  <div className="text-center py-6">
+                    <ConfigAlert configured={false} service="Stripe" />
+                    <p className="text-sm text-muted-foreground">
+                      Stripe n'est pas configuré
+                    </p>
+                  </div>
+                ) : !API_BASE_URL || API_BASE_URL === "" ? (
+                  <div className="text-center py-6">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
+                      <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                      <p className="text-xs text-yellow-500">
+                        Backend API non configuré. Ajoutez VITE_API_URL dans .env pour activer les abonnements.
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Les fonctionnalités d'abonnement nécessitent un backend API configuré.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-lg border border-border/50 bg-card/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h4 className="font-medium">Plan Mensuel</h4>
+                            <p className="text-xs text-muted-foreground">Facturé chaque mois</p>
+                          </div>
+                          <Crown className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="mt-3">
+                          <Button
+                            variant={subscriptionStatus?.plan === "pro" ? "outline" : "default"}
+                            size="sm"
+                            className="w-full"
+                            onClick={handleUpgradeMonthly}
+                            disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
+                          >
+                            {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
+                              ? "Plan actuel"
+                              : "Choisir ce plan"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-lg border-2 border-primary/50 bg-primary/5">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h4 className="font-medium">Plan Annuel</h4>
+                            <p className="text-xs text-muted-foreground">Facturé chaque année</p>
+                            <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-primary/20 text-primary rounded">
+                              Économisez 20%
+                            </span>
+                          </div>
+                          <Crown className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="mt-3">
+                          <Button
+                            variant={subscriptionStatus?.plan === "pro" ? "outline" : "default"}
+                            size="sm"
+                            className="w-full"
+                            onClick={handleUpgradeYearly}
+                            disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
+                          >
+                            {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
+                              ? "Plan actuel"
+                              : "Choisir ce plan"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-border/30">
+                      <h5 className="text-sm font-medium mb-2">Avantages du Plan Pro :</h5>
+                      <ul className="space-y-1.5 text-xs text-muted-foreground">
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary" />
+                          Stockage cloud illimité
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary" />
+                          Synchronisation automatique
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary" />
+                          Support prioritaire
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary" />
+                          Accès aux fonctionnalités avancées
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </SettingsCard>
             </div>
           </TabsContent>

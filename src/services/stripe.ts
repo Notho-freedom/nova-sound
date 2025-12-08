@@ -57,7 +57,7 @@ class StripeService {
   // Create checkout session for Pro subscription
   async createCheckoutSession(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<string> {
     const accessToken = await authService.getAccessToken();
-    if (!idToken) {
+    if (!accessToken) {
       throw new Error("User not authenticated");
     }
 
@@ -75,8 +75,28 @@ class StripeService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to create checkout session");
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const error = await response.json();
+        // Check if it's a Stripe configuration error
+        if (response.status === 503 && error.error?.includes("Stripe is not configured")) {
+          throw new Error("Stripe n'est pas configuré sur le serveur. Veuillez ajouter STRIPE_SECRET_KEY dans server/.env");
+        }
+        throw new Error(error.message || error.error || "Failed to create checkout session");
+      } else {
+        const text = await response.text();
+        console.error("Unexpected response from create-checkout-session:", text.substring(0, 200));
+        throw new Error(`Failed to create checkout session: ${response.status}. Backend API may not be configured.`);
+      }
+    }
+
+    // Check if response is JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Unexpected response type from create-checkout-session:", contentType, text.substring(0, 200));
+      throw new Error("Invalid response format from server. Backend API may not be configured.");
     }
 
     const data: CheckoutSessionResponse = await response.json();
@@ -92,7 +112,7 @@ class StripeService {
   // Create billing portal session
   async createPortalSession(): Promise<string> {
     const accessToken = await authService.getAccessToken();
-    if (!idToken) {
+    if (!accessToken) {
       throw new Error("User not authenticated");
     }
 
@@ -108,8 +128,24 @@ class StripeService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to create portal session");
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create portal session");
+      } else {
+        const text = await response.text();
+        console.error("Unexpected response from create-portal-session:", text.substring(0, 200));
+        throw new Error(`Failed to create portal session: ${response.status}. Backend API may not be configured.`);
+      }
+    }
+
+    // Check if response is JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Unexpected response type from create-portal-session:", contentType, text.substring(0, 200));
+      throw new Error("Invalid response format from server. Backend API may not be configured.");
     }
 
     const data: PortalSessionResponse = await response.json();
@@ -125,7 +161,7 @@ class StripeService {
   // Get subscription status
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
     const accessToken = await authService.getAccessToken();
-    if (!idToken) {
+    if (!accessToken) {
       return {
         isActive: false,
         plan: "free",
@@ -143,16 +179,32 @@ class StripeService {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get subscription status");
+        throw new Error(`Failed to get subscription status: ${response.status}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.warn("Backend API not available or not configured. Subscription status unavailable.");
+        // Return default status if API is not available
+        return {
+          isActive: false,
+          plan: "free",
+          status: "none",
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+        };
       }
 
       return response.json();
     } catch (error) {
-      console.error("Error getting subscription status:", error);
+      console.warn("Error getting subscription status (backend may not be configured):", error);
+      // Return default status if API is not available
       return {
         isActive: false,
         plan: "free",
-        status: "error",
+        status: "none",
         currentPeriodEnd: null,
         cancelAtPeriodEnd: false,
       };
@@ -162,7 +214,7 @@ class StripeService {
   // Handle post-checkout success
   async handleCheckoutSuccess(sessionId: string): Promise<void> {
     const accessToken = await authService.getAccessToken();
-    if (!idToken) {
+    if (!accessToken) {
       throw new Error("User not authenticated");
     }
 
@@ -182,7 +234,7 @@ class StripeService {
     // Refresh user profile
     const user = authService.getCurrentUser();
     if (user) {
-      await firebaseService.updateProfile({ plan: "pro", subscriptionStatus: "active" });
+      await authService.updateProfile({ plan: "pro", subscriptionStatus: "active" });
     }
   }
 }
