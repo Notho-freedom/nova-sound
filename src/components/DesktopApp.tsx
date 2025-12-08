@@ -4,6 +4,7 @@ import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
+import { LoadingScreen } from "./LoadingScreen";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
@@ -13,6 +14,7 @@ import { demoTracks } from "@/data/tracks";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const DesktopApp = () => {
+  const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>("home");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -25,6 +27,11 @@ export const DesktopApp = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const currentTrack = demoTracks[currentTrackIndex];
+
+  // Loading complete handler
+  const handleLoadComplete = useCallback(() => {
+    setIsLoading(false);
+  }, []);
 
   // Simulate playback progress
   useEffect(() => {
@@ -253,6 +260,11 @@ export const DesktopApp = () => {
         );
     }
   };
+
+  // Show loading screen
+  if (isLoading) {
+    return <LoadingScreen onLoadComplete={handleLoadComplete} />;
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
