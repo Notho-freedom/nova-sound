@@ -107,6 +107,17 @@ ipcMain.handle('dialog:openFile', async (_event, filters) => {
     });
     return result.filePaths;
 });
+// Read file as base64 for blob creation
+ipcMain.handle('file:readAsBase64', async (_event, filePath) => {
+    try {
+        const data = fs.readFileSync(filePath);
+        return data.toString('base64');
+    }
+    catch (error) {
+        console.error('Failed to read file:', filePath, error);
+        throw error;
+    }
+});
 ipcMain.handle('dialog:openPlaylist', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openFile'],

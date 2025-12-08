@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { 
   Play, 
   Video, 
@@ -7,9 +8,12 @@ import {
   List, 
   Clock,
   Film,
-  Plus
+  Plus,
+  Search,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 interface VideoFile {
@@ -75,8 +79,16 @@ const mockVideos: VideoFile[] = [
 export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const displayVideos = videos.length > 0 ? videos : [];
+  const displayVideos = useMemo(() => {
+    if (!searchQuery.trim()) return videos.length > 0 ? videos : [];
+    const query = searchQuery.toLowerCase();
+    return videos.filter(video =>
+      video.name.toLowerCase().includes(query) ||
+      video.path.toLowerCase().includes(query)
+    );
+  }, [videos, searchQuery]);
 
   // Video Player View
   if (selectedVideo) {
@@ -127,43 +139,60 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
   }
 
   return (
-    <div className="p-6 space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold mb-1">Vidéos</h1>
-          <p className="text-muted-foreground">
-            {displayVideos.length} vidéos dans votre bibliothèque
-          </p>
-        </div>
+    <div className="h-full flex flex-col animate-in fade-in duration-300">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <PageHeader
+            title="Vidéos"
+            subtitle={`${displayVideos.length} vidéos dans votre bibliothèque`}
+            rightContent={
+              <div className="flex rounded-lg bg-muted/30 p-1">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={cn(
+                    "p-2 rounded transition-colors",
+                    viewMode === "grid"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Grid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "p-2 rounded transition-colors",
+                    viewMode === "list"
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+            }
+          />
 
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg bg-muted/30 p-1">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "p-2 rounded transition-colors",
-                viewMode === "grid"
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "p-2 rounded transition-colors",
-                viewMode === "list"
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <List className="w-4 h-4" />
-            </button>
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Rechercher des vidéos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-        </div>
-      </div>
 
       {/* Empty State */}
       {displayVideos.length === 0 && (
@@ -251,25 +280,26 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
 
       {/* Video List */}
       {displayVideos.length > 0 && viewMode === "list" && (
-        <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border/30">
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
-                  Nom
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                  Durée
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                  Taille
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 relative">
+          <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+            <table className="w-full">
+              <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+                <tr className="border-b border-border/30">
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+                    Nom
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                    Durée
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
+                    Taille
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
               {displayVideos.map((video) => (
                 <tr
                   key={video.id}
@@ -311,8 +341,11 @@ export const VideosView = ({ videos = [], onSelectFolder }: VideosViewProps) => 
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };

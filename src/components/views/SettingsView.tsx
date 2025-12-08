@@ -428,9 +428,11 @@ export const SettingsView = () => {
   return (
     <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-300">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4">
-        <h1 className="font-display text-2xl font-bold text-foreground">Paramètres</h1>
-        <p className="text-sm text-muted-foreground mt-1">Personnalisez votre expérience NEXUS</p>
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
+        <div className="px-6 pt-6 pb-4">
+          <h1 className="font-display text-2xl font-bold text-foreground">Paramètres</h1>
+          <p className="text-sm text-muted-foreground mt-1">Personnalisez votre expérience NEXUS</p>
+        </div>
       </div>
 
       {/* Tabs */}

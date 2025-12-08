@@ -15,11 +15,14 @@ import {
   Trash2,
   Cloud,
   ListMusic,
+  Search,
+  X,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +31,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { TrackListView } from "@/components/TrackListView";
+import { TrackGridView } from "@/components/TrackGridView";
+import { PageHeader } from "@/components/PageHeader";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylists } from "@/hooks/usePlaylists";
@@ -152,8 +158,23 @@ export const LibraryView = ({
   
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
 
-  const sortedTracks = useMemo(() => {
-    return [...tracks].sort((a, b) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredAndSortedTracks = useMemo(() => {
+    let filtered = tracks;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = tracks.filter(track =>
+        track.title.toLowerCase().includes(query) ||
+        track.artist.toLowerCase().includes(query) ||
+        track.album.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply sorting
+    return [...filtered].sort((a, b) => {
       switch (sortMode) {
         case "title":
           return a.title.localeCompare(b.title);
@@ -169,7 +190,7 @@ export const LibraryView = ({
           return 0;
       }
     });
-  }, [tracks, sortMode]);
+  }, [tracks, sortMode, searchQuery]);
 
   const albums = useMemo(() => groupByAlbum(tracks), [tracks]);
   const artists = useMemo(() => groupByArtist(tracks), [tracks]);
@@ -247,16 +268,17 @@ export const LibraryView = ({
         </div>
 
         {/* Track list */}
-        <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border/30">
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
-                <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 relative">
+          <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+            <table className="w-full">
+              <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+                <tr className="border-b border-border/30">
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
+                  <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
+                </tr>
+              </thead>
+              <tbody>
               {album.tracks.map((track, idx) => {
                 const actualIndex = tracks.findIndex(t => t.id === track.id);
                 const isCurrentTrack = currentTrackIndex === actualIndex;
@@ -297,8 +319,9 @@ export const LibraryView = ({
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -439,93 +462,114 @@ export const LibraryView = ({
 
   // Default Tracks View
   return (
-    <div className="p-6 space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold mb-1">{title}</h1>
-          <p className="text-muted-foreground">
-            {tracks.length} titres • {formatDuration(totalDuration)}
-          </p>
-        </div>
+    <div className="h-full flex flex-col animate-in fade-in duration-300">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <PageHeader
+            title={title}
+            subtitle={`${filteredAndSortedTracks.length} titres • ${formatDuration(totalDuration)}`}
+            rightContent={
+              showFilters && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30">
+                    <SortAsc className="w-4 h-4 text-muted-foreground" />
+                    <select
+                      value={sortMode}
+                      onChange={(e) => setSortMode(e.target.value as SortMode)}
+                      className="bg-transparent text-sm text-foreground focus:outline-none cursor-pointer"
+                    >
+                      <option value="title">Titre</option>
+                      <option value="artist">Artiste</option>
+                      <option value="album">Album</option>
+                      <option value="duration">Durée</option>
+                      {showHistory && <option value="date">Date</option>}
+                    </select>
+                  </div>
 
-        {showFilters && (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30">
-              <SortAsc className="w-4 h-4 text-muted-foreground" />
-              <select
-                value={sortMode}
-                onChange={(e) => setSortMode(e.target.value as SortMode)}
-                className="bg-transparent text-sm text-foreground focus:outline-none cursor-pointer"
-              >
-                <option value="title">Titre</option>
-                <option value="artist">Artiste</option>
-                <option value="album">Album</option>
-                <option value="duration">Durée</option>
-                {showHistory && <option value="date">Date</option>}
-              </select>
+                  <div className="flex rounded-lg bg-muted/30 p-1">
+                    <button
+                      onClick={() => setDisplayMode("list")}
+                      className={cn(
+                        "p-2 rounded transition-colors",
+                        displayMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <List className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDisplayMode("grid")}
+                      className={cn(
+                        "p-2 rounded transition-colors",
+                        displayMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Grid className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+          />
+
+          {/* Actions Bar with Search */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-3 flex-1">
+              <Button onClick={() => filteredAndSortedTracks.length > 0 && onTrackSelect(tracks.findIndex(t => t.id === filteredAndSortedTracks[0].id))} className="gap-2">
+                <Play className="w-4 h-4 fill-current" />
+                Tout lire
+              </Button>
+              <Button variant="outline" className="gap-2">
+                <Shuffle className="w-4 h-4" />
+                Aléatoire
+              </Button>
+              {showHistory && (
+                <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive">
+                  <Trash2 className="w-4 h-4" />
+                  Effacer l'historique
+                </Button>
+              )}
             </div>
-
-            <div className="flex rounded-lg bg-muted/30 p-1">
-              <button
-                onClick={() => setDisplayMode("list")}
-                className={cn(
-                  "p-2 rounded transition-colors",
-                  displayMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <List className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setDisplayMode("grid")}
-                className={cn(
-                  "p-2 rounded transition-colors",
-                  displayMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Grid className="w-4 h-4" />
-              </button>
+            {/* Search */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Play All Button */}
-      <div className="flex gap-3">
-        <Button onClick={() => onTrackSelect(0)} className="gap-2">
-          <Play className="w-4 h-4 fill-current" />
-          Tout lire
-        </Button>
-        <Button variant="outline" className="gap-2">
-          <Shuffle className="w-4 h-4" />
-          Aléatoire
-        </Button>
-        {showHistory && (
-          <Button variant="ghost" className="gap-2 text-destructive hover:text-destructive">
-            <Trash2 className="w-4 h-4" />
-            Effacer l'historique
-          </Button>
-        )}
-      </div>
 
       {/* Content */}
       {displayMode === "list" ? (
-        <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border/30">
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
-                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Album</th>
-                {showHistory && (
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">Écouté</th>
-                )}
-                <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
-                <th className="px-4 py-3 w-12"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTracks.map((track, idx) => {
+        <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30 relative">
+          <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+            <table className="w-full">
+              <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+                <tr className="border-b border-border/30">
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Album</th>
+                  {showHistory && (
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">Écouté</th>
+                  )}
+                  <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
+                  <th className="px-4 py-3 w-12"></th>
+                </tr>
+              </thead>
+              <tbody>
+              {filteredAndSortedTracks.map((track, idx) => {
                 const actualIndex = tracks.findIndex(t => t.id === track.id);
                 const isCurrentTrack = currentTrackIndex === actualIndex;
 
@@ -638,12 +682,13 @@ export const LibraryView = ({
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {sortedTracks.map((track) => {
+          {filteredAndSortedTracks.map((track) => {
             const actualIndex = tracks.findIndex(t => t.id === track.id);
             const isCurrentTrack = currentTrackIndex === actualIndex;
 
@@ -711,6 +756,8 @@ export const LibraryView = ({
           })}
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };

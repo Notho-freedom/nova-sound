@@ -2,6 +2,8 @@ import { Play, Clock, TrendingUp, Sparkles, Heart, Music } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
+import { PageHeader } from "@/components/PageHeader";
+import { useState, useMemo } from "react";
 
 interface HomeViewProps {
   tracks: Track[];

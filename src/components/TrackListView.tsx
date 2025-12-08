@@ -1,0 +1,185 @@
+import { Play, MoreHorizontal } from "lucide-react";
+import { Track } from "@/types/music";
+import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
+import { TrackContextMenu } from "@/components/TrackContextMenu";
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+interface TrackListViewProps {
+  tracks: Track[];
+  currentTrackIndex: number;
+  isPlaying: boolean;
+  onTrackSelect: (index: number) => void;
+  playlists?: any[];
+  isFavorite?: (trackId: string) => boolean;
+  toggleFavorite?: (trackId: string) => void;
+  createPlaylist?: (name: string, trackIds: string[]) => Promise<any>;
+  uploadTrack?: (track: Track) => void;
+  getTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+  canUploadToCloudinary?: boolean;
+  showHistory?: boolean;
+  showAlbum?: boolean;
+  showTrackNumber?: boolean;
+}
+
+export const TrackListView = ({
+  tracks,
+  currentTrackIndex,
+  isPlaying,
+  onTrackSelect,
+  playlists = [],
+  isFavorite,
+  toggleFavorite,
+  createPlaylist,
+  uploadTrack,
+  getTrackProgress,
+  canUploadToCloudinary = false,
+  showHistory = false,
+  showAlbum = true,
+  showTrackNumber = false,
+}: TrackListViewProps) => {
+  return (
+    <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden relative">
+      <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+        <table className="w-full">
+          <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+            <tr className="border-b border-border/30">
+              <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
+                {showTrackNumber ? "#" : ""}
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+                Titre
+              </th>
+              {showAlbum && (
+                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                  Album
+                </th>
+              )}
+              {showHistory && (
+                <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
+                  Écouté
+                </th>
+              )}
+              <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+                Durée
+              </th>
+              <th className="px-4 py-3 w-12"></th>
+            </tr>
+          </thead>
+          <tbody>
+          {tracks.map((track, idx) => {
+            const actualIndex = tracks.findIndex(t => t.id === track.id);
+            const isCurrentTrack = currentTrackIndex === actualIndex;
+
+            return (
+              <tr
+                key={track.id}
+                onClick={() => onTrackSelect(actualIndex)}
+                className={cn(
+                  "group cursor-pointer transition-all duration-200",
+                  isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
+                )}
+              >
+                <td className="px-4 py-3">
+                  <div className="w-6 flex items-center justify-center">
+                    {isCurrentTrack && isPlaying ? (
+                      <div className="flex items-center gap-0.5">
+                        <div className="w-1 h-4 bg-primary rounded-full animate-wave" />
+                        <div className="w-1 h-4 bg-primary rounded-full animate-wave" style={{ animationDelay: "0.1s" }} />
+                        <div className="w-1 h-4 bg-primary rounded-full animate-wave" style={{ animationDelay: "0.2s" }} />
+                      </div>
+                    ) : (
+                      <>
+                        {showTrackNumber && (
+                          <span className="text-sm text-muted-foreground group-hover:hidden">
+                            {track.trackNumber || idx + 1}
+                          </span>
+                        )}
+                        <Play className="w-4 h-4 text-foreground hidden group-hover:block fill-current" />
+                      </>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <TrackContextMenu
+                    track={track}
+                    playlists={playlists}
+                    isFavorite={isFavorite?.(track.id) || false}
+                    onPlay={() => onTrackSelect(actualIndex)}
+                    onPlayNext={() => {}}
+                    onAddToQueue={() => {}}
+                    onAddToPlaylist={() => {}}
+                    onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
+                    onToggleFavorite={() => toggleFavorite?.(track.id)}
+                    onUploadToCloudinary={() => uploadTrack?.(track)}
+                    canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                    isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
+                        <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover" />
+                        {getTrackProgress?.(track.id) && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <span className="text-[10px] text-white font-medium">
+                              {getTrackProgress(track.id)?.progress || 0}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                          {track.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                      </div>
+                    </div>
+                  </TrackContextMenu>
+                </td>
+                {showAlbum && (
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <p className="text-sm text-muted-foreground truncate">{track.album}</p>
+                  </td>
+                )}
+                {showHistory && (
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    <p className="text-sm text-muted-foreground">
+                      {track.lastPlayedAt ? new Date(track.lastPlayedAt).toLocaleDateString() : "-"}
+                    </p>
+                  </td>
+                )}
+                <td className="px-4 py-3 text-right">
+                  <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <TrackContextMenu
+                    track={track}
+                    playlists={playlists}
+                    isFavorite={isFavorite?.(track.id) || false}
+                    onPlay={() => onTrackSelect(actualIndex)}
+                    onPlayNext={() => {}}
+                    onAddToQueue={() => {}}
+                    onAddToPlaylist={() => {}}
+                    onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
+                    onToggleFavorite={() => toggleFavorite?.(track.id)}
+                    onUploadToCloudinary={() => uploadTrack?.(track)}
+                    canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                    isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                  >
+                    <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </TrackContextMenu>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+

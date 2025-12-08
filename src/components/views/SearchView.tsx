@@ -4,6 +4,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/PageHeader";
 
 interface SearchViewProps {
   tracks: Track[];
@@ -125,31 +126,43 @@ export const SearchView = ({
   const hasResults = query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0);
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-300">
-      {/* Search Input */}
-      <div className="relative max-w-2xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Rechercher des titres, artistes ou albums..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && query.trim()) {
-              saveToHistory(query.trim());
-            }
-          }}
-          className="pl-12 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all"
-        />
-        {query && (
-          <button
-            onClick={() => setQuery("")}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
-          >
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
-        )}
-      </div>
+    <div className="h-full flex flex-col animate-in fade-in duration-300">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 space-y-8">
+          {/* Header */}
+          <PageHeader
+            title="Recherche"
+            subtitle={searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0 ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
+          />
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Rechercher des titres, artistes ou albums..."
+              value={query}
+              onChange={(e) => {
+                const value = e.target.value;
+                setQuery(value);
+                if (value.trim()) saveToHistory(value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && query.trim()) {
+                  saveToHistory(query.trim());
+                }
+              }}
+              className="pl-10 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
 
       {query ? (
         /* Search Results */
@@ -377,6 +390,8 @@ export const SearchView = ({
           )}
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };
