@@ -1,26 +1,30 @@
 import { useState, useEffect, useCallback } from "react";
 import { cloudinaryService, CloudinaryConfig, UploadProgress } from "@/services/cloudinary";
-import { nexusServerService, NexusUser } from "@/services/nexus-server";
+import { nexusServerService } from "@/services/nexus-server";
+import { firebaseService, UserProfile } from "@/services/firebase";
+import { stripeService } from "@/services/stripe";
 import { toast } from "sonner";
 
 interface UseCloudSyncReturn {
+  // Firebase status
+  firebaseInitialized: boolean;
+  stripeInitialized: boolean;
+
   // Cloudinary
   cloudinaryConfigured: boolean;
   cloudinaryConfig: CloudinaryConfig | null;
   saveCloudinaryConfig: (config: CloudinaryConfig) => void;
   clearCloudinaryConfig: () => void;
 
-  // Nexus Server
-  nexusUser: NexusUser | null;
+  // Nexus Server (Firebase Auth + Storage)
+  nexusUser: UserProfile | null;
   nexusAuthenticated: boolean;
   nexusIsPro: boolean;
-  nexusLogin: (credential: string, provider: string) => Promise<void>;
-  nexusLoginWithEmail: (email: string, password: string) => Promise<void>;
-  nexusRegister: (email: string, password: string, name: string) => Promise<void>;
-  nexusLogout: () => void;
+  nexusLoginWithGoogle: () => Promise<void>;
+  nexusLogout: () => Promise<void>;
   nexusUpgradeToPro: () => Promise<void>;
   nexusManageBilling: () => Promise<void>;
-  refreshNexusUser: () => Promise<void>;
+  refreshUser: () => void;
 
   // Upload status
   uploadProgress: Map<string, UploadProgress>;
@@ -34,16 +38,22 @@ interface UseCloudSyncReturn {
     tracksUploaded: number;
     tracksDownloaded: number;
   };
+  syncLoading: boolean;
 }
 
 export function useCloudSync(): UseCloudSyncReturn {
+  // Service status
+  const [firebaseInitialized] = useState(firebaseService.isInitialized());
+  const [stripeInitialized] = useState(stripeService.isInitialized());
+
   // Cloudinary state
   const [cloudinaryConfig, setCloudinaryConfig] = useState<CloudinaryConfig | null>(null);
   const [cloudinaryConfigured, setCloudinaryConfigured] = useState(false);
 
   // Nexus state
-  const [nexusUser, setNexusUser] = useState<NexusUser | null>(null);
+  const [nexusUser, setNexusUser] = useState<UserProfile | null>(null);
   const [nexusAuthenticated, setNexusAuthenticated] = useState(false);
+  const [nexusIsPro, setNexusIsPro] = useState(false);
 
   // Upload state
   const [uploadProgress, setUploadProgress] = useState<Map<string, UploadProgress>>(new Map());
@@ -55,6 +65,7 @@ export function useCloudSync(): UseCloudSyncReturn {
     tracksUploaded: 0,
     tracksDownloaded: 0,
   });
+  const [syncLoading, setSyncLoading] = useState(false);
 
   // Initialize on mount
   useEffect(() => {
@@ -63,29 +74,44 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfig(config);
     setCloudinaryConfigured(cloudinaryService.isConfigured());
 
-    // Check Nexus auth
-    const isAuth = nexusServerService.isAuthenticated();
-    setNexusAuthenticated(isAuth);
-    setNexusUser(nexusServerService.getUser());
+    // Subscribe to Firebase auth state changes
+    const unsubscribeAuth = firebaseService.onAuthStateChange((user) => {
+      if (user) {
+        const profile = firebaseService.getUserProfile();
+        setNexusUser(profile);
+        setNexusAuthenticated(true);
+        setNexusIsPro(firebaseService.isPro());
 
-    // Load sync status
-    if (isAuth) {
-      nexusServerService.getSyncStatus().then((status) => {
-        setSyncStatus({
-          lastSyncAt: status.lastSyncAt || null,
-          tracksUploaded: status.tracksUploaded,
-          tracksDownloaded: status.tracksDownloaded,
+        // Load sync status
+        nexusServerService.getSyncStatus().then((status) => {
+          setSyncStatus({
+            lastSyncAt: status.lastSyncAt || null,
+            tracksUploaded: status.tracksUploaded,
+            tracksDownloaded: status.tracksDownloaded,
+          });
         });
-      });
-    }
+      } else {
+        setNexusUser(null);
+        setNexusAuthenticated(false);
+        setNexusIsPro(false);
+        setSyncStatus({
+          lastSyncAt: null,
+          tracksUploaded: 0,
+          tracksDownloaded: 0,
+        });
+      }
+    });
 
     // Subscribe to upload progress
-    const unsubscribe = cloudinaryService.onProgressUpdate((progress) => {
+    const unsubscribeProgress = cloudinaryService.onProgressUpdate((progress) => {
       setUploadProgress(new Map(progress));
       setOverallProgress(cloudinaryService.getOverallProgress());
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      unsubscribeProgress();
+    };
   }, []);
 
   // Cloudinary methods
@@ -101,102 +127,98 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfigured(false);
   }, []);
 
-  // Nexus methods - Google/OAuth login
-  const nexusLogin = useCallback(async (credential: string, provider: string) => {
-    try {
-      let user: NexusUser;
-      
-      if (provider === "google") {
-        // Check if it's a credential (JWT) or an OAuth code
-        if (credential.includes(".")) {
-          // JWT credential from Google Identity Services
-          user = await nexusServerService.loginWithGoogle(credential);
-        } else {
-          // OAuth code from popup flow
-          user = await nexusServerService.loginWithOAuthCode(credential, provider);
-        }
-      } else {
-        user = await nexusServerService.loginWithOAuthCode(credential, provider);
-      }
-      
-      setNexusUser(user);
-      setNexusAuthenticated(true);
-      
-      // Load sync status
-      const status = await nexusServerService.getSyncStatus();
-      setSyncStatus({
-        lastSyncAt: status.lastSyncAt || null,
-        tracksUploaded: status.tracksUploaded,
-        tracksDownloaded: status.tracksDownloaded,
+  // Nexus methods - Google login via Firebase
+  const nexusLoginWithGoogle = useCallback(async () => {
+    if (!firebaseInitialized) {
+      toast.error("Firebase non configuré", {
+        description: "Vérifiez votre fichier .env",
       });
-    } catch (error) {
+      return;
+    }
+
+    try {
+      const profile = await firebaseService.signInWithGoogle();
+      setNexusUser(profile);
+      setNexusAuthenticated(true);
+      setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");
+      toast.success("Connecté avec succès");
+    } catch (error: any) {
       console.error("Login error:", error);
+      toast.error("Erreur de connexion", {
+        description: error.message,
+      });
       throw error;
     }
-  }, []);
+  }, [firebaseInitialized]);
 
-  // Email/password login
-  const nexusLoginWithEmail = useCallback(async (email: string, password: string) => {
-    const user = await nexusServerService.login(email, password);
-    setNexusUser(user);
-    setNexusAuthenticated(true);
-    
-    // Load sync status
-    const status = await nexusServerService.getSyncStatus();
-    setSyncStatus({
-      lastSyncAt: status.lastSyncAt || null,
-      tracksUploaded: status.tracksUploaded,
-      tracksDownloaded: status.tracksDownloaded,
-    });
-  }, []);
-
-  const nexusRegister = useCallback(async (email: string, password: string, name: string) => {
-    const user = await nexusServerService.register(email, password, name);
-    setNexusUser(user);
-    setNexusAuthenticated(true);
-  }, []);
-
-  const nexusLogout = useCallback(() => {
-    nexusServerService.logout();
-    setNexusUser(null);
-    setNexusAuthenticated(false);
-    setSyncStatus({
-      lastSyncAt: null,
-      tracksUploaded: 0,
-      tracksDownloaded: 0,
-    });
+  const nexusLogout = useCallback(async () => {
+    try {
+      await firebaseService.signOut();
+      setNexusUser(null);
+      setNexusAuthenticated(false);
+      setNexusIsPro(false);
+      setSyncStatus({
+        lastSyncAt: null,
+        tracksUploaded: 0,
+        tracksDownloaded: 0,
+      });
+      toast.success("Déconnecté");
+    } catch (error: any) {
+      console.error("Logout error:", error);
+      toast.error("Erreur lors de la déconnexion");
+    }
   }, []);
 
   const nexusUpgradeToPro = useCallback(async () => {
-    const url = await nexusServerService.getProCheckoutUrl();
-    
-    if (url === "DEMO_UPGRADE_SUCCESS") {
-      // Demo mode - user was upgraded locally
-      const updatedUser = nexusServerService.getUser();
-      setNexusUser(updatedUser);
-      toast.success("Passé au plan Pro !", {
-        description: "Mode démo: Upgrade simulé avec succès",
+    if (!stripeInitialized) {
+      toast.error("Stripe non configuré", {
+        description: "Vérifiez votre fichier .env",
       });
-    } else if (url) {
-      window.open(url, "_blank");
+      return;
     }
-  }, []);
+
+    if (!nexusAuthenticated) {
+      toast.error("Connectez-vous d'abord");
+      return;
+    }
+
+    try {
+      toast.info("Redirection vers Stripe...");
+      await stripeService.redirectToCheckout();
+    } catch (error: any) {
+      console.error("Upgrade error:", error);
+      toast.error("Erreur", {
+        description: error.message,
+      });
+    }
+  }, [stripeInitialized, nexusAuthenticated]);
 
   const nexusManageBilling = useCallback(async () => {
-    const url = await nexusServerService.getBillingPortalUrl();
-    
-    if (url === "DEMO_BILLING_PORTAL") {
-      toast.info("Portail de facturation", {
-        description: "Mode démo: Le portail n'est pas disponible",
-      });
-    } else if (url) {
-      window.open(url, "_blank");
+    if (!stripeInitialized) {
+      toast.error("Stripe non configuré");
+      return;
     }
-  }, []);
 
-  const refreshNexusUser = useCallback(async () => {
-    await nexusServerService.refreshUser();
-    setNexusUser(nexusServerService.getUser());
+    if (!nexusAuthenticated) {
+      toast.error("Connectez-vous d'abord");
+      return;
+    }
+
+    try {
+      toast.info("Redirection vers le portail...");
+      await stripeService.redirectToPortal();
+    } catch (error: any) {
+      console.error("Billing portal error:", error);
+      toast.error("Erreur", {
+        description: error.message,
+      });
+    }
+  }, [stripeInitialized, nexusAuthenticated]);
+
+  const refreshUser = useCallback(() => {
+    const profile = firebaseService.getUserProfile();
+    setNexusUser(profile);
+    setNexusIsPro(firebaseService.isPro());
   }, []);
 
   // Sync methods
@@ -205,10 +227,11 @@ export function useCloudSync(): UseCloudSyncReturn {
       toast.error("Configurez un service cloud d'abord");
       return;
     }
-    
+
+    setSyncLoading(true);
     try {
       await nexusServerService.startSync();
-      
+
       // Update sync status
       const status = await nexusServerService.getSyncStatus();
       setSyncStatus({
@@ -216,18 +239,27 @@ export function useCloudSync(): UseCloudSyncReturn {
         tracksUploaded: status.tracksUploaded,
         tracksDownloaded: status.tracksDownloaded,
       });
-      
+
       toast.success("Synchronisation terminée");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sync error:", error);
-      toast.error("Erreur de synchronisation");
+      toast.error("Erreur de synchronisation", {
+        description: error.message,
+      });
+    } finally {
+      setSyncLoading(false);
     }
   }, [nexusAuthenticated, cloudinaryConfigured]);
 
-  const isUploading = uploadProgress.size > 0 && 
-    Array.from(uploadProgress.values()).some(p => p.status === "uploading");
+  const isUploading =
+    uploadProgress.size > 0 &&
+    Array.from(uploadProgress.values()).some((p) => p.status === "uploading");
 
   return {
+    // Service status
+    firebaseInitialized,
+    stripeInitialized,
+
     // Cloudinary
     cloudinaryConfigured,
     cloudinaryConfig,
@@ -237,14 +269,12 @@ export function useCloudSync(): UseCloudSyncReturn {
     // Nexus Server
     nexusUser,
     nexusAuthenticated,
-    nexusIsPro: nexusUser?.plan === "pro",
-    nexusLogin,
-    nexusLoginWithEmail,
-    nexusRegister,
+    nexusIsPro,
+    nexusLoginWithGoogle,
     nexusLogout,
     nexusUpgradeToPro,
     nexusManageBilling,
-    refreshNexusUser,
+    refreshUser,
 
     // Upload status
     uploadProgress,
@@ -254,5 +284,6 @@ export function useCloudSync(): UseCloudSyncReturn {
     // Sync
     startSync,
     syncStatus,
+    syncLoading,
   };
 }

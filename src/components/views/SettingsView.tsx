@@ -24,7 +24,7 @@ import {
   Eye,
   EyeOff,
   LogOut,
-  Chrome,
+  AlertCircle,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -78,11 +78,26 @@ const SettingsCard = ({ title, icon: Icon, children, className }: SettingsCardPr
   </div>
 );
 
+// Config status alert
+const ConfigAlert = ({ configured, service }: { configured: boolean; service: string }) => {
+  if (configured) return null;
+  return (
+    <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
+      <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+      <p className="text-xs text-yellow-500">
+        {service} non configuré. Ajoutez les variables dans votre fichier .env
+      </p>
+    </div>
+  );
+};
+
 export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders } = useLibrary();
-  const { theme, setTheme, themes } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { enabled: notificationsEnabled, setEnabled: setNotificationsEnabled, notifySuccess, notifyError } = useNotifications();
   const {
+    firebaseInitialized,
+    stripeInitialized,
     cloudinaryConfigured,
     cloudinaryConfig,
     saveCloudinaryConfig,
@@ -90,7 +105,7 @@ export const SettingsView = () => {
     nexusUser,
     nexusAuthenticated,
     nexusIsPro,
-    nexusLogin,
+    nexusLoginWithGoogle,
     nexusLogout,
     nexusUpgradeToPro,
     nexusManageBilling,
@@ -98,6 +113,7 @@ export const SettingsView = () => {
     isUploading,
     syncStatus,
     startSync,
+    syncLoading,
   } = useCloudSync();
 
   const [settings, setSettings] = useState<Partial<Settings>>({
@@ -158,12 +174,29 @@ export const SettingsView = () => {
     loadSettings();
   }, [isElectron, cloudinaryConfig]);
 
+  // Handle URL params for Stripe success/cancel
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get("success");
+    const canceled = urlParams.get("canceled");
+
+    if (success === "true") {
+      toast.success("Paiement réussi !", {
+        description: "Bienvenue dans le plan Pro !",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (canceled === "true") {
+      toast.info("Paiement annulé");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     if (isElectron) {
       await window.electronAPI!.updateSettings({ [key]: value });
     }
-    // Update local storage as backup
     localStorage.setItem(`nexus-setting-${key}`, JSON.stringify(value));
   };
 
@@ -251,72 +284,54 @@ export const SettingsView = () => {
     notifySuccess("Configuration Cloudinary supprimée");
   };
 
-  // Google Sign In
+  // Google Sign In with Firebase
   const handleGoogleSignIn = async () => {
+    if (!firebaseInitialized) {
+      toast.error("Firebase non configuré", {
+        description: "Ajoutez les variables VITE_FIREBASE_* dans .env",
+      });
+      return;
+    }
+
     setAuthLoading(true);
     try {
-      // Demo mode - simulate Google OAuth
-      // In production, you would:
-      // 1. Set up Google OAuth credentials in Google Cloud Console
-      // 2. Use Google Identity Services for web
-      // 3. Use electron-oauth2 for Electron
-      
-      // Simulate authentication delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Create a mock Google user
-      const mockCredential = btoa(JSON.stringify({
-        email: "demo.user@gmail.com",
-        name: "Demo User",
-        picture: "https://ui-avatars.com/api/?name=Demo+User&background=4285F4&color=fff",
-      }));
-      
-      await nexusLogin(mockCredential, "google");
-      toast.success("Connecté avec Google", {
-        description: "Mode démo - authentification simulée",
-      });
+      await nexusLoginWithGoogle();
     } catch (err) {
-      console.error("Google sign in error:", err);
-      notifyError("Erreur lors de la connexion Google");
+      // Error already handled in hook
     } finally {
       setAuthLoading(false);
     }
   };
 
   // Handle logout
-  const handleLogout = () => {
-    nexusLogout();
-    notifySuccess("Déconnecté");
+  const handleLogout = async () => {
+    setAuthLoading(true);
+    try {
+      await nexusLogout();
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   // Handle upgrade to pro
   const handleUpgradeToPro = async () => {
-    try {
-      await nexusUpgradeToPro();
-      notifySuccess("Redirection vers le paiement...");
-    } catch (err) {
-      notifyError("Erreur lors de la redirection");
+    if (!stripeInitialized) {
+      toast.error("Stripe non configuré", {
+        description: "Ajoutez VITE_STRIPE_PUBLISHABLE_KEY dans .env",
+      });
+      return;
     }
+    await nexusUpgradeToPro();
   };
 
   // Handle manage billing
   const handleManageBilling = async () => {
-    try {
-      await nexusManageBilling();
-      notifySuccess("Ouverture du portail de facturation...");
-    } catch (err) {
-      notifyError("Erreur lors de l'ouverture du portail");
-    }
+    await nexusManageBilling();
   };
 
   // Handle sync
   const handleStartSync = async () => {
-    try {
-      await startSync();
-      notifySuccess("Synchronisation démarrée");
-    } catch (err) {
-      notifyError("Erreur lors de la synchronisation");
-    }
+    await startSync();
   };
 
   // Theme change handler
@@ -715,8 +730,10 @@ export const SettingsView = () => {
                 </div>
               </SettingsCard>
 
-              {/* Nexus Server */}
+              {/* Nexus Server with Firebase Auth */}
               <SettingsCard title="Serveur NEXUS" icon={Shield}>
+                <ConfigAlert configured={firebaseInitialized} service="Firebase" />
+                
                 <div className="space-y-4">
                   <div className="p-3 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
                     <p className="text-sm text-primary flex items-center gap-2">
@@ -731,15 +748,15 @@ export const SettingsView = () => {
                   {nexusAuthenticated && nexusUser ? (
                     <div className="space-y-4">
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                          {nexusUser.avatarUrl ? (
-                            <img src={nexusUser.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center overflow-hidden">
+                          {nexusUser.photoURL ? (
+                            <img src={nexusUser.photoURL} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <User className="w-6 h-6 text-muted-foreground" />
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium">{nexusUser.name}</p>
+                          <p className="font-medium">{nexusUser.displayName}</p>
                           <p className="text-xs text-muted-foreground">{nexusUser.email}</p>
                           <span className={cn(
                             "inline-block px-2 py-0.5 rounded text-xs mt-1",
@@ -751,19 +768,23 @@ export const SettingsView = () => {
                       </div>
 
                       {nexusIsPro ? (
-                        <Button variant="outline" size="sm" className="w-full" onClick={handleManageBilling}>
+                        <Button variant="outline" size="sm" className="w-full" onClick={handleManageBilling} disabled={!stripeInitialized}>
                           <CreditCard className="w-4 h-4 mr-2" />
                           Gérer l'abonnement
                         </Button>
                       ) : (
-                        <Button variant="default" size="sm" className="w-full" onClick={handleUpgradeToPro}>
+                        <Button variant="default" size="sm" className="w-full" onClick={handleUpgradeToPro} disabled={!stripeInitialized}>
                           <Sparkles className="w-4 h-4 mr-2" />
                           Passer au Pro - €9.99/mois
                         </Button>
                       )}
 
-                      <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={handleLogout}>
-                        <LogOut className="w-4 h-4 mr-2" />
+                      <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={handleLogout} disabled={authLoading}>
+                        {authLoading ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <LogOut className="w-4 h-4 mr-2" />
+                        )}
                         Se déconnecter
                       </Button>
                     </div>
@@ -780,12 +801,17 @@ export const SettingsView = () => {
                           size="sm" 
                           className="w-full gap-2"
                           onClick={handleGoogleSignIn}
-                          disabled={authLoading}
+                          disabled={authLoading || !firebaseInitialized}
                         >
                           {authLoading ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Chrome className="w-4 h-4" />
+                            <svg className="w-4 h-4" viewBox="0 0 24 24">
+                              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
                           )}
                           Continuer avec Google
                         </Button>
@@ -844,10 +870,10 @@ export const SettingsView = () => {
                     variant="default" 
                     size="sm" 
                     onClick={handleStartSync}
-                    disabled={!nexusAuthenticated && !cloudinaryConfigured}
+                    disabled={(!nexusAuthenticated && !cloudinaryConfigured) || syncLoading}
                   >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Synchroniser maintenant
+                    <RefreshCw className={cn("w-4 h-4 mr-2", syncLoading && "animate-spin")} />
+                    {syncLoading ? "Synchronisation..." : "Synchroniser maintenant"}
                   </Button>
                   {syncStatus.lastSyncAt && (
                     <p className="text-xs text-muted-foreground self-center">
@@ -867,13 +893,13 @@ export const SettingsView = () => {
                   <div className="space-y-4">
                     <div className="text-center py-4">
                       <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4 overflow-hidden">
-                        {nexusUser.avatarUrl ? (
-                          <img src={nexusUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        {nexusUser.photoURL ? (
+                          <img src={nexusUser.photoURL} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <User className="w-10 h-10 text-muted-foreground" />
                         )}
                       </div>
-                      <p className="text-lg font-medium">{nexusUser.name}</p>
+                      <p className="text-lg font-medium">{nexusUser.displayName}</p>
                       <p className="text-sm text-muted-foreground">{nexusUser.email}</p>
                       <div className="mt-2">
                         <span className={cn(
@@ -884,8 +910,12 @@ export const SettingsView = () => {
                         </span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full" onClick={handleLogout}>
-                      <LogOut className="w-4 h-4 mr-2" />
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleLogout} disabled={authLoading}>
+                      {authLoading ? (
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <LogOut className="w-4 h-4 mr-2" />
+                      )}
                       Se déconnecter
                     </Button>
                   </div>
@@ -901,12 +931,17 @@ export const SettingsView = () => {
                       size="sm" 
                       className="mt-4 gap-2"
                       onClick={handleGoogleSignIn}
-                      disabled={authLoading}
+                      disabled={authLoading || !firebaseInitialized}
                     >
                       {authLoading ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Chrome className="w-4 h-4" />
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
                       )}
                       Créer un compte
                     </Button>
@@ -927,6 +962,18 @@ export const SettingsView = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Mode</span>
                     <span className="text-sm">{isElectron ? "Desktop" : "Web"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Firebase</span>
+                    <span className={cn("text-sm", firebaseInitialized ? "text-green-500" : "text-yellow-500")}>
+                      {firebaseInitialized ? "Connecté" : "Non configuré"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Stripe</span>
+                    <span className={cn("text-sm", stripeInitialized ? "text-green-500" : "text-yellow-500")}>
+                      {stripeInitialized ? "Connecté" : "Non configuré"}
+                    </span>
                   </div>
                   <div className="pt-3 flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => notifySuccess("Vous êtes à jour !")}>
