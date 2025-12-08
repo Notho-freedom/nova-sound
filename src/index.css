@@ -303,3 +303,202 @@
 .animate-wave {
   animation: wave 0.8s ease-in-out infinite;
 }
+
+/* Additional animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes scale-in {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px hsl(var(--primary) / 0.5), 0 0 10px hsl(var(--primary) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.8), 0 0 20px hsl(var(--primary) / 0.5), 0 0 30px hsl(var(--primary) / 0.3);
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 0.3s ease-out;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Stagger animation delays */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Hover transitions */
+.hover-lift {
+  @apply transition-transform duration-200;
+}
+.hover-lift:hover {
+  @apply -translate-y-1;
+}
+
+.hover-scale {
+  @apply transition-transform duration-200;
+}
+.hover-scale:hover {
+  @apply scale-105;
+}
+
+.hover-glow {
+  @apply transition-shadow duration-200;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 15px hsl(var(--primary) / 0.4);
+}
+
+/* Theme: Light */
+.light {
+  --background: 0 0% 100%;
+  --foreground: 230 25% 10%;
+  --card: 0 0% 98%;
+  --card-foreground: 230 25% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 230 25% 10%;
+  --primary: 200 100% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 320 80% 50%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 220 15% 92%;
+  --muted-foreground: 220 15% 40%;
+  --accent: 270 60% 50%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 15% 85%;
+  --input: 220 15% 90%;
+  --ring: 200 100% 40%;
+  --neon-cyan: 200 100% 40%;
+  --neon-magenta: 320 80% 50%;
+  --neon-purple: 270 60% 50%;
+  --glass-bg: 0 0% 98%;
+  --glass-border: 220 15% 85%;
+}
+
+/* Theme: Cyberpunk */
+.cyberpunk {
+  --background: 270 40% 5%;
+  --foreground: 60 100% 95%;
+  --card: 270 45% 8%;
+  --card-foreground: 60 100% 95%;
+  --popover: 270 45% 8%;
+  --popover-foreground: 60 100% 95%;
+  --primary: 60 100% 50%;
+  --primary-foreground: 270 40% 5%;
+  --secondary: 320 100% 60%;
+  --secondary-foreground: 270 40% 5%;
+  --muted: 270 30% 15%;
+  --muted-foreground: 60 20% 55%;
+  --accent: 180 100% 50%;
+  --accent-foreground: 270 40% 5%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 60 100% 95%;
+  --border: 270 40% 20%;
+  --input: 270 40% 12%;
+  --ring: 60 100% 50%;
+  --neon-cyan: 180 100% 50%;
+  --neon-magenta: 320 100% 60%;
+  --neon-purple: 270 80% 60%;
+  --glass-bg: 270 45% 10%;
+  --glass-border: 270 50% 25%;
+}
+
+/* Theme: Minimal */
+.minimal {
+  --background: 0 0% 4%;
+  --foreground: 0 0% 90%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 90%;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 90%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 0 0% 60%;
+  --secondary-foreground: 0 0% 4%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 50%;
+  --accent: 0 0% 80%;
+  --accent-foreground: 0 0% 4%;
+  --destructive: 0 62.8% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 15%;
+  --input: 0 0% 10%;
+  --ring: 0 0% 100%;
+  --neon-cyan: 0 0% 100%;
+  --neon-magenta: 0 0% 80%;
+  --neon-purple: 0 0% 60%;
+  --glass-bg: 0 0% 8%;
+  --glass-border: 0 0% 20%;
+}

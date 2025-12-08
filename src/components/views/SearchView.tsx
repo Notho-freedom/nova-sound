@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Search, Play, X } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Search, Play, X, Clock, TrendingUp, Disc3, User, Music } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -18,14 +18,7 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-const categories = [
-  { name: "Électronique", color: "from-primary to-blue-500" },
-  { name: "Synthwave", color: "from-secondary to-pink-500" },
-  { name: "Ambient", color: "from-accent to-purple-500" },
-  { name: "Cyberpunk", color: "from-cyan-500 to-primary" },
-  { name: "Lo-Fi", color: "from-orange-500 to-red-500" },
-  { name: "Techno", color: "from-green-500 to-teal-500" },
-];
+const MAX_HISTORY = 8;
 
 export const SearchView = ({
   tracks,
@@ -34,18 +27,105 @@ export const SearchView = ({
   onTrackSelect,
 }: SearchViewProps) => {
   const [query, setQuery] = useState("");
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
-  const filteredTracks = query
-    ? tracks.filter(
-        (track) =>
-          track.title.toLowerCase().includes(query.toLowerCase()) ||
-          track.artist.toLowerCase().includes(query.toLowerCase()) ||
-          track.album.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  // Load search history from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("nexus-search-history");
+    if (saved) {
+      try {
+        setSearchHistory(JSON.parse(saved));
+      } catch {
+        setSearchHistory([]);
+      }
+    }
+  }, []);
+
+  // Save search history
+  const saveToHistory = (term: string) => {
+    if (!term.trim()) return;
+    const newHistory = [term, ...searchHistory.filter(h => h !== term)].slice(0, MAX_HISTORY);
+    setSearchHistory(newHistory);
+    localStorage.setItem("nexus-search-history", JSON.stringify(newHistory));
+  };
+
+  const clearHistory = () => {
+    setSearchHistory([]);
+    localStorage.removeItem("nexus-search-history");
+  };
+
+  const removeFromHistory = (term: string) => {
+    const newHistory = searchHistory.filter(h => h !== term);
+    setSearchHistory(newHistory);
+    localStorage.setItem("nexus-search-history", JSON.stringify(newHistory));
+  };
+
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!query.trim()) return { tracks: [], albums: [], artists: [] };
+
+    const q = query.toLowerCase();
+    
+    const matchedTracks = tracks.filter(t =>
+      t.title.toLowerCase().includes(q) ||
+      t.artist.toLowerCase().includes(q) ||
+      t.album.toLowerCase().includes(q)
+    );
+
+    // Group by album
+    const albumsMap = new Map<string, { name: string; artist: string; coverUrl: string; count: number }>();
+    matchedTracks.forEach(t => {
+      const key = `${t.album}-${t.artist}`;
+      if (!albumsMap.has(key)) {
+        albumsMap.set(key, { name: t.album, artist: t.artist, coverUrl: t.coverUrl, count: 0 });
+      }
+      albumsMap.get(key)!.count++;
+    });
+
+    // Group by artist
+    const artistsMap = new Map<string, { name: string; coverUrl: string; count: number }>();
+    matchedTracks.forEach(t => {
+      if (!artistsMap.has(t.artist)) {
+        artistsMap.set(t.artist, { name: t.artist, coverUrl: t.coverUrl, count: 0 });
+      }
+      artistsMap.get(t.artist)!.count++;
+    });
+
+    return {
+      tracks: matchedTracks,
+      albums: Array.from(albumsMap.values()).slice(0, 6),
+      artists: Array.from(artistsMap.values()).slice(0, 6)
+    };
+  }, [query, tracks]);
+
+  // Get unique genres from tracks
+  const genres = useMemo(() => {
+    const genreSet = new Set<string>();
+    tracks.forEach(t => {
+      if (t.genre) genreSet.add(t.genre);
+    });
+    return Array.from(genreSet).slice(0, 6);
+  }, [tracks]);
+
+  // Default categories if no genres
+  const defaultCategories = [
+    { name: "Électronique", color: "from-cyan-500 to-blue-600" },
+    { name: "Synthwave", color: "from-pink-500 to-purple-600" },
+    { name: "Ambient", color: "from-green-500 to-teal-600" },
+    { name: "Cyberpunk", color: "from-yellow-500 to-orange-600" },
+    { name: "Lo-Fi", color: "from-indigo-500 to-purple-600" },
+    { name: "Techno", color: "from-red-500 to-pink-600" },
+  ];
+
+  const handleSearch = (term: string) => {
+    setQuery(term);
+    saveToHistory(term);
+  };
+
+  const hasResults = query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0);
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-6 space-y-8 animate-in fade-in duration-300">
       {/* Search Input */}
       <div className="relative max-w-2xl">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -54,7 +134,12 @@ export const SearchView = ({
           placeholder="Rechercher des titres, artistes ou albums..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-12 pr-10 py-6 text-lg bg-muted/50 border-border/50 focus:border-primary focus:ring-primary"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && query.trim()) {
+              saveToHistory(query.trim());
+            }
+          }}
+          className="pl-12 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all"
         />
         {query && (
           <button
@@ -68,91 +153,228 @@ export const SearchView = ({
 
       {query ? (
         /* Search Results */
-        <div>
-          <h2 className="font-display text-lg tracking-wider mb-4">
-            RÉSULTATS ({filteredTracks.length})
-          </h2>
-          {filteredTracks.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                Aucun résultat pour "{query}"
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredTracks.map((track) => {
-                const actualIndex = tracks.findIndex((t) => t.id === track.id);
-                const isCurrentTrack = currentTrackIndex === actualIndex;
-
-                return (
-                  <div
-                    key={track.id}
-                    onClick={() => onTrackSelect(actualIndex)}
-                    className={cn(
-                      "flex items-center gap-4 p-3 rounded-lg cursor-pointer transition-all duration-200 group",
-                      isCurrentTrack
-                        ? "bg-primary/10 border border-primary/30"
-                        : "hover:bg-muted/50"
-                    )}
+        <div className="space-y-8">
+          {/* Artists Results */}
+          {searchResults.artists.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <User className="w-5 h-5 text-primary" />
+                <h2 className="font-display text-lg tracking-wider">ARTISTES</h2>
+              </div>
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {searchResults.artists.map((artist) => (
+                  <button
+                    key={artist.name}
+                    onClick={() => handleSearch(artist.name)}
+                    className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-colors text-center"
                   >
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
-                      <img
-                        src={getCoverUrl(track.coverUrl)}
-                        alt={track.album}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play className="w-5 h-5 text-white fill-current" />
-                      </div>
+                    <div className="w-24 h-24 rounded-full overflow-hidden mx-auto mb-2 bg-gradient-to-br from-primary/20 to-secondary/20">
+                      <img src={getCoverUrl(artist.coverUrl)} alt={artist.name} className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={cn(
-                          "text-sm font-medium truncate",
-                          isCurrentTrack ? "text-primary" : "text-foreground"
-                        )}
-                      >
-                        {track.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {track.artist} • {track.album}
-                      </p>
-                    </div>
-                    <span className="text-sm text-muted-foreground font-display">
-                      {formatTime(track.duration)}
-                    </span>
-                  </div>
-                );
-              })}
+                    <p className="text-sm font-medium truncate w-24">{artist.name}</p>
+                    <p className="text-xs text-muted-foreground">{artist.count} titres</p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Albums Results */}
+          {searchResults.albums.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Disc3 className="w-5 h-5 text-primary" />
+                <h2 className="font-display text-lg tracking-wider">ALBUMS</h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {searchResults.albums.map((album) => (
+                  <button
+                    key={`${album.name}-${album.artist}`}
+                    onClick={() => handleSearch(album.name)}
+                    className="p-3 rounded-xl hover:bg-card/50 transition-colors text-left"
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-2 shadow-lg">
+                      <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
+                    </div>
+                    <p className="text-sm font-medium truncate">{album.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tracks Results */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Music className="w-5 h-5 text-primary" />
+              <h2 className="font-display text-lg tracking-wider">
+                TITRES ({searchResults.tracks.length})
+              </h2>
+            </div>
+            {searchResults.tracks.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground">
+                  Aucun résultat pour "{query}"
+                </p>
+              </div>
+            ) : (
+              <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 divide-y divide-border/30">
+                {searchResults.tracks.slice(0, 20).map((track) => {
+                  const actualIndex = tracks.findIndex((t) => t.id === track.id);
+                  const isCurrentTrack = currentTrackIndex === actualIndex;
+
+                  return (
+                    <div
+                      key={track.id}
+                      onClick={() => onTrackSelect(actualIndex)}
+                      className={cn(
+                        "flex items-center gap-4 p-3 cursor-pointer transition-all duration-200 group",
+                        isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
+                      )}
+                    >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
+                        <img
+                          src={getCoverUrl(track.coverUrl)}
+                          alt={track.album}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Play className="w-5 h-5 text-white fill-current" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-medium truncate",
+                          isCurrentTrack ? "text-primary" : "text-foreground"
+                        )}>
+                          {track.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {track.artist} • {track.album}
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted-foreground font-mono">
+                        {formatTime(track.duration)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        /* Browse Categories */
-        <div>
-          <h2 className="font-display text-lg tracking-wider mb-4">
-            PARCOURIR LES GENRES
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {categories.map((category) => (
-              <button
-                key={category.name}
-                onClick={() => setQuery(category.name)}
-                className={cn(
-                  "relative h-32 rounded-xl overflow-hidden group",
-                  "bg-gradient-to-br",
-                  category.color
-                )}
-              >
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                <div className="absolute inset-0 flex items-end p-4">
-                  <h3 className="font-display text-xl font-bold text-white">
-                    {category.name}
-                  </h3>
+        /* Browse View */
+        <div className="space-y-8">
+          {/* Search History */}
+          {searchHistory.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-muted-foreground" />
+                  <h2 className="font-display text-lg tracking-wider">RECHERCHES RÉCENTES</h2>
                 </div>
-              </button>
-            ))}
+                <button
+                  onClick={clearHistory}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Effacer tout
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {searchHistory.map((term) => (
+                  <div
+                    key={term}
+                    className="group flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 hover:bg-card transition-colors"
+                  >
+                    <button
+                      onClick={() => setQuery(term)}
+                      className="text-sm text-foreground"
+                    >
+                      {term}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromHistory(term);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Browse by Genre */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              <h2 className="font-display text-lg tracking-wider">
+                {genres.length > 0 ? "VOS GENRES" : "PARCOURIR LES GENRES"}
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {(genres.length > 0 ? genres.map((g, i) => ({ 
+                name: g, 
+                color: defaultCategories[i % defaultCategories.length].color 
+              })) : defaultCategories).map((category) => (
+                <button
+                  key={category.name}
+                  onClick={() => handleSearch(category.name)}
+                  className={cn(
+                    "relative h-28 rounded-xl overflow-hidden group",
+                    "bg-gradient-to-br",
+                    category.color
+                  )}
+                >
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                  <div className="absolute inset-0 flex items-end p-4">
+                    <h3 className="font-display text-xl font-bold text-white">
+                      {category.name}
+                    </h3>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Quick Access - Top Artists */}
+          {tracks.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <User className="w-5 h-5 text-secondary" />
+                <h2 className="font-display text-lg tracking-wider">ARTISTES POPULAIRES</h2>
+              </div>
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {Array.from(new Set(tracks.map(t => t.artist))).slice(0, 8).map((artist) => {
+                  const artistTrack = tracks.find(t => t.artist === artist);
+                  return (
+                    <button
+                      key={artist}
+                      onClick={() => handleSearch(artist)}
+                      className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-colors text-center"
+                    >
+                      <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-2 shadow-lg">
+                        <img 
+                          src={getCoverUrl(artistTrack?.coverUrl)} 
+                          alt={artist} 
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                      <p className="text-sm font-medium truncate w-20">{artist}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

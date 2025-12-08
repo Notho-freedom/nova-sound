@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Home, 
   Library, 
@@ -8,17 +8,20 @@ import {
   Clock, 
   Disc3, 
   Users, 
-  Radio, 
-  Settings,
+  Video,
   Plus,
   FolderOpen,
   Download,
-  Mic2
+  ChevronLeft,
+  ChevronRight,
+  Music
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePlaylists } from "@/hooks/usePlaylists";
 
-type ViewType = 
+export type ViewType = 
   | "home" 
   | "library" 
   | "search" 
@@ -27,16 +30,20 @@ type ViewType =
   | "recent" 
   | "albums" 
   | "artists" 
-  | "radio"
+  | "videos"
   | "local"
   | "downloads"
-  | "podcasts"
-  | "settings";
+  | "settings"
+  | "album-detail"
+  | "artist-detail"
+  | "player";
 
 interface SidebarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
   favoritesCount?: number;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 const mainNavItems = [
@@ -53,9 +60,8 @@ const libraryItems = [
   { id: "artists" as ViewType, icon: Users, label: "Artistes" },
 ];
 
-const discoverItems = [
-  { id: "radio" as ViewType, icon: Radio, label: "Radio" },
-  { id: "podcasts" as ViewType, icon: Mic2, label: "Podcasts" },
+const mediaItems = [
+  { id: "videos" as ViewType, icon: Video, label: "Vidéos" },
 ];
 
 const localItems = [
@@ -69,49 +75,128 @@ interface NavItemProps {
   isActive: boolean;
   onClick: () => void;
   badge?: number;
+  collapsed?: boolean;
 }
 
-const NavItem = ({ icon: Icon, label, isActive, onClick, badge }: NavItemProps) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-      isActive 
-        ? "bg-primary/20 text-primary glow-cyan" 
-        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-    )}
-  >
-    <Icon className={cn(
-      "w-5 h-5 transition-all duration-200",
-      isActive && "drop-shadow-[0_0_8px_hsl(var(--neon-cyan))]"
-    )} />
-    <span className="text-sm font-medium flex-1 text-left">{label}</span>
-    {badge !== undefined && badge > 0 && (
-      <span className="px-2 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
-        {badge}
-      </span>
-    )}
-  </button>
-);
+const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed }: NavItemProps) => {
+  const button = (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-3 rounded-lg transition-all duration-300 group",
+        collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
+        isActive 
+          ? "bg-primary/20 text-primary glow-cyan" 
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+      )}
+    >
+      <Icon className={cn(
+        "w-5 h-5 transition-all duration-300 flex-shrink-0",
+        isActive && "drop-shadow-[0_0_8px_hsl(var(--neon-cyan))]"
+      )} />
+      {!collapsed && (
+        <>
+          <span className="text-sm font-medium flex-1 text-left truncate">{label}</span>
+          {badge !== undefined && badge > 0 && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+              {badge}
+            </span>
+          )}
+        </>
+      )}
+    </button>
+  );
 
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="px-3 py-2 text-[10px] font-display uppercase tracking-widest text-muted-foreground/50">
-    {children}
-  </h3>
-);
+  if (collapsed) {
+    return (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          {button}
+        </TooltipTrigger>
+        <TooltipContent side="right" className="flex items-center gap-2">
+          {label}
+          {badge !== undefined && badge > 0 && (
+            <span className="px-1.5 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+              {badge}
+            </span>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
 
-export const Sidebar = ({ currentView, onViewChange, favoritesCount }: SidebarProps) => {
-  const [playlists] = useState([
-    { id: 1, name: "Cyberpunk Mix", count: 24 },
-    { id: 2, name: "Night Drive", count: 18 },
-    { id: 3, name: "Focus Mode", count: 32 },
-    { id: 4, name: "Workout Beats", count: 45 },
-  ]);
+  return button;
+};
+
+const SectionTitle = ({ children, collapsed }: { children: React.ReactNode; collapsed?: boolean }) => {
+  if (collapsed) return null;
+  return (
+    <h3 className="px-3 py-2 text-[10px] font-display uppercase tracking-widest text-muted-foreground/50 transition-opacity duration-300">
+      {children}
+    </h3>
+  );
+};
+
+export const Sidebar = ({ 
+  currentView, 
+  onViewChange, 
+  favoritesCount,
+  collapsed: controlledCollapsed,
+  onCollapsedChange
+}: SidebarProps) => {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const collapsed = controlledCollapsed ?? internalCollapsed;
+  const { playlists } = usePlaylists();
+
+  const handleCollapsedChange = (value: boolean) => {
+    if (onCollapsedChange) {
+      onCollapsedChange(value);
+    } else {
+      setInternalCollapsed(value);
+    }
+  };
+
+  // Load collapsed state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('nexus-sidebar-collapsed');
+    if (saved !== null) {
+      handleCollapsedChange(saved === 'true');
+    }
+  }, []);
+
+  // Save collapsed state
+  useEffect(() => {
+    localStorage.setItem('nexus-sidebar-collapsed', String(collapsed));
+  }, [collapsed]);
 
   return (
-    <div className="w-56 h-full flex flex-col bg-card border-r border-border">
+    <div 
+      className={cn(
+        "h-full flex flex-col bg-card/50 backdrop-blur-sm border-r border-border/50 transition-all duration-300 ease-in-out relative",
+        collapsed ? "w-16" : "w-56"
+      )}
+    >
+      {/* Collapse Toggle Button */}
+      <button
+        onClick={() => handleCollapsedChange(!collapsed)}
+        className={cn(
+          "absolute -right-3 top-1/2 -translate-y-1/2 z-50",
+          "w-6 h-6 rounded-full bg-card border border-border",
+          "flex items-center justify-center",
+          "text-muted-foreground hover:text-primary hover:border-primary/50",
+          "transition-all duration-300 hover:scale-110",
+          "shadow-lg"
+        )}
+      >
+        {collapsed ? (
+          <ChevronRight className="w-3 h-3" />
+        ) : (
+          <ChevronLeft className="w-3 h-3" />
+        )}
+      </button>
+
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-6">
+        <div className={cn("p-2 space-y-4", collapsed && "px-1.5")}>
           {/* Main Navigation */}
           <div className="space-y-1">
             {mainNavItems.map((item) => (
@@ -121,13 +206,14 @@ export const Sidebar = ({ currentView, onViewChange, favoritesCount }: SidebarPr
                 label={item.label}
                 isActive={currentView === item.id}
                 onClick={() => onViewChange(item.id)}
+                collapsed={collapsed}
               />
             ))}
           </div>
 
           {/* Library */}
           <div>
-            <SectionTitle>Ma Musique</SectionTitle>
+            <SectionTitle collapsed={collapsed}>Ma Musique</SectionTitle>
             <div className="space-y-1">
               {libraryItems.map((item) => (
                 <NavItem
@@ -137,22 +223,24 @@ export const Sidebar = ({ currentView, onViewChange, favoritesCount }: SidebarPr
                   isActive={currentView === item.id}
                   onClick={() => onViewChange(item.id)}
                   badge={item.id === "favorites" ? favoritesCount : undefined}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
           </div>
 
-          {/* Discover */}
+          {/* Media */}
           <div>
-            <SectionTitle>Découvrir</SectionTitle>
+            <SectionTitle collapsed={collapsed}>Médias</SectionTitle>
             <div className="space-y-1">
-              {discoverItems.map((item) => (
+              {mediaItems.map((item) => (
                 <NavItem
                   key={item.id}
                   icon={item.icon}
                   label={item.label}
                   isActive={currentView === item.id}
                   onClick={() => onViewChange(item.id)}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
@@ -160,7 +248,7 @@ export const Sidebar = ({ currentView, onViewChange, favoritesCount }: SidebarPr
 
           {/* Local Files */}
           <div>
-            <SectionTitle>Local</SectionTitle>
+            <SectionTitle collapsed={collapsed}>Local</SectionTitle>
             <div className="space-y-1">
               {localItems.map((item) => (
                 <NavItem
@@ -169,52 +257,84 @@ export const Sidebar = ({ currentView, onViewChange, favoritesCount }: SidebarPr
                   label={item.label}
                   isActive={currentView === item.id}
                   onClick={() => onViewChange(item.id)}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
           </div>
 
-          {/* Playlists */}
-          <div>
-            <div className="flex items-center justify-between px-3 py-2">
-              <h3 className="text-[10px] font-display uppercase tracking-widest text-muted-foreground/50">
-                Playlists
-              </h3>
-              <button className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-primary transition-colors">
-                <Plus className="w-4 h-4" />
-              </button>
+          {/* Playlists - Only show when expanded */}
+          {!collapsed && (
+            <div className="animate-in fade-in slide-in-from-left-2 duration-300">
+              <div className="flex items-center justify-between px-3 py-2">
+                <h3 className="text-[10px] font-display uppercase tracking-widest text-muted-foreground/50">
+                  Playlists
+                </h3>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <button className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-primary transition-colors">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Créer une playlist</TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="space-y-1">
+                {playlists.slice(0, 5).map((playlist) => (
+                  <button
+                    key={playlist.id}
+                    onClick={() => onViewChange("playlists")}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 group"
+                  >
+                    <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all">
+                      <Music className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-sm truncate">{playlist.name}</p>
+                      <p className="text-xs text-muted-foreground">{playlist.trackIds.length} titres</p>
+                    </div>
+                  </button>
+                ))}
+                {playlists.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground italic">
+                    Aucune playlist
+                  </p>
+                )}
+                {playlists.length > 5 && (
+                  <button
+                    onClick={() => onViewChange("playlists")}
+                    className="w-full px-3 py-2 text-xs text-primary hover:underline text-left"
+                  >
+                    Voir tout ({playlists.length})
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="space-y-1">
-              {playlists.map((playlist) => (
+          )}
+
+          {/* Collapsed playlist indicator */}
+          {collapsed && playlists.length > 0 && (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
                 <button
-                  key={playlist.id}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  onClick={() => onViewChange("playlists")}
+                  className="w-full flex items-center justify-center px-2 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
                 >
-                  <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                    <ListMusic className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm truncate">{playlist.name}</p>
-                    <p className="text-xs text-muted-foreground">{playlist.count} titres</p>
+                  <div className="relative">
+                    <ListMusic className="w-5 h-5" />
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-[10px] flex items-center justify-center text-primary-foreground">
+                      {playlists.length}
+                    </span>
                   </div>
                 </button>
-              ))}
-            </div>
-          </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {playlists.length} Playlists
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </ScrollArea>
-
-      {/* Settings Button */}
-      <div className="p-3 border-t border-border">
-        <NavItem
-          icon={Settings}
-          label="Paramètres"
-          isActive={currentView === "settings"}
-          onClick={() => onViewChange("settings")}
-        />
-      </div>
     </div>
   );
 };
-
-export type { ViewType };

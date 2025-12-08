@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { 
   Play, 
   Pause, 
@@ -13,9 +12,11 @@ import {
   Heart,
   ListMusic,
   Maximize2,
-  Mic2
+  Mic2,
+  MoreHorizontal
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Track } from "@/types/music";
@@ -28,6 +29,7 @@ interface NowPlayingBarProps {
   repeatMode: "off" | "all" | "one";
   volume: number;
   isMuted: boolean;
+  isFavorite?: boolean;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -38,6 +40,9 @@ interface NowPlayingBarProps {
   onMuteToggle: () => void;
   onToggleQueue: () => void;
   onFullscreen: () => void;
+  onToggleFavorite?: () => void;
+  onShowPlayer?: () => void;
+  onShowLyrics?: () => void;
   isQueueOpen: boolean;
 }
 
@@ -55,6 +60,7 @@ export const NowPlayingBar = ({
   repeatMode,
   volume,
   isMuted,
+  isFavorite = false,
   onPlayPause,
   onPrevious,
   onNext,
@@ -65,169 +71,231 @@ export const NowPlayingBar = ({
   onMuteToggle,
   onToggleQueue,
   onFullscreen,
+  onToggleFavorite,
+  onShowPlayer,
+  onShowLyrics,
   isQueueOpen,
 }: NowPlayingBarProps) => {
-  const [isLiked, setIsLiked] = useState(false);
-
   const VolumeIcon = isMuted || volume === 0 
     ? VolumeX 
     : volume < 50 
       ? Volume1 
       : Volume2;
 
+  const progress = currentTrack.duration > 0 
+    ? (currentTime / currentTrack.duration) * 100 
+    : 0;
+
   return (
-    <div className="h-20 bg-card border-t border-border flex items-center px-4 gap-4">
-      {/* Track Info */}
-      <div className="w-72 flex items-center gap-3">
-        <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group">
-          <img 
-            src={getCoverUrl(currentTrack.coverUrl)} 
-            alt={currentTrack.album}
-            className="w-full h-full object-cover"
-          />
-          <button
-            onClick={onFullscreen}
-            className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <Maximize2 className="w-5 h-5 text-white" />
-          </button>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate text-foreground">
-            {currentTrack.title}
-          </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {currentTrack.artist}
-          </p>
-        </div>
-        <button
-          onClick={() => setIsLiked(!isLiked)}
-          className={cn(
-            "p-2 rounded-full transition-all duration-200",
-            isLiked 
-              ? "text-secondary glow-magenta" 
-              : "text-muted-foreground hover:text-secondary"
-          )}
+    <div className="bg-card/80 backdrop-blur-md border-t border-border/50 flex flex-col">
+      {/* Progress Bar - Full width at top */}
+      <div className="h-1 w-full bg-muted/30 cursor-pointer group" onClick={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        onSeek([percent * currentTrack.duration]);
+      }}>
+        <div 
+          className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-150 relative"
+          style={{ width: `${progress}%` }}
         >
-          <Heart className={cn("w-4 h-4", isLiked && "fill-current")} />
-        </button>
-      </div>
-
-      {/* Player Controls */}
-      <div className="flex-1 flex flex-col items-center gap-2 max-w-2xl">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onShuffle}
-            className={cn(
-              "p-2 rounded-full transition-all duration-200",
-              isShuffle 
-                ? "text-primary glow-cyan" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Shuffle className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={onPrevious}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <SkipBack className="w-5 h-5 fill-current" />
-          </button>
-          
-          <button
-            onClick={onPlayPause}
-            className="w-10 h-10 rounded-full bg-primary/20 text-primary border border-primary/50 flex items-center justify-center hover:bg-primary/30 hover:glow-cyan transition-all duration-200"
-          >
-            {isPlaying ? (
-              <Pause className="w-5 h-5 fill-current" />
-            ) : (
-              <Play className="w-5 h-5 fill-current ml-0.5" />
-            )}
-          </button>
-          
-          <button
-            onClick={onNext}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <SkipForward className="w-5 h-5 fill-current" />
-          </button>
-          
-          <button
-            onClick={onRepeat}
-            className={cn(
-              "p-2 rounded-full transition-all duration-200",
-              repeatMode !== "off" 
-                ? "text-primary glow-cyan" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {repeatMode === "one" ? (
-              <Repeat1 className="w-4 h-4" />
-            ) : (
-              <Repeat className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="w-full flex items-center gap-2">
-          <span className="text-xs text-muted-foreground w-10 text-right font-display">
-            {formatTime(currentTime)}
-          </span>
-          <Slider
-            value={[currentTime]}
-            max={currentTrack.duration}
-            step={1}
-            onValueChange={onSeek}
-            className="flex-1"
-          />
-          <span className="text-xs text-muted-foreground w-10 font-display">
-            {formatTime(currentTrack.duration)}
-          </span>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity shadow-lg shadow-primary/50" />
         </div>
       </div>
 
-      {/* Right Controls */}
-      <div className="w-72 flex items-center justify-end gap-2">
-        <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-          <Mic2 className="w-4 h-4" />
-        </button>
-        
-        <button
-          onClick={onToggleQueue}
-          className={cn(
-            "p-2 rounded-full transition-all duration-200",
-            isQueueOpen 
-              ? "text-primary glow-cyan" 
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <ListMusic className="w-4 h-4" />
-        </button>
-        
-        <div className="flex items-center gap-2 w-32">
-          <button
-            onClick={onMuteToggle}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <VolumeIcon className="w-4 h-4" />
-          </button>
-          <Slider
-            value={[isMuted ? 0 : volume]}
-            max={100}
-            step={1}
-            onValueChange={onVolumeChange}
-            className="flex-1"
-          />
-        </div>
+      {/* Main Content - Compact 2 rows */}
+      <div className="px-3 py-2">
+        <div className="flex items-center gap-3">
+          {/* Cover + Track Info - Left */}
+          <div className="flex items-center gap-3 min-w-0 w-64">
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onShowPlayer}
+                  className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group ring-2 ring-transparent hover:ring-primary/50 transition-all duration-300"
+                >
+                  <img 
+                    src={getCoverUrl(currentTrack.coverUrl)} 
+                    alt={currentTrack.album}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Maximize2 className="w-4 h-4 text-white" />
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Ouvrir le lecteur</TooltipContent>
+            </Tooltip>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate text-foreground hover:text-primary cursor-pointer transition-colors">
+                {currentTrack.title}
+              </p>
+              <p className="text-xs text-muted-foreground truncate hover:text-foreground cursor-pointer transition-colors">
+                {currentTrack.artist} • {currentTrack.album}
+              </p>
+            </div>
+          </div>
 
-        <button
-          onClick={onFullscreen}
-          className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
+          {/* Center Controls */}
+          <div className="flex-1 flex items-center justify-center gap-1">
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onShuffle}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all duration-200",
+                    isShuffle 
+                      ? "text-primary" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Shuffle className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Lecture aléatoire {isShuffle ? "activée" : "désactivée"}</TooltipContent>
+            </Tooltip>
+            
+            <button
+              onClick={onPrevious}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <SkipBack className="w-5 h-5 fill-current" />
+            </button>
+            
+            <button
+              onClick={onPlayPause}
+              className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 hover:shadow-lg hover:shadow-primary/30 transition-all duration-200"
+            >
+              {isPlaying ? (
+                <Pause className="w-4 h-4 fill-current" />
+              ) : (
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              )}
+            </button>
+            
+            <button
+              onClick={onNext}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <SkipForward className="w-5 h-5 fill-current" />
+            </button>
+            
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onRepeat}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all duration-200",
+                    repeatMode !== "off" 
+                      ? "text-primary" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {repeatMode === "one" ? (
+                    <Repeat1 className="w-4 h-4" />
+                  ) : (
+                    <Repeat className="w-4 h-4" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {repeatMode === "off" ? "Répéter désactivé" : repeatMode === "all" ? "Répéter tout" : "Répéter un"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Time Display */}
+          <div className="text-xs text-muted-foreground font-mono w-24 text-center">
+            {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
+          </div>
+
+          {/* Right Controls */}
+          <div className="flex items-center gap-0.5 w-64 justify-end">
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleFavorite}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all duration-200",
+                    isFavorite 
+                      ? "text-red-500" 
+                      : "text-muted-foreground hover:text-red-500"
+                  )}
+                >
+                  <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}</TooltipContent>
+            </Tooltip>
+
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onShowLyrics}
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Mic2 className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Paroles</TooltipContent>
+            </Tooltip>
+            
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleQueue}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all duration-200",
+                    isQueueOpen 
+                      ? "text-primary" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ListMusic className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>File d'attente</TooltipContent>
+            </Tooltip>
+            
+            {/* Volume */}
+            <div className="flex items-center gap-1 ml-2">
+              <button
+                onClick={onMuteToggle}
+                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <VolumeIcon className="w-4 h-4" />
+              </button>
+              <Slider
+                value={[isMuted ? 0 : volume]}
+                max={100}
+                step={1}
+                onValueChange={onVolumeChange}
+                className="w-20"
+              />
+            </div>
+
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onFullscreen}
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors ml-1"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Plein écran</TooltipContent>
+            </Tooltip>
+
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Plus d'options</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
       </div>
     </div>
   );
