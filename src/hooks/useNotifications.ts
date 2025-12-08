@@ -43,6 +43,16 @@ export function useNotifications(): UseNotificationsReturn {
   const setEnabled = useCallback((value: boolean) => {
     setEnabledState(value);
     localStorage.setItem("nexus-notifications-enabled", String(value));
+    
+    // Sync to Firebase
+    (async () => {
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        firebaseSyncService.queueSync('notifications', value);
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    })();
   }, []);
 
   const notify = useCallback((options: NotificationOptions) => {

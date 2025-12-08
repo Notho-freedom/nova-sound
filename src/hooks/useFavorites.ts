@@ -59,10 +59,20 @@ export function useFavorites(): UseFavoritesReturn {
     async (trackId: string) => {
       if (favorites.includes(trackId)) return;
 
+      const newFavorites = [...favorites, trackId];
+      
       if (isElectron) {
         await window.electronAPI!.addFavorite(trackId);
       }
-      setFavorites((prev) => [...prev, trackId]);
+      setFavorites(newFavorites);
+      
+      // Sync to Firebase
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        firebaseSyncService.queueSync('favorites', newFavorites);
+      } catch (error) {
+        console.error('Error syncing favorites to Firebase:', error);
+      }
     },
     [favorites, isElectron]
   );
@@ -71,10 +81,20 @@ export function useFavorites(): UseFavoritesReturn {
     async (trackId: string) => {
       if (!favorites.includes(trackId)) return;
 
+      const newFavorites = favorites.filter((id) => id !== trackId);
+      
       if (isElectron) {
         await window.electronAPI!.removeFavorite(trackId);
       }
-      setFavorites((prev) => prev.filter((id) => id !== trackId));
+      setFavorites(newFavorites);
+      
+      // Sync to Firebase
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        firebaseSyncService.queueSync('favorites', newFavorites);
+      } catch (error) {
+        console.error('Error syncing favorites to Firebase:', error);
+      }
     },
     [favorites, isElectron]
   );

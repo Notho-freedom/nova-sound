@@ -21,12 +21,24 @@ export function useTheme(): UseThemeReturn {
   const [theme, setThemeState] = useState<Theme>("dark");
   const [systemTheme, setSystemTheme] = useState<"dark" | "light">("dark");
 
-  // Load theme from localStorage
+  // Load theme from localStorage and listen to Firebase sync updates
   useEffect(() => {
     const saved = localStorage.getItem("nexus-theme") as Theme | null;
     if (saved && themes.some(t => t.id === saved)) {
       setThemeState(saved);
     }
+
+    // Listen to Firebase sync updates
+    const handleSyncUpdate = (event: CustomEvent) => {
+      if (event.detail?.theme && themes.some(t => t.id === event.detail.theme)) {
+        setThemeState(event.detail.theme);
+      }
+    };
+
+    window.addEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+    return () => {
+      window.removeEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+    };
 
     // Watch system theme changes
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -53,6 +65,16 @@ export function useTheme(): UseThemeReturn {
 
     // Save to localStorage
     localStorage.setItem("nexus-theme", theme);
+    
+    // Sync to Firebase
+    (async () => {
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        firebaseSyncService.queueSync('theme', theme);
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    })();
   }, [theme, systemTheme]);
 
   const setTheme = useCallback((newTheme: Theme) => {

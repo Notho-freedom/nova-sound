@@ -20,7 +20,7 @@ export function usePlaylists(): UsePlaylistsReturn {
 
   const isElectron = !!window.electronAPI;
 
-  // Load playlists on mount
+  // Load playlists on mount and listen to Firebase sync updates
   useEffect(() => {
     const loadPlaylists = async () => {
       if (!isElectron) {
@@ -44,6 +44,18 @@ export function usePlaylists(): UsePlaylistsReturn {
     };
 
     loadPlaylists();
+
+    // Listen to Firebase sync updates
+    const handlePlaylistsUpdate = (event: CustomEvent) => {
+      if (event.detail) {
+        setPlaylists(event.detail);
+      }
+    };
+
+    window.addEventListener('firebase-playlists-update', handlePlaylistsUpdate as EventListener);
+    return () => {
+      window.removeEventListener('firebase-playlists-update', handlePlaylistsUpdate as EventListener);
+    };
   }, [isElectron]);
 
   // Save to localStorage in web mode
@@ -56,50 +68,78 @@ export function usePlaylists(): UsePlaylistsReturn {
   const createPlaylist = useCallback(
     async (name: string, trackIds: string[] = []): Promise<Playlist | null> => {
       try {
+        let playlist: Playlist | null = null;
+        
         if (isElectron) {
-          const playlist = await window.electronAPI!.createPlaylist(name, trackIds);
-          setPlaylists((prev) => [...prev, playlist]);
-          return playlist;
+          playlist = await window.electronAPI!.createPlaylist(name, trackIds);
+          setPlaylists((prev) => [...prev, playlist!]);
         } else {
           // Web mode
-          const playlist: Playlist = {
+          playlist = {
             id: crypto.randomUUID(),
             name,
             trackIds,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          setPlaylists((prev) => [...prev, playlist]);
-          return playlist;
+          setPlaylists((prev) => [...prev, playlist!]);
         }
+        
+        // Sync to Firebase
+        if (playlist) {
+          try {
+            const { firebaseSyncService } = await import('../services/firebase-sync');
+            const updatedPlaylists = [...playlists, playlist];
+            firebaseSyncService.queueSync('playlists', updatedPlaylists);
+          } catch (error) {
+            console.error('Error syncing playlists to Firebase:', error);
+          }
+        }
+        
+        return playlist;
       } catch (err) {
         console.error("Failed to create playlist:", err);
         return null;
       }
     },
-    [isElectron]
+    [isElectron, playlists]
   );
 
   const updatePlaylist = useCallback(
     async (id: string, data: Partial<Playlist>): Promise<Playlist | null> => {
       try {
+        let updated: Playlist | null = null;
+        
         if (isElectron) {
-          const updated = await window.electronAPI!.updatePlaylist(id, data);
+          updated = await window.electronAPI!.updatePlaylist(id, data);
           setPlaylists((prev) =>
-            prev.map((p) => (p.id === id ? { ...p, ...updated } : p))
+            prev.map((p) => (p.id === id ? { ...p, ...updated! } : p))
           );
-          return updated;
         } else {
           // Web mode
-          setPlaylists((prev) =>
-            prev.map((p) =>
+          setPlaylists((prev) => {
+            const updatedPlaylists = prev.map((p) =>
               p.id === id
                 ? { ...p, ...data, updatedAt: new Date().toISOString() }
                 : p
-            )
-          );
-          return playlists.find((p) => p.id === id) || null;
+            );
+            updated = updatedPlaylists.find((p) => p.id === id) || null;
+            return updatedPlaylists;
+          });
         }
+        
+        // Sync to Firebase
+        if (updated) {
+          try {
+            const { firebaseSyncService } = await import('../services/firebase-sync');
+            const updatedPlaylists = playlists.map((p) => (p.id === id ? updated! : p));
+            firebaseSyncService.queueSync('playlists', updatedPlaylists);
+          } catch (error) {
+            console.error('Error syncing playlists to Firebase:', error);
+          }
+        }
+        
+        return updated;
       } catch (err) {
         console.error("Failed to update playlist:", err);
         return null;
@@ -114,12 +154,21 @@ export function usePlaylists(): UsePlaylistsReturn {
         if (isElectron) {
           await window.electronAPI!.deletePlaylist(id);
         }
-        setPlaylists((prev) => prev.filter((p) => p.id !== id));
+        const updatedPlaylists = playlists.filter((p) => p.id !== id);
+        setPlaylists(updatedPlaylists);
+        
+        // Sync to Firebase
+        try {
+          const { firebaseSyncService } = await import('../services/firebase-sync');
+          firebaseSyncService.queueSync('playlists', updatedPlaylists);
+        } catch (error) {
+          console.error('Error syncing playlists to Firebase:', error);
+        }
       } catch (err) {
         console.error("Failed to delete playlist:", err);
       }
     },
-    [isElectron]
+    [isElectron, playlists]
   );
 
   const addTracksToPlaylist = useCallback(

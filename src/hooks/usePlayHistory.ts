@@ -19,7 +19,7 @@ const MAX_HISTORY_SIZE = 100;
 export function usePlayHistory(): UsePlayHistoryReturn {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // Load history from localStorage
+  // Load history from localStorage and listen to Firebase sync updates
   useEffect(() => {
     const stored = localStorage.getItem("nexus-play-history");
     if (stored) {
@@ -29,11 +29,37 @@ export function usePlayHistory(): UsePlayHistoryReturn {
         setHistory([]);
       }
     }
+
+    // Listen to Firebase sync updates
+    const handleSyncUpdate = (event: CustomEvent) => {
+      if (event.detail?.history) {
+        setHistory(event.detail.history);
+      }
+    };
+
+    window.addEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+    return () => {
+      window.removeEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+    };
   }, []);
 
-  // Save history to localStorage
+  // Save history to localStorage and sync to Firebase
   useEffect(() => {
     localStorage.setItem("nexus-play-history", JSON.stringify(history));
+    
+    // Sync to Firebase (debounced to avoid too many writes)
+    const timeoutId = setTimeout(() => {
+      (async () => {
+        try {
+          const { firebaseSyncService } = await import('../services/firebase-sync');
+          firebaseSyncService.queueSync('history', history);
+        } catch (error) {
+          // Silently fail if Firebase sync is not available
+        }
+      })();
+    }, 1000); // Debounce 1 second
+    
+    return () => clearTimeout(timeoutId);
   }, [history]);
 
   const addToHistory = useCallback((trackId: string) => {

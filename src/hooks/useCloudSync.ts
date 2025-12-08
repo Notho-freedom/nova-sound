@@ -302,6 +302,16 @@ export function useCloudSync(): UseCloudSyncReturn {
             setNexusAuthenticated(!firebaseUser.isAnonymous);
             setNexusIsPro(firebaseService.isPro());
             
+            // Initialize Firebase sync for user data (only if authenticated with Google)
+            if (!firebaseUser.isAnonymous) {
+              try {
+                const { firebaseSyncService } = await import('../services/firebase-sync');
+                await firebaseSyncService.initializeSync(firebaseUser.uid);
+              } catch (error) {
+                console.error('Error initializing Firebase sync:', error);
+              }
+            }
+            
             // Load sync status (only for non-anonymous users)
             if (!firebaseUser.isAnonymous) {
               try {
