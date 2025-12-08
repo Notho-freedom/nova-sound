@@ -41,12 +41,31 @@ class NexusServerService {
 
   constructor() {
     // Load session from localStorage
+    this.loadSession();
+  }
+
+  private loadSession(): void {
     const savedSession = localStorage.getItem("nexus-server-session");
+    const savedUser = localStorage.getItem("nexus-server-user");
+    
     if (savedSession) {
       try {
         this.session = JSON.parse(savedSession);
+        // Check if session is expired
+        if (this.session && this.session.expiresAt < Date.now()) {
+          this.logout();
+          return;
+        }
       } catch {
         this.session = null;
+      }
+    }
+    
+    if (savedUser) {
+      try {
+        this.user = JSON.parse(savedUser);
+      } catch {
+        this.user = null;
       }
     }
   }
@@ -68,46 +87,118 @@ class NexusServerService {
 
   // Login with email/password
   async login(email: string, password: string): Promise<NexusUser> {
-    // Mock implementation - in real app, this would call the API
+    // Try to call the real API
     const response = await fetch(`${NEXUS_API_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     }).catch(() => null);
 
-    // Mock response for development
+    // Mock response for development when API is not available
     if (!response) {
-      // Simulate successful login for demo
-      this.session = {
-        accessToken: "mock_access_token",
-        refreshToken: "mock_refresh_token",
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      };
-      
-      this.user = {
-        id: "user_1",
-        email,
-        name: email.split("@")[0],
-        plan: "free",
-        storageUsed: 0,
-        storageLimit: 1024 * 1024 * 1024, // 1GB for free
-        createdAt: new Date().toISOString(),
-      };
-
-      localStorage.setItem("nexus-server-session", JSON.stringify(this.session));
-      localStorage.setItem("nexus-server-user", JSON.stringify(this.user));
-
-      return this.user;
+      return this.createMockSession(email, email.split("@")[0]);
     }
 
     const data = await response.json();
     this.session = data.session;
     this.user = data.user;
 
-    localStorage.setItem("nexus-server-session", JSON.stringify(this.session));
-    localStorage.setItem("nexus-server-user", JSON.stringify(this.user));
-
+    this.saveSession();
     return this.user;
+  }
+
+  // Login with Google
+  async loginWithGoogle(credential: string): Promise<NexusUser> {
+    // Try to call the real API with Google credential
+    const response = await fetch(`${NEXUS_API_URL}/auth/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential }),
+    }).catch(() => null);
+
+    // Mock response for development when API is not available
+    if (!response) {
+      // Decode JWT to get user info (for demo purposes)
+      try {
+        const payload = JSON.parse(atob(credential.split(".")[1]));
+        return this.createMockSession(
+          payload.email || "user@example.com",
+          payload.name || "Google User",
+          payload.picture
+        );
+      } catch {
+        return this.createMockSession(
+          "googleuser@example.com",
+          "Google User",
+          "https://lh3.googleusercontent.com/a/default-user"
+        );
+      }
+    }
+
+    const data = await response.json();
+    this.session = data.session;
+    this.user = data.user;
+
+    this.saveSession();
+    return this.user;
+  }
+
+  // Login with OAuth code (for popup flow)
+  async loginWithOAuthCode(code: string, provider: string): Promise<NexusUser> {
+    // Try to call the real API
+    const response = await fetch(`${NEXUS_API_URL}/auth/oauth/callback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, provider }),
+    }).catch(() => null);
+
+    // Mock response for development when API is not available
+    if (!response) {
+      return this.createMockSession(
+        `${provider}user@example.com`,
+        `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+        "https://lh3.googleusercontent.com/a/default-user"
+      );
+    }
+
+    const data = await response.json();
+    this.session = data.session;
+    this.user = data.user;
+
+    this.saveSession();
+    return this.user;
+  }
+
+  // Create mock session (for demo/development)
+  private createMockSession(email: string, name: string, avatarUrl?: string): NexusUser {
+    this.session = {
+      accessToken: `mock_access_token_${Date.now()}`,
+      refreshToken: `mock_refresh_token_${Date.now()}`,
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+    
+    this.user = {
+      id: `user_${Date.now()}`,
+      email,
+      name,
+      avatarUrl,
+      plan: "free",
+      storageUsed: 0,
+      storageLimit: 1024 * 1024 * 1024, // 1GB for free
+      createdAt: new Date().toISOString(),
+    };
+
+    this.saveSession();
+    return this.user;
+  }
+
+  private saveSession(): void {
+    if (this.session) {
+      localStorage.setItem("nexus-server-session", JSON.stringify(this.session));
+    }
+    if (this.user) {
+      localStorage.setItem("nexus-server-user", JSON.stringify(this.user));
+    }
   }
 
   // Register new account
@@ -120,7 +211,7 @@ class NexusServerService {
 
     // Mock response for development
     if (!response) {
-      return this.login(email, password);
+      return this.createMockSession(email, name);
     }
 
     const data = await response.json();
@@ -154,9 +245,20 @@ class NexusServerService {
       }),
     }).catch(() => null);
 
-    // Mock URL for development
+    // Mock URL for development - show message
     if (!response) {
-      return "https://checkout.stripe.com/mock_session";
+      // In demo mode, simulate upgrade
+      if (this.user) {
+        this.user.plan = "pro";
+        this.user.storageLimit = -1; // Unlimited
+        this.user.subscription = {
+          status: "active",
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          cancelAtPeriodEnd: false,
+        };
+        this.saveSession();
+      }
+      return "DEMO_UPGRADE_SUCCESS";
     }
 
     const data = await response.json();
@@ -179,7 +281,7 @@ class NexusServerService {
 
     // Mock URL for development
     if (!response) {
-      return "https://billing.stripe.com/mock_portal";
+      return "DEMO_BILLING_PORTAL";
     }
 
     const data = await response.json();
@@ -227,6 +329,13 @@ class NexusServerService {
           onProgress?.(progress);
           if (progress >= 100) {
             clearInterval(interval);
+            
+            // Update storage used
+            if (this.user) {
+              this.user.storageUsed += file.size;
+              this.saveSession();
+            }
+            
             resolve({
               id: `file_${Date.now()}`,
               url: `https://cdn.nexus-audio.com/files/${fileName}`,
@@ -274,7 +383,12 @@ class NexusServerService {
   // Get sync status
   async getSyncStatus(): Promise<SyncStatus> {
     if (!this.isAuthenticated()) {
-      throw new Error("Not authenticated");
+      return {
+        lastSyncAt: "",
+        tracksUploaded: 0,
+        tracksDownloaded: 0,
+        totalStorage: 0,
+      };
     }
 
     const response = await fetch(`${NEXUS_API_URL}/sync/status`, {
@@ -285,10 +399,14 @@ class NexusServerService {
 
     // Mock for development
     if (!response) {
+      const lastSync = localStorage.getItem("nexus-last-sync");
+      const tracksUploaded = parseInt(localStorage.getItem("nexus-tracks-uploaded") || "0");
+      const tracksDownloaded = parseInt(localStorage.getItem("nexus-tracks-downloaded") || "0");
+      
       return {
-        lastSyncAt: new Date().toISOString(),
-        tracksUploaded: 0,
-        tracksDownloaded: 0,
+        lastSyncAt: lastSync || "",
+        tracksUploaded,
+        tracksDownloaded,
         totalStorage: this.user?.storageUsed || 0,
       };
     }
@@ -302,10 +420,28 @@ class NexusServerService {
       throw new Error("Not authenticated");
     }
 
-    // This would start a background sync process
+    // Update last sync time
+    localStorage.setItem("nexus-last-sync", new Date().toISOString());
+    
     console.log("Starting sync...");
+    // In a real implementation, this would trigger a background sync
+  }
+
+  // Refresh user data
+  async refreshUser(): Promise<void> {
+    if (!this.isAuthenticated()) return;
+
+    const response = await fetch(`${NEXUS_API_URL}/user/me`, {
+      headers: {
+        Authorization: `Bearer ${this.session!.accessToken}`,
+      },
+    }).catch(() => null);
+
+    if (response) {
+      this.user = await response.json();
+      this.saveSession();
+    }
   }
 }
 
 export const nexusServerService = new NexusServerService();
-

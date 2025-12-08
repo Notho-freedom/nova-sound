@@ -16,6 +16,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
+import { useCloudSync } from "@/hooks/useCloudSync";
 import { getAudioSrc } from "@/lib/audio";
 import type { Track } from "@/types/music";
 
@@ -23,6 +24,7 @@ export const DesktopApp = () => {
   const { tracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory } = usePlayHistory();
+  const { overallProgress, isUploading } = useCloudSync();
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>("home");
@@ -529,7 +531,10 @@ export const DesktopApp = () => {
         )}
 
         {/* Title Bar */}
-        <TitleBar onOpenSettings={handleOpenSettings} />
+        <TitleBar 
+          onOpenSettings={handleOpenSettings} 
+          uploadProgress={isUploading ? overallProgress : undefined}
+        />
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden relative">

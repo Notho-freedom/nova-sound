@@ -6,7 +6,6 @@ import {
   Bell,
   Keyboard,
   HardDrive,
-  Monitor,
   Info,
   FolderOpen,
   RefreshCw,
@@ -24,6 +23,8 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  LogOut,
+  Chrome,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -34,6 +35,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/hooks/useLibrary";
+import { useCloudSync } from "@/hooks/useCloudSync";
+import { useTheme } from "@/hooks/useTheme";
+import { useNotifications } from "@/hooks/useNotifications";
+import { toast } from "sonner";
 import type { Settings } from "@/types/music";
 
 interface SettingRowProps {
@@ -75,6 +80,26 @@ const SettingsCard = ({ title, icon: Icon, children, className }: SettingsCardPr
 
 export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders } = useLibrary();
+  const { theme, setTheme, themes } = useTheme();
+  const { enabled: notificationsEnabled, setEnabled: setNotificationsEnabled, notifySuccess, notifyError } = useNotifications();
+  const {
+    cloudinaryConfigured,
+    cloudinaryConfig,
+    saveCloudinaryConfig,
+    clearCloudinaryConfig,
+    nexusUser,
+    nexusAuthenticated,
+    nexusIsPro,
+    nexusLogin,
+    nexusLogout,
+    nexusUpgradeToPro,
+    nexusManageBilling,
+    overallProgress,
+    isUploading,
+    syncStatus,
+    startSync,
+  } = useCloudSync();
+
   const [settings, setSettings] = useState<Partial<Settings>>({
     musicDirectories: [],
     crossfadeDuration: 5,
@@ -94,11 +119,13 @@ export const SettingsView = () => {
   });
   const [loading, setLoading] = useState(true);
   const [showCloudinaryKey, setShowCloudinaryKey] = useState(false);
-  const [cloudinaryConfig, setCloudinaryConfig] = useState({
+  const [cloudinaryForm, setCloudinaryForm] = useState({
     cloudName: "",
     apiKey: "",
     uploadPreset: "",
   });
+  const [savingCloudinary, setSavingCloudinary] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
   const isElectron = !!window.electronAPI;
 
   // Load settings from backend
@@ -108,7 +135,7 @@ export const SettingsView = () => {
         try {
           const [loadedSettings, status] = await Promise.all([
             window.electronAPI!.getSettings(),
-            window.electronAPI!.getScrobblerStatus(),
+            window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false }, libreFm: { connected: false } }),
           ]);
           setSettings(loadedSettings);
           setScrobblerStatus(status);
@@ -116,16 +143,28 @@ export const SettingsView = () => {
           console.error("Failed to load settings:", err);
         }
       }
+      
+      // Load cloudinary config
+      if (cloudinaryConfig) {
+        setCloudinaryForm({
+          cloudName: cloudinaryConfig.cloudName || "",
+          apiKey: cloudinaryConfig.apiKey || "",
+          uploadPreset: cloudinaryConfig.uploadPreset || "",
+        });
+      }
+      
       setLoading(false);
     };
     loadSettings();
-  }, [isElectron]);
+  }, [isElectron, cloudinaryConfig]);
 
   const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     if (isElectron) {
       await window.electronAPI!.updateSettings({ [key]: value });
     }
+    // Update local storage as backup
+    localStorage.setItem(`nexus-setting-${key}`, JSON.stringify(value));
   };
 
   const handleAddMusicFolder = async () => {
@@ -133,12 +172,14 @@ export const SettingsView = () => {
     if (folders.length > 0) {
       const newDirs = [...(settings.musicDirectories || []), ...folders];
       await updateSetting("musicDirectories", newDirs);
+      notifySuccess(`${folders.length} dossier(s) ajouté(s)`);
     }
   };
 
   const handleRemoveMusicFolder = async (folder: string) => {
     const newDirs = (settings.musicDirectories || []).filter((d) => d !== folder);
     await updateSetting("musicDirectories", newDirs);
+    notifySuccess("Dossier retiré");
   };
 
   const handleScanLibrary = async () => {
@@ -146,20 +187,30 @@ export const SettingsView = () => {
   };
 
   const handleConnectLastFm = async () => {
-    if (isElectron) {
-      await window.electronAPI!.authenticateLastFm();
+    if (isElectron && window.electronAPI?.authenticateLastFm) {
+      try {
+        await window.electronAPI.authenticateLastFm();
+        notifySuccess("Connecté à Last.fm");
+      } catch (err) {
+        notifyError("Échec de connexion à Last.fm");
+      }
     }
   };
 
   const handleConnectLibreFm = async () => {
-    if (isElectron) {
-      await window.electronAPI!.authenticateLibreFm();
+    if (isElectron && window.electronAPI?.authenticateLibreFm) {
+      try {
+        await window.electronAPI.authenticateLibreFm();
+        notifySuccess("Connecté à Libre.fm");
+      } catch (err) {
+        notifyError("Échec de connexion à Libre.fm");
+      }
     }
   };
 
   const handleDisconnectScrobbler = async (service: "lastfm" | "librefm") => {
-    if (isElectron) {
-      await window.electronAPI!.disconnectScrobbler(service);
+    if (isElectron && window.electronAPI?.disconnectScrobbler) {
+      await window.electronAPI.disconnectScrobbler(service);
       setScrobblerStatus((prev) => ({
         ...prev,
         [service === "lastfm" ? "lastFm" : "libreFm"]: {
@@ -167,7 +218,111 @@ export const SettingsView = () => {
           username: undefined,
         },
       }));
+      notifySuccess(`Déconnecté de ${service === "lastfm" ? "Last.fm" : "Libre.fm"}`);
     }
+  };
+
+  // Save Cloudinary config
+  const handleSaveCloudinary = async () => {
+    if (!cloudinaryForm.cloudName || !cloudinaryForm.uploadPreset) {
+      notifyError("Cloud Name et Upload Preset sont requis");
+      return;
+    }
+    
+    setSavingCloudinary(true);
+    try {
+      saveCloudinaryConfig({
+        cloudName: cloudinaryForm.cloudName,
+        apiKey: cloudinaryForm.apiKey,
+        uploadPreset: cloudinaryForm.uploadPreset,
+      });
+      notifySuccess("Configuration Cloudinary sauvegardée");
+    } catch (err) {
+      notifyError("Erreur lors de la sauvegarde");
+    } finally {
+      setSavingCloudinary(false);
+    }
+  };
+
+  // Clear Cloudinary config
+  const handleClearCloudinary = () => {
+    clearCloudinaryConfig();
+    setCloudinaryForm({ cloudName: "", apiKey: "", uploadPreset: "" });
+    notifySuccess("Configuration Cloudinary supprimée");
+  };
+
+  // Google Sign In
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      // Demo mode - simulate Google OAuth
+      // In production, you would:
+      // 1. Set up Google OAuth credentials in Google Cloud Console
+      // 2. Use Google Identity Services for web
+      // 3. Use electron-oauth2 for Electron
+      
+      // Simulate authentication delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Create a mock Google user
+      const mockCredential = btoa(JSON.stringify({
+        email: "demo.user@gmail.com",
+        name: "Demo User",
+        picture: "https://ui-avatars.com/api/?name=Demo+User&background=4285F4&color=fff",
+      }));
+      
+      await nexusLogin(mockCredential, "google");
+      toast.success("Connecté avec Google", {
+        description: "Mode démo - authentification simulée",
+      });
+    } catch (err) {
+      console.error("Google sign in error:", err);
+      notifyError("Erreur lors de la connexion Google");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    nexusLogout();
+    notifySuccess("Déconnecté");
+  };
+
+  // Handle upgrade to pro
+  const handleUpgradeToPro = async () => {
+    try {
+      await nexusUpgradeToPro();
+      notifySuccess("Redirection vers le paiement...");
+    } catch (err) {
+      notifyError("Erreur lors de la redirection");
+    }
+  };
+
+  // Handle manage billing
+  const handleManageBilling = async () => {
+    try {
+      await nexusManageBilling();
+      notifySuccess("Ouverture du portail de facturation...");
+    } catch (err) {
+      notifyError("Erreur lors de l'ouverture du portail");
+    }
+  };
+
+  // Handle sync
+  const handleStartSync = async () => {
+    try {
+      await startSync();
+      notifySuccess("Synchronisation démarrée");
+    } catch (err) {
+      notifyError("Erreur lors de la synchronisation");
+    }
+  };
+
+  // Theme change handler
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme as any);
+    notifySuccess(`Thème ${newTheme} appliqué`);
   };
 
   if (loading) {
@@ -411,43 +566,42 @@ export const SettingsView = () => {
           <TabsContent value="appearance" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SettingsCard title="Thème" icon={Palette}>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: "dark", label: "Sombre", color: "bg-zinc-900" },
-                    { id: "light", label: "Clair", color: "bg-zinc-100" },
-                    { id: "system", label: "Système", color: "bg-gradient-to-r from-zinc-900 to-zinc-100" },
-                  ].map((theme) => (
+                    { id: "dark", label: "Sombre", color: "bg-zinc-900", border: "border-cyan-500" },
+                    { id: "light", label: "Clair", color: "bg-zinc-100", border: "border-blue-500" },
+                    { id: "cyberpunk", label: "Cyberpunk", color: "bg-gradient-to-br from-purple-900 to-yellow-500", border: "border-yellow-500" },
+                    { id: "minimal", label: "Minimal", color: "bg-zinc-800", border: "border-white" },
+                  ].map((t) => (
                     <button
-                      key={theme.id}
-                      onClick={() => updateSetting("theme", theme.id as any)}
+                      key={t.id}
+                      onClick={() => handleThemeChange(t.id)}
                       className={cn(
                         "p-4 rounded-xl border-2 transition-all duration-200",
-                        settings.theme === theme.id
-                          ? "border-primary bg-primary/10"
+                        theme === t.id
+                          ? `${t.border} bg-primary/10`
                           : "border-transparent bg-muted/30 hover:bg-muted/50"
                       )}
                     >
-                      <div className={cn("w-full h-8 rounded-lg mb-2", theme.color)} />
-                      <span className="text-sm font-medium">{theme.label}</span>
+                      <div className={cn("w-full h-8 rounded-lg mb-2", t.color)} />
+                      <span className="text-sm font-medium">{t.label}</span>
+                      {theme === t.id && (
+                        <Check className="w-4 h-4 text-primary inline ml-2" />
+                      )}
                     </button>
                   ))}
-                </div>
-                <div className="mt-4 pt-4 border-t border-border/30">
-                  <p className="text-xs text-muted-foreground mb-3">Thèmes personnalisés (bientôt)</p>
-                  <div className="grid grid-cols-4 gap-2 opacity-50">
-                    {["Cyberpunk", "Ocean", "Forest", "Sunset"].map((name) => (
-                      <div key={name} className="p-2 rounded-lg bg-muted/30 text-center">
-                        <div className="w-full h-4 rounded bg-gradient-to-r from-primary/50 to-secondary/50 mb-1" />
-                        <span className="text-[10px]">{name}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </SettingsCard>
 
               <SettingsCard title="Notifications" icon={Bell}>
                 <SettingRow label="Notifications de bureau" description="Affiche le titre en cours">
-                  <Switch checked={settings.notificationsEnabled} onCheckedChange={(v) => updateSetting("notificationsEnabled", v)} />
+                  <Switch 
+                    checked={notificationsEnabled} 
+                    onCheckedChange={(v) => {
+                      setNotificationsEnabled(v);
+                      if (v) notifySuccess("Notifications activées");
+                    }} 
+                  />
                 </SettingRow>
                 <SettingRow label="Son de notification" description="Joue un son">
                   <Switch checked={false} disabled />
@@ -491,48 +645,73 @@ export const SettingsView = () => {
                     </p>
                   </div>
                   
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs">Cloud Name</Label>
-                      <Input
-                        value={cloudinaryConfig.cloudName}
-                        onChange={(e) => setCloudinaryConfig(prev => ({ ...prev, cloudName: e.target.value }))}
-                        placeholder="votre-cloud-name"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">API Key</Label>
-                      <div className="relative mt-1">
-                        <Input
-                          type={showCloudinaryKey ? "text" : "password"}
-                          value={cloudinaryConfig.apiKey}
-                          onChange={(e) => setCloudinaryConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                          placeholder="••••••••••••"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCloudinaryKey(!showCloudinaryKey)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showCloudinaryKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                  {cloudinaryConfigured ? (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <p className="text-sm text-green-400 flex items-center gap-2">
+                          <Check className="w-4 h-4" />
+                          Configuré: {cloudinaryConfig?.cloudName}
+                        </p>
                       </div>
+                      <Button variant="outline" size="sm" className="w-full" onClick={handleClearCloudinary}>
+                        <X className="w-4 h-4 mr-2" />
+                        Supprimer la configuration
+                      </Button>
                     </div>
-                    <div>
-                      <Label className="text-xs">Upload Preset (unsigned)</Label>
-                      <Input
-                        value={cloudinaryConfig.uploadPreset}
-                        onChange={(e) => setCloudinaryConfig(prev => ({ ...prev, uploadPreset: e.target.value }))}
-                        placeholder="preset-name"
-                        className="mt-1"
-                      />
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs">Cloud Name *</Label>
+                        <Input
+                          value={cloudinaryForm.cloudName}
+                          onChange={(e) => setCloudinaryForm(prev => ({ ...prev, cloudName: e.target.value }))}
+                          placeholder="votre-cloud-name"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">API Key (optionnel)</Label>
+                        <div className="relative mt-1">
+                          <Input
+                            type={showCloudinaryKey ? "text" : "password"}
+                            value={cloudinaryForm.apiKey}
+                            onChange={(e) => setCloudinaryForm(prev => ({ ...prev, apiKey: e.target.value }))}
+                            placeholder="••••••••••••"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCloudinaryKey(!showCloudinaryKey)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showCloudinaryKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Upload Preset (unsigned) *</Label>
+                        <Input
+                          value={cloudinaryForm.uploadPreset}
+                          onChange={(e) => setCloudinaryForm(prev => ({ ...prev, uploadPreset: e.target.value }))}
+                          placeholder="preset-name"
+                          className="mt-1"
+                        />
+                      </div>
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="w-full" 
+                        onClick={handleSaveCloudinary}
+                        disabled={savingCloudinary || !cloudinaryForm.cloudName || !cloudinaryForm.uploadPreset}
+                      >
+                        {savingCloudinary ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4 mr-2" />
+                        )}
+                        Sauvegarder
+                      </Button>
                     </div>
-                    <Button variant="default" size="sm" className="w-full">
-                      <Check className="w-4 h-4 mr-2" />
-                      Sauvegarder
-                    </Button>
-                  </div>
+                  )}
                 </div>
               </SettingsCard>
 
@@ -549,53 +728,132 @@ export const SettingsView = () => {
                     </p>
                   </div>
 
-                  <div className="text-center py-4">
-                    <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-3">
-                      <User className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">Non connecté</p>
-                    <Button variant="default" size="sm">
-                      <User className="w-4 h-4 mr-2" />
-                      Se connecter
-                    </Button>
-                  </div>
+                  {nexusAuthenticated && nexusUser ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                          {nexusUser.avatarUrl ? (
+                            <img src={nexusUser.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <User className="w-6 h-6 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{nexusUser.name}</p>
+                          <p className="text-xs text-muted-foreground">{nexusUser.email}</p>
+                          <span className={cn(
+                            "inline-block px-2 py-0.5 rounded text-xs mt-1",
+                            nexusIsPro ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                          )}>
+                            {nexusIsPro ? "Pro" : "Gratuit"}
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="border-t border-border/30 pt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Plan Pro</span>
-                      <span className="text-xs text-primary">€9.99/mois</span>
+                      {nexusIsPro ? (
+                        <Button variant="outline" size="sm" className="w-full" onClick={handleManageBilling}>
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Gérer l'abonnement
+                        </Button>
+                      ) : (
+                        <Button variant="default" size="sm" className="w-full" onClick={handleUpgradeToPro}>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Passer au Pro - €9.99/mois
+                        </Button>
+                      )}
+
+                      <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={handleLogout}>
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Se déconnecter
+                      </Button>
                     </div>
-                    <ul className="space-y-1.5 text-xs text-muted-foreground">
-                      <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Stockage illimité</li>
-                      <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Sync multi-appareils</li>
-                      <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Support prioritaire</li>
-                    </ul>
-                    <Button variant="outline" size="sm" className="w-full mt-3">
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Passer au Pro
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="text-center py-4">
+                        <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-3">
+                          <User className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">Connectez-vous pour synchroniser</p>
+                        
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="w-full gap-2"
+                          onClick={handleGoogleSignIn}
+                          disabled={authLoading}
+                        >
+                          {authLoading ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Chrome className="w-4 h-4" />
+                          )}
+                          Continuer avec Google
+                        </Button>
+                      </div>
+
+                      <div className="border-t border-border/30 pt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">Plan Pro</span>
+                          <span className="text-xs text-primary">€9.99/mois</span>
+                        </div>
+                        <ul className="space-y-1.5 text-xs text-muted-foreground">
+                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Stockage illimité</li>
+                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Sync multi-appareils</li>
+                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Support prioritaire</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </SettingsCard>
 
               {/* Sync Status */}
               <SettingsCard title="Synchronisation" icon={RefreshCw} className="lg:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="p-4 rounded-lg bg-muted/30 text-center">
                     <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-2xl font-bold font-mono">0</p>
+                    <p className="text-2xl font-bold font-mono">{syncStatus.tracksUploaded}</p>
                     <p className="text-xs text-muted-foreground">Fichiers uploadés</p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/30 text-center">
                     <Download className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-2xl font-bold font-mono">0</p>
+                    <p className="text-2xl font-bold font-mono">{syncStatus.tracksDownloaded}</p>
                     <p className="text-xs text-muted-foreground">Fichiers téléchargés</p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/30 text-center">
                     <HardDrive className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-2xl font-bold font-mono">0 Mo</p>
+                    <p className="text-2xl font-bold font-mono">
+                      {nexusUser ? `${Math.round(nexusUser.storageUsed / (1024 * 1024))} Mo` : "0 Mo"}
+                    </p>
                     <p className="text-xs text-muted-foreground">Espace utilisé</p>
                   </div>
+                </div>
+
+                {isUploading && (
+                  <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Upload en cours...</span>
+                      <span className="text-primary font-mono">{overallProgress}%</span>
+                    </div>
+                    <Progress value={overallProgress} className="h-1.5" />
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleStartSync}
+                    disabled={!nexusAuthenticated && !cloudinaryConfigured}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Synchroniser maintenant
+                  </Button>
+                  {syncStatus.lastSyncAt && (
+                    <p className="text-xs text-muted-foreground self-center">
+                      Dernière sync: {new Date(syncStatus.lastSyncAt).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </SettingsCard>
             </div>
@@ -605,16 +863,55 @@ export const SettingsView = () => {
           <TabsContent value="account" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SettingsCard title="Profil" icon={User}>
-                <div className="text-center py-6">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
-                    <User className="w-10 h-10 text-muted-foreground" />
+                {nexusAuthenticated && nexusUser ? (
+                  <div className="space-y-4">
+                    <div className="text-center py-4">
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4 overflow-hidden">
+                        {nexusUser.avatarUrl ? (
+                          <img src={nexusUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-10 h-10 text-muted-foreground" />
+                        )}
+                      </div>
+                      <p className="text-lg font-medium">{nexusUser.name}</p>
+                      <p className="text-sm text-muted-foreground">{nexusUser.email}</p>
+                      <div className="mt-2">
+                        <span className={cn(
+                          "inline-block px-3 py-1 rounded-full text-sm",
+                          nexusIsPro ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                        )}>
+                          {nexusIsPro ? "Plan Pro" : "Plan Gratuit"}
+                        </span>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleLogout}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Se déconnecter
+                    </Button>
                   </div>
-                  <p className="text-lg font-medium">Utilisateur local</p>
-                  <p className="text-sm text-muted-foreground">Mode hors ligne</p>
-                  <Button variant="outline" size="sm" className="mt-4">
-                    Créer un compte
-                  </Button>
-                </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
+                      <User className="w-10 h-10 text-muted-foreground" />
+                    </div>
+                    <p className="text-lg font-medium">Utilisateur local</p>
+                    <p className="text-sm text-muted-foreground">Mode hors ligne</p>
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="mt-4 gap-2"
+                      onClick={handleGoogleSignIn}
+                      disabled={authLoading}
+                    >
+                      {authLoading ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Chrome className="w-4 h-4" />
+                      )}
+                      Créer un compte
+                    </Button>
+                  </div>
+                )}
               </SettingsCard>
 
               <SettingsCard title="À propos" icon={Info}>
@@ -632,13 +929,13 @@ export const SettingsView = () => {
                     <span className="text-sm">{isElectron ? "Desktop" : "Web"}</span>
                   </div>
                   <div className="pt-3 flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => notifySuccess("Vous êtes à jour !")}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Mises à jour
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => window.open("https://github.com/nexus-audio", "_blank")}>
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      Licences
+                      GitHub
                     </Button>
                   </div>
                 </div>
