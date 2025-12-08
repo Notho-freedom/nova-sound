@@ -383,7 +383,7 @@ export const FullscreenPlayer = ({
 
   // Fullscreen mode
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[10000] bg-background flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
       <BackgroundEffects />
       
       {/* Background blur from album art */}

@@ -410,7 +410,7 @@ export const Sidebar = ({
 
       {/* Edit Playlist Name Dialog */}
       {editingPlaylist && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50">
           <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Renommer la playlist</h3>
             <input

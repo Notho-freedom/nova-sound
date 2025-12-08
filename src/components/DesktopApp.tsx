@@ -613,7 +613,7 @@ export const DesktopApp = () => {
 
         {/* Scan progress indicator */}
         {scanning && scanProgress && (
-          <div className="fixed bottom-20 right-4 glass rounded-lg p-4 z-50 max-w-xs animate-in slide-in-from-right duration-300">
+          <div className="fixed bottom-20 right-4 glass rounded-lg p-4 z-[10000] max-w-xs animate-in slide-in-from-right duration-300">
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               <div>
