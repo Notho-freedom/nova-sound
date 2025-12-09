@@ -83,6 +83,19 @@
     --border: 230 30% 20%;
     --input: 230 30% 15%;
     --ring: 180 100% 50%;
+    --neon-cyan: 180 100% 50%;
+    --neon-magenta: 320 100% 60%;
+    --neon-purple: 270 80% 60%;
+    --glass-bg: 230 30% 10%;
+    --glass-border: 230 40% 25%;
+    --sidebar-background: 230 30% 8%;
+    --sidebar-foreground: 200 100% 95%;
+    --sidebar-primary: 180 100% 50%;
+    --sidebar-primary-foreground: 230 25% 5%;
+    --sidebar-accent: 230 20% 15%;
+    --sidebar-accent-foreground: 200 100% 95%;
+    --sidebar-border: 230 30% 20%;
+    --sidebar-ring: 180 100% 50%;
   }
 }
 
@@ -445,6 +458,14 @@
   --neon-purple: 270 60% 50%;
   --glass-bg: 0 0% 98%;
   --glass-border: 220 15% 85%;
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 230 25% 10%;
+  --sidebar-primary: 200 100% 40%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 15% 92%;
+  --sidebar-accent-foreground: 230 25% 10%;
+  --sidebar-border: 220 15% 85%;
+  --sidebar-ring: 200 100% 40%;
 }
 
 /* Theme: Cyberpunk */
@@ -473,6 +494,14 @@
   --neon-purple: 270 80% 60%;
   --glass-bg: 270 45% 10%;
   --glass-border: 270 50% 25%;
+  --sidebar-background: 270 40% 4%;
+  --sidebar-foreground: 60 100% 95%;
+  --sidebar-primary: 60 100% 50%;
+  --sidebar-primary-foreground: 270 40% 5%;
+  --sidebar-accent: 270 30% 15%;
+  --sidebar-accent-foreground: 60 100% 95%;
+  --sidebar-border: 270 40% 20%;
+  --sidebar-ring: 60 100% 50%;
 }
 
 /* Theme: Minimal */
@@ -501,144 +530,177 @@
   --neon-purple: 0 0% 60%;
   --glass-bg: 0 0% 8%;
   --glass-border: 0 0% 20%;
+  --sidebar-background: 0 0% 3%;
+  --sidebar-foreground: 0 0% 90%;
+  --sidebar-primary: 0 0% 100%;
+  --sidebar-primary-foreground: 0 0% 4%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 0 0% 90%;
+  --sidebar-border: 0 0% 15%;
+  --sidebar-ring: 0 0% 100%;
 }
 
-/* Theme: Spotify */
+/* Theme: Spotify - Noir profond avec vert emblématique #1DB954 */
 .spotify {
-  --background: 141 73% 12%;
-  --foreground: 0 0% 100%;
-  --card: 141 73% 15%;
+  --background: 0 0% 8%;           /* #121212 - Fond principal très sombre */
+  --foreground: 0 0% 100%;          /* Blanc pur pour le texte */
+  --card: 0 0% 10%;                 /* #191414 - Cartes légèrement plus claires */
   --card-foreground: 0 0% 100%;
-  --popover: 141 73% 15%;
+  --popover: 0 0% 12%;              /* Popovers avec fond légèrement éclairci */
   --popover-foreground: 0 0% 100%;
-  --primary: 141 73% 55%;
+  --primary: 141 73% 50%;           /* #1DB954 - Vert Spotify emblématique */
   --primary-foreground: 0 0% 100%;
-  --secondary: 141 73% 35%;
+  --secondary: 141 50% 35%;         /* Vert secondaire plus sombre */
   --secondary-foreground: 0 0% 100%;
-  --muted: 141 50% 20%;
-  --muted-foreground: 141 20% 70%;
-  --accent: 141 73% 45%;
+  --muted: 0 0% 18%;                /* Zones muettes gris très foncé */
+  --muted-foreground: 0 0% 70%;     /* Texte muet gris clair */
+  --accent: 141 73% 45%;            /* Accent vert légèrement plus sombre */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
+  --destructive: 0 84% 60%;         /* Rouge pour actions destructives */
   --destructive-foreground: 0 0% 100%;
-  --border: 141 50% 25%;
-  --input: 141 50% 18%;
-  --ring: 141 73% 55%;
-  --neon-cyan: 141 73% 55%;
-  --neon-magenta: 141 73% 45%;
-  --neon-purple: 141 73% 35%;
-  --glass-bg: 141 73% 14%;
-  --glass-border: 141 50% 25%;
+  --border: 0 0% 20%;               /* Bordures gris foncé subtiles */
+  --input: 0 0% 15%;                /* Champs de saisie très sombres */
+  --ring: 141 73% 50%;              /* Focus ring vert Spotify */
+  --neon-cyan: 141 73% 50%;         /* Vert pour effets néon */
+  --neon-magenta: 141 60% 40%;      /* Vert plus sombre pour variété */
+  --neon-purple: 141 50% 30%;       /* Vert très sombre pour profondeur */
+  --glass-bg: 0 0% 9%;              /* Fond glassmorphism */
+  --glass-border: 0 0% 25%;         /* Bordure glassmorphism */
+  --sidebar-background: 0 0% 7%;    /* Sidebar encore plus sombre */
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 141 73% 50%;   /* Accent vert dans sidebar */
+  --sidebar-accent: 0 0% 18%;
+  --sidebar-border: 0 0% 20%;
 }
 
-/* Theme: Apple Music */
+/* Theme: Apple Music - Rose/Rouge vif #FC3C44 avec fond sombre élégant */
 .apple-music {
-  --background: 350 100% 8%;
-  --foreground: 0 0% 100%;
-  --card: 350 100% 10%;
-  --card-foreground: 0 0% 100%;
-  --popover: 350 100% 10%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 350 100% 60%;
+  --background: 350 100% 6%;       /* Fond très sombre avec teinte rose */
+  --foreground: 0 0% 98%;           /* Presque blanc pour contraste doux */
+  --card: 350 100% 8%;              /* Cartes avec légère teinte rose */
+  --card-foreground: 0 0% 98%;
+  --popover: 350 100% 9%;           /* Popovers avec teinte rose subtile */
+  --popover-foreground: 0 0% 98%;
+  --primary: 350 100% 60%;          /* #FC3C44 - Rouge/rose Apple Music */
   --primary-foreground: 0 0% 100%;
-  --secondary: 350 80% 40%;
+  --secondary: 350 80% 45%;         /* Rose secondaire plus doux */
   --secondary-foreground: 0 0% 100%;
-  --muted: 350 50% 18%;
-  --muted-foreground: 350 20% 70%;
-  --accent: 350 100% 50%;
+  --muted: 350 40% 15%;            /* Zones muettes avec teinte rose */
+  --muted-foreground: 350 20% 65%;  /* Texte muet avec teinte rose */
+  --accent: 350 100% 55%;           /* Accent rose vif */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
+  --destructive: 0 84% 60%;         /* Rouge pour actions destructives */
   --destructive-foreground: 0 0% 100%;
-  --border: 350 50% 22%;
-  --input: 350 50% 15%;
-  --ring: 350 100% 60%;
-  --neon-cyan: 350 100% 60%;
-  --neon-magenta: 350 100% 50%;
-  --neon-purple: 350 80% 40%;
-  --glass-bg: 350 100% 9%;
-  --glass-border: 350 50% 22%;
+  --border: 350 50% 20%;           /* Bordures avec teinte rose */
+  --input: 350 40% 12%;             /* Champs avec teinte rose subtile */
+  --ring: 350 100% 60%;             /* Focus ring rose Apple Music */
+  --neon-cyan: 350 100% 60%;       /* Rose pour effets néon */
+  --neon-magenta: 350 90% 50%;      /* Rose plus foncé */
+  --neon-purple: 350 70% 40%;       /* Rose très foncé */
+  --glass-bg: 350 100% 7%;         /* Fond glassmorphism */
+  --glass-border: 350 60% 25%;      /* Bordure glassmorphism */
+  --sidebar-background: 350 100% 5%; /* Sidebar très sombre */
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 350 100% 60%;  /* Accent rose dans sidebar */
+  --sidebar-accent: 350 40% 15%;
+  --sidebar-border: 350 50% 20%;
 }
 
-/* Theme: YouTube Music */
+/* Theme: YouTube Music - Rouge vif #FF0000 avec noir profond */
 .youtube-music {
-  --background: 0 72% 10%;
-  --foreground: 0 0% 100%;
-  --card: 0 72% 12%;
+  --background: 0 0% 7%;            /* #121212 - Fond noir profond */
+  --foreground: 0 0% 100%;          /* Blanc pur */
+  --card: 0 0% 9%;                  /* Cartes légèrement plus claires */
   --card-foreground: 0 0% 100%;
-  --popover: 0 72% 12%;
+  --popover: 0 0% 10%;              /* Popovers avec fond sombre */
   --popover-foreground: 0 0% 100%;
-  --primary: 0 72% 55%;
+  --primary: 0 100% 50%;            /* #FF0000 - Rouge YouTube pur */
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 72% 35%;
+  --secondary: 0 80% 40%;           /* Rouge secondaire plus sombre */
   --secondary-foreground: 0 0% 100%;
-  --muted: 0 50% 18%;
-  --muted-foreground: 0 20% 70%;
-  --accent: 0 72% 45%;
+  --muted: 0 0% 16%;                /* Zones muettes gris très foncé */
+  --muted-foreground: 0 0% 65%;     /* Texte muet gris moyen */
+  --accent: 0 100% 45%;             /* Accent rouge légèrement plus sombre */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
+  --destructive: 0 84% 60%;         /* Rouge pour actions destructives */
   --destructive-foreground: 0 0% 100%;
-  --border: 0 50% 22%;
-  --input: 0 50% 15%;
-  --ring: 0 72% 55%;
-  --neon-cyan: 0 72% 55%;
-  --neon-magenta: 0 72% 45%;
-  --neon-purple: 0 72% 35%;
-  --glass-bg: 0 72% 11%;
-  --glass-border: 0 50% 22%;
+  --border: 0 0% 18%;               /* Bordures gris foncé */
+  --input: 0 0% 12%;                /* Champs de saisie très sombres */
+  --ring: 0 100% 50%;               /* Focus ring rouge YouTube */
+  --neon-cyan: 0 100% 50%;          /* Rouge pour effets néon */
+  --neon-magenta: 0 90% 40%;        /* Rouge plus foncé */
+  --neon-purple: 0 70% 30%;         /* Rouge très foncé */
+  --glass-bg: 0 0% 8%;              /* Fond glassmorphism */
+  --glass-border: 0 0% 22%;         /* Bordure glassmorphism */
+  --sidebar-background: 0 0% 6%;    /* Sidebar très sombre */
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 0 100% 50%;    /* Accent rouge dans sidebar */
+  --sidebar-accent: 0 0% 16%;
+  --sidebar-border: 0 0% 18%;
 }
 
-/* Theme: Tidal */
+/* Theme: Tidal - Cyan #00FFFF avec noir élégant */
 .tidal {
-  --background: 220 100% 8%;
-  --foreground: 0 0% 100%;
-  --card: 220 100% 10%;
-  --card-foreground: 0 0% 100%;
-  --popover: 220 100% 10%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 220 100% 60%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 80% 40%;
+  --background: 200 100% 4%;       /* Fond bleu très foncé */
+  --foreground: 0 0% 98%;           /* Presque blanc */
+  --card: 200 100% 6%;              /* Cartes avec teinte bleue */
+  --card-foreground: 0 0% 98%;
+  --popover: 200 100% 7%;           /* Popovers avec teinte bleue */
+  --popover-foreground: 0 0% 98%;
+  --primary: 180 100% 50%;          /* #00FFFF - Cyan Tidal pur */
+  --primary-foreground: 200 100% 4%;
+  --secondary: 180 80% 40%;         /* Cyan secondaire plus sombre */
   --secondary-foreground: 0 0% 100%;
-  --muted: 220 50% 18%;
-  --muted-foreground: 220 20% 70%;
-  --accent: 220 100% 50%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
+  --muted: 200 50% 12%;            /* Zones muettes avec teinte bleue */
+  --muted-foreground: 200 20% 60%;  /* Texte muet avec teinte bleue */
+  --accent: 180 100% 45%;           /* Accent cyan légèrement plus sombre */
+  --accent-foreground: 200 100% 4%;
+  --destructive: 0 84% 60%;         /* Rouge pour actions destructives */
   --destructive-foreground: 0 0% 100%;
-  --border: 220 50% 22%;
-  --input: 220 50% 15%;
-  --ring: 220 100% 60%;
-  --neon-cyan: 220 100% 60%;
-  --neon-magenta: 220 100% 50%;
-  --neon-purple: 220 80% 40%;
-  --glass-bg: 220 100% 9%;
-  --glass-border: 220 50% 22%;
+  --border: 200 50% 18%;           /* Bordures avec teinte bleue */
+  --input: 200 50% 10%;            /* Champs avec teinte bleue */
+  --ring: 180 100% 50%;             /* Focus ring cyan Tidal */
+  --neon-cyan: 180 100% 50%;       /* Cyan pour effets néon */
+  --neon-magenta: 180 90% 40%;     /* Cyan plus foncé */
+  --neon-purple: 180 70% 30%;      /* Cyan très foncé */
+  --glass-bg: 200 100% 5%;         /* Fond glassmorphism */
+  --glass-border: 200 60% 22%;     /* Bordure glassmorphism */
+  --sidebar-background: 200 100% 3%; /* Sidebar très sombre */
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 180 100% 50%;  /* Accent cyan dans sidebar */
+  --sidebar-accent: 200 50% 12%;
+  --sidebar-border: 200 50% 18%;
 }
 
-/* Theme: Deezer */
+/* Theme: Deezer - Bleu ciel #00C7F2 et rose #FF0090 avec fond sombre */
 .deezer {
-  --background: 280 60% 10%;
-  --foreground: 0 0% 100%;
-  --card: 280 60% 12%;
-  --card-foreground: 0 0% 100%;
-  --popover: 280 60% 12%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 280 100% 65%;
+  --background: 190 100% 8%;        /* Fond bleu très foncé */
+  --foreground: 0 0% 98%;            /* Presque blanc */
+  --card: 190 100% 10%;             /* Cartes avec teinte bleue */
+  --card-foreground: 0 0% 98%;
+  --popover: 190 100% 11%;          /* Popovers avec teinte bleue */
+  --popover-foreground: 0 0% 98%;
+  --primary: 190 100% 47%;          /* #00C7F2 - Bleu ciel Deezer */
   --primary-foreground: 0 0% 100%;
-  --secondary: 320 80% 50%;
+  --secondary: 320 100% 50%;        /* #FF0090 - Rose vif Deezer */
   --secondary-foreground: 0 0% 100%;
-  --muted: 280 40% 18%;
-  --muted-foreground: 280 20% 70%;
-  --accent: 320 100% 60%;
+  --muted: 190 50% 15%;             /* Zones muettes avec teinte bleue */
+  --muted-foreground: 190 20% 65%;  /* Texte muet avec teinte bleue */
+  --accent: 320 100% 55%;           /* Accent rose vif */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84.2% 60.2%;
+  --destructive: 0 84% 60%;         /* Rouge pour actions destructives */
   --destructive-foreground: 0 0% 100%;
-  --border: 280 40% 22%;
-  --input: 280 40% 15%;
-  --ring: 280 100% 65%;
-  --neon-cyan: 280 100% 65%;
-  --neon-magenta: 320 100% 60%;
-  --neon-purple: 280 80% 50%;
-  --glass-bg: 280 60% 11%;
-  --glass-border: 280 40% 22%;
+  --border: 190 50% 20%;           /* Bordures avec teinte bleue */
+  --input: 190 50% 12%;            /* Champs avec teinte bleue */
+  --ring: 190 100% 47%;            /* Focus ring bleu Deezer */
+  --neon-cyan: 190 100% 47%;        /* Bleu pour effets néon */
+  --neon-magenta: 320 100% 50%;    /* Rose pour effets néon */
+  --neon-purple: 280 80% 50%;      /* Violet pour variété */
+  --glass-bg: 190 100% 9%;         /* Fond glassmorphism */
+  --glass-border: 190 60% 25%;     /* Bordure glassmorphism */
+  --sidebar-background: 190 100% 7%; /* Sidebar très sombre */
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 190 100% 47%;  /* Accent bleu dans sidebar */
+  --sidebar-accent: 190 50% 15%;
+  --sidebar-border: 190 50% 20%;
 }

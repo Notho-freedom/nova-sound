@@ -697,15 +697,15 @@ export const SettingsView = () => {
               <SettingsCard title="Thème" icon={Palette}>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
-                    { id: "dark", label: "Sombre", color: "bg-zinc-900", border: "border-cyan-500" },
-                    { id: "light", label: "Clair", color: "bg-zinc-100", border: "border-blue-500" },
-                    { id: "cyberpunk", label: "Cyberpunk", color: "bg-gradient-to-br from-purple-900 to-yellow-500", border: "border-yellow-500" },
-                    { id: "minimal", label: "Minimal", color: "bg-zinc-800", border: "border-white" },
-                    { id: "spotify", label: "Spotify", color: "bg-gradient-to-br from-green-600 to-green-800", border: "border-green-500" },
-                    { id: "apple-music", label: "Apple Music", color: "bg-gradient-to-br from-pink-600 to-red-600", border: "border-pink-500" },
-                    { id: "youtube-music", label: "YouTube Music", color: "bg-gradient-to-br from-red-600 to-red-800", border: "border-red-500" },
-                    { id: "tidal", label: "Tidal", color: "bg-gradient-to-br from-blue-600 to-blue-800", border: "border-blue-500" },
-                    { id: "deezer", label: "Deezer", color: "bg-gradient-to-br from-purple-600 to-pink-600", border: "border-purple-500" },
+                    { id: "dark", label: "Sombre", color: "bg-gradient-to-br from-zinc-900 to-zinc-950", border: "border-cyan-500" },
+                    { id: "light", label: "Clair", color: "bg-gradient-to-br from-zinc-50 to-zinc-100", border: "border-blue-500" },
+                    { id: "cyberpunk", label: "Cyberpunk", color: "bg-gradient-to-br from-purple-900 via-yellow-600 to-purple-800", border: "border-yellow-500" },
+                    { id: "minimal", label: "Minimal", color: "bg-gradient-to-br from-zinc-900 to-black", border: "border-white" },
+                    { id: "spotify", label: "Spotify", color: "bg-gradient-to-br from-[#121212] via-[#1DB954] to-[#191414]", border: "border-[#1DB954]" },
+                    { id: "apple-music", label: "Apple Music", color: "bg-gradient-to-br from-[#1a0f0f] via-[#FC3C44] to-[#2a1515]", border: "border-[#FC3C44]" },
+                    { id: "youtube-music", label: "YouTube Music", color: "bg-gradient-to-br from-[#121212] via-[#FF0000] to-[#1a0a0a]", border: "border-[#FF0000]" },
+                    { id: "tidal", label: "Tidal", color: "bg-gradient-to-br from-[#0a1a1f] via-[#00FFFF] to-[#0f1f2a]", border: "border-[#00FFFF]" },
+                    { id: "deezer", label: "Deezer", color: "bg-gradient-to-br from-[#00C7F2] via-[#FF0090] to-[#0a1a1f]", border: "border-[#00C7F2]" },
                   ].map((t) => (
                     <button
                       key={t.id}
