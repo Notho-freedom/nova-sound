@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-export type Theme = "dark" | "light" | "cyberpunk" | "minimal" | "spotify" | "apple-music" | "youtube-music" | "tidal" | "deezer" | "system";
+export type Theme = "dark" | "light" | "cyberpunk" | "minimal" | "spotify" | "apple-music" | "youtube-music" | "tidal" | "deezer" | "apple" | "system";
 
 interface UseThemeReturn {
   theme: Theme;
@@ -19,6 +19,7 @@ const themes: { id: Theme; name: string }[] = [
   { id: "youtube-music", name: "YouTube Music" },
   { id: "tidal", name: "Tidal" },
   { id: "deezer", name: "Deezer" },
+  { id: "apple", name: "Apple" },
   { id: "system", name: "Système" },
 ];
 
@@ -63,7 +64,7 @@ export function useTheme(): UseThemeReturn {
     const resolvedTheme = theme === "system" ? systemTheme : theme;
 
     // Remove all theme classes
-    root.classList.remove("dark", "light", "cyberpunk", "minimal", "spotify", "apple-music", "youtube-music", "tidal", "deezer");
+    root.classList.remove("dark", "light", "cyberpunk", "minimal", "spotify", "apple-music", "youtube-music", "tidal", "deezer", "apple");
 
     // Add current theme class
     root.classList.add(resolvedTheme);

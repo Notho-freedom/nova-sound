@@ -3,6 +3,7 @@
 @import '@fontsource/rajdhani/400.css';
 @import '@fontsource/rajdhani/500.css';
 @import '@fontsource/rajdhani/600.css';
+/* Apple-style fonts use system fonts (SF Pro on Apple devices, Inter/Segoe UI as fallback) */
 
 @tailwind base;
 @tailwind components;
@@ -96,6 +97,31 @@
     --sidebar-accent-foreground: 200 100% 95%;
     --sidebar-border: 230 30% 20%;
     --sidebar-ring: 180 100% 50%;
+
+    /* Design Style Variables - Nexus (default) */
+    --design-font-display: 'Orbitron', sans-serif;
+    --design-font-body: 'Rajdhani', sans-serif;
+    --design-radius-sm: 0.5rem;
+    --design-radius-md: 0.75rem;
+    --design-radius-lg: 1rem;
+    --design-radius-xl: 1.5rem;
+    --design-spacing-tight: 0.5rem;
+    --design-spacing-normal: 1rem;
+    --design-spacing-relaxed: 1.5rem;
+    --design-spacing-loose: 2rem;
+    --design-shadow-sm: 0 2px 8px hsl(var(--neon-cyan) / 0.2);
+    --design-shadow-md: 0 4px 16px hsl(var(--neon-cyan) / 0.3);
+    --design-shadow-lg: 0 8px 32px hsl(var(--neon-cyan) / 0.4);
+    --design-shadow-xl: 0 16px 64px hsl(var(--neon-cyan) / 0.5);
+    --design-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --design-transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --design-transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+    --design-blur-sm: blur(8px);
+    --design-blur-md: blur(16px);
+    --design-blur-lg: blur(24px);
+    --design-blur-xl: blur(40px);
+    --design-border-width: 1px;
+    --design-border-opacity: 0.3;
   }
 }
 
@@ -109,10 +135,15 @@
   }
 
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--design-font-body);
     /* Prevent text selection for desktop app feel */
     -webkit-user-select: none;
     user-select: none;
+    /* Smooth scrolling for Apple style */
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Allow text selection in specific areas */
@@ -122,7 +153,22 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display;
+    font-family: var(--design-font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  
+  /* Apple-style typography refinements */
+  .design-apple h1, .design-apple h2, .design-apple h3, 
+  .design-apple h4, .design-apple h5, .design-apple h6 {
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+  
+  .design-apple p, .design-apple span, .design-apple div {
+    letter-spacing: -0.01em;
+    line-height: 1.5;
   }
 
   /* Remove focus outline on all interactive elements */
@@ -133,11 +179,41 @@
 
 @layer utilities {
   .glass {
-    @apply bg-glass/80 backdrop-blur-xl border border-glass-border/50;
+    background: var(--design-card-backdrop, hsl(var(--glass-bg) / 0.8));
+    backdrop-filter: var(--design-blur-md, blur(16px));
+    border: var(--design-border-width, 1px) solid hsl(var(--glass-border) / var(--design-border-opacity, 0.3));
+    transition: all var(--design-transition-normal, 300ms);
   }
 
   .glass-strong {
-    @apply bg-glass/90 backdrop-blur-2xl border border-glass-border/70;
+    background: var(--design-card-backdrop, hsl(var(--glass-bg) / 0.9));
+    backdrop-filter: var(--design-blur-lg, blur(24px));
+    border: var(--design-border-width-thick, 2px) solid hsl(var(--glass-border) / 0.5);
+    transition: all var(--design-transition-normal, 300ms);
+  }
+  
+  /* Apple-style glass - more subtle */
+  .design-apple .glass {
+    background: var(--design-glass-bg, rgba(255, 255, 255, 0.05));
+    backdrop-filter: var(--design-blur-backdrop, saturate(180%) blur(20px));
+    border: var(--design-border-width, 0.5px) solid var(--design-glass-border, rgba(255, 255, 255, 0.1));
+    box-shadow: var(--design-shadow-sm);
+  }
+  
+  .design-apple .glass-strong {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: saturate(180%) blur(30px);
+    border: 0.5px solid rgba(255, 255, 255, 0.15);
+    box-shadow: var(--design-shadow-md);
+  }
+  
+  /* Nexus-style enhancements */
+  .design-nexus .glass {
+    box-shadow: var(--design-shadow-md), var(--design-border-glow);
+  }
+  
+  .design-nexus .glass-strong {
+    box-shadow: var(--design-shadow-lg), var(--design-border-glow);
   }
 
   .neon-text-cyan {
@@ -703,4 +779,316 @@
   --sidebar-primary: 190 100% 47%;  /* Accent bleu dans sidebar */
   --sidebar-accent: 190 50% 15%;
   --sidebar-border: 190 50% 20%;
+}
+
+/* Theme: Apple - Design minimaliste et élégant */
+.apple {
+  --background: 0 0% 98%;           /* Fond blanc très clair */
+  --foreground: 0 0% 8%;             /* Texte presque noir */
+  --card: 0 0% 100%;                 /* Cartes blanches pures */
+  --card-foreground: 0 0% 8%;
+  --popover: 0 0% 100%;              /* Popovers blancs */
+  --popover-foreground: 0 0% 8%;
+  --primary: 210 100% 50%;           /* Bleu Apple (#007AFF) */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 96%;             /* Gris très clair */
+  --secondary-foreground: 0 0% 8%;
+  --muted: 0 0% 96%;                 /* Zones muettes gris clair */
+  --muted-foreground: 0 0% 45%;      /* Texte muet gris moyen */
+  --accent: 210 100% 55%;            /* Accent bleu légèrement plus clair */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;          /* Rouge pour actions destructives */
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 90%;                /* Bordures gris très clair */
+  --input: 0 0% 100%;                /* Champs blancs */
+  --ring: 210 100% 50%;              /* Focus ring bleu Apple */
+  --neon-cyan: 210 100% 50%;         /* Bleu pour cohérence */
+  --neon-magenta: 280 60% 50%;      /* Violet doux */
+  --neon-purple: 270 50% 50%;        /* Violet doux */
+  --glass-bg: 0 0% 100%;             /* Fond glassmorphism blanc */
+  --glass-border: 0 0% 90%;          /* Bordure glassmorphism */
+  --sidebar-background: 0 0% 97%;    /* Sidebar gris très clair */
+  --sidebar-foreground: 0 0% 8%;
+  --sidebar-primary: 210 100% 50%;  /* Accent bleu dans sidebar */
+  --sidebar-accent: 0 0% 94%;
+  --sidebar-border: 0 0% 90%;
+}
+
+/* Apple dark mode variant */
+.apple.dark,
+.dark.apple {
+  --background: 0 0% 8%;             /* Fond noir */
+  --foreground: 0 0% 98%;            /* Texte blanc */
+  --card: 0 0% 10%;                  /* Cartes gris très foncé */
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 10%;               /* Popovers gris foncé */
+  --popover-foreground: 0 0% 98%;
+  --primary: 210 100% 50%;           /* Bleu Apple (#007AFF) */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 15%;             /* Gris foncé */
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 15%;                 /* Zones muettes gris foncé */
+  --muted-foreground: 0 0% 60%;     /* Texte muet gris clair */
+  --accent: 210 100% 55%;            /* Accent bleu */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;          /* Rouge */
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 20%;                /* Bordures gris foncé */
+  --input: 0 0% 12%;                 /* Champs gris très foncé */
+  --ring: 210 100% 50%;              /* Focus ring bleu Apple */
+  --neon-cyan: 210 100% 50%;         /* Bleu */
+  --neon-magenta: 280 60% 50%;      /* Violet doux */
+  --neon-purple: 270 50% 50%;        /* Violet doux */
+  --glass-bg: 0 0% 10%;              /* Fond glassmorphism gris foncé */
+  --glass-border: 0 0% 20%;         /* Bordure glassmorphism */
+  --sidebar-background: 0 0% 7%;     /* Sidebar noir */
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 210 100% 50%;  /* Accent bleu dans sidebar */
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-border: 0 0% 20%;
+}
+
+/* ============================================
+   DESIGN STYLE: NEXUS (Futuristic) - Default
+   ============================================ */
+.design-nexus {
+  /* Typography - Futuristic fonts */
+  --design-font-display: 'Orbitron', sans-serif;
+  --design-font-body: 'Rajdhani', sans-serif;
+  
+  /* Border radius - Sharp with slight rounding */
+  --design-radius-sm: 0.5rem;
+  --design-radius-md: 0.75rem;
+  --design-radius-lg: 1rem;
+  --design-radius-xl: 1.5rem;
+  --design-radius-full: 9999px;
+  
+  /* Spacing - Compact and efficient */
+  --design-spacing-xs: 0.25rem;
+  --design-spacing-sm: 0.5rem;
+  --design-spacing-md: 1rem;
+  --design-spacing-lg: 1.5rem;
+  --design-spacing-xl: 2rem;
+  --design-spacing-2xl: 3rem;
+  
+  /* Shadows - Neon glow effects */
+  --design-shadow-sm: 0 2px 8px hsl(var(--neon-cyan) / 0.2), 0 0 4px hsl(var(--neon-cyan) / 0.1);
+  --design-shadow-md: 0 4px 16px hsl(var(--neon-cyan) / 0.3), 0 0 8px hsl(var(--neon-cyan) / 0.2);
+  --design-shadow-lg: 0 8px 32px hsl(var(--neon-cyan) / 0.4), 0 0 16px hsl(var(--neon-cyan) / 0.3);
+  --design-shadow-xl: 0 16px 64px hsl(var(--neon-cyan) / 0.5), 0 0 32px hsl(var(--neon-cyan) / 0.4);
+  --design-shadow-inner: inset 0 2px 4px hsl(var(--neon-cyan) / 0.1);
+  
+  /* Transitions - Quick and snappy */
+  --design-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --design-transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --design-transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  --design-transition-bounce: 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Blur effects - Strong glassmorphism */
+  --design-blur-sm: blur(8px);
+  --design-blur-md: blur(16px);
+  --design-blur-lg: blur(24px);
+  --design-blur-xl: blur(40px);
+  
+  /* Borders - Visible with glow */
+  --design-border-width: 1px;
+  --design-border-width-thick: 2px;
+  --design-border-opacity: 0.3;
+  --design-border-glow: 0 0 8px hsl(var(--neon-cyan) / 0.5);
+  
+  /* Card styling */
+  --design-card-padding: 1.5rem;
+  --design-card-gap: 1rem;
+  --design-card-backdrop: hsl(var(--glass-bg) / 0.8);
+  
+  /* Button styling */
+  --design-button-padding-x: 1.5rem;
+  --design-button-padding-y: 0.75rem;
+  --design-button-gap: 0.5rem;
+  --design-button-hover-scale: 1.05;
+  --design-button-active-scale: 0.98;
+  
+  /* Input styling */
+  --design-input-padding-x: 1rem;
+  --design-input-padding-y: 0.75rem;
+  --design-input-focus-ring: 0 0 0 2px hsl(var(--neon-cyan) / 0.5);
+}
+
+/* ============================================
+   DESIGN STYLE: APPLE (Minimalist & Elegant)
+   ============================================ */
+.design-apple {
+  /* Typography - Clean system fonts */
+  --design-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
+  --design-font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif;
+  
+  /* Border radius - Softer, more rounded */
+  --design-radius-sm: 0.375rem;
+  --design-radius-md: 0.5rem;
+  --design-radius-lg: 0.75rem;
+  --design-radius-xl: 1rem;
+  --design-radius-full: 9999px;
+  
+  /* Spacing - Generous and breathable */
+  --design-spacing-xs: 0.375rem;
+  --design-spacing-sm: 0.75rem;
+  --design-spacing-md: 1.25rem;
+  --design-spacing-lg: 2rem;
+  --design-spacing-xl: 3rem;
+  --design-spacing-2xl: 4rem;
+  
+  /* Shadows - Subtle and soft (Apple-style) */
+  --design-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --design-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --design-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --design-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --design-shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+  --design-shadow-colored: 0 4px 14px 0 rgba(0, 118, 255, 0.15);
+  
+  /* Transitions - Smooth and natural */
+  --design-transition-fast: 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --design-transition-normal: 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --design-transition-slow: 500ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --design-transition-bounce: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* Blur effects - Subtle glassmorphism */
+  --design-blur-sm: blur(10px);
+  --design-blur-md: blur(20px);
+  --design-blur-lg: blur(30px);
+  --design-blur-xl: blur(50px);
+  --design-blur-backdrop: saturate(180%) blur(20px);
+  
+  /* Borders - Minimal and refined */
+  --design-border-width: 0.5px;
+  --design-border-width-thick: 1px;
+  --design-border-opacity: 0.15;
+  --design-border-glow: none;
+  
+  /* Card styling - Elevated with subtle shadows */
+  --design-card-padding: 2rem;
+  --design-card-gap: 1.5rem;
+  --design-card-backdrop: rgba(255, 255, 255, 0.05);
+  
+  /* Button styling - Rounded and soft */
+  --design-button-padding-x: 2rem;
+  --design-button-padding-y: 0.875rem;
+  --design-button-gap: 0.625rem;
+  --design-button-hover-scale: 1.02;
+  --design-button-active-scale: 0.98;
+  --design-button-hover-lift: translateY(-1px);
+  
+  /* Input styling - Clean and minimal */
+  --design-input-padding-x: 1.25rem;
+  --design-input-padding-y: 0.875rem;
+  --design-input-focus-ring: 0 0 0 3px rgba(0, 118, 255, 0.1);
+  
+  /* Apple-specific effects */
+  --design-glass-bg: rgba(255, 255, 255, 0.05);
+  --design-glass-border: rgba(255, 255, 255, 0.1);
+  --design-hover-brightness: brightness(1.1);
+  --design-active-brightness: brightness(0.95);
+  
+  /* Override radius for Apple style */
+  --radius: 0.5rem;
+}
+
+/* Apple-style component overrides */
+.design-apple .glass {
+  background: var(--design-glass-bg);
+  backdrop-filter: var(--design-blur-backdrop);
+  border: var(--design-border-width) solid var(--design-glass-border);
+  box-shadow: var(--design-shadow-sm);
+}
+
+.design-apple button {
+  border-radius: var(--design-radius-md);
+  transition: all var(--design-transition-normal);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.design-apple button:hover {
+  transform: var(--design-button-hover-lift);
+  filter: var(--design-hover-brightness);
+  box-shadow: var(--design-shadow-md);
+}
+
+.design-apple button:active {
+  transform: scale(var(--design-button-active-scale));
+  filter: var(--design-active-brightness);
+}
+
+.design-apple [class*="card"] {
+  border-radius: var(--design-radius-lg);
+  padding: var(--design-card-padding);
+  box-shadow: var(--design-shadow-sm);
+  border: var(--design-border-width) solid hsl(var(--border) / var(--design-border-opacity));
+  transition: all var(--design-transition-normal);
+}
+
+.design-apple [class*="card"]:hover {
+  box-shadow: var(--design-shadow-md);
+  transform: var(--design-button-hover-lift);
+}
+
+.design-apple input,
+.design-apple textarea,
+.design-apple select {
+  border-radius: var(--design-radius-md);
+  border: var(--design-border-width) solid hsl(var(--border) / var(--design-border-opacity));
+  padding: var(--design-input-padding-y) var(--design-input-padding-x);
+  transition: all var(--design-transition-normal);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.design-apple input:focus,
+.design-apple textarea:focus,
+.design-apple select:focus {
+  outline: none;
+  box-shadow: var(--design-input-focus-ring);
+  border-color: hsl(var(--primary));
+}
+
+/* Apple-style smooth animations */
+@keyframes apple-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes apple-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.design-apple [class*="animate-"] {
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Default to Nexus style if not specified */
+:root:not(.design-nexus):not(.design-apple) {
+  --design-font-display: 'Orbitron', sans-serif;
+  --design-font-body: 'Rajdhani', sans-serif;
+  --design-radius-sm: 0.5rem;
+  --design-radius-md: 0.75rem;
+  --design-radius-lg: 1rem;
+  --design-radius-xl: 1.5rem;
+  --design-spacing-xs: 0.25rem;
+  --design-spacing-sm: 0.5rem;
+  --design-spacing-md: 1rem;
+  --design-spacing-lg: 1.5rem;
+  --design-spacing-xl: 2rem;
+  --design-spacing-2xl: 3rem;
 }

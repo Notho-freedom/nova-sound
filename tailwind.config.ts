@@ -14,8 +14,36 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Orbitron", "sans-serif"],
-        body: ["Rajdhani", "sans-serif"],
+        display: ["var(--design-font-display)", "sans-serif"],
+        body: ["var(--design-font-body)", "sans-serif"],
+      },
+      spacing: {
+        'design-xs': 'var(--design-spacing-xs)',
+        'design-sm': 'var(--design-spacing-sm)',
+        'design-md': 'var(--design-spacing-md)',
+        'design-lg': 'var(--design-spacing-lg)',
+        'design-xl': 'var(--design-spacing-xl)',
+        'design-2xl': 'var(--design-spacing-2xl)',
+      },
+      boxShadow: {
+        'design-sm': 'var(--design-shadow-sm)',
+        'design-md': 'var(--design-shadow-md)',
+        'design-lg': 'var(--design-shadow-lg)',
+        'design-xl': 'var(--design-shadow-xl)',
+        'design-inner': 'var(--design-shadow-inner)',
+        'design-colored': 'var(--design-shadow-colored)',
+      },
+      transitionDuration: {
+        'design-fast': 'var(--design-transition-fast)',
+        'design-normal': 'var(--design-transition-normal)',
+        'design-slow': 'var(--design-transition-slow)',
+        'design-bounce': 'var(--design-transition-bounce)',
+      },
+      backdropBlur: {
+        'design-sm': 'var(--design-blur-sm)',
+        'design-md': 'var(--design-blur-md)',
+        'design-lg': 'var(--design-blur-lg)',
+        'design-xl': 'var(--design-blur-xl)',
       },
       colors: {
         border: "hsl(var(--border))",

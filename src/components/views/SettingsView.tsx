@@ -41,6 +41,7 @@ import { useVideos } from "@/hooks/useVideos";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { authService } from "@/services/auth";
 import { useTheme } from "@/hooks/useTheme";
+import { useDesignStyle } from "@/hooks/useDesignStyle";
 import { useNotifications } from "@/hooks/useNotifications";
 import { toast } from "sonner";
 import type { Settings } from "@/types/music";
@@ -106,6 +107,7 @@ export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders } = useLibrary();
   const { videos, scanning: scanningVideos, scanProgress: videoScanProgress, scanVideos, selectVideoFolders } = useVideos();
   const { theme, setTheme } = useTheme();
+  const { designStyle, setDesignStyle, styles: designStyles } = useDesignStyle();
   const { enabled: notificationsEnabled, setEnabled: setNotificationsEnabled, notifySuccess, notifyError } = useNotifications();
   const {
     firebaseInitialized,
@@ -694,6 +696,36 @@ export const SettingsView = () => {
           {/* Appearance Tab */}
           <TabsContent value="appearance" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SettingsCard title="Style de design" icon={Sparkles}>
+                <div className="space-y-3">
+                  {designStyles.map((style) => (
+                    <button
+                      key={style.id}
+                      onClick={() => {
+                        setDesignStyle(style.id);
+                        notifySuccess(`Style ${style.name} appliqué`);
+                      }}
+                      className={cn(
+                        "w-full p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                        designStyle === style.id
+                          ? "border-primary bg-primary/10"
+                          : "border-transparent bg-muted/30 hover:bg-muted/50"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold text-sm mb-1">{style.name}</div>
+                          <div className="text-xs text-muted-foreground">{style.description}</div>
+                        </div>
+                        {designStyle === style.id && (
+                          <Check className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </SettingsCard>
+
               <SettingsCard title="Thème" icon={Palette}>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
@@ -706,6 +738,7 @@ export const SettingsView = () => {
                     { id: "youtube-music", label: "YouTube Music", color: "bg-gradient-to-br from-[#121212] via-[#FF0000] to-[#1a0a0a]", border: "border-[#FF0000]" },
                     { id: "tidal", label: "Tidal", color: "bg-gradient-to-br from-[#0a1a1f] via-[#00FFFF] to-[#0f1f2a]", border: "border-[#00FFFF]" },
                     { id: "deezer", label: "Deezer", color: "bg-gradient-to-br from-[#00C7F2] via-[#FF0090] to-[#0a1a1f]", border: "border-[#00C7F2]" },
+                    { id: "apple", label: "Apple", color: "bg-gradient-to-br from-white via-[#007AFF] to-gray-100", border: "border-[#007AFF]" },
                   ].map((t) => (
                     <button
                       key={t.id}

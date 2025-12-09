@@ -51,7 +51,10 @@ export interface UserAppData {
   equalizerPresets?: EqualizerPreset[];
   
   // Theme preference
-  theme?: 'dark' | 'light' | 'cyberpunk' | 'minimal' | 'spotify' | 'apple-music' | 'youtube-music' | 'tidal' | 'deezer' | 'system';
+  theme?: 'dark' | 'light' | 'cyberpunk' | 'minimal' | 'spotify' | 'apple-music' | 'youtube-music' | 'tidal' | 'deezer' | 'apple' | 'system';
+  
+  // Design style preference
+  designStyle?: 'nexus' | 'apple';
   
   // Notifications enabled
   notificationsEnabled?: boolean;
@@ -326,6 +329,14 @@ class FirebaseSyncService {
         this.saveToLocalStorage('nexus-theme', data.theme);
       }
 
+      if (data.designStyle) {
+        this.saveToLocalStorage('nexus-design-style', data.designStyle);
+        // Apply design style to document
+        const root = document.documentElement;
+        root.classList.remove("design-nexus", "design-apple");
+        root.classList.add(`design-${data.designStyle}`);
+      }
+
       if (data.notificationsEnabled !== undefined) {
         this.saveToLocalStorage('nexus-notifications-enabled', data.notificationsEnabled);
       }
@@ -555,6 +566,9 @@ class FirebaseSyncService {
     const theme = this.loadFromLocalStorage<'dark' | 'light' | 'cyberpunk' | 'minimal' | 'spotify' | 'apple-music' | 'youtube-music' | 'tidal' | 'deezer' | 'system'>('nexus-theme');
     if (theme) data.theme = theme;
 
+    const designStyle = this.loadFromLocalStorage<'nexus' | 'apple'>('nexus-design-style');
+    if (designStyle) data.designStyle = designStyle;
+
     const notificationsEnabled = this.loadFromLocalStorage<boolean>('nexus-notifications-enabled');
     if (notificationsEnabled !== null) data.notificationsEnabled = notificationsEnabled;
 
@@ -708,6 +722,9 @@ class FirebaseSyncService {
           break;
         case 'theme':
           await this.saveToFirestore(this.currentUserId, { theme: item.data });
+          break;
+        case 'designStyle':
+          await this.saveToFirestore(this.currentUserId, { designStyle: item.data });
           break;
         case 'notifications':
           await this.saveToFirestore(this.currentUserId, { notificationsEnabled: item.data });
