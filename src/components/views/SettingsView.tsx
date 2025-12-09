@@ -47,7 +47,10 @@ import type { Settings } from "@/types/music";
 import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
+const API_BASE_URL = typeof window !== 'undefined' 
+  ? (process.env.NEXT_PUBLIC_API_URL || "") 
+  : "";
 
 interface SettingRowProps {
   label: string;
@@ -162,10 +165,13 @@ export const SettingsView = () => {
         try {
           const [loadedSettings, status] = await Promise.all([
             window.electronAPI!.getSettings(),
-            window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false }, libreFm: { connected: false } }),
+            window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false, username: undefined }, libreFm: { connected: false, username: undefined } }),
           ]);
           setSettings(loadedSettings);
-          setScrobblerStatus(status);
+          setScrobblerStatus({
+            lastFm: { connected: status.lastFm.connected, username: 'username' in status.lastFm ? status.lastFm.username : undefined },
+            libreFm: { connected: status.libreFm.connected, username: 'username' in status.libreFm ? status.libreFm.username : undefined },
+          });
         } catch (err) {
           console.error("Failed to load settings:", err);
         }
@@ -346,7 +352,7 @@ export const SettingsView = () => {
     const clientId = authService.getGoogleClientId();
     if (!clientId) {
       toast.error("Google OAuth non configuré", {
-        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez VITE_GOOGLE_OAUTH_CLIENT_ID dans .env",
+        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID dans .env",
       });
       return;
     }
@@ -375,7 +381,7 @@ export const SettingsView = () => {
   const handleUpgradeToPro = async () => {
     if (!stripeInitialized) {
       toast.error("Stripe non configuré", {
-        description: "Ajoutez VITE_STRIPE_PUBLISHABLE_KEY dans .env",
+        description: "Ajoutez NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY dans .env",
       });
       return;
     }
@@ -1080,7 +1086,7 @@ export const SettingsView = () => {
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
                       <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                       <p className="text-xs text-yellow-500">
-                        Backend API non configuré. Ajoutez VITE_API_URL dans .env pour activer les abonnements.
+                        Backend API non configuré. Ajoutez NEXT_PUBLIC_API_URL dans .env pour activer les abonnements.
                       </p>
                     </div>
                     <p className="text-sm text-muted-foreground">

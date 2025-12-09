@@ -35,6 +35,7 @@ server/*.log
 *.njsproj
 *.sln
 *.sw?
+.next
 # Google OAuth client secrets
 client_secret_*.json
 *client_secret*.json

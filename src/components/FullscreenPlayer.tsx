@@ -106,7 +106,7 @@ export const FullscreenPlayer = ({
             currentTrack.artist,
             currentTrack.title
           );
-          setLyrics(lyricsData);
+          setLyrics(lyricsData?.plainLyrics || null);
         } catch {
           setLyrics(null);
         }

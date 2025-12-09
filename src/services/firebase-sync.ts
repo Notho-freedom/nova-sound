@@ -3,7 +3,8 @@ import {
   doc, 
   getDoc, 
   setDoc, 
-  updateDoc, 
+  updateDoc,
+  deleteDoc,
   onSnapshot,
   collection,
   query,
@@ -331,7 +332,7 @@ class FirebaseSyncService {
       const localIds = new Set(playlists.map(p => p.id));
       existingSnap.forEach((docSnap) => {
         if (!localIds.has(docSnap.id)) {
-          docSnap.ref.delete();
+          deleteDoc(docSnap.ref);
         }
       });
 

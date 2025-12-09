@@ -179,6 +179,7 @@ export const TrackListView = ({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };

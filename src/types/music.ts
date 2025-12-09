@@ -78,6 +78,7 @@ export interface HistoryEntry {
 
 export interface Settings {
   musicDirectories: string[];
+  videoDirectories?: string[];
   equalizerEnabled: boolean;
   equalizerPreset: string;
   customEqualizer: number[];

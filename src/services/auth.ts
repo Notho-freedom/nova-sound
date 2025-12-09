@@ -7,7 +7,7 @@ export interface UserProfile {
   displayName: string;
   photoURL: string | null;
   plan: "free" | "pro";
-  subscriptionStatus?: "active" | "canceled" | "past_due" | null;
+  subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing" | null;
   storageUsed: number;
   createdAt: string;
   lastLoginAt: string;
@@ -33,11 +33,14 @@ const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";
 
 // Backend proxy endpoint (optional - if not set, will try direct OAuth)
-const OAUTH_PROXY_ENDPOINT = import.meta.env.VITE_OAUTH_PROXY_URL || null;
+// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
+const OAUTH_PROXY_ENDPOINT = 
+  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_OAUTH_PROXY_URL : null) || null;
 
 // Client secret (optional - for Desktop/Electron apps only, not recommended for web)
 // Should only be used in Electron/Desktop apps where the secret is bundled
-const GOOGLE_CLIENT_SECRET = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_SECRET || null;
+const GOOGLE_CLIENT_SECRET = 
+  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET : null) || null;
 
 class AuthService {
   private currentUser: UserProfile | null = null;
@@ -68,6 +71,11 @@ class AuthService {
 
   // Load data from localStorage
   private loadFromStorage(): void {
+    // Only access localStorage on client side
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    
     try {
       const profileStr = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
       if (profileStr) {
@@ -90,6 +98,11 @@ class AuthService {
 
   // Save data to localStorage
   private saveToStorage(): void {
+    // Only access localStorage on client side
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    
     try {
       if (this.currentUser) {
         localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(this.currentUser));
@@ -104,6 +117,11 @@ class AuthService {
 
   // Clear storage
   private clearStorage(): void {
+    // Only access localStorage on client side
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    
     localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
     localStorage.removeItem(STORAGE_KEYS.AUTH_TOKENS);
   }
@@ -111,12 +129,18 @@ class AuthService {
   // Set Google OAuth Client ID
   setGoogleClientId(clientId: string): void {
     this.googleClientId = clientId;
-    localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
+    // Only access localStorage on client side
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
+    }
   }
 
   // Get Google OAuth Client ID
   getGoogleClientId(): string | null {
-    return this.googleClientId || import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || null;
+    const envClientId = typeof window !== 'undefined' 
+      ? process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID 
+      : null;
+    return this.googleClientId || envClientId || null;
   }
 
   // Generate code verifier and challenge for PKCE
@@ -159,7 +183,7 @@ class AuthService {
     if (!clientId) {
       throw new Error(
         "Google OAuth Client ID not configured. " +
-        "Please set it in settings or add VITE_GOOGLE_OAUTH_CLIENT_ID to .env"
+        "Please set it in settings or add NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID to .env"
       );
     }
 
@@ -276,10 +300,10 @@ class AuthService {
           throw new Error(
             "OAuth configuration error: " +
             (GOOGLE_CLIENT_SECRET 
-              ? "The provided client_secret is invalid. Please check VITE_GOOGLE_OAUTH_CLIENT_SECRET in your .env file."
+              ? "The provided client_secret is invalid. Please check NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET in your .env file."
               : "Your Google OAuth client requires a client_secret. " +
-                "For Electron/Desktop apps, add VITE_GOOGLE_OAUTH_CLIENT_SECRET to your .env file. " +
-                "For web apps, use a backend proxy (VITE_OAUTH_PROXY_URL) or configure as 'Desktop app' type in Google Cloud Console.")
+                "For Electron/Desktop apps, add NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET to your .env file. " +
+                "For web apps, use a backend proxy (NEXT_PUBLIC_OAUTH_PROXY_URL) or configure as 'Desktop app' type in Google Cloud Console.")
           );
         }
       } catch (parseError) {
@@ -375,6 +399,11 @@ class AuthService {
 
   // Handle OAuth callback
   async handleCallback(): Promise<UserProfile | null> {
+    // Only access window on client side
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
     const state = urlParams.get("state");
@@ -384,14 +413,25 @@ class AuthService {
       throw new Error(`OAuth error: ${error}`);
     }
 
+    // If no OAuth parameters, return null (not an error)
     if (!code || !state) {
       return null;
     }
 
-    // Verify state
+    // Verify state - only if we have both code and state
     const savedState = sessionStorage.getItem("oauth_state");
+    if (!savedState) {
+      // No saved state means this is not a valid OAuth callback
+      // Clean up URL and return null
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return null;
+    }
+
     if (state !== savedState) {
-      throw new Error("Invalid state parameter");
+      // Invalid state - clean up and return null instead of throwing
+      sessionStorage.removeItem("oauth_state");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return null;
     }
     sessionStorage.removeItem("oauth_state");
 

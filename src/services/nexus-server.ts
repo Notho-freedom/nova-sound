@@ -16,7 +16,8 @@ export interface UploadResult {
   size: number;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+// Use Next.js API routes (same origin - no base URL needed)
+const API_BASE_URL = '';
 
 class NexusServerService {
   // Check if authenticated

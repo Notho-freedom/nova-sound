@@ -253,30 +253,42 @@ export function useCloudSync(): UseCloudSyncReturn {
           }
         }
 
-        // Then check manual OAuth callback
-        const profile = await authService.handleCallback();
-        if (profile) {
-          // User just authenticated via manual OAuth redirect
-          setNexusUser(profile);
-          setNexusAuthenticated(true);
-          setNexusIsPro(authService.isPro());
-          
-          // Show success message
-          toast.success("Connecté avec succès", {
-            description: `Bienvenue ${profile.displayName}!`,
-          });
-          
-          // Load sync status
-          const status = await nexusServerService.getSyncStatus();
-          setSyncStatus({
-            lastSyncAt: status.lastSyncAt || null,
-            tracksUploaded: status.tracksUploaded,
-            tracksDownloaded: status.tracksDownloaded,
-          });
-        } else {
-          // No redirect, check if we need to create anonymous user
+        // Then check manual OAuth callback (only if there are OAuth params in URL)
+        // Only check on client side
+        if (typeof window === 'undefined') {
           await initAnonymousUser();
+          return;
         }
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasOAuthParams = urlParams.has("code") && urlParams.has("state");
+        
+        if (hasOAuthParams) {
+          const profile = await authService.handleCallback();
+          if (profile) {
+            // User just authenticated via manual OAuth redirect
+            setNexusUser(profile);
+            setNexusAuthenticated(true);
+            setNexusIsPro(authService.isPro());
+            
+            // Show success message
+            toast.success("Connecté avec succès", {
+              description: `Bienvenue ${profile.displayName}!`,
+            });
+            
+            // Load sync status
+            const status = await nexusServerService.getSyncStatus();
+            setSyncStatus({
+              lastSyncAt: status.lastSyncAt || null,
+              tracksUploaded: status.tracksUploaded,
+              tracksDownloaded: status.tracksDownloaded,
+            });
+            return;
+          }
+        }
+        
+        // No OAuth redirect, check if we need to create anonymous user
+        await initAnonymousUser();
       } catch (error) {
         console.error("Error handling redirect:", error);
         // Try to create anonymous user on error
@@ -427,7 +439,7 @@ export function useCloudSync(): UseCloudSyncReturn {
     const clientId = authService.getGoogleClientId();
     if (!clientId) {
       toast.error("Google OAuth non configuré", {
-        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez VITE_GOOGLE_OAUTH_CLIENT_ID dans .env",
+        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID dans .env",
       });
       return;
     }
