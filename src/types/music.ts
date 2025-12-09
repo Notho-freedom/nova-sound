@@ -85,7 +85,7 @@ export interface Settings {
   scrobblingEnabled: boolean;
   lastFmConnected: boolean;
   libreFmConnected: boolean;
-  theme: 'dark' | 'light' | 'system';
+  theme: 'dark' | 'light' | 'cyberpunk' | 'minimal' | 'spotify' | 'apple-music' | 'youtube-music' | 'tidal' | 'deezer' | 'system';
   language: string;
   audioQuality: 'low' | 'medium' | 'high' | 'lossless';
   crossfadeEnabled: boolean;

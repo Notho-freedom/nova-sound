@@ -51,7 +51,7 @@ export interface UserAppData {
   equalizerPresets?: EqualizerPreset[];
   
   // Theme preference
-  theme?: 'dark' | 'light' | 'system';
+  theme?: 'dark' | 'light' | 'cyberpunk' | 'minimal' | 'spotify' | 'apple-music' | 'youtube-music' | 'tidal' | 'deezer' | 'system';
   
   // Notifications enabled
   notificationsEnabled?: boolean;
@@ -544,7 +544,7 @@ class FirebaseSyncService {
     const history = this.loadFromLocalStorage<HistoryEntry[]>('nexus-play-history');
     if (history) data.history = history;
 
-    const theme = this.loadFromLocalStorage<'dark' | 'light' | 'system'>('nexus-theme');
+    const theme = this.loadFromLocalStorage<'dark' | 'light' | 'cyberpunk' | 'minimal' | 'spotify' | 'apple-music' | 'youtube-music' | 'tidal' | 'deezer' | 'system'>('nexus-theme');
     if (theme) data.theme = theme;
 
     const notificationsEnabled = this.loadFromLocalStorage<boolean>('nexus-notifications-enabled');

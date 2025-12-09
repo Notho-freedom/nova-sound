@@ -695,12 +695,17 @@ export const SettingsView = () => {
           <TabsContent value="appearance" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SettingsCard title="Thème" icon={Palette}>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
                     { id: "dark", label: "Sombre", color: "bg-zinc-900", border: "border-cyan-500" },
                     { id: "light", label: "Clair", color: "bg-zinc-100", border: "border-blue-500" },
                     { id: "cyberpunk", label: "Cyberpunk", color: "bg-gradient-to-br from-purple-900 to-yellow-500", border: "border-yellow-500" },
                     { id: "minimal", label: "Minimal", color: "bg-zinc-800", border: "border-white" },
+                    { id: "spotify", label: "Spotify", color: "bg-gradient-to-br from-green-600 to-green-800", border: "border-green-500" },
+                    { id: "apple-music", label: "Apple Music", color: "bg-gradient-to-br from-pink-600 to-red-600", border: "border-pink-500" },
+                    { id: "youtube-music", label: "YouTube Music", color: "bg-gradient-to-br from-red-600 to-red-800", border: "border-red-500" },
+                    { id: "tidal", label: "Tidal", color: "bg-gradient-to-br from-blue-600 to-blue-800", border: "border-blue-500" },
+                    { id: "deezer", label: "Deezer", color: "bg-gradient-to-br from-purple-600 to-pink-600", border: "border-purple-500" },
                   ].map((t) => (
                     <button
                       key={t.id}
