@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cloudinaryService, CloudinaryConfig, UploadProgress } from "@/services/cloudinary";
 import { nexusServerService } from "@/services/nexus-server";
 import { authService, UserProfile } from "@/services/auth";
@@ -67,6 +67,10 @@ export function useCloudSync(): UseCloudSyncReturn {
     tracksDownloaded: 0,
   });
   const [syncLoading, setSyncLoading] = useState(false);
+
+  // Track if sync has been initialized to prevent multiple initializations
+  const syncInitializedRef = useRef<boolean>(false);
+  const lastUserIdRef = useRef<string | null>(null);
 
   // Initialize on mount
   useEffect(() => {
@@ -305,42 +309,47 @@ export function useCloudSync(): UseCloudSyncReturn {
           // Always get the latest profile from Firestore (contains merged Google data with priority)
           const profile = firebaseService.getUserProfile();
           if (profile) {
-            const userType = firebaseUser.isAnonymous ? "Anonymous" : (firebaseUser.email || profile.displayName || "User");
-            console.log("useCloudSync: Firebase auth state changed, user:", userType, "Profile (Google data prioritized):", profile);
-            
             // Update UI with profile from Firestore (Google data is prioritized during merge)
             setNexusUser(profile);
             // Only consider authenticated if user is NOT anonymous (has Google account)
             setNexusAuthenticated(!firebaseUser.isAnonymous);
             setNexusIsPro(firebaseService.isPro());
             
-            // Initialize Firebase sync for user data (only if authenticated with Google)
+            // Initialize Firebase sync ONLY ONCE per user session
+            // Check if this is a new user or if sync hasn't been initialized yet
             if (!firebaseUser.isAnonymous) {
-              try {
-                const { firebaseSyncService } = await import('../services/firebase-sync');
-                await firebaseSyncService.initializeSync(firebaseUser.uid);
-              } catch (error) {
-                console.error('Error initializing Firebase sync:', error);
+              const currentUserId = firebaseUser.uid;
+              
+              // Only initialize if it's a different user or sync hasn't been initialized
+              if (lastUserIdRef.current !== currentUserId || !syncInitializedRef.current) {
+                try {
+                  const { firebaseSyncService } = await import('../services/firebase-sync');
+                  await firebaseSyncService.initializeSync(currentUserId);
+                  syncInitializedRef.current = true;
+                  lastUserIdRef.current = currentUserId;
+                  
+                  // Load sync status only once during initialization
+                  try {
+                    const status = await nexusServerService.getSyncStatus();
+                    setSyncStatus({
+                      lastSyncAt: status.lastSyncAt || null,
+                      tracksUploaded: status.tracksUploaded,
+                      tracksDownloaded: status.tracksDownloaded,
+                    });
+                  } catch (error) {
+                    // Silently fail
+                    setSyncStatus({
+                      lastSyncAt: null,
+                      tracksUploaded: 0,
+                      tracksDownloaded: 0,
+                    });
+                  }
+                } catch (error) {
+                  console.error('Error initializing Firebase sync:', error);
+                }
               }
-            }
-            
-            // Load sync status (only for non-anonymous users)
-            if (!firebaseUser.isAnonymous) {
-              try {
-                const status = await nexusServerService.getSyncStatus();
-                setSyncStatus({
-                  lastSyncAt: status.lastSyncAt || null,
-                  tracksUploaded: status.tracksUploaded,
-                  tracksDownloaded: status.tracksDownloaded,
-                });
-              } catch (error) {
-                console.error("Error loading sync status:", error);
-                setSyncStatus({
-                  lastSyncAt: null,
-                  tracksUploaded: 0,
-                  tracksDownloaded: 0,
-                });
-              }
+              // If sync is already initialized for this user, skip everything
+              // This prevents re-initialization and status loading on every auth state change
             }
           }
         } else {
@@ -349,8 +358,12 @@ export function useCloudSync(): UseCloudSyncReturn {
             const { firebaseSyncService } = await import('../services/firebase-sync');
             firebaseSyncService.cleanup();
           } catch (error) {
-            console.error('Error cleaning up sync on logout:', error);
+            // Silently fail
           }
+          
+          // Reset flags
+          syncInitializedRef.current = false;
+          lastUserIdRef.current = null;
           
           setNexusUser(null);
           setNexusAuthenticated(false);

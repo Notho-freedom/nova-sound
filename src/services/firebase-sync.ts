@@ -126,13 +126,11 @@ class FirebaseSyncService {
 
     // Prevent concurrent initialization
     if (this.isInitializing) {
-      console.log('Sync initialization already in progress, skipping...');
-      return;
+      return; // Silent - already initializing
     }
 
     if (this.currentUserId === userId && this.syncListeners.size > 0) {
-      console.log('Sync already initialized for user:', userId);
-      return; // Already initialized
+      return; // Silent - already initialized
     }
 
     this.isInitializing = true;
@@ -146,7 +144,7 @@ class FirebaseSyncService {
       // Load initial data from Firestore
       await this.loadFromFirestore(userId);
       
-      // Set up real-time listeners
+      // Set up real-time listeners (silent - no logs)
       this.setupRealtimeListeners(userId);
       
       // Start periodic sync (every hour)
@@ -156,7 +154,10 @@ class FirebaseSyncService {
       const initialData = await this.getCurrentLocalData();
       this.lastSyncedDataHash = this.calculateDataHash(initialData);
       
-      console.log(`✅ Firebase sync initialized for user: ${userId}`);
+      // Only log on first initialization, not on every call
+      if (!this.syncListeners.has('appData')) {
+        console.log(`✅ Firebase sync initialized for user: ${userId}`);
+      }
     } catch (error) {
       console.error('Error initializing sync:', error);
       this.cleanup();
@@ -166,7 +167,7 @@ class FirebaseSyncService {
     }
   }
 
-  // Load all user data from Firestore
+  // Load all user data from Firestore (silent mode - minimal logs)
   private async loadFromFirestore(userId: string): Promise<void> {
     if (!db) return;
     
@@ -180,18 +181,20 @@ class FirebaseSyncService {
         // Merge with local data (Firestore takes priority for first load)
         await this.mergeWithLocal(data);
         
-        console.log('📥 User data loaded from Firestore');
+        // Only log on first load, not on every sync
       } else {
         // No Firestore data, save local data to Firestore
         await this.saveToFirestore(userId);
-        console.log('💾 Local data saved to Firestore (first time)');
       }
     } catch (error) {
-      console.error('Error loading from Firestore:', error);
+      // Only log actual errors
+      if (error.code !== 'unavailable' && error.code !== 'cancelled') {
+        console.error('Error loading from Firestore:', error);
+      }
     }
   }
 
-  // Set up real-time listeners for continuous sync
+  // Set up real-time listeners for continuous sync (silent mode - no console logs)
   private setupRealtimeListeners(userId: string): void {
     if (!db) return;
     
@@ -213,7 +216,10 @@ class FirebaseSyncService {
         }
       },
       (error) => {
-        console.error('Error in app data listener:', error);
+        // Only log actual errors, not normal connection issues
+        if (error.code !== 'unavailable' && error.code !== 'cancelled') {
+          console.error('Error in app data listener:', error);
+        }
         this.handleListenerError('appData', userId, () => {
           // Retry setup
           const existingUnsubscribe = this.syncListeners.get('appData');
@@ -243,7 +249,10 @@ class FirebaseSyncService {
         }
       },
       (error) => {
-        console.error('Error in playlists listener:', error);
+        // Only log actual errors, not normal connection issues
+        if (error.code !== 'unavailable' && error.code !== 'cancelled') {
+          console.error('Error in playlists listener:', error);
+        }
         this.handleListenerError('playlists', userId, () => {
           // Retry setup
           const existingUnsubscribe = this.syncListeners.get('playlists');
@@ -278,7 +287,7 @@ class FirebaseSyncService {
     // Exponential backoff: delay * 2^attempts
     const delay = this.reconnectDelay * Math.pow(2, attempts - 1);
     
-    console.log(`Retrying ${listenerKey} listener in ${delay}ms (attempt ${newAttempts}/${this.maxReconnectAttempts})`);
+    // Silent retry - no console log
     
     setTimeout(() => {
       retryCallback();
@@ -351,7 +360,7 @@ class FirebaseSyncService {
       // Dispatch custom events for UI updates
       window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: data }));
       
-      console.log('🔄 Remote data synced to local storage');
+      // Silent sync - no console logs for normal operations
     } catch (error) {
       console.error('Error handling remote update:', error);
     } finally {
@@ -388,7 +397,7 @@ class FirebaseSyncService {
 
       window.dispatchEvent(new CustomEvent('firebase-playlists-update', { detail: playlists }));
       
-      console.log('🔄 Playlists synced from Firestore');
+      // Silent sync - no console logs for normal operations
     } catch (error) {
       console.error('Error handling playlists update:', error);
     } finally {
@@ -418,8 +427,7 @@ class FirebaseSyncService {
 
     // Only sync if data has changed
     if (newHash === this.lastSyncedDataHash) {
-      console.log('📋 No changes detected, skipping Firestore sync');
-      return;
+      return; // Silent - no changes
     }
 
     this.isSyncing = true;
@@ -440,7 +448,7 @@ class FirebaseSyncService {
       this.lastSyncedDataHash = newHash;
       this.pendingChanges.clear();
       
-      console.log('💾 Data saved to Firestore');
+      // Silent sync - no console logs for normal operations
     } catch (error) {
       console.error('Error saving to Firestore:', error);
       // Mark as pending for retry
@@ -521,7 +529,7 @@ class FirebaseSyncService {
         }
       });
 
-      console.log('💾 Playlists saved to Firestore');
+      // Silent - playlists saved
     } catch (error) {
       console.error('Error saving playlists to Firestore:', error);
       throw error;
@@ -605,23 +613,21 @@ class FirebaseSyncService {
       }
 
       try {
-        console.log('⏰ Periodic sync check...');
+        // Silent periodic sync check
         const currentData = await this.getCurrentLocalData();
         const newHash = this.calculateDataHash(currentData);
 
         // Only sync if there are pending changes or data has changed
         if (this.pendingChanges.size > 0 || newHash !== this.lastSyncedDataHash) {
-          console.log('🔄 Periodic sync: Changes detected, syncing to Firestore...');
+          // Silent periodic sync - only sync if needed
           await this.saveToFirestore(userId);
-        } else {
-          console.log('✅ Periodic sync: No changes, skipping');
         }
       } catch (error) {
         console.error('Error during periodic sync:', error);
       }
     }, this.syncIntervalMs);
 
-    console.log(`⏰ Periodic sync started (every ${this.syncIntervalMs / 1000 / 60} minutes)`);
+    // Silent - no console log for periodic sync start
   }
 
   // Stop periodic sync
@@ -667,10 +673,10 @@ class FirebaseSyncService {
         const newHash = this.calculateDataHash(currentData);
 
         if (newHash !== this.lastSyncedDataHash) {
-          console.log(`🔄 Queued sync for ${type}, syncing to Firestore...`);
+          // Silent sync - no console log
           await this.saveToFirestore(this.currentUserId, { [type]: data } as Partial<UserAppData>);
         } else {
-          console.log(`📋 No changes detected for ${type}, skipping sync`);
+          // Silent - no changes
           this.pendingChanges.delete(type);
         }
       } catch (error) {
