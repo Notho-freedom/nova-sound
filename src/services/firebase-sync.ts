@@ -13,7 +13,7 @@ import {
   Timestamp,
   serverTimestamp
 } from 'firebase/firestore';
-import { firebaseApp } from './firebase';
+import { firebaseApp, db as sharedDb } from './firebase';
 import type { 
   Settings, 
   Playlist, 
@@ -21,13 +21,16 @@ import type {
   HistoryEntry 
 } from '../types/music';
 
-let db: ReturnType<typeof getFirestore> | null = null;
+// Use the shared Firestore instance from firebase.ts to avoid multiple instances
+let db: ReturnType<typeof getFirestore> | null = sharedDb || null;
 
-// Initialize Firestore
-try {
-  db = getFirestore(firebaseApp);
-} catch (error) {
-  console.error('Error initializing Firestore for sync:', error);
+// If shared instance is not available, initialize one
+if (!db && firebaseApp) {
+  try {
+    db = getFirestore(firebaseApp);
+  } catch (error) {
+    console.error('Error initializing Firestore for sync:', error);
+  }
 }
 
 // User data structure in Firestore
@@ -52,6 +55,20 @@ export interface UserAppData {
   
   // Notifications enabled
   notificationsEnabled?: boolean;
+  
+  // Volume (0-100)
+  volume?: number;
+  
+  // Search history
+  searchHistory?: string[];
+  
+  // Uploaded media (for easy identification)
+  uploadedMedia?: Array<{
+    id: string;
+    name: string;
+    uploadedAt: string;
+    cloudProvider?: 'cloudinary' | 'nexus';
+  }>;
   
   // Cloudinary config (encrypted or stored securely)
   cloudinaryConfig?: {
@@ -86,30 +103,67 @@ class FirebaseSyncService {
   private isSyncing: boolean = false;
   private syncQueue: Array<{ type: string; data: any }> = [];
   private currentUserId: string | null = null;
+  private reconnectAttempts: Map<string, number> = new Map();
+  private maxReconnectAttempts: number = 3;
+  private reconnectDelay: number = 5000; // 5 seconds
+  
+  // Change detection and periodic sync
+  private lastSyncedDataHash: string | null = null;
+  private periodicSyncInterval: NodeJS.Timeout | null = null;
+  private syncIntervalMs: number = 60 * 60 * 1000; // 1 hour
+  private pendingChanges: Set<string> = new Set();
+  private changeDetectionDebounce: NodeJS.Timeout | null = null;
+  private changeDetectionDelay: number = 2000; // 2 seconds debounce
 
   // Initialize sync for a user
+  private isInitializing: boolean = false;
+  
   async initializeSync(userId: string): Promise<void> {
     if (!db) {
       console.warn('Firestore not initialized, cannot sync');
       return;
     }
 
-    if (this.currentUserId === userId) {
+    // Prevent concurrent initialization
+    if (this.isInitializing) {
+      console.log('Sync initialization already in progress, skipping...');
+      return;
+    }
+
+    if (this.currentUserId === userId && this.syncListeners.size > 0) {
+      console.log('Sync already initialized for user:', userId);
       return; // Already initialized
     }
 
-    // Clean up previous listeners
-    this.cleanup();
+    this.isInitializing = true;
 
-    this.currentUserId = userId;
-    
-    // Load initial data from Firestore
-    await this.loadFromFirestore(userId);
-    
-    // Set up real-time listeners
-    this.setupRealtimeListeners(userId);
-    
-    console.log(`✅ Firebase sync initialized for user: ${userId}`);
+    try {
+      // Clean up previous listeners
+      this.cleanup();
+
+      this.currentUserId = userId;
+      
+      // Load initial data from Firestore
+      await this.loadFromFirestore(userId);
+      
+      // Set up real-time listeners
+      this.setupRealtimeListeners(userId);
+      
+      // Start periodic sync (every hour)
+      this.startPeriodicSync(userId);
+      
+      // Calculate initial hash for change detection
+      const initialData = await this.getCurrentLocalData();
+      this.lastSyncedDataHash = this.calculateDataHash(initialData);
+      
+      console.log(`✅ Firebase sync initialized for user: ${userId}`);
+    } catch (error) {
+      console.error('Error initializing sync:', error);
+      this.cleanup();
+      throw error;
+    } finally {
+      this.isInitializing = false;
+    }
   }
 
   // Load all user data from Firestore
@@ -141,11 +195,18 @@ class FirebaseSyncService {
   private setupRealtimeListeners(userId: string): void {
     if (!db) return;
     
+    // Reset reconnect attempts for this user
+    this.reconnectAttempts.set('appData', 0);
+    this.reconnectAttempts.set('playlists', 0);
+    
     // Main app data listener
     const appDataRef = doc(db, 'users', userId, 'appData', 'data');
     const unsubscribeAppData = onSnapshot(
       appDataRef,
       (snapshot) => {
+        // Reset reconnect attempts on successful connection
+        this.reconnectAttempts.set('appData', 0);
+        
         if (snapshot.exists() && !this.isSyncing) {
           const data = snapshot.data() as UserAppData;
           this.handleRemoteUpdate(data);
@@ -153,6 +214,14 @@ class FirebaseSyncService {
       },
       (error) => {
         console.error('Error in app data listener:', error);
+        this.handleListenerError('appData', userId, () => {
+          // Retry setup
+          const existingUnsubscribe = this.syncListeners.get('appData');
+          if (existingUnsubscribe) {
+            existingUnsubscribe();
+          }
+          this.setupRealtimeListeners(userId);
+        });
       }
     );
     this.syncListeners.set('appData', unsubscribeAppData);
@@ -162,6 +231,9 @@ class FirebaseSyncService {
     const unsubscribePlaylists = onSnapshot(
       playlistsRef,
       (snapshot) => {
+        // Reset reconnect attempts on successful connection
+        this.reconnectAttempts.set('playlists', 0);
+        
         if (!this.isSyncing) {
           const playlists: Playlist[] = [];
           snapshot.forEach((doc) => {
@@ -172,9 +244,45 @@ class FirebaseSyncService {
       },
       (error) => {
         console.error('Error in playlists listener:', error);
+        this.handleListenerError('playlists', userId, () => {
+          // Retry setup
+          const existingUnsubscribe = this.syncListeners.get('playlists');
+          if (existingUnsubscribe) {
+            existingUnsubscribe();
+          }
+          this.setupRealtimeListeners(userId);
+        });
       }
     );
     this.syncListeners.set('playlists', unsubscribePlaylists);
+  }
+
+  // Handle listener errors with exponential backoff
+  private handleListenerError(listenerKey: string, userId: string, retryCallback: () => void): void {
+    const attempts = this.reconnectAttempts.get(listenerKey) || 0;
+    
+    if (attempts >= this.maxReconnectAttempts) {
+      console.warn(`Max reconnect attempts reached for ${listenerKey}. Stopping automatic reconnection.`);
+      // Remove listener to prevent further errors
+      const unsubscribe = this.syncListeners.get(listenerKey);
+      if (unsubscribe) {
+        unsubscribe();
+        this.syncListeners.delete(listenerKey);
+      }
+      return;
+    }
+
+    const newAttempts = attempts + 1;
+    this.reconnectAttempts.set(listenerKey, newAttempts);
+    
+    // Exponential backoff: delay * 2^attempts
+    const delay = this.reconnectDelay * Math.pow(2, attempts - 1);
+    
+    console.log(`Retrying ${listenerKey} listener in ${delay}ms (attempt ${newAttempts}/${this.maxReconnectAttempts})`);
+    
+    setTimeout(() => {
+      retryCallback();
+    }, delay);
   }
 
   // Handle remote updates from Firestore
@@ -213,6 +321,18 @@ class FirebaseSyncService {
         this.saveToLocalStorage('nexus-notifications-enabled', data.notificationsEnabled);
       }
 
+      if (data.volume !== undefined) {
+        this.saveToLocalStorage('nexus-volume', data.volume);
+      }
+
+      if (data.searchHistory) {
+        this.saveToLocalStorage('nexus-search-history', data.searchHistory);
+      }
+
+      if (data.uploadedMedia) {
+        this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia);
+      }
+
       if (data.cloudinaryConfig) {
         this.saveToLocalStorage('nexus-cloudinary-config', data.cloudinaryConfig);
       }
@@ -224,6 +344,9 @@ class FirebaseSyncService {
       if (data.scrobblerSettings) {
         this.saveToLocalStorage('nexus-scrobbler-settings', data.scrobblerSettings);
       }
+
+      // Update hash after remote update
+      this.lastSyncedDataHash = this.calculateDataHash(data);
 
       // Dispatch custom events for UI updates
       window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: data }));
@@ -273,10 +396,29 @@ class FirebaseSyncService {
     }
   }
 
-  // Save data to Firestore
+  // Save data to Firestore (only if changed)
   async saveToFirestore(userId: string, data?: Partial<UserAppData>): Promise<void> {
     if (!db || !userId) {
       console.warn('Cannot save to Firestore: no user ID or Firestore not initialized');
+      return;
+    }
+
+    // Always save locally first
+    if (data) {
+      this.saveDataLocally(data);
+    }
+
+    // Check if data has changed before syncing
+    const currentData = await this.getCurrentLocalData();
+    const mergedData: UserAppData = {
+      ...currentData,
+      ...data,
+    };
+    const newHash = this.calculateDataHash(mergedData);
+
+    // Only sync if data has changed
+    if (newHash === this.lastSyncedDataHash) {
+      console.log('📋 No changes detected, skipping Firestore sync');
       return;
     }
 
@@ -284,24 +426,67 @@ class FirebaseSyncService {
 
     try {
       const userDataRef = doc(db, 'users', userId, 'appData', 'data');
-      const currentData = await this.getCurrentLocalData();
       
       // Merge with provided data
       const dataToSave: UserAppData = {
-        ...currentData,
-        ...data,
+        ...mergedData,
         lastSyncAt: new Date().toISOString(),
         version: (currentData.version || 0) + 1,
       };
 
       await setDoc(userDataRef, dataToSave, { merge: true });
       
+      // Update hash after successful sync
+      this.lastSyncedDataHash = newHash;
+      this.pendingChanges.clear();
+      
       console.log('💾 Data saved to Firestore');
     } catch (error) {
       console.error('Error saving to Firestore:', error);
+      // Mark as pending for retry
+      if (data) {
+        Object.keys(data).forEach(key => this.pendingChanges.add(key));
+      }
       throw error;
     } finally {
       this.isSyncing = false;
+    }
+  }
+
+  // Save data locally immediately
+  private saveDataLocally(data: Partial<UserAppData>): void {
+    if (data.settings) {
+      this.saveToLocalStorage('nexus-settings', data.settings);
+    }
+    if (data.favorites) {
+      this.saveToLocalStorage('nexus-favorites', data.favorites);
+    }
+    if (data.history) {
+      this.saveToLocalStorage('nexus-play-history', data.history);
+    }
+    if (data.theme) {
+      this.saveToLocalStorage('nexus-theme', data.theme);
+    }
+    if (data.notificationsEnabled !== undefined) {
+      this.saveToLocalStorage('nexus-notifications-enabled', data.notificationsEnabled);
+    }
+    if (data.volume !== undefined) {
+      this.saveToLocalStorage('nexus-volume', data.volume);
+    }
+    if (data.searchHistory) {
+      this.saveToLocalStorage('nexus-search-history', data.searchHistory);
+    }
+    if (data.uploadedMedia) {
+      this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia);
+    }
+    if (data.cloudinaryConfig) {
+      this.saveToLocalStorage('nexus-cloudinary-config', data.cloudinaryConfig);
+    }
+    if (data.equalizerPresets) {
+      this.saveToLocalStorage('nexus-equalizer-presets', data.equalizerPresets);
+    }
+    if (data.scrobblerSettings) {
+      this.saveToLocalStorage('nexus-scrobbler-settings', data.scrobblerSettings);
     }
   }
 
@@ -365,6 +550,15 @@ class FirebaseSyncService {
     const notificationsEnabled = this.loadFromLocalStorage<boolean>('nexus-notifications-enabled');
     if (notificationsEnabled !== null) data.notificationsEnabled = notificationsEnabled;
 
+    const volume = this.loadFromLocalStorage<number>('nexus-volume');
+    if (volume !== null) data.volume = volume;
+
+    const searchHistory = this.loadFromLocalStorage<string[]>('nexus-search-history');
+    if (searchHistory) data.searchHistory = searchHistory;
+
+    const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: string }>>('nexus-uploaded-media');
+    if (uploadedMedia) data.uploadedMedia = uploadedMedia;
+
     const cloudinaryConfig = this.loadFromLocalStorage<any>('nexus-cloudinary-config');
     if (cloudinaryConfig) data.cloudinaryConfig = cloudinaryConfig;
 
@@ -377,6 +571,67 @@ class FirebaseSyncService {
     return data;
   }
 
+  // Calculate hash for change detection
+  private calculateDataHash(data: Partial<UserAppData>): string {
+    // Create a simplified version for hashing (exclude metadata fields)
+    const hashableData = {
+      settings: data.settings,
+      favorites: data.favorites,
+      history: data.history,
+      theme: data.theme,
+      notificationsEnabled: data.notificationsEnabled,
+      volume: data.volume,
+      searchHistory: data.searchHistory,
+      uploadedMedia: data.uploadedMedia,
+      cloudinaryConfig: data.cloudinaryConfig,
+      equalizerPresets: data.equalizerPresets,
+      scrobblerSettings: data.scrobblerSettings,
+    };
+    
+    // Simple hash using JSON stringify (for change detection)
+    return JSON.stringify(hashableData);
+  }
+
+  // Start periodic sync (every hour)
+  private startPeriodicSync(userId: string): void {
+    // Clear existing interval if any
+    if (this.periodicSyncInterval) {
+      clearInterval(this.periodicSyncInterval);
+    }
+
+    this.periodicSyncInterval = setInterval(async () => {
+      if (!this.currentUserId || this.isSyncing) {
+        return;
+      }
+
+      try {
+        console.log('⏰ Periodic sync check...');
+        const currentData = await this.getCurrentLocalData();
+        const newHash = this.calculateDataHash(currentData);
+
+        // Only sync if there are pending changes or data has changed
+        if (this.pendingChanges.size > 0 || newHash !== this.lastSyncedDataHash) {
+          console.log('🔄 Periodic sync: Changes detected, syncing to Firestore...');
+          await this.saveToFirestore(userId);
+        } else {
+          console.log('✅ Periodic sync: No changes, skipping');
+        }
+      } catch (error) {
+        console.error('Error during periodic sync:', error);
+      }
+    }, this.syncIntervalMs);
+
+    console.log(`⏰ Periodic sync started (every ${this.syncIntervalMs / 1000 / 60} minutes)`);
+  }
+
+  // Stop periodic sync
+  private stopPeriodicSync(): void {
+    if (this.periodicSyncInterval) {
+      clearInterval(this.periodicSyncInterval);
+      this.periodicSyncInterval = null;
+    }
+  }
+
   // Merge Firestore data with local data (conflict resolution)
   private async mergeWithLocal(firestoreData: UserAppData): Promise<void> {
     // For now, Firestore data takes priority on first load
@@ -386,10 +641,43 @@ class FirebaseSyncService {
     await this.handleRemoteUpdate(firestoreData);
   }
 
-  // Queue a sync operation
+  // Queue a sync operation (with debounce and change detection)
   queueSync(type: string, data: any): void {
-    this.syncQueue.push({ type, data });
-    this.processSyncQueue();
+    // Save locally immediately
+    const dataMap: Record<string, any> = { [type]: data };
+    this.saveDataLocally(dataMap as Partial<UserAppData>);
+    
+    // Mark as pending change
+    this.pendingChanges.add(type);
+
+    // Clear existing debounce timer
+    if (this.changeDetectionDebounce) {
+      clearTimeout(this.changeDetectionDebounce);
+    }
+
+    // Debounce sync to Firestore (only sync if changes persist after delay)
+    this.changeDetectionDebounce = setTimeout(async () => {
+      if (!this.currentUserId) {
+        return;
+      }
+
+      try {
+        // Check if data actually changed before syncing
+        const currentData = await this.getCurrentLocalData();
+        const newHash = this.calculateDataHash(currentData);
+
+        if (newHash !== this.lastSyncedDataHash) {
+          console.log(`🔄 Queued sync for ${type}, syncing to Firestore...`);
+          await this.saveToFirestore(this.currentUserId, { [type]: data } as Partial<UserAppData>);
+        } else {
+          console.log(`📋 No changes detected for ${type}, skipping sync`);
+          this.pendingChanges.delete(type);
+        }
+      } catch (error) {
+        console.error(`Error syncing ${type}:`, error);
+        // Will be retried in periodic sync
+      }
+    }, this.changeDetectionDelay);
   }
 
   // Process sync queue
@@ -417,6 +705,15 @@ class FirebaseSyncService {
           break;
         case 'notifications':
           await this.saveToFirestore(this.currentUserId, { notificationsEnabled: item.data });
+          break;
+        case 'volume':
+          await this.saveToFirestore(this.currentUserId, { volume: item.data });
+          break;
+        case 'searchHistory':
+          await this.saveToFirestore(this.currentUserId, { searchHistory: item.data });
+          break;
+        case 'uploadedMedia':
+          await this.saveToFirestore(this.currentUserId, { uploadedMedia: item.data });
           break;
         case 'cloudinary':
           await this.saveToFirestore(this.currentUserId, { cloudinaryConfig: item.data });
@@ -479,9 +776,25 @@ class FirebaseSyncService {
 
   // Cleanup listeners
   cleanup(): void {
-    this.syncListeners.forEach((unsubscribe) => unsubscribe());
+    this.syncListeners.forEach((unsubscribe) => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        console.error('Error unsubscribing listener:', error);
+      }
+    });
     this.syncListeners.clear();
+    this.reconnectAttempts.clear();
+    this.stopPeriodicSync();
+    
+    if (this.changeDetectionDebounce) {
+      clearTimeout(this.changeDetectionDebounce);
+      this.changeDetectionDebounce = null;
+    }
+    
     this.currentUserId = null;
+    this.lastSyncedDataHash = null;
+    this.pendingChanges.clear();
   }
 
   // Get sync status

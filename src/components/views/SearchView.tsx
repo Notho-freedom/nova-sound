@@ -48,17 +48,47 @@ export const SearchView = ({
     const newHistory = [term, ...searchHistory.filter(h => h !== term)].slice(0, MAX_HISTORY);
     setSearchHistory(newHistory);
     localStorage.setItem("nexus-search-history", JSON.stringify(newHistory));
+    
+    // Sync to Firebase
+    (async () => {
+      try {
+        const { firebaseSyncService } = await import('../../services/firebase-sync');
+        firebaseSyncService.queueSync('searchHistory', newHistory);
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    })();
   };
 
   const clearHistory = () => {
     setSearchHistory([]);
     localStorage.removeItem("nexus-search-history");
+    
+    // Sync to Firebase
+    (async () => {
+      try {
+        const { firebaseSyncService } = await import('../../services/firebase-sync');
+        firebaseSyncService.queueSync('searchHistory', []);
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    })();
   };
 
   const removeFromHistory = (term: string) => {
     const newHistory = searchHistory.filter(h => h !== term);
     setSearchHistory(newHistory);
     localStorage.setItem("nexus-search-history", JSON.stringify(newHistory));
+    
+    // Sync to Firebase
+    (async () => {
+      try {
+        const { firebaseSyncService } = await import('../../services/firebase-sync');
+        firebaseSyncService.queueSync('searchHistory', newHistory);
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    })();
   };
 
   // Search results

@@ -146,6 +146,29 @@ class CloudinaryService {
       this.uploadQueue.set(track.id, progress);
       this.notifyListeners();
 
+      // Track uploaded media for sync
+      if (result && result.publicId) {
+        (async () => {
+          try {
+            const { firebaseSyncService } = await import('./firebase-sync');
+            // Load existing uploaded media
+            const saved = localStorage.getItem('nexus-uploaded-media');
+            const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: string }> = saved ? JSON.parse(saved) : [];
+            const newEntry = {
+              id: track.id,
+              name: track.title,
+              uploadedAt: new Date().toISOString(),
+              cloudProvider: 'cloudinary' as const,
+            };
+            const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== track.id)].slice(0, 100); // Keep last 100
+            localStorage.setItem('nexus-uploaded-media', JSON.stringify(updated));
+            firebaseSyncService.queueSync('uploadedMedia', updated);
+          } catch (error) {
+            // Silently fail if Firebase sync is not available
+          }
+        })();
+      }
+
       return result;
     } catch (error) {
       progress.status = "error";

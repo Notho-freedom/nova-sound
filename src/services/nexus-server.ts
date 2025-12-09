@@ -107,6 +107,28 @@ class NexusServerService {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result = JSON.parse(xhr.responseText);
+            
+            // Track uploaded media for sync
+            (async () => {
+              try {
+                const { firebaseSyncService } = await import('./firebase-sync');
+                // Load existing uploaded media
+                const saved = localStorage.getItem('nexus-uploaded-media');
+                const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: string }> = saved ? JSON.parse(saved) : [];
+                const newEntry = {
+                  id: result.id,
+                  name: fileName,
+                  uploadedAt: new Date().toISOString(),
+                  cloudProvider: 'nexus' as const,
+                };
+                const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== result.id)].slice(0, 100); // Keep last 100
+                localStorage.setItem('nexus-uploaded-media', JSON.stringify(updated));
+                firebaseSyncService.queueSync('uploadedMedia', updated);
+              } catch (error) {
+                // Silently fail if Firebase sync is not available
+              }
+            })();
+            
             resolve({
               id: result.id,
               url: result.url,

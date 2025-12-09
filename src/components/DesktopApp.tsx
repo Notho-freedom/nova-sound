@@ -41,7 +41,14 @@ export const DesktopApp = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
-  const [volume, setVolume] = useState(70);
+  // Load volume from localStorage on mount
+  const [volume, setVolume] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nexus-volume');
+      return saved ? parseInt(saved, 10) : 70;
+    }
+    return 70;
+  });
   const [isMuted, setIsMuted] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -115,6 +122,21 @@ export const DesktopApp = () => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
+    
+    // Save volume to localStorage and sync to Firebase
+    localStorage.setItem('nexus-volume', volume.toString());
+    
+    // Sync to Firebase (debounced)
+    const timeoutId = setTimeout(async () => {
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        firebaseSyncService.queueSync('volume', volume);
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timeoutId);
   }, [volume, isMuted]);
 
   // Update current time from audio element

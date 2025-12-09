@@ -344,7 +344,14 @@ export function useCloudSync(): UseCloudSyncReturn {
             }
           }
         } else {
-          // Firebase user signed out
+          // Firebase user signed out - cleanup sync listeners
+          try {
+            const { firebaseSyncService } = await import('../services/firebase-sync');
+            firebaseSyncService.cleanup();
+          } catch (error) {
+            console.error('Error cleaning up sync on logout:', error);
+          }
+          
           setNexusUser(null);
           setNexusAuthenticated(false);
           setNexusIsPro(false);
@@ -417,6 +424,13 @@ export function useCloudSync(): UseCloudSyncReturn {
       }
       unsubscribeAuth();
       unsubscribeProgress();
+      
+      // Cleanup Firestore sync listeners
+      import('../services/firebase-sync').then(({ firebaseSyncService }) => {
+        firebaseSyncService.cleanup();
+      }).catch((error) => {
+        console.error('Error cleaning up sync on unmount:', error);
+      });
     };
   }, []);
 
