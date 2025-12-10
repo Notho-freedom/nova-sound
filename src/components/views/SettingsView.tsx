@@ -27,6 +27,7 @@ import {
   EyeOff,
   LogOut,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -843,6 +844,72 @@ export const SettingsView = () => {
                           <Check className="w-4 h-4 mr-2" />
                         )}
                         Sauvegarder
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </SettingsCard>
+
+              {/* Bunny Storage - Pro Only */}
+              <SettingsCard title="Bunny Storage" icon={Zap}>
+                <div className="space-y-4">
+                  <div className="p-3 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
+                    <p className="text-sm text-yellow-400 flex items-center gap-2">
+                      <Crown className="w-4 h-4" />
+                      Exclusif aux utilisateurs Pro
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      CDN ultra-rapide avec stockage illimité
+                    </p>
+                  </div>
+
+                  {nexusIsPro ? (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <p className="text-sm text-green-400 flex items-center gap-2">
+                          <Check className="w-4 h-4" />
+                          Bunny Storage activé
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Vos uploads utilisent automatiquement Bunny CDN
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Check className="w-3 h-3 text-green-500" />
+                          Upload jusqu'à 500MB par fichier
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="w-3 h-3 text-green-500" />
+                          CDN mondial pour lecture ultra-rapide
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="w-3 h-3 text-green-500" />
+                          Stockage illimité
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Check className="w-3 h-3 text-green-500" />
+                          Streaming optimisé audio/vidéo
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                        <p className="text-sm text-muted-foreground">
+                          Passez au plan Pro pour accéder à Bunny Storage
+                        </p>
+                      </div>
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="w-full" 
+                        onClick={handleUpgradeToPro}
+                        disabled={!stripeInitialized || !nexusAuthenticated}
+                      >
+                        <Crown className="w-4 h-4 mr-2" />
+                        Passer au Pro
                       </Button>
                     </div>
                   )}
