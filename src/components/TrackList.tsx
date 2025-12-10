@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Music, Play, Pause, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Track } from "@/types/music";
@@ -15,6 +16,9 @@ interface TrackListProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayNext?: (track: Track) => void;
+  onAddToQueue?: (track: Track) => void;
+  onAddToPlaylist?: (playlistId: string, track: Track) => void;
   playlists?: any[];
   isFavorite?: (trackId: string) => boolean;
   toggleFavorite?: (trackId: string) => void;
@@ -33,11 +37,14 @@ const formatDuration = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-export const TrackList = ({ 
+export const TrackList = memo(({ 
   tracks, 
   currentTrackIndex, 
   isPlaying, 
   onTrackSelect,
+  onPlayNext,
+  onAddToQueue,
+  onAddToPlaylist,
   playlists = [],
   isFavorite,
   toggleFavorite,
@@ -58,9 +65,9 @@ export const TrackList = ({
           playlists={playlists}
           isFavorite={isFavorite?.(track.id) || false}
           onPlay={() => onTrackSelect(index)}
-          onPlayNext={() => {}}
-          onAddToQueue={() => {}}
-          onAddToPlaylist={() => {}}
+          onPlayNext={() => onPlayNext?.(track)}
+          onAddToQueue={() => onAddToQueue?.(track)}
+          onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
           onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
           onToggleFavorite={() => toggleFavorite?.(track.id)}
           onUploadToCloudinary={() => uploadTrack?.(track)}
@@ -151,4 +158,4 @@ export const TrackList = ({
       ))}
     </div>
   );
-};
+});

@@ -14,6 +14,9 @@ interface TrackListViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayNext?: (track: Track) => void;
+  onAddToQueue?: (track: Track) => void;
+  onAddToPlaylist?: (playlistId: string, track: Track) => void;
   playlists?: any[];
   isFavorite?: (trackId: string) => boolean;
   toggleFavorite?: (trackId: string) => void;
@@ -34,6 +37,9 @@ export const TrackListView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayNext,
+  onAddToQueue,
+  onAddToPlaylist,
   playlists = [],
   isFavorite,
   toggleFavorite,
@@ -116,9 +122,9 @@ export const TrackListView = ({
                     playlists={playlists}
                     isFavorite={isFavorite?.(track.id) || false}
                     onPlay={() => onTrackSelect(actualIndex)}
-                    onPlayNext={() => {}}
-                    onAddToQueue={() => {}}
-                    onAddToPlaylist={() => {}}
+                    onPlayNext={() => onPlayNext?.(track)}
+                    onAddToQueue={() => onAddToQueue?.(track)}
+                    onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
                     onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
                     onToggleFavorite={() => toggleFavorite?.(track.id)}
                     onUploadToCloudinary={() => uploadTrack?.(track)}
@@ -169,9 +175,9 @@ export const TrackListView = ({
                     playlists={playlists}
                     isFavorite={isFavorite?.(track.id) || false}
                     onPlay={() => onTrackSelect(actualIndex)}
-                    onPlayNext={() => {}}
-                    onAddToQueue={() => {}}
-                    onAddToPlaylist={() => {}}
+                    onPlayNext={() => onPlayNext?.(track)}
+                    onAddToQueue={() => onAddToQueue?.(track)}
+                    onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
                     onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
                     onToggleFavorite={() => toggleFavorite?.(track.id)}
                     onUploadToCloudinary={() => uploadTrack?.(track)}

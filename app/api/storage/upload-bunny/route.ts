@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuthAndPro } from '../../../../lib/stripe-utils';
-import { uploadToBunny } from '../../../../lib/bunny';
+import { verifyAuthAndPro } from '~/lib/stripe-utils';
+import { uploadToBunny } from '~/lib/bunny';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB for Pro users
 

@@ -147,7 +147,7 @@ class CloudinaryService {
       this.notifyListeners();
 
       // Track uploaded media for sync
-      if (result && result.publicId) {
+      if (result && result.public_id) {
         (async () => {
           try {
             const { firebaseSyncService } = await import('./firebase-sync');

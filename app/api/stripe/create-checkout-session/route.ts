@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyAuth } from '../../auth/middleware';
+import { validateRequest, createErrorResponse, ErrorCodes, stripeCheckoutSchema, isValidationError } from '~/lib/validation';
+import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
@@ -15,6 +17,20 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientId = getClientIdentifier(request);
+    const rateLimit = await rateLimiters.strict(clientId, false);
+    if (!rateLimit.allowed) {
+      return createErrorResponse(
+        ErrorCodes.RATE_LIMIT_EXCEEDED,
+        rateLimit.message || 'Too many requests',
+        429,
+        {
+          resetTime: new Date(rateLimit.resetTime).toISOString(),
+        }
+      );
+    }
+
     const auth = await verifyAuth(request);
     if (!auth) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
@@ -28,15 +44,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { priceId, successUrl, cancelUrl } = body;
-
-    if (!priceId) {
-      return NextResponse.json({ error: 'priceId is required' }, { status: 400 });
+    
+    // Validate request body
+    const validation = validateRequest(stripeCheckoutSchema, body);
+    if (isValidationError(validation)) {
+      return createErrorResponse(
+        validation.error.code,
+        validation.error.message,
+        400,
+        validation.error.details
+      );
     }
+
+    const { priceId, successUrl, cancelUrl } = validation.data;
 
     // Validate price ID
     if (priceId !== PRICE_PRO_MONTHLY && priceId !== PRICE_PRO_YEARLY) {
-      return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 });
+      return createErrorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        `Invalid price ID. Expected ${PRICE_PRO_MONTHLY} or ${PRICE_PRO_YEARLY}`,
+        400,
+        { providedPriceId: priceId }
+      );
     }
 
     // Create checkout session
@@ -61,11 +90,24 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       url: session.url,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating checkout session:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create checkout session' },
-      { status: 500 }
+    const err = error as { message?: string; type?: string; code?: string };
+    
+    // Check if it's a Stripe error
+    if (err.type === 'StripeInvalidRequestError') {
+      return createErrorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        err.message || 'Invalid Stripe request',
+        400
+      );
+    }
+    
+    return createErrorResponse(
+      ErrorCodes.INTERNAL_ERROR,
+      err.message || 'Failed to create checkout session. Please try again later.',
+      500,
+      process.env.NODE_ENV === 'development' ? { originalError: err.message } : undefined
     );
   }
 }

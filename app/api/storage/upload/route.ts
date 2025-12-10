@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { verifyAuthAndPro } from '../../../lib/stripe-utils';
-import { uploadToBunny } from '../../../lib/bunny';
+import { verifyAuthAndPro } from '~/lib/stripe-utils';
+import { uploadToBunny } from '~/lib/bunny';
+import { createErrorResponse, ErrorCodes } from '~/lib/validation';
+import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
 
 const STORAGE_DIR = process.env.STORAGE_DIR || path.join(process.cwd(), 'storage');
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for free users
@@ -10,25 +12,65 @@ const MAX_FILE_SIZE_PRO = 500 * 1024 * 1024; // 500MB for Pro users
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientId = getClientIdentifier(request);
+    const rateLimit = await rateLimiters.upload(clientId, false);
+    if (!rateLimit.allowed) {
+      return createErrorResponse(
+        ErrorCodes.RATE_LIMIT_EXCEEDED,
+        rateLimit.message || 'Upload limit exceeded',
+        429,
+        {
+          resetTime: new Date(rateLimit.resetTime).toISOString(),
+        }
+      );
+    }
+
     const auth = await verifyAuthAndPro(request);
     if (!auth) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+      return createErrorResponse(
+        ErrorCodes.AUTHENTICATION_ERROR,
+        'User not authenticated',
+        401
+      );
     }
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      return createErrorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        'No file uploaded. Please provide a file in the request.',
+        400
+      );
+    }
+
+    // Validate file type (optional - can be made stricter)
+    const allowedTypes = [
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/flac', 'audio/aac', 'audio/ogg',
+      'video/mp4', 'video/avi', 'video/mkv', 'video/webm',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    ];
+    if (file.type && !allowedTypes.includes(file.type) && !file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+      return createErrorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        `File type not allowed: ${file.type}. Allowed types: audio, video, image files.`,
+        400
+      );
     }
 
     const maxSize = auth.isPro ? MAX_FILE_SIZE_PRO : MAX_FILE_SIZE;
     if (file.size > maxSize) {
-      return NextResponse.json(
-        { 
-          error: `File too large. Maximum size is ${maxSize / 1024 / 1024}MB${auth.isPro ? '' : '. Upgrade to Pro for 500MB limit.'}` 
-        },
-        { status: 400 }
+      return createErrorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        `File too large. Maximum size is ${maxSize / 1024 / 1024}MB${auth.isPro ? '' : '. Upgrade to Pro for 500MB limit.'}`,
+        400,
+        {
+          maxSize,
+          fileSize: file.size,
+          isPro: auth.isPro,
+        }
       );
     }
 
@@ -81,11 +123,24 @@ export async function POST(request: NextRequest) {
       filename: file.name,
       provider: 'local',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error uploading file:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to upload file' },
-      { status: 500 }
+    const err = error as { message?: string; code?: string };
+    
+    // Check if it's a known error type
+    if (err.code === 'VALIDATION_ERROR' || err.code === 'AUTHENTICATION_ERROR') {
+      return createErrorResponse(
+        err.code,
+        err.message || 'Upload failed',
+        400
+      );
+    }
+    
+    return createErrorResponse(
+      ErrorCodes.INTERNAL_ERROR,
+      err.message || 'Failed to upload file. Please try again later.',
+      500,
+      process.env.NODE_ENV === 'development' ? { originalError: err.message } : undefined
     );
   }
 }

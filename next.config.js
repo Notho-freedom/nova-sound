@@ -26,6 +26,11 @@ const nextConfig = {
       test: /electron\/.*\.ts$/,
       use: 'ignore-loader',
     });
+    // Exclure les fichiers de test et config Vitest
+    config.module.rules.push({
+      test: /(vitest\.config|vitest\.setup|\.test|\.spec)\.ts$/,
+      use: 'ignore-loader',
+    });
     return config;
   },
   // Désactiver certaines optimisations pour Electron

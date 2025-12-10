@@ -1,53 +1,180 @@
-# API Routes Next.js
+# Nexus Audio Player - API Documentation
 
-Le serveur backend est maintenant intégré directement dans Next.js via les API Routes.
+## Overview
 
-## Routes disponibles
+The Nexus Audio Player API provides endpoints for file storage, subscription management, and cloud synchronization.
 
-### Health Check
-- `GET /api/health` - Vérification de l'état du serveur
+## Base URL
 
-### Storage
-- `POST /api/storage/upload` - Upload de fichier
-- `GET /api/storage/download/[fileId]` - Téléchargement de fichier
-- `GET /api/storage/files` - Liste des fichiers
-- `DELETE /api/storage/files/[fileId]` - Suppression de fichier
+- **Development**: `http://localhost:3000/api`
+- **Production**: `https://api.nexus-audio.com/api`
 
-### Stripe
-- `POST /api/stripe/create-checkout-session` - Créer une session de checkout
-- `POST /api/stripe/create-portal-session` - Créer une session de portail de facturation
-- `GET /api/stripe/subscription-status` - Statut de l'abonnement
+## Authentication
 
-### Sync
-- `GET /api/sync/status` - Statut de synchronisation
-- `POST /api/sync/start` - Démarrer la synchronisation
-
-## Authentification
-
-Toutes les routes (sauf `/api/health`) nécessitent une authentification via un token Bearer dans le header `Authorization`:
+All protected endpoints require authentication via Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer <token>
 ```
 
-Le token est vérifié via Google OAuth (ID token ou access token).
+The token can be either:
+- **Firebase ID token** (recommended)
+- **Google OAuth access token**
 
-## Variables d'environnement
+## OpenAPI Specification
 
-Les variables suivantes doivent être définies dans `.env`:
+Full API documentation is available in OpenAPI 3.1 format:
 
-```env
-GOOGLE_CLIENT_ID=your_google_client_id
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_PRICE_PRO_MONTHLY=price_id_monthly
-STRIPE_PRICE_PRO_YEARLY=price_id_yearly
-STORAGE_DIR=./storage
-NEXT_PUBLIC_FRONTEND_URL=http://localhost:3000
+- **OpenAPI Spec**: [docs/openapi.yaml](./docs/openapi.yaml)
+- **View Online**: Use [Swagger Editor](https://editor.swagger.io/) or [Swagger UI](https://swagger.io/tools/swagger-ui/) to view the spec
+
+## Quick Start
+
+### 1. Health Check
+
+```bash
+curl http://localhost:3000/api/health
 ```
 
-## Migration depuis le serveur Express
+Response:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
 
-Le serveur Express séparé (`server/`) n'est plus nécessaire. Toutes les routes ont été migrées vers Next.js API Routes dans `app/api/`.
+### 2. Upload a File
 
-Les appels API dans `src/services/nexus-server.ts` utilisent maintenant les routes Next.js (même origine, pas besoin de base URL).
+```bash
+curl -X POST http://localhost:3000/api/storage/upload \
+  -H "Authorization: Bearer <your-token>" \
+  -F "file=@song.mp3"
+```
 
+Response:
+```json
+{
+  "id": "1234567890-123456789",
+  "url": "https://cdn.example.com/nexus/user123/file.mp3",
+  "size": 5242880,
+  "filename": "song.mp3",
+  "provider": "bunny"
+}
+```
+
+### 3. Get Subscription Status
+
+```bash
+curl http://localhost:3000/api/stripe/subscription-status \
+  -H "Authorization: Bearer <your-token>"
+```
+
+Response:
+```json
+{
+  "isPro": true,
+  "status": "active",
+  "currentPeriodEnd": "2024-02-01T00:00:00Z",
+  "plan": "monthly"
+}
+```
+
+## Error Handling
+
+All errors follow a consistent format:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "details": {}
+  }
+}
+```
+
+### Error Codes
+
+- `VALIDATION_ERROR` - Invalid input or validation failed
+- `AUTHENTICATION_ERROR` - User not authenticated
+- `AUTHORIZATION_ERROR` - User not authorized
+- `NOT_FOUND` - Resource not found
+- `RATE_LIMIT_EXCEEDED` - Too many requests
+- `INTERNAL_ERROR` - Server error
+- `EXTERNAL_SERVICE_ERROR` - External service (Stripe, Bunny) error
+
+## Rate Limiting
+
+API requests are rate-limited. Contact support if you need higher limits.
+
+## File Upload Limits
+
+- **Free users**: 100MB per file
+- **Pro users**: 500MB per file
+
+## Supported File Types
+
+- **Audio**: MP3, WAV, FLAC, AAC, OGG
+- **Video**: MP4, AVI, MKV, WebM
+- **Images**: JPEG, PNG, GIF, WebP
+
+## Examples
+
+### JavaScript/TypeScript
+
+```typescript
+// Upload file
+const formData = new FormData();
+formData.append('file', file);
+
+const response = await fetch('http://localhost:3000/api/storage/upload', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+  },
+  body: formData,
+});
+
+const result = await response.json();
+```
+
+### Python
+
+```python
+import requests
+
+headers = {
+    'Authorization': f'Bearer {token}'
+}
+
+files = {
+    'file': open('song.mp3', 'rb')
+}
+
+response = requests.post(
+    'http://localhost:3000/api/storage/upload',
+    headers=headers,
+    files=files
+)
+
+result = response.json()
+```
+
+## Testing
+
+Use the provided test scripts:
+
+```bash
+# Test all API routes
+npm run test:api
+
+# Validate environment variables
+npm run validate:env
+```
+
+## Support
+
+For questions or issues:
+- Email: support@nexus-audio.com
+- Documentation: [docs/openapi.yaml](./docs/openapi.yaml)

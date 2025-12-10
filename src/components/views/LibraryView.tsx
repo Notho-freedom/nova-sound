@@ -47,6 +47,9 @@ interface LibraryViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayNext?: (track: Track) => void;
+  onAddToQueue?: (track: Track) => void;
+  onAddToPlaylist?: (playlistId: string, track: Track) => void;
   title?: string;
   showFilters?: boolean;
   viewMode?: "tracks" | "albums" | "artists" | "folders";
@@ -137,6 +140,9 @@ export const LibraryView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayNext,
+  onAddToQueue,
+  onAddToPlaylist,
   title = "Bibliothèque",
   showFilters = true,
   viewMode = "tracks",
@@ -360,8 +366,16 @@ export const LibraryView = ({
                 const idx = tracks.findIndex(t => t.id === shuffled[0].id);
                 if (idx !== -1) onTrackSelect(idx);
               }}
-              onAddToQueue={() => {}}
-              onAddToPlaylist={(playlistId) => {}}
+              onAddToQueue={() => {
+                if (onAddToQueue) {
+                  album.tracks.forEach(track => onAddToQueue(track));
+                }
+              }}
+              onAddToPlaylist={(playlistId) => {
+                if (onAddToPlaylist) {
+                  album.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                }
+              }}
               onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
               onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
               onViewArtist={() => setSelectedArtist(album.artist)}
@@ -426,8 +440,16 @@ export const LibraryView = ({
                   const idx = tracks.findIndex(t => t.id === shuffled[0].id);
                   if (idx !== -1) onTrackSelect(idx);
                 }}
-                onAddToQueue={() => {}}
-                onAddToPlaylist={(playlistId) => {}}
+                onAddToQueue={() => {
+                  if (onAddToQueue) {
+                    artist.tracks.forEach(track => onAddToQueue(track));
+                  }
+                }}
+                onAddToPlaylist={(playlistId) => {
+                  if (onAddToPlaylist) {
+                    artist.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                  }
+                }}
                 onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
                 onViewArtist={() => setSelectedArtist(artist.name)}
               >
@@ -664,9 +686,15 @@ export const LibraryView = ({
                         playlists={playlists}
                         isFavorite={isFavorite(track.id)}
                         onPlay={() => onTrackSelect(actualIndex)}
-                        onPlayNext={() => {}}
-                        onAddToQueue={() => {}}
-                        onAddToPlaylist={(playlistId) => {}}
+                        onPlayNext={() => {
+                          if (onPlayNext) onPlayNext(track);
+                        }}
+                        onAddToQueue={() => {
+                          if (onAddToQueue) onAddToQueue(track);
+                        }}
+                        onAddToPlaylist={(playlistId) => {
+                          if (onAddToPlaylist) onAddToPlaylist(playlistId, track);
+                        }}
                         onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
                         onToggleFavorite={() => toggleFavorite(track.id)}
                         onUploadToCloudinary={() => uploadTrack(track)}
@@ -728,9 +756,15 @@ export const LibraryView = ({
                         playlists={playlists}
                         isFavorite={isFavorite(track.id)}
                         onPlay={() => onTrackSelect(actualIndex)}
-                        onPlayNext={() => {}}
-                        onAddToQueue={() => {}}
-                        onAddToPlaylist={(playlistId) => {}}
+                        onPlayNext={() => {
+                          if (onPlayNext) onPlayNext(track);
+                        }}
+                        onAddToQueue={() => {
+                          if (onAddToQueue) onAddToQueue(track);
+                        }}
+                        onAddToPlaylist={(playlistId) => {
+                          if (onAddToPlaylist) onAddToPlaylist(playlistId, track);
+                        }}
                         onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
                         onToggleFavorite={() => toggleFavorite(track.id)}
                         onUploadToCloudinary={() => uploadTrack(track)}
@@ -765,9 +799,15 @@ export const LibraryView = ({
                 playlists={playlists}
                 isFavorite={isFavorite(track.id)}
                 onPlay={() => onTrackSelect(actualIndex)}
-                onPlayNext={() => {}}
-                onAddToQueue={() => {}}
-                onAddToPlaylist={(playlistId) => {}}
+                onPlayNext={() => {
+                  if (onPlayNext) onPlayNext(track);
+                }}
+                onAddToQueue={() => {
+                  if (onAddToQueue) onAddToQueue(track);
+                }}
+                onAddToPlaylist={(playlistId) => {
+                  if (onAddToPlaylist) onAddToPlaylist(playlistId, track);
+                }}
                 onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
                 onToggleFavorite={() => toggleFavorite(track.id)}
                 onUploadToCloudinary={() => uploadTrack(track)}

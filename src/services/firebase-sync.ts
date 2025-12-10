@@ -564,8 +564,16 @@ class FirebaseSyncService {
     const searchHistory = this.loadFromLocalStorage<string[]>('nexus-search-history');
     if (searchHistory) data.searchHistory = searchHistory;
 
-    const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: string }>>('nexus-uploaded-media');
-    if (uploadedMedia) data.uploadedMedia = uploadedMedia;
+    const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" }>>('nexus-uploaded-media');
+    if (uploadedMedia) {
+      // Type assertion needed because localStorage might have old data with different types
+      data.uploadedMedia = uploadedMedia.map(item => ({
+        ...item,
+        cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus") 
+          ? item.cloudProvider 
+          : undefined
+      }));
+    }
 
     const cloudinaryConfig = this.loadFromLocalStorage<any>('nexus-cloudinary-config');
     if (cloudinaryConfig) data.cloudinaryConfig = cloudinaryConfig;

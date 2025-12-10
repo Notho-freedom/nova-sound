@@ -57,6 +57,8 @@ interface SidebarProps {
   favoritesCount?: number;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  onPlayPlaylist?: (playlistId: string) => void;
+  onShufflePlaylist?: (playlistId: string) => void;
 }
 
 const mainNavItems = [
@@ -155,7 +157,9 @@ export const Sidebar = ({
   onViewChange, 
   favoritesCount,
   collapsed: controlledCollapsed,
-  onCollapsedChange
+  onCollapsedChange,
+  onPlayPlaylist,
+  onShufflePlaylist,
 }: SidebarProps) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? internalCollapsed;
@@ -307,11 +311,15 @@ export const Sidebar = ({
                     playlist={playlist}
                     onPlay={() => {
                       onViewChange("playlists");
-                      // TODO: Implement play playlist
+                      if (onPlayPlaylist) {
+                        onPlayPlaylist(playlist.id);
+                      }
                     }}
                     onShuffle={() => {
                       onViewChange("playlists");
-                      // TODO: Implement shuffle playlist
+                      if (onShufflePlaylist) {
+                        onShufflePlaylist(playlist.id);
+                      }
                     }}
                     onEdit={() => {
                       setEditingPlaylist({ id: playlist.id, name: playlist.name });

@@ -5,27 +5,35 @@ import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
+import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
 import { SettingsView } from "./views/SettingsView";
-import { VideosView } from "./views/VideosView";
+
+// Lazy load heavy components
+const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
+const DownloadsView = lazy(() => import("./views/DownloadsView").then(m => ({ default: m.DownloadsView })));
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
+import { usePlaylists } from "@/hooks/usePlaylists";
+import { useQueue } from "@/hooks/useQueue";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { Track } from "@/types/music";
 
 export const DesktopApp = () => {
-  const { tracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
+  const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory } = usePlayHistory();
+  const { playlists, addTracksToPlaylist } = usePlaylists();
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
   
@@ -33,13 +41,36 @@ export const DesktopApp = () => {
   const overallProgress = cloudinaryUploading ? cloudinaryProgress : (cloudSyncUploading ? cloudSyncProgress : undefined);
   const isUploading = cloudinaryUploading || cloudSyncUploading;
   
+  // Queue management
+  const {
+    queue,
+    currentTrack: queueCurrentTrack,
+    addToQueue,
+    addToQueueNext,
+    setCurrentIndex,
+    setQueue,
+    shuffle: shuffleQueue,
+    unshuffle: unshuffleQueue,
+    isShuffled: queueIsShuffled,
+  } = useQueue(libraryTracks);
+  
+  // Initialize queue with library tracks when they change
+  useEffect(() => {
+    if (libraryTracks.length > 0 && queue.tracks.length === 0) {
+      setQueue(libraryTracks);
+    }
+  }, [libraryTracks, queue.tracks.length, setQueue]);
+  
+  const tracks = queue.tracks.length > 0 ? queue.tracks : libraryTracks;
+  const currentTrackIndex = queue.currentIndex;
+  const currentTrack = queueCurrentTrack || (tracks.length > 0 ? tracks[currentTrackIndex] || tracks[0] : null);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>("home");
   const [previousView, setPreviousView] = useState<ViewType>("home");
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isShuffle, setIsShuffle] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(queueIsShuffled);
   const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
   // Load volume from localStorage on mount
   const [volume, setVolume] = useState(() => {
@@ -57,9 +88,6 @@ export const DesktopApp = () => {
 
   // Audio element ref for real playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Get current track safely
-  const currentTrack: Track | null = tracks.length > 0 ? tracks[currentTrackIndex] || tracks[0] : null;
 
   // Loading complete handler
   const handleLoadComplete = useCallback(() => {
@@ -252,12 +280,11 @@ export const DesktopApp = () => {
         audioRef.current.currentTime = 0;
       }
     } else {
-      setCurrentTrackIndex((prev) =>
-        prev === 0 ? tracks.length - 1 : prev - 1
-      );
+      const newIndex = currentTrackIndex === 0 ? tracks.length - 1 : currentTrackIndex - 1;
+      setCurrentIndex(newIndex);
       setCurrentTime(0);
     }
-  }, [currentTime, tracks.length]);
+  }, [currentTime, tracks.length, currentTrackIndex, setCurrentIndex]);
 
   const handleNext = useCallback(() => {
     if (tracks.length === 0) return;
@@ -276,17 +303,15 @@ export const DesktopApp = () => {
       do {
         randomIndex = Math.floor(Math.random() * tracks.length);
       } while (randomIndex === currentTrackIndex && tracks.length > 1);
-      setCurrentTrackIndex(randomIndex);
+      setCurrentIndex(randomIndex);
     } else {
-      setCurrentTrackIndex((prev) => {
-        if (prev === tracks.length - 1) {
-          return repeatMode === "all" ? 0 : prev;
-        }
-        return prev + 1;
-      });
+      const newIndex = currentTrackIndex === tracks.length - 1
+        ? (repeatMode === "all" ? 0 : currentTrackIndex)
+        : currentTrackIndex + 1;
+      setCurrentIndex(newIndex);
     }
     setCurrentTime(0);
-  }, [repeatMode, isShuffle, currentTrackIndex, tracks.length]);
+  }, [repeatMode, isShuffle, currentTrackIndex, tracks.length, setCurrentIndex]);
 
   const handleSeek = (value: number[]) => {
     const newTime = value[0];
@@ -308,10 +333,103 @@ export const DesktopApp = () => {
   };
 
   const handleTrackSelect = (index: number) => {
-    setCurrentTrackIndex(index);
+    setCurrentIndex(index);
     setCurrentTime(0);
     setIsPlaying(true);
   };
+
+  // Queue management handlers
+  const handlePlayNext = useCallback((track: Track | Track[]) => {
+    const tracksToAdd = Array.isArray(track) ? track : [track];
+    addToQueueNext(tracksToAdd);
+    toast.success(`Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la suite`);
+  }, [addToQueueNext]);
+
+  const handleAddToQueue = useCallback((track: Track | Track[]) => {
+    const tracksToAdd = Array.isArray(track) ? track : [track];
+    addToQueue(tracksToAdd);
+    toast.success(`Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la file`);
+  }, [addToQueue]);
+
+  const handleAddToPlaylist = useCallback(async (playlistId: string, track: Track | Track[]) => {
+    const tracksToAdd = Array.isArray(track) ? track : [track];
+    const trackIds = tracksToAdd.map(t => t.id);
+    try {
+      await addTracksToPlaylist(playlistId, trackIds);
+      toast.success(`Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la playlist`);
+    } catch (error) {
+      console.error('Failed to add tracks to playlist:', error);
+      toast.error('Erreur lors de l\'ajout à la playlist');
+    }
+  }, [addTracksToPlaylist]);
+
+  const handleShuffle = useCallback(() => {
+    if (isShuffle) {
+      unshuffleQueue();
+      setIsShuffle(false);
+    } else {
+      shuffleQueue();
+      setIsShuffle(true);
+    }
+  }, [isShuffle, shuffleQueue, unshuffleQueue]);
+
+  // Sync shuffle state with queue
+  useEffect(() => {
+    setIsShuffle(queueIsShuffled);
+  }, [queueIsShuffled]);
+
+  // Playlist handlers
+  const handlePlayPlaylist = useCallback((playlistId: string) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) {
+      toast.error('Playlist introuvable');
+      return;
+    }
+
+    // Get tracks from playlist trackIds
+    const playlistTracks = playlist.trackIds
+      .map(id => libraryTracks.find(t => t.id === id))
+      .filter((t): t is Track => t !== undefined);
+
+    if (playlistTracks.length === 0) {
+      toast.error('La playlist est vide');
+      return;
+    }
+
+    // Set queue and start playing
+    setQueue(playlistTracks);
+    setCurrentIndex(0);
+    setIsPlaying(true);
+    toast.success(`Lecture de "${playlist.name}"`);
+  }, [playlists, libraryTracks, setQueue, setCurrentIndex]);
+
+  const handleShufflePlaylist = useCallback((playlistId: string) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) {
+      toast.error('Playlist introuvable');
+      return;
+    }
+
+    // Get tracks from playlist trackIds
+    const playlistTracks = playlist.trackIds
+      .map(id => libraryTracks.find(t => t.id === id))
+      .filter((t): t is Track => t !== undefined);
+
+    if (playlistTracks.length === 0) {
+      toast.error('La playlist est vide');
+      return;
+    }
+
+    // Shuffle tracks
+    const shuffled = [...playlistTracks].sort(() => Math.random() - 0.5);
+
+    // Set queue and start playing
+    setQueue(shuffled);
+    setCurrentIndex(0);
+    setIsPlaying(true);
+    setIsShuffle(true);
+    toast.success(`Lecture aléatoire de "${playlist.name}"`);
+  }, [playlists, libraryTracks, setQueue, setCurrentIndex]);
 
   const handleToggleFavorite = () => {
     if (!currentTrack) return;
@@ -362,7 +480,7 @@ export const DesktopApp = () => {
           onPlayPause={handlePlayPause}
           onPrevious={handlePrevious}
           onNext={handleNext}
-          onShuffle={() => setIsShuffle(!isShuffle)}
+          onShuffle={handleShuffle}
           onRepeat={handleRepeat}
           onSeek={handleSeek}
           onVolumeChange={handleVolumeChange}
@@ -403,6 +521,9 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "favorites":
@@ -418,6 +539,9 @@ export const DesktopApp = () => {
             }}
             title="Favoris"
             emptyMessage="Aucun favori. Cliquez sur ❤️ pour ajouter des titres."
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "playlists":
@@ -428,6 +552,9 @@ export const DesktopApp = () => {
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
             title="Playlists"
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "recent":
@@ -444,6 +571,9 @@ export const DesktopApp = () => {
             title="Écouté récemment"
             showHistory={true}
             emptyMessage="Aucun historique d'écoute."
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "albums":
@@ -455,6 +585,9 @@ export const DesktopApp = () => {
             onTrackSelect={handleTrackSelect}
             title="Albums"
             viewMode="albums"
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "artists":
@@ -466,6 +599,9 @@ export const DesktopApp = () => {
             onTrackSelect={handleTrackSelect}
             title="Artistes"
             viewMode="artists"
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "videos":
@@ -484,14 +620,16 @@ export const DesktopApp = () => {
             }}
             title="Fichiers Locaux"
             viewMode="folders"
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         );
       case "downloads":
         return (
-          <div className="p-6">
-            <h1 className="font-display text-3xl font-bold text-foreground">Téléchargements</h1>
-            <p className="text-muted-foreground mt-2">Gérez vos téléchargements ici.</p>
-          </div>
+          <Suspense fallback={<div className="p-6">Chargement des téléchargements...</div>}>
+            <DownloadsView />
+          </Suspense>
         );
       case "settings":
         return <SettingsView />;
@@ -548,7 +686,7 @@ export const DesktopApp = () => {
             onPlayPause={handlePlayPause}
             onPrevious={handlePrevious}
             onNext={handleNext}
-            onShuffle={() => setIsShuffle(!isShuffle)}
+            onShuffle={handleShuffle}
             onRepeat={handleRepeat}
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
@@ -579,6 +717,8 @@ export const DesktopApp = () => {
             favoritesCount={favoriteTracks.length}
             collapsed={sidebarCollapsed}
             onCollapsedChange={setSidebarCollapsed}
+            onPlayPlaylist={handlePlayPlaylist}
+            onShufflePlaylist={handleShufflePlaylist}
           />
 
           {/* Content Area */}
@@ -620,7 +760,7 @@ export const DesktopApp = () => {
             onPlayPause={handlePlayPause}
             onPrevious={handlePrevious}
             onNext={handleNext}
-            onShuffle={() => setIsShuffle(!isShuffle)}
+            onShuffle={handleShuffle}
             onRepeat={handleRepeat}
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}

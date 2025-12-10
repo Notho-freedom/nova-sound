@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyAuth } from '../../auth/middleware';
+import { validateRequest, createErrorResponse, ErrorCodes, stripePortalSchema, isValidationError } from '~/lib/validation';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -15,18 +16,35 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await verifyAuth(request);
     if (!auth) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+      return createErrorResponse(
+        ErrorCodes.AUTHENTICATION_ERROR,
+        'User not authenticated',
+        401
+      );
     }
 
     if (!stripe) {
-      return NextResponse.json(
-        { error: 'Stripe is not configured. Please set STRIPE_SECRET_KEY in .env' },
-        { status: 503 }
+      return createErrorResponse(
+        ErrorCodes.EXTERNAL_SERVICE_ERROR,
+        'Stripe is not configured. Please set STRIPE_SECRET_KEY in .env',
+        503
       );
     }
 
     const body = await request.json();
-    const { returnUrl } = body;
+    
+    // Validate request body
+    const validation = validateRequest(stripePortalSchema, body);
+    if (isValidationError(validation)) {
+      return createErrorResponse(
+        validation.error.code,
+        validation.error.message,
+        400,
+        validation.error.details
+      );
+    }
+
+    const { returnUrl } = validation.data;
 
     // Find customer by metadata
     let customer = null;
@@ -70,12 +88,11 @@ export async function POST(request: NextRequest) {
       
       // Check if it's a configuration error
       if (stripeError.type === 'invalid_request_error' && stripeError.message?.includes('portal')) {
-        return NextResponse.json(
-          { 
-            error: 'Stripe Billing Portal is not configured. Please configure it in your Stripe Dashboard: Settings > Billing > Customer portal',
-            details: stripeError.message 
-          },
-          { status: 400 }
+        return createErrorResponse(
+          ErrorCodes.EXTERNAL_SERVICE_ERROR,
+          'Stripe Billing Portal is not configured. Please configure it in your Stripe Dashboard: Settings > Billing > Customer portal',
+          400,
+          { stripeError: stripeError.message }
         );
       }
       
@@ -88,12 +105,11 @@ export async function POST(request: NextRequest) {
       type: err.type,
       code: err.code,
     });
-    return NextResponse.json(
-      { 
-        error: err.message || 'Failed to create portal session',
-        details: err.type || 'Unknown error'
-      },
-      { status: 500 }
+    return createErrorResponse(
+      ErrorCodes.INTERNAL_ERROR,
+      err.message || 'Failed to create portal session. Please try again later.',
+      500,
+      process.env.NODE_ENV === 'development' ? { originalError: err.message, type: err.type } : undefined
     );
   }
 }

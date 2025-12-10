@@ -3,6 +3,7 @@ import axios from 'axios';
 const BUNNY_STORAGE_NAME = process.env.BUNNY_STORAGE_NAME;
 const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
 const BUNNY_CDN_URL = process.env.BUNNY_CDN_URL;
+const BUNNY_TOKEN_KEY = process.env.BUNNY_TOKEN_KEY; // Secret key for signing URLs
 const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}`;
 
 export interface BunnyUploadResult {
@@ -75,15 +76,53 @@ export async function deleteFromBunny(path: string): Promise<void> {
 }
 
 /**
- * Generate a signed URL for private content (optional - requires Bunny CDN token)
+ * Generate a signed URL for private content using Bunny CDN token authentication
+ * 
+ * Bunny CDN supports token-based URL signing for secure content delivery.
+ * The token is generated using HMAC-SHA256 with the following format:
+ * - token: HMAC-SHA256(path + expires, secret_key)
+ * - expires: Unix timestamp when the URL expires
+ * 
+ * @param path - The file path on Bunny CDN (e.g., "uploads/user123/file.mp3")
+ * @param expiresIn - Time in seconds until the URL expires (default: 1 hour)
+ * @returns Signed URL with token parameter
  */
 export function generateSignedUrl(path: string, expiresIn: number = 3600): string {
   if (!BUNNY_CDN_URL) {
-    return path;
+    console.warn('BUNNY_CDN_URL not configured, returning unsigned URL');
+    return path.startsWith('http') ? path : `https://${BUNNY_STORAGE_NAME}.b-cdn.net/${path}`;
   }
 
-  // Note: Bunny CDN token signing requires additional configuration
-  // This is a placeholder for future implementation
-  return `${BUNNY_CDN_URL}/${path}`;
+  // If no token key is configured, return unsigned URL
+  if (!BUNNY_TOKEN_KEY) {
+    console.warn('BUNNY_TOKEN_KEY not configured, returning unsigned URL. Set BUNNY_TOKEN_KEY in .env to enable URL signing.');
+    return `${BUNNY_CDN_URL}/${path}`;
+  }
+
+  try {
+    // Import crypto for HMAC (Node.js built-in)
+    const crypto = require('crypto');
+    
+    // Calculate expiration timestamp
+    const expires = Math.floor(Date.now() / 1000) + expiresIn;
+    
+    // Create the string to sign: path + expires
+    const stringToSign = `${path}${expires}`;
+    
+    // Generate HMAC-SHA256 signature
+    const token = crypto
+      .createHmac('sha256', BUNNY_TOKEN_KEY)
+      .update(stringToSign)
+      .digest('hex');
+    
+    // Construct signed URL
+    // Format: https://cdn.example.com/path?token=xxx&expires=xxx
+    const separator = path.includes('?') ? '&' : '?';
+    return `${BUNNY_CDN_URL}/${path}${separator}token=${token}&expires=${expires}`;
+  } catch (error) {
+    console.error('Error generating signed URL:', error);
+    // Fallback to unsigned URL if signing fails
+    return `${BUNNY_CDN_URL}/${path}`;
+  }
 }
 

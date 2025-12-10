@@ -1,0 +1,577 @@
+openapi: 3.1.0
+info:
+  title: Nexus Audio Player API
+  version: 1.0.0
+  description: |
+    API documentation for Nexus Audio Player - A modern audio/video player with cloud sync capabilities.
+    
+    ## Authentication
+    All protected endpoints require authentication via Bearer token in the Authorization header.
+    The token can be either:
+    - Firebase ID token (recommended)
+    - Google OAuth access token
+    
+    ## Rate Limiting
+    API requests are rate-limited. Contact support if you need higher limits.
+    
+    ## Error Responses
+    All errors follow a consistent format:
+    ```json
+    {
+      "error": {
+        "code": "ERROR_CODE",
+        "message": "Human-readable error message",
+        "details": {}
+      }
+    }
+    ```
+  contact:
+    name: Nexus Audio Player Support
+    email: support@nexus-audio.com
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://api.nexus-audio.com/api
+    description: Production server
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Storage
+    description: File storage and management
+  - name: Stripe
+    description: Stripe payment integration
+  - name: Sync
+    description: Cloud synchronization
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the API is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-01T00:00:00Z"
+
+  /storage/upload:
+    post:
+      tags:
+        - Storage
+      summary: Upload a file
+      description: |
+        Upload a file to storage. Pro users automatically use Bunny CDN, free users use local storage.
+        
+        **File size limits:**
+        - Free users: 100MB
+        - Pro users: 500MB
+        
+        **Allowed file types:**
+        - Audio: MP3, WAV, FLAC, AAC, OGG
+        - Video: MP4, AVI, MKV, WebM
+        - Images: JPEG, PNG, GIF, WebP
+      operationId: uploadFile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      examples:
+        success:
+          summary: Successful upload
+          value:
+            id: "1234567890-123456789"
+            url: "https://cdn.example.com/nexus/user123/file.mp3"
+            size: 5242880
+            filename: "song.mp3"
+            provider: "bunny"
+
+  /storage/files:
+    get:
+      tags:
+        - Storage
+      summary: List user files
+      description: Get a list of all files uploaded by the authenticated user
+      operationId: listFiles
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /storage/files/{fileId}:
+    delete:
+      tags:
+        - Storage
+      summary: Delete a file
+      description: Delete a file by ID
+      operationId: deleteFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The file ID to delete
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /storage/download/{fileId}:
+    get:
+      tags:
+        - Storage
+      summary: Download a file
+      description: Download a file by ID (returns file stream)
+      operationId: downloadFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The file ID to download
+      responses:
+        '200':
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /stripe/subscription-status:
+    get:
+      tags:
+        - Stripe
+      summary: Get subscription status
+      description: Get the current subscription status for the authenticated user
+      operationId: getSubscriptionStatus
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Subscription status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /stripe/create-checkout-session:
+    post:
+      tags:
+        - Stripe
+      summary: Create checkout session
+      description: Create a Stripe checkout session for subscription
+      operationId: createCheckoutSession
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /stripe/create-portal-session:
+    post:
+      tags:
+        - Stripe
+      summary: Create billing portal session
+      description: Create a Stripe billing portal session for managing subscription
+      operationId: createPortalSession
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortalRequest'
+      responses:
+        '200':
+          description: Portal session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /sync/status:
+    get:
+      tags:
+        - Sync
+      summary: Get sync status
+      description: Get the current cloud sync status
+      operationId: getSyncStatus
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /sync/start:
+    post:
+      tags:
+        - Sync
+      summary: Start sync
+      description: Start a cloud synchronization
+      operationId: startSync
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  description: Force sync even if already in progress
+                  default: false
+      responses:
+        '200':
+          description: Sync started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Sync started"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Bearer token authentication. Use either:
+        - Firebase ID token (recommended)
+        - Google OAuth access token
+
+  schemas:
+    UploadResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique file ID
+          example: "1234567890-123456789"
+        url:
+          type: string
+          format: uri
+          description: URL to access the file
+          example: "https://cdn.example.com/nexus/user123/file.mp3"
+        size:
+          type: integer
+          description: File size in bytes
+          example: 5242880
+        filename:
+          type: string
+          description: Original filename
+          example: "song.mp3"
+        provider:
+          type: string
+          enum: [local, bunny]
+          description: Storage provider used
+          example: "bunny"
+
+    FileInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1234567890-123456789"
+        filename:
+          type: string
+          example: "song.mp3"
+        size:
+          type: integer
+          example: 5242880
+        url:
+          type: string
+          format: uri
+          example: "https://cdn.example.com/nexus/user123/file.mp3"
+        provider:
+          type: string
+          enum: [local, bunny]
+          example: "bunny"
+        uploadedAt:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00Z"
+
+    SubscriptionStatus:
+      type: object
+      properties:
+        isPro:
+          type: boolean
+          description: Whether user has active Pro subscription
+          example: true
+        status:
+          type: string
+          enum: [active, canceled, past_due, trialing]
+          example: "active"
+        currentPeriodEnd:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-02-01T00:00:00Z"
+        plan:
+          type: string
+          enum: [monthly, yearly]
+          nullable: true
+          example: "monthly"
+
+    CheckoutRequest:
+      type: object
+      required:
+        - priceId
+      properties:
+        priceId:
+          type: string
+          description: Stripe price ID (monthly or yearly)
+          example: "price_1234567890"
+        successUrl:
+          type: string
+          format: uri
+          description: URL to redirect after successful payment
+          example: "https://app.nexus-audio.com/settings?success=true"
+        cancelUrl:
+          type: string
+          format: uri
+          description: URL to redirect after canceled payment
+          example: "https://app.nexus-audio.com/settings?canceled=true"
+
+    CheckoutResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          description: Stripe checkout session ID
+          example: "cs_test_1234567890"
+        url:
+          type: string
+          format: uri
+          description: Checkout URL to redirect user to
+          example: "https://checkout.stripe.com/c/pay/cs_test_1234567890"
+
+    PortalRequest:
+      type: object
+      properties:
+        returnUrl:
+          type: string
+          format: uri
+          description: URL to return to after managing subscription
+          example: "https://app.nexus-audio.com/settings"
+
+    PortalResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Billing portal URL to redirect user to
+          example: "https://billing.stripe.com/session/1234567890"
+
+    SyncStatus:
+      type: object
+      properties:
+        isSyncing:
+          type: boolean
+          example: false
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-01T00:00:00Z"
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+          example: 75
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "File too large. Maximum size is 100MB"
+            details:
+              type: object
+              description: Additional error details
+              nullable: true
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error or invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "File too large. Maximum size is 100MB"
+              details:
+                maxSize: 104857600
+                fileSize: 157286400
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "AUTHENTICATION_ERROR"
+              message: "User not authenticated"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "File not found"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred"
+
+    ServiceUnavailable:
+      description: Service unavailable - external service not configured
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "EXTERNAL_SERVICE_ERROR"
+              message: "Stripe is not configured. Please set STRIPE_SECRET_KEY in .env"
+
