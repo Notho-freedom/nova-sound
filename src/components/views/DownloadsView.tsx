@@ -13,6 +13,10 @@ import {
   Image,
   FileText,
   MoreVertical,
+  Cloud,
+  Server,
+  HardDrive,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +29,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { firebaseService } from "@/services/firebase";
 
 interface DownloadItem {
   id: string;
@@ -39,7 +44,17 @@ interface DownloadItem {
   error?: string;
 }
 
+interface UploadedFile {
+  id: string;
+  name: string;
+  uploadedAt: string;
+  cloudProvider?: "cloudinary" | "nexus" | "bunny";
+  url?: string;
+  size?: number;
+}
+
 const DOWNLOADS_STORAGE_KEY = "nexus-downloads";
+const UPLOADED_MEDIA_KEY = "nexus-uploaded-media";
 
 export const DownloadsView = () => {
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
@@ -61,6 +76,10 @@ export const DownloadsView = () => {
     return [];
   });
 
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [loadingUploaded, setLoadingUploaded] = useState(true);
+  const [activeTab, setActiveTab] = useState<"downloads" | "uploaded">("downloads");
+
   // Save to localStorage whenever downloads change
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -71,6 +90,69 @@ export const DownloadsView = () => {
       }
     }
   }, [downloads]);
+
+  // Load uploaded files from localStorage and API
+  useEffect(() => {
+    const loadUploadedFiles = async () => {
+      setLoadingUploaded(true);
+      try {
+        // Load from localStorage
+        const saved = localStorage.getItem(UPLOADED_MEDIA_KEY);
+        const uploadedMedia: UploadedFile[] = saved ? JSON.parse(saved) : [];
+
+        // Fetch files from Nexus API for local storage files
+        try {
+          const token = await firebaseService.getIdToken();
+          if (token) {
+            const response = await fetch("/api/storage/files", {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            if (response.ok) {
+              const nexusFiles = await response.json();
+              // Merge with uploadedMedia, avoiding duplicates
+              const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
+              nexusFiles.forEach((file: any) => {
+                if (!nexusFileIds.has(file.id)) {
+                  uploadedMedia.push({
+                    id: file.id,
+                    name: file.name,
+                    uploadedAt: file.uploadedAt,
+                    cloudProvider: "nexus",
+                    url: `/api/storage/download/${file.id}`,
+                    size: file.size,
+                  });
+                } else {
+                  // Update existing entry with URL if missing
+                  const existing = uploadedMedia.find(f => f.id === file.id);
+                  if (existing && !existing.url) {
+                    existing.url = `/api/storage/download/${file.id}`;
+                    existing.size = file.size;
+                  }
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch Nexus files:", error);
+        }
+
+        // Sort by upload date (newest first)
+        uploadedMedia.sort((a, b) => 
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+
+        setUploadedFiles(uploadedMedia);
+      } catch (error) {
+        console.error("Failed to load uploaded files:", error);
+      } finally {
+        setLoadingUploaded(false);
+      }
+    };
+
+    loadUploadedFiles();
+  }, []);
 
   const getFileType = (filename: string): DownloadItem["type"] => {
     const ext = filename.split(".").pop()?.toLowerCase();
@@ -251,6 +333,99 @@ export const DownloadsView = () => {
     toast.success("Téléchargements terminés supprimés");
   };
 
+  const getProviderIcon = (provider?: string) => {
+    switch (provider) {
+      case "bunny":
+        return <Cloud className="w-4 h-4 text-blue-500" />;
+      case "cloudinary":
+        return <Cloud className="w-4 h-4 text-purple-500" />;
+      case "nexus":
+        return <Server className="w-4 h-4 text-green-500" />;
+      default:
+        return <HardDrive className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  const getProviderName = (provider?: string) => {
+    switch (provider) {
+      case "bunny":
+        return "Bunny CDN";
+      case "cloudinary":
+        return "Cloudinary";
+      case "nexus":
+        return "Nexus Local";
+      default:
+        return "Local";
+    }
+  };
+
+  const refreshUploadedFiles = async () => {
+    setLoadingUploaded(true);
+    try {
+      const saved = localStorage.getItem(UPLOADED_MEDIA_KEY);
+      const uploadedMedia: UploadedFile[] = saved ? JSON.parse(saved) : [];
+
+      try {
+        const token = await firebaseService.getIdToken();
+        if (token) {
+          const response = await fetch("/api/storage/files", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (response.ok) {
+            const nexusFiles = await response.json();
+            const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
+            nexusFiles.forEach((file: any) => {
+              if (!nexusFileIds.has(file.id)) {
+                uploadedMedia.push({
+                  id: file.id,
+                  name: file.name,
+                  uploadedAt: file.uploadedAt,
+                  cloudProvider: "nexus",
+                  url: `/api/storage/download/${file.id}`,
+                  size: file.size,
+                });
+              } else {
+                const existing = uploadedMedia.find(f => f.id === file.id);
+                if (existing && !existing.url) {
+                  existing.url = `/api/storage/download/${file.id}`;
+                  existing.size = file.size;
+                }
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch Nexus files:", error);
+      }
+
+      uploadedMedia.sort((a, b) => 
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      );
+
+      setUploadedFiles(uploadedMedia);
+      toast.success("Fichiers uploadés actualisés");
+    } catch (error) {
+      console.error("Failed to refresh uploaded files:", error);
+      toast.error("Erreur lors de l'actualisation");
+    } finally {
+      setLoadingUploaded(false);
+    }
+  };
+
+  // Group uploaded files by provider
+  const filesByProvider = uploadedFiles.reduce((acc, file) => {
+    const provider = file.cloudProvider || "local";
+    if (!acc[provider]) {
+      acc[provider] = [];
+    }
+    acc[provider].push(file);
+    return acc;
+  }, {} as Record<string, UploadedFile[]>);
+
+  const providerOrder = ["bunny", "cloudinary", "nexus", "local"];
+
   const activeDownloads = downloads.filter(
     (d) => d.status === "downloading" || d.status === "paused"
   );
@@ -260,12 +435,51 @@ export const DownloadsView = () => {
   return (
     <div className="p-6 h-full flex flex-col">
       <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold text-foreground mb-2">
-          Téléchargements
-        </h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="font-display text-3xl font-bold text-foreground">
+            Téléchargements
+          </h1>
+          {activeTab === "uploaded" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshUploadedFiles}
+              disabled={loadingUploaded}
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "animate-spin")} />
+              Actualiser
+            </Button>
+          )}
+        </div>
         <p className="text-muted-foreground">
-          Gérez vos téléchargements de fichiers audio, vidéo et autres.
+          Gérez vos téléchargements et fichiers uploadés.
         </p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-border">
+        <button
+          onClick={() => setActiveTab("downloads")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            activeTab === "downloads"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Téléchargements ({downloads.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("uploaded")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+            activeTab === "uploaded"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Fichiers Uploadés ({uploadedFiles.length})
+        </button>
       </div>
 
       {/* Actions */}
@@ -466,8 +680,133 @@ export const DownloadsView = () => {
         </div>
       )}
 
-      {/* Empty State */}
-      {downloads.length === 0 && (
+      {/* Uploaded Files View */}
+      {activeTab === "uploaded" && (
+        <>
+          {loadingUploaded ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <RefreshCw className="w-8 h-8 text-muted-foreground animate-spin mx-auto mb-2" />
+                <p className="text-muted-foreground">Chargement des fichiers...</p>
+              </div>
+            </div>
+          ) : uploadedFiles.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center max-w-md">
+                <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4 mx-auto">
+                  <Cloud className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Aucun fichier uploadé</h3>
+                <p className="text-muted-foreground text-sm">
+                  Les fichiers que vous uploadez sur les serveurs apparaîtront ici, classés par source.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              {providerOrder.map((provider) => {
+                const files = filesByProvider[provider] || [];
+                if (files.length === 0) return null;
+
+                return (
+                  <div key={provider} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      {getProviderIcon(provider as any)}
+                      <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground">
+                        {getProviderName(provider as any)} ({files.length})
+                      </h2>
+                    </div>
+                    <div className="space-y-2">
+                      {files.map((file) => (
+                        <div
+                          key={file.id}
+                          className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                              {getFileIcon(getFileType(file.name))}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate text-foreground">
+                                {file.name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDuration(new Date(file.uploadedAt))}
+                                </span>
+                                {file.size && (
+                                  <>
+                                    <span className="text-xs text-muted-foreground">•</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatFileSize(file.size)}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {file.url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => startDownload(file.url!, file.name)}
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Télécharger
+                                </Button>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {file.url && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const a = document.createElement("a");
+                                          a.href = file.url!;
+                                          a.download = file.name;
+                                          a.click();
+                                        }}
+                                      >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Télécharger directement
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      const updated = uploadedFiles.filter(f => f.id !== file.id);
+                                      setUploadedFiles(updated);
+                                      localStorage.setItem(UPLOADED_MEDIA_KEY, JSON.stringify(updated));
+                                      toast.success("Fichier supprimé de la liste");
+                                    }}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Supprimer de la liste
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Empty State for Downloads */}
+      {activeTab === "downloads" && downloads.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4 mx-auto">

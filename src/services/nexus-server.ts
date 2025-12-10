@@ -153,12 +153,20 @@ class NexusServerService {
                 const { firebaseSyncService } = await import('./firebase-sync');
                 // Load existing uploaded media
                 const saved = localStorage.getItem('nexus-uploaded-media');
-                const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: string }> = saved ? JSON.parse(saved) : [];
+                const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
+                
+                // Determine provider from API response
+                const provider = result.provider === 'bunny' ? 'bunny' as const : 
+                                result.provider === 'local' ? 'nexus' as const : 
+                                'nexus' as const;
+                
                 const newEntry = {
                   id: result.id,
                   name: fileName,
                   uploadedAt: new Date().toISOString(),
-                  cloudProvider: 'nexus' as const,
+                  cloudProvider: provider,
+                  url: result.url,
+                  size: result.size || file.size,
                 };
                 const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== result.id)].slice(0, 100); // Keep last 100
                 localStorage.setItem('nexus-uploaded-media', JSON.stringify(updated));

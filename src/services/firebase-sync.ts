@@ -67,7 +67,9 @@ export interface UserAppData {
     id: string;
     name: string;
     uploadedAt: string;
-    cloudProvider?: 'cloudinary' | 'nexus';
+    cloudProvider?: 'cloudinary' | 'nexus' | 'bunny';
+    url?: string;
+    size?: number;
   }>;
   
   // Cloudinary config (encrypted or stored securely)

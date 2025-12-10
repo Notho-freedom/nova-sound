@@ -153,12 +153,14 @@ class CloudinaryService {
             const { firebaseSyncService } = await import('./firebase-sync');
             // Load existing uploaded media
             const saved = localStorage.getItem('nexus-uploaded-media');
-            const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: string }> = saved ? JSON.parse(saved) : [];
+            const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
             const newEntry = {
               id: track.id,
               name: track.title,
               uploadedAt: new Date().toISOString(),
               cloudProvider: 'cloudinary' as const,
+              url: result.secure_url,
+              size: result.bytes,
             };
             const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== track.id)].slice(0, 100); // Keep last 100
             localStorage.setItem('nexus-uploaded-media', JSON.stringify(updated));
