@@ -22,6 +22,9 @@ interface TrackListProps {
   uploadTrack?: (track: Track) => void;
   getTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToCloudinary?: boolean;
+  uploadTrackToNexus?: (track: Track) => void;
+  getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+  canUploadToNexus?: boolean;
 }
 
 const formatDuration = (seconds: number): string => {
@@ -42,6 +45,9 @@ export const TrackList = ({
   uploadTrack,
   getTrackProgress,
   canUploadToCloudinary = false,
+  uploadTrackToNexus,
+  getNexusTrackProgress,
+  canUploadToNexus = false,
 }: TrackListProps) => {
   return (
     <div className="h-full overflow-y-auto space-y-1 pr-2">
@@ -60,6 +66,9 @@ export const TrackList = ({
           onUploadToCloudinary={() => uploadTrack?.(track)}
           canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
           isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+          onUploadToNexus={() => uploadTrackToNexus?.(track)}
+          canUploadToNexus={canUploadToNexus && !!track.filePath}
+          isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
         >
           <div
             onClick={() => onTrackSelect(index)}

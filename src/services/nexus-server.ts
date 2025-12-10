@@ -22,11 +22,31 @@ const API_BASE_URL = '';
 class NexusServerService {
   // Check if authenticated
   isAuthenticated(): boolean {
+    // Try Firebase first
+    try {
+      const { firebaseService } = require('./firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        return true;
+      }
+    } catch (error) {
+      // Firebase not available
+    }
+    // Fallback to authService
     return authService.isAuthenticated();
   }
 
   // Check if pro user
   isPro(): boolean {
+    // Try Firebase first
+    try {
+      const { firebaseService } = require('./firebase');
+      if (firebaseService.isInitialized()) {
+        return firebaseService.isPro();
+      }
+    } catch (error) {
+      // Firebase not available
+    }
+    // Fallback to authService
     return authService.isPro();
   }
 
@@ -72,11 +92,30 @@ class NexusServerService {
     onProgress?: (progress: number) => void
   ): Promise<UploadResult> {
     console.log("Upload file: Getting access token...");
-    const accessToken = await authService.getAccessToken();
-    console.log("Access token received:", accessToken ? "✓ Token length: " + accessToken.length : "✗ No token");
+    
+    // Try Firebase first (if user is connected via Firebase)
+    let accessToken: string | null = null;
+    
+    try {
+      const { firebaseService } = await import('./firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        accessToken = await firebaseService.getIdToken();
+        console.log("Firebase token received:", accessToken ? "✓ Token length: " + accessToken.length : "✗ No token");
+      }
+    } catch (error) {
+      console.log('Firebase not available, trying authService...');
+    }
+    
+    // Fallback to authService (manual OAuth)
+    if (!accessToken) {
+      accessToken = await authService.getAccessToken();
+      console.log("AuthService token received:", accessToken ? "✓ Token length: " + accessToken.length : "✗ No token");
+    }
     
     if (!accessToken) {
-      console.error("No access token available. Current user:", authService.getCurrentUser()?.email);
+      const firebaseUser = await import('./firebase').then(m => m.firebaseService.getCurrentUser()).catch(() => null);
+      const authUser = authService.getCurrentUser();
+      console.error("No access token available. Firebase user:", firebaseUser?.email, "AuthService user:", authUser?.email);
       throw new Error("Not authenticated - no token available");
     }
 

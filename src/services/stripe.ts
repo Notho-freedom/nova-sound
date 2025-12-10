@@ -121,7 +121,23 @@ class StripeService {
 
   // Create billing portal session
   async createPortalSession(): Promise<string> {
-    const accessToken = await authService.getAccessToken();
+    // Try Firebase first (if user is connected via Firebase)
+    let accessToken: string | null = null;
+    
+    try {
+      const { firebaseService } = await import('./firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        accessToken = await firebaseService.getIdToken();
+      }
+    } catch (error) {
+      console.log('Firebase not available, trying authService...');
+    }
+    
+    // Fallback to authService (manual OAuth)
+    if (!accessToken) {
+      accessToken = await authService.getAccessToken();
+    }
+    
     if (!accessToken) {
       throw new Error("User not authenticated");
     }
@@ -170,7 +186,23 @@ class StripeService {
 
   // Get subscription status
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
-    const accessToken = await authService.getAccessToken();
+    // Try Firebase first (if user is connected via Firebase)
+    let accessToken: string | null = null;
+    
+    try {
+      const { firebaseService } = await import('./firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        accessToken = await firebaseService.getIdToken();
+      }
+    } catch (error) {
+      console.log('Firebase not available, trying authService...');
+    }
+    
+    // Fallback to authService (manual OAuth)
+    if (!accessToken) {
+      accessToken = await authService.getAccessToken();
+    }
+    
     if (!accessToken) {
       return {
         isActive: false,

@@ -37,6 +37,7 @@ import { AlbumContextMenu } from "@/components/AlbumContextMenu";
 import { ArtistContextMenu } from "@/components/ArtistContextMenu";
 import { PageHeader } from "@/components/PageHeader";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -150,7 +151,9 @@ export const LibraryView = ({
   
   // Cloudinary upload
   const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
-  const { cloudinaryConfigured, nexusIsPro } = useCloudSync();
+  // Nexus/Bunny upload (Pro only)
+  const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
+  const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const playlistsResult = usePlaylists();
   const { isFavorite, toggleFavorite } = useFavorites();
   
@@ -159,6 +162,7 @@ export const LibraryView = ({
   const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
   
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated;
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -668,6 +672,9 @@ export const LibraryView = ({
                         onUploadToCloudinary={() => uploadTrack(track)}
                         canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                         isUploading={getTrackProgress(track.id)?.status === 'uploading'}
+                        onUploadToNexus={() => uploadTrackToNexus(track)}
+                        canUploadToNexus={canUploadToNexus && !!track.filePath}
+                        isUploadingToNexus={getNexusTrackProgress(track.id)?.status === 'uploading'}
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
@@ -729,6 +736,9 @@ export const LibraryView = ({
                         onUploadToCloudinary={() => uploadTrack(track)}
                         canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                         isUploading={getTrackProgress(track.id)?.status === 'uploading'}
+                        onUploadToNexus={() => uploadTrackToNexus(track)}
+                        canUploadToNexus={canUploadToNexus && !!track.filePath}
+                        isUploadingToNexus={getNexusTrackProgress(track.id)?.status === 'uploading'}
                       >
                         <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
                           <MoreHorizontal className="w-4 h-4" />

@@ -21,6 +21,9 @@ interface TrackListViewProps {
   uploadTrack?: (track: Track) => void;
   getTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToCloudinary?: boolean;
+  uploadTrackToNexus?: (track: Track) => void;
+  getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+  canUploadToNexus?: boolean;
   showHistory?: boolean;
   showAlbum?: boolean;
   showTrackNumber?: boolean;
@@ -38,6 +41,9 @@ export const TrackListView = ({
   uploadTrack,
   getTrackProgress,
   canUploadToCloudinary = false,
+  uploadTrackToNexus,
+  getNexusTrackProgress,
+  canUploadToNexus = false,
   showHistory = false,
   showAlbum = true,
   showTrackNumber = false,
@@ -118,6 +124,9 @@ export const TrackListView = ({
                     onUploadToCloudinary={() => uploadTrack?.(track)}
                     canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                     isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                    onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                    canUploadToNexus={canUploadToNexus && !!track.filePath}
+                    isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
@@ -168,6 +177,9 @@ export const TrackListView = ({
                     onUploadToCloudinary={() => uploadTrack?.(track)}
                     canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                     isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                    onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                    canUploadToNexus={canUploadToNexus && !!track.filePath}
+                    isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                   >
                     <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
                       <MoreHorizontal className="w-4 h-4" />

@@ -22,6 +22,8 @@ import {
   Trash2,
   Cloud,
   CloudOff,
+  Zap,
+  Server,
 } from "lucide-react";
 import { Track, Playlist } from "@/types/music";
 
@@ -44,6 +46,9 @@ interface TrackContextMenuProps {
   onUploadToCloudinary?: () => void;
   canUploadToCloudinary?: boolean;
   isUploading?: boolean;
+  onUploadToNexus?: () => void;
+  canUploadToNexus?: boolean;
+  isUploadingToNexus?: boolean;
 }
 
 export const TrackContextMenu = ({
@@ -65,6 +70,9 @@ export const TrackContextMenu = ({
   onUploadToCloudinary,
   canUploadToCloudinary = false,
   isUploading = false,
+  onUploadToNexus,
+  canUploadToNexus = false,
+  isUploadingToNexus = false,
 }: TrackContextMenuProps) => {
   return (
     <ContextMenu>
@@ -145,27 +153,47 @@ export const TrackContextMenu = ({
           </ContextMenuItem>
         )}
 
-        {onUploadToCloudinary && canUploadToCloudinary && (
+        {(onUploadToCloudinary && canUploadToCloudinary) || (onUploadToNexus && canUploadToNexus) ? (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem 
-              onClick={onUploadToCloudinary}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <>
-                  <Cloud className="w-4 h-4 mr-2 animate-pulse" />
-                  Upload en cours...
-                </>
-              ) : (
-                <>
-                  <Cloud className="w-4 h-4 mr-2" />
-                  Uploader vers Cloudinary
-                </>
-              )}
-            </ContextMenuItem>
+            {onUploadToCloudinary && canUploadToCloudinary && (
+              <ContextMenuItem 
+                onClick={onUploadToCloudinary}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <Cloud className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload en cours...
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="w-4 h-4 mr-2" />
+                    Uploader vers Cloudinary
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
+            {onUploadToNexus && canUploadToNexus && (
+              <ContextMenuItem 
+                onClick={onUploadToNexus}
+                disabled={isUploadingToNexus}
+              >
+                {isUploadingToNexus ? (
+                  <>
+                    <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload vers Bunny...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Uploader vers Nexus/Bunny (Pro)
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
           </>
-        )}
+        ) : null}
 
         {onRemoveFromPlaylist && (
           <>
