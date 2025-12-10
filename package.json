@@ -137,6 +137,20 @@
       "dist-electron/**/*",
       "public/**/*"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["mp3", "wav", "flac", "aac", "ogg", "m4a", "opus", "wma", "aiff", "mp2", "mp1", "ac3", "dts", "ape", "tta", "tak", "ofr", "ofs", "off", "rka", "shn", "aa", "aax", "act", "aiff", "alac", "au", "awb", "dct", "dss", "dvf", "gsm", "iklax", "ivs", "m4b", "mmf", "msv", "nmf", "nsf", "oga", "mogg", "ra", "rm", "raw", "rf64", "sln", "tta", "voc", "vox", "wv", "webm"],
+        "name": "Audio File",
+        "role": "Viewer",
+        "description": "NEXUS Audio File"
+      },
+      {
+        "ext": ["mp4", "avi", "mkv", "webm", "mov", "wmv", "flv", "m4v", "3gp", "3g2", "asf", "rm", "rmvb", "vob", "ogv", "divx", "xvid", "m2v", "mts", "m2ts", "ts", "f4v", "amv", "drc", "gifv", "mxf", "roq", "nsv", "yuv", "viv", "svi", "mng", "qt", "yuv", "rm", "asf", "amv", "rmvb", "flv", "f4v", "swf", "wmv", "vob", "ogv", "drc", "gifv", "mng", "m2v", "svi", "3g2", "3gp", "nsv", "roq", "nsv", "flv", "f4v", "swf", "wmv", "vob", "ogv", "drc", "gifv", "mng", "m2v", "svi", "3g2", "3gp", "nsv", "roq"],
+        "name": "Video File",
+        "role": "Viewer",
+        "description": "NEXUS Video File"
+      }
+    ],
     "win": {
       "target": [
         "nsis"

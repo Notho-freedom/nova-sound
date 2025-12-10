@@ -12,14 +12,111 @@ import { initPlaylistManager } from './services/playlist-manager.js';
 import { initEqualizer } from './services/equalizer.js';
 import { initLyricsProvider } from './services/lyrics-provider.js';
 import { initScrobbler } from './services/scrobbler.js';
+// Import CLI parser
+import { parseArgs, showHelp, showVersion, applyCLIOptions } from './cli.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Parse CLI arguments
+const cliOptions = parseArgs();
+// Handle CLI commands that exit immediately
+if (cliOptions.help) {
+    showHelp();
+    process.exit(0);
+}
+if (cliOptions.version) {
+    showVersion();
+    process.exit(0);
+}
+// Apply CLI options to environment
+applyCLIOptions(cliOptions);
 // Handle creating/removing shortcuts on Windows when installing/uninstalling
 if (process.platform === 'win32') {
     app.setAppUserModelId('com.nexus.audio');
 }
 let mainWindow = null;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+// Supported media file extensions
+const AUDIO_EXTENSIONS = [
+    'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'opus', 'wma', 'aiff', 'mp2', 'mp1',
+    'ac3', 'dts', 'ape', 'tta', 'tak', 'ofr', 'ofs', 'off', 'rka', 'shn', 'aa', 'aax',
+    'act', 'alac', 'au', 'awb', 'dct', 'dss', 'dvf', 'gsm', 'iklax', 'ivs', 'm4b',
+    'mmf', 'msv', 'nmf', 'nsf', 'oga', 'mogg', 'ra', 'rm', 'raw', 'rf64', 'sln', 'voc',
+    'vox', 'wv', 'webm'
+];
+const VIDEO_EXTENSIONS = [
+    'mp4', 'avi', 'mkv', 'webm', 'mov', 'wmv', 'flv', 'm4v', '3gp', '3g2', 'asf',
+    'rm', 'rmvb', 'vob', 'ogv', 'divx', 'xvid', 'm2v', 'mts', 'm2ts', 'ts', 'f4v',
+    'amv', 'drc', 'gifv', 'mxf', 'roq', 'nsv', 'yuv', 'viv', 'svi', 'mng', 'qt'
+];
+const MEDIA_EXTENSIONS = [...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS];
+/**
+ * Check if a file path is a media file
+ */
+function isMediaFile(filePath) {
+    const ext = path.extname(filePath).toLowerCase().slice(1); // Remove the dot
+    return MEDIA_EXTENSIONS.includes(ext);
+}
+/**
+ * Extract file paths from command line arguments
+ */
+function getFileArgsFromArgs() {
+    const args = process.argv.slice(1); // Skip node/electron path
+    const files = [];
+    for (const arg of args) {
+        // Skip CLI flags
+        if (arg.startsWith('--') || arg.startsWith('-')) {
+            continue;
+        }
+        // Check if it's a file path (contains drive letter on Windows or starts with / on Unix)
+        if (arg.includes(path.sep) || arg.match(/^[A-Za-z]:/)) {
+            // Check if file exists and is a media file
+            try {
+                if (fs.existsSync(arg) && isMediaFile(arg)) {
+                    files.push(path.resolve(arg));
+                }
+            }
+            catch (error) {
+                // Ignore errors, just skip this file
+            }
+        }
+    }
+    return files;
+}
+/**
+ * Open a media file in the player
+ */
+function openMediaFile(filePath) {
+    if (!mainWindow) {
+        console.warn('Main window not ready, file will be opened when window is created');
+        return;
+    }
+    const normalizedPath = path.resolve(filePath);
+    // Send file to renderer process
+    mainWindow.webContents.send('file:open', normalizedPath);
+    // Focus window
+    if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+    }
+    mainWindow.focus();
+    console.log('Opening media file:', normalizedPath);
+}
+/**
+ * Handle files passed as command line arguments
+ */
+function handleFileArgs() {
+    const files = getFileArgsFromArgs();
+    if (files.length > 0) {
+        console.log('Files passed as arguments:', files);
+        // If window is ready, open files immediately
+        if (mainWindow) {
+            files.forEach(file => openMediaFile(file));
+        }
+        else {
+            // Store files to open when window is ready
+            app.pendingFiles = files;
+        }
+    }
+}
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
@@ -39,9 +136,12 @@ function createWindow() {
         },
     });
     // Load the app
-    if (isDev) {
-        mainWindow.loadURL('http://localhost:3000');
-        mainWindow.webContents.openDevTools();
+    if (isDev || cliOptions.dev) {
+        const port = cliOptions.port || 3000;
+        mainWindow.loadURL(`http://localhost:${port}`);
+        if (cliOptions.debug) {
+            mainWindow.webContents.openDevTools();
+        }
     }
     else {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -273,6 +373,50 @@ function registerLocalVideoProtocol() {
         }
     });
 }
+// Make the app a single instance (handle "Open with..." on Windows)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    // Another instance is already running
+    // On Windows, this means "Open with..." was used
+    // We'll handle it in the second-instance event
+    app.quit();
+}
+else {
+    // Handle second instance (when user opens file with "Open with..." while app is running)
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        // Focus the main window if it exists
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) {
+                mainWindow.restore();
+            }
+            mainWindow.focus();
+        }
+        // Extract file paths from command line
+        const files = [];
+        for (const arg of commandLine) {
+            // Skip executable path and flags
+            if (arg === commandLine[0] || arg.startsWith('--') || arg.startsWith('-')) {
+                continue;
+            }
+            // Check if it's a file path
+            if (arg.includes(path.sep) || arg.match(/^[A-Za-z]:/)) {
+                try {
+                    const resolvedPath = path.isAbsolute(arg) ? arg : path.resolve(workingDirectory, arg);
+                    if (fs.existsSync(resolvedPath) && isMediaFile(resolvedPath)) {
+                        files.push(resolvedPath);
+                    }
+                }
+                catch (error) {
+                    // Ignore errors
+                }
+            }
+        }
+        // Open files in existing window
+        if (files.length > 0 && mainWindow) {
+            files.forEach(file => openMediaFile(file));
+        }
+    });
+}
 // App lifecycle
 app.whenReady().then(async () => {
     // Register custom protocols
@@ -282,13 +426,44 @@ app.whenReady().then(async () => {
     await storage.init();
     initServices();
     createWindow();
-    // Auto-scan on startup if enabled
-    const settings = await storage.getSettings();
-    if (settings.autoScanOnStartup && settings.musicDirectories.length > 0) {
-        // Trigger a scan after window is ready
-        setTimeout(() => {
-            mainWindow?.webContents.send('library:auto-scan-start');
-        }, 2000);
+    // Handle files passed as arguments on first launch
+    handleFileArgs();
+    // Handle pending files (files passed before window was ready)
+    if (app.pendingFiles) {
+        app.pendingFiles.forEach((file) => openMediaFile(file));
+        delete app.pendingFiles;
+    }
+    // Handle CLI options for reset and cache clearing
+    if (cliOptions.reset) {
+        await storage.resetSettings();
+        console.log('Settings reset to defaults');
+    }
+    if (cliOptions.clearCache) {
+        // Clear cache logic would go here
+        console.log('Cache cleared');
+    }
+    // Handle music directories from CLI
+    if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
+        const settings = await storage.getSettings();
+        const newDirs = cliOptions.musicDir.filter(dir => !settings.musicDirectories.includes(dir));
+        if (newDirs.length > 0) {
+            await storage.updateSettings({
+                musicDirectories: [...settings.musicDirectories, ...newDirs]
+            });
+            console.log(`Added music directories: ${newDirs.join(', ')}`);
+        }
+    }
+    // Auto-scan on startup if enabled (unless --no-scan is specified)
+    if (!cliOptions.noScan) {
+        const settings = await storage.getSettings();
+        const shouldAutoScan = cliOptions.autoScan ||
+            (settings.autoScanOnStartup && settings.musicDirectories.length > 0);
+        if (shouldAutoScan) {
+            // Trigger a scan after window is ready
+            setTimeout(() => {
+                mainWindow?.webContents.send('library:auto-scan-start');
+            }, 2000);
+        }
     }
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

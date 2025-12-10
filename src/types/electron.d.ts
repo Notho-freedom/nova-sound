@@ -89,6 +89,9 @@ export interface ElectronAPI {
   getAudioDuration: (filePath: string) => Promise<number>;
   readFileAsBase64: (filePath: string) => Promise<string>;
   openPath?: (filePath: string) => Promise<void>;
+  
+  // File open event (from "Open with..." or command line)
+  onFileOpen: (callback: (filePath: string) => void) => () => void;
 }
 
 declare global {

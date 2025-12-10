@@ -431,6 +431,11 @@ class Storage {
     return updated;
   }
 
+  async resetSettings(): Promise<Settings> {
+    await writeJSON(PATHS.settings, DEFAULT_SETTINGS);
+    return DEFAULT_SETTINGS;
+  }
+
   // Equalizer
   async getEqualizerPresets(): Promise<EqualizerPreset[]> {
     return readJSON<EqualizerPreset[]>(PATHS.equalizer, DEFAULT_EQUALIZER_PRESETS);

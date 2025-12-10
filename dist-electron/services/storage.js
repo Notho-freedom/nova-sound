@@ -285,6 +285,10 @@ class Storage {
         await writeJSON(PATHS.settings, updated);
         return updated;
     }
+    async resetSettings() {
+        await writeJSON(PATHS.settings, DEFAULT_SETTINGS);
+        return DEFAULT_SETTINGS;
+    }
     // Equalizer
     async getEqualizerPresets() {
         return readJSON(PATHS.equalizer, DEFAULT_EQUALIZER_PRESETS);

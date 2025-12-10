@@ -94,6 +94,7 @@ export const DesktopApp = () => {
     setIsLoading(false);
   }, []);
 
+
   // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
