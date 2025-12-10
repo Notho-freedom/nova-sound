@@ -157,8 +157,10 @@ class StripeService {
       // Check if response is JSON
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to create portal session");
+        const error = await response.json() as { message?: string; details?: string };
+        const errorMessage = error.message || "Failed to create portal session";
+        const errorDetails = error.details ? ` (${error.details})` : '';
+        throw new Error(`${errorMessage}${errorDetails}`);
       } else {
         const text = await response.text();
         console.error("Unexpected response from create-portal-session:", text.substring(0, 200));

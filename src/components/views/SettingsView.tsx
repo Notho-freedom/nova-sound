@@ -391,7 +391,33 @@ export const SettingsView = () => {
 
   // Handle manage billing
   const handleManageBilling = async () => {
-    await nexusManageBilling();
+    if (!stripeInitialized) {
+      toast.error("Stripe non configuré");
+      return;
+    }
+    if (!nexusAuthenticated) {
+      toast.error("Connectez-vous d'abord");
+      return;
+    }
+    try {
+      setSubscriptionLoading(true);
+      await nexusManageBilling();
+    } catch (error: unknown) {
+      console.error("Manage billing error:", error);
+      const err = error as { message?: string };
+      const errorMessage = err.message || "Erreur lors de l'accès au portail de facturation";
+      
+      // Check if it's a portal configuration error
+      if (errorMessage.includes("Billing Portal") || errorMessage.includes("portal")) {
+        toast.error("Portail non configuré", { 
+          description: "Le portail de facturation Stripe n'est pas configuré. Si vous avez un abonnement Pro activé manuellement, contactez le support." 
+        });
+      } else {
+        toast.error("Erreur", { description: errorMessage });
+      }
+    } finally {
+      setSubscriptionLoading(false);
+    }
   };
 
   // Handle upgrade to monthly
