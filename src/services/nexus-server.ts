@@ -158,10 +158,11 @@ class NexusServerService {
                 
                 // Load existing uploaded media
                 const saved = localStorage.getItem(storageKey);
-                const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
+                const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
                 
                 // Determine provider from API response
                 const provider = result.provider === 'bunny' ? 'bunny' as const : 
+                                result.provider === 'planethoster' ? 'planethoster' as const :
                                 result.provider === 'local' ? 'nexus' as const : 
                                 'nexus' as const;
                 

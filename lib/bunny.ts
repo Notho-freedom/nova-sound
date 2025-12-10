@@ -6,6 +6,13 @@ const BUNNY_CDN_URL = process.env.BUNNY_CDN_URL;
 const BUNNY_TOKEN_KEY = process.env.BUNNY_TOKEN_KEY; // Secret key for signing URLs
 const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}`;
 
+/**
+ * Check if Bunny Storage is configured
+ */
+export function isBunnyConfigured(): boolean {
+  return !!(BUNNY_STORAGE_NAME && BUNNY_API_KEY);
+}
+
 export interface BunnyUploadResult {
   success: boolean;
   url: string;

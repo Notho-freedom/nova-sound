@@ -34,7 +34,8 @@ const nextConfig = {
     return config;
   },
   // Désactiver certaines optimisations pour Electron
-  serverExternalPackages: ['electron'],
+  // Mark native Node.js modules as external (server-only)
+  serverExternalPackages: ['electron', 'ssh2', 'ssh2-sftp-client'],
   // Configuration Turbopack (vide pour permettre webpack)
   turbopack: {},
 };

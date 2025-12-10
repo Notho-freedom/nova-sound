@@ -158,7 +158,7 @@ class CloudinaryService {
             
             // Load existing uploaded media
             const saved = localStorage.getItem(storageKey);
-            const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
+            const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
             const newEntry = {
               id: track.id,
               name: track.title,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { verifyAuthAndPro } from '~/lib/stripe-utils';
-import { uploadToBunny } from '~/lib/bunny';
+import { uploadToBunny, isBunnyConfigured } from '~/lib/bunny';
+import { uploadToPlanetHoster, isPlanetHosterConfigured } from '~/lib/planethoster-sftp';
 import { createErrorResponse, ErrorCodes } from '~/lib/validation';
 import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
 
@@ -78,28 +79,55 @@ export async function POST(request: NextRequest) {
     const fileId = uniqueSuffix;
     const fileExtension = path.extname(file.name);
 
-    // Pro users: upload to Bunny Storage
+    // Pro users: upload to cloud storage (Bunny or PlanetHoster)
     if (auth.isPro) {
-      try {
-        const fileName = `${fileId}${fileExtension}`;
-        const bunnyPath = `nexus/${auth.userId}/${fileName}`;
-        
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const contentType = file.type || 'application/octet-stream';
-        
-        const result = await uploadToBunny(bunnyPath, buffer, contentType);
+      // Try Bunny first (if configured)
+      if (isBunnyConfigured()) {
+        try {
+          const fileName = `${fileId}${fileExtension}`;
+          const bunnyPath = `nexus/${auth.userId}/${fileName}`;
+          
+          const bytes = await file.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          const contentType = file.type || 'application/octet-stream';
+          
+          const result = await uploadToBunny(bunnyPath, buffer, contentType);
 
-        return NextResponse.json({
-          id: fileId,
-          url: result.url,
-          size: file.size,
-          filename: file.name,
-          provider: 'bunny',
-        });
-      } catch (bunnyError: any) {
-        console.error('Bunny upload failed, falling back to local storage:', bunnyError);
-        // Fallback to local storage if Bunny fails
+          return NextResponse.json({
+            id: fileId,
+            url: result.url,
+            size: file.size,
+            filename: file.name,
+            provider: 'bunny',
+          });
+        } catch (bunnyError: any) {
+          console.error('Bunny upload failed, trying PlanetHoster:', bunnyError);
+          // Fallback to PlanetHoster if Bunny fails
+        }
+      }
+
+      // Try PlanetHoster SFTP (if configured)
+      if (isPlanetHosterConfigured()) {
+        try {
+          const fileName = `${fileId}${fileExtension}`;
+          const remotePath = `nexus/${auth.userId}/${fileName}`;
+          
+          const bytes = await file.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          
+          const result = await uploadToPlanetHoster(remotePath, buffer);
+
+          return NextResponse.json({
+            id: fileId,
+            url: result.url,
+            size: file.size,
+            filename: file.name,
+            provider: 'planethoster',
+          });
+        } catch (planethosterError: any) {
+          console.error('PlanetHoster upload failed, falling back to local storage:', planethosterError);
+          // Fallback to local storage if PlanetHoster fails
+        }
       }
     }
 

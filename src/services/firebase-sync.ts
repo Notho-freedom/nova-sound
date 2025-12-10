@@ -68,7 +68,7 @@ export interface UserAppData {
     id: string;
     name: string;
     uploadedAt: string;
-    cloudProvider?: 'cloudinary' | 'nexus' | 'bunny';
+    cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster';
     url?: string;
     size?: number;
   }>;
@@ -591,23 +591,23 @@ class FirebaseSyncService {
     // Note: This is called during sync, so we need to use the currentUserId
     if (this.currentUserId) {
       const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
-      const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" | "bunny"; url?: string; size?: number }>>(storageKey);
+      const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" | "bunny" | "planethoster"; url?: string; size?: number }>>(storageKey);
       if (uploadedMedia) {
         // Type assertion needed because localStorage might have old data with different types
         data.uploadedMedia = uploadedMedia.map(item => ({
           ...item,
-          cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus" || item.cloudProvider === "bunny") 
+          cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus" || item.cloudProvider === "bunny" || item.cloudProvider === "planethoster") 
             ? item.cloudProvider 
             : undefined
         }));
       }
     } else {
       // Fallback to old key for backward compatibility
-      const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" | "bunny"; url?: string; size?: number }>>('nexus-uploaded-media');
+      const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" | "bunny" | "planethoster"; url?: string; size?: number }>>('nexus-uploaded-media');
       if (uploadedMedia) {
         data.uploadedMedia = uploadedMedia.map(item => ({
           ...item,
-          cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus" || item.cloudProvider === "bunny") 
+          cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus" || item.cloudProvider === "bunny" || item.cloudProvider === "planethoster") 
             ? item.cloudProvider 
             : undefined
         }));

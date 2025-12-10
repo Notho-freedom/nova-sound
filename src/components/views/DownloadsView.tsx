@@ -49,7 +49,7 @@ interface UploadedFile {
   id: string;
   name: string;
   uploadedAt: string;
-  cloudProvider?: "cloudinary" | "nexus" | "bunny";
+  cloudProvider?: "cloudinary" | "nexus" | "bunny" | "planethoster";
   url?: string;
   size?: number;
 }
@@ -344,6 +344,8 @@ export const DownloadsView = () => {
         return <Cloud className="w-4 h-4 text-blue-500" />;
       case "cloudinary":
         return <Cloud className="w-4 h-4 text-purple-500" />;
+      case "planethoster":
+        return <Cloud className="w-4 h-4 text-orange-500" />;
       case "nexus":
         return <Server className="w-4 h-4 text-green-500" />;
       default:
@@ -357,6 +359,8 @@ export const DownloadsView = () => {
         return "Bunny CDN";
       case "cloudinary":
         return "Cloudinary";
+      case "planethoster":
+        return "PlanetHoster SFTP";
       case "nexus":
         return "Nexus Local";
       default:
@@ -433,7 +437,7 @@ export const DownloadsView = () => {
     return acc;
   }, {} as Record<string, UploadedFile[]>);
 
-  const providerOrder = ["bunny", "cloudinary", "nexus", "local"];
+  const providerOrder = ["bunny", "planethoster", "cloudinary", "nexus", "local"];
 
   const activeDownloads = downloads.filter(
     (d) => d.status === "downloading" || d.status === "paused"

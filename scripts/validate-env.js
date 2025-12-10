@@ -126,6 +126,36 @@ const envDefinitions = {
         validate: (val) => !val || val.length > 10,
       },
       {
+        key: 'PLANETHOSTER_SFTP_HOST',
+        description: 'PlanetHoster SFTP Host',
+        validate: (val) => !val || val.length > 0,
+      },
+      {
+        key: 'PLANETHOSTER_SFTP_PORT',
+        description: 'PlanetHoster SFTP Port (default: 22)',
+        validate: (val) => !val || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 65535),
+      },
+      {
+        key: 'PLANETHOSTER_SFTP_USER',
+        description: 'PlanetHoster SFTP Username',
+        validate: (val) => !val || val.length > 0,
+      },
+      {
+        key: 'PLANETHOSTER_SFTP_PASSWORD',
+        description: 'PlanetHoster SFTP Password',
+        validate: (val) => !val || val.length > 0,
+      },
+      {
+        key: 'PLANETHOSTER_SFTP_PRIVATE_KEY',
+        description: 'PlanetHoster SFTP Private Key (SSH key - more secure)',
+        validate: (val) => !val || val.includes('BEGIN'),
+      },
+      {
+        key: 'PLANETHOSTER_CDN_URL',
+        description: 'PlanetHoster CDN/Public URL',
+        validate: (val) => !val || val.startsWith('https://'),
+      },
+      {
         key: 'STORAGE_DIR',
         description: 'Storage Directory',
         validate: (val) => !val || val.length > 0,
