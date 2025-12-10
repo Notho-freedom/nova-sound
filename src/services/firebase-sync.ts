@@ -20,6 +20,7 @@ import type {
   EqualizerPreset,
   HistoryEntry 
 } from '../types/music';
+import { getUserStorageKeySync } from '../lib/storage-utils';
 
 // Use the shared Firestore instance from firebase.ts to avoid multiple instances
 let db: ReturnType<typeof getFirestore> | null = sharedDb || null;
@@ -142,6 +143,14 @@ class FirebaseSyncService {
       this.cleanup();
 
       this.currentUserId = userId;
+      
+      // Migrate old localStorage keys to user-isolated keys
+      try {
+        const { migrateToUserIsolatedStorage } = await import('../lib/storage-utils');
+        await migrateToUserIsolatedStorage();
+      } catch (error) {
+        console.error('Failed to migrate to user-isolated storage:', error);
+      }
       
       // Load initial data from Firestore
       await this.loadFromFirestore(userId);
@@ -340,7 +349,12 @@ class FirebaseSyncService {
         this.saveToLocalStorage('nexus-search-history', data.searchHistory);
       }
 
-      if (data.uploadedMedia) {
+      if (data.uploadedMedia && this.currentUserId) {
+        // Use user-isolated storage key
+        const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
+        this.saveToLocalStorage(storageKey, data.uploadedMedia);
+      } else if (data.uploadedMedia) {
+        // Fallback to old key for backward compatibility
         this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia);
       }
 
@@ -486,9 +500,16 @@ class FirebaseSyncService {
     if (data.searchHistory) {
       this.saveToLocalStorage('nexus-search-history', data.searchHistory);
     }
-    if (data.uploadedMedia) {
-      this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia);
-    }
+      if (data.uploadedMedia) {
+        if (this.currentUserId) {
+          // Use user-isolated storage key
+          const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
+          this.saveToLocalStorage(storageKey, data.uploadedMedia);
+        } else {
+          // Fallback to old key for backward compatibility
+          this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia);
+        }
+      }
     if (data.cloudinaryConfig) {
       this.saveToLocalStorage('nexus-cloudinary-config', data.cloudinaryConfig);
     }
@@ -566,15 +587,31 @@ class FirebaseSyncService {
     const searchHistory = this.loadFromLocalStorage<string[]>('nexus-search-history');
     if (searchHistory) data.searchHistory = searchHistory;
 
-    const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" }>>('nexus-uploaded-media');
-    if (uploadedMedia) {
-      // Type assertion needed because localStorage might have old data with different types
-      data.uploadedMedia = uploadedMedia.map(item => ({
-        ...item,
-        cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus") 
-          ? item.cloudProvider 
-          : undefined
-      }));
+    // Load uploaded media with user isolation
+    // Note: This is called during sync, so we need to use the currentUserId
+    if (this.currentUserId) {
+      const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
+      const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" | "bunny"; url?: string; size?: number }>>(storageKey);
+      if (uploadedMedia) {
+        // Type assertion needed because localStorage might have old data with different types
+        data.uploadedMedia = uploadedMedia.map(item => ({
+          ...item,
+          cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus" || item.cloudProvider === "bunny") 
+            ? item.cloudProvider 
+            : undefined
+        }));
+      }
+    } else {
+      // Fallback to old key for backward compatibility
+      const uploadedMedia = this.loadFromLocalStorage<Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: "cloudinary" | "nexus" | "bunny"; url?: string; size?: number }>>('nexus-uploaded-media');
+      if (uploadedMedia) {
+        data.uploadedMedia = uploadedMedia.map(item => ({
+          ...item,
+          cloudProvider: (item.cloudProvider === "cloudinary" || item.cloudProvider === "nexus" || item.cloudProvider === "bunny") 
+            ? item.cloudProvider 
+            : undefined
+        }));
+      }
     }
 
     const cloudinaryConfig = this.loadFromLocalStorage<any>('nexus-cloudinary-config');

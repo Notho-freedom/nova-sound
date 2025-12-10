@@ -151,8 +151,13 @@ class CloudinaryService {
         (async () => {
           try {
             const { firebaseSyncService } = await import('./firebase-sync');
+            const { getUserStorageKey } = await import('@/lib/storage-utils');
+            
+            // Get user-isolated storage key
+            const storageKey = await getUserStorageKey('nexus-uploaded-media');
+            
             // Load existing uploaded media
-            const saved = localStorage.getItem('nexus-uploaded-media');
+            const saved = localStorage.getItem(storageKey);
             const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
             const newEntry = {
               id: track.id,
@@ -163,7 +168,7 @@ class CloudinaryService {
               size: result.bytes,
             };
             const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== track.id)].slice(0, 100); // Keep last 100
-            localStorage.setItem('nexus-uploaded-media', JSON.stringify(updated));
+            localStorage.setItem(storageKey, JSON.stringify(updated));
             firebaseSyncService.queueSync('uploadedMedia', updated);
           } catch (error) {
             // Silently fail if Firebase sync is not available

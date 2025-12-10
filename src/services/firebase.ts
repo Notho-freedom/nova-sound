@@ -115,6 +115,17 @@ class FirebaseService {
           }
         } else {
           console.log("Auth state changed: user signed out");
+          
+          // Clean up user-isolated storage when signing out
+          if (this.currentUser) {
+            try {
+              const { cleanupUserStorage } = await import('@/lib/storage-utils');
+              cleanupUserStorage(this.currentUser.uid);
+            } catch (error) {
+              console.error('Failed to cleanup user storage:', error);
+            }
+          }
+          
           this.userProfile = null;
           // Notify listeners
           this.authStateListeners.forEach((listener) => listener(null));

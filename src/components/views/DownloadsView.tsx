@@ -30,6 +30,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { firebaseService } from "@/services/firebase";
+import { getUserStorageKey, getCurrentUserId } from "@/lib/storage-utils";
 
 interface DownloadItem {
   id: string;
@@ -96,8 +97,12 @@ export const DownloadsView = () => {
     const loadUploadedFiles = async () => {
       setLoadingUploaded(true);
       try {
-        // Load from localStorage
-        const saved = localStorage.getItem(UPLOADED_MEDIA_KEY);
+        // Get user-isolated storage key
+        const userId = await getCurrentUserId();
+        const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+        
+        // Load from localStorage (user-isolated)
+        const saved = localStorage.getItem(storageKey);
         const uploadedMedia: UploadedFile[] = saved ? JSON.parse(saved) : [];
 
         // Fetch files from Nexus API for local storage files
@@ -362,7 +367,11 @@ export const DownloadsView = () => {
   const refreshUploadedFiles = async () => {
     setLoadingUploaded(true);
     try {
-      const saved = localStorage.getItem(UPLOADED_MEDIA_KEY);
+      // Get user-isolated storage key
+      const userId = await getCurrentUserId();
+      const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+      
+      const saved = localStorage.getItem(storageKey);
       const uploadedMedia: UploadedFile[] = saved ? JSON.parse(saved) : [];
 
       try {
@@ -779,10 +788,23 @@ export const DownloadsView = () => {
                                     </>
                                   )}
                                   <DropdownMenuItem
-                                    onClick={() => {
+                                    onClick={async () => {
                                       const updated = uploadedFiles.filter(f => f.id !== file.id);
                                       setUploadedFiles(updated);
-                                      localStorage.setItem(UPLOADED_MEDIA_KEY, JSON.stringify(updated));
+                                      
+                                      // Get user-isolated storage key
+                                      const userId = await getCurrentUserId();
+                                      const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+                                      localStorage.setItem(storageKey, JSON.stringify(updated));
+                                      
+                                      // Sync to Firebase if available
+                                      try {
+                                        const { firebaseSyncService } = await import('@/services/firebase-sync');
+                                        firebaseSyncService.queueSync('uploadedMedia', updated);
+                                      } catch (error) {
+                                        // Silently fail if Firebase sync is not available
+                                      }
+                                      
                                       toast.success("Fichier supprimé de la liste");
                                     }}
                                     className="text-destructive"
