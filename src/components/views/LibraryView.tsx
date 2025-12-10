@@ -33,6 +33,8 @@ import {
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { TrackListView } from "@/components/TrackListView";
 import { TrackGridView } from "@/components/TrackGridView";
+import { AlbumContextMenu } from "@/components/AlbumContextMenu";
+import { ArtistContextMenu } from "@/components/ArtistContextMenu";
 import { PageHeader } from "@/components/PageHeader";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -340,23 +342,51 @@ export const LibraryView = ({
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {albums.map((album) => (
-            <button
+            <AlbumContextMenu
               key={`${album.name}-${album.artist}`}
-              onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-              className="group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50"
+              album={album}
+              playlists={playlists}
+              onPlay={() => {
+                const firstTrack = album.tracks[0];
+                const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                if (idx !== -1) onTrackSelect(idx);
+              }}
+              onShuffle={() => {
+                const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
+                const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                if (idx !== -1) onTrackSelect(idx);
+              }}
+              onAddToQueue={() => {}}
+              onAddToPlaylist={(playlistId) => {}}
+              onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
+              onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+              onViewArtist={() => setSelectedArtist(album.artist)}
             >
-              <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
-                <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                    <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+              <div className="group relative">
+                <button
+                  onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                  className="w-full p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50"
+                >
+                  <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+                    <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                        <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                  <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
+                  <p className="text-xs text-muted-foreground/70">{album.tracks.length} titres</p>
+                </button>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
               </div>
-              <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
-              <p className="text-xs text-muted-foreground/70">{album.tracks.length} titres</p>
-            </button>
+            </AlbumContextMenu>
           ))}
         </div>
       </div>
@@ -378,35 +408,61 @@ export const LibraryView = ({
           {artists.map((artist) => {
             const coverUrl = artist.tracks[0]?.coverUrl;
             return (
-              <button
+              <ArtistContextMenu
                 key={artist.name}
-                onClick={() => {
-                  // Play first track from this artist
+                artist={artist}
+                playlists={playlists}
+                onPlay={() => {
                   const firstTrack = artist.tracks[0];
                   const idx = tracks.findIndex(t => t.id === firstTrack.id);
                   if (idx !== -1) onTrackSelect(idx);
                 }}
-                className="group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50"
+                onShuffle={() => {
+                  const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
+                  const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                  if (idx !== -1) onTrackSelect(idx);
+                }}
+                onAddToQueue={() => {}}
+                onAddToPlaylist={(playlistId) => {}}
+                onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
+                onViewArtist={() => setSelectedArtist(artist.name)}
               >
-                <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
-                  {coverUrl ? (
-                    <img src={getCoverUrl(coverUrl)} alt={artist.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                      <User className="w-12 h-12 text-muted-foreground" />
+                <div className="group relative">
+                  <button
+                    onClick={() => {
+                      const firstTrack = artist.tracks[0];
+                      const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                      if (idx !== -1) onTrackSelect(idx);
+                    }}
+                    className="w-full p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50"
+                  >
+                    <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
+                      {coverUrl ? (
+                        <img src={getCoverUrl(coverUrl)} alt={artist.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                          <User className="w-12 h-12 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                          <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                      <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
-                    </div>
-                  </div>
+                    <p className="text-sm font-medium text-center truncate text-foreground">{artist.name}</p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {artist.albums.size} albums • {artist.tracks.length} titres
+                    </p>
+                  </button>
+                  <button
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
                 </div>
-                <p className="text-sm font-medium text-center truncate text-foreground">{artist.name}</p>
-                <p className="text-xs text-muted-foreground text-center">
-                  {artist.albums.size} albums • {artist.tracks.length} titres
-                </p>
-              </button>
+              </ArtistContextMenu>
             );
           })}
         </div>

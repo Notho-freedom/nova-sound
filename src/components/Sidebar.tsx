@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { CreatePlaylistModal } from "@/components/PlaylistModal";
+import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
 
 export type ViewType = 
@@ -301,58 +302,78 @@ export const Sidebar = ({
               </div>
               <div className="space-y-1">
                 {playlists.slice(0, 5).map((playlist) => (
-                  <div
+                  <PlaylistContextMenu
                     key={playlist.id}
-                    className="w-full flex items-center gap-2 group"
+                    playlist={playlist}
+                    onPlay={() => {
+                      onViewChange("playlists");
+                      // TODO: Implement play playlist
+                    }}
+                    onShuffle={() => {
+                      onViewChange("playlists");
+                      // TODO: Implement shuffle playlist
+                    }}
+                    onEdit={() => {
+                      setEditingPlaylist({ id: playlist.id, name: playlist.name });
+                    }}
+                    onDelete={async () => {
+                      if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
+                        await deletePlaylist(playlist.id);
+                        toast.success("Playlist supprimée");
+                      }
+                    }}
+                    onView={() => onViewChange("playlists")}
                   >
-                    <button
-                      onClick={() => onViewChange("playlists")}
-                      className="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
-                    >
-                      <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all">
-                        <Music className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 text-left min-w-0">
-                        <p className="text-sm truncate">{playlist.name}</p>
-                        <p className="text-xs text-muted-foreground">{playlist.trackIds.length} titres</p>
-                      </div>
-                    </button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingPlaylist({ id: playlist.id, name: playlist.name });
-                          }}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Renommer
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
-                              await deletePlaylist(playlist.id);
-                              toast.success("Playlist supprimée");
-                            }
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                    <div className="w-full flex items-center gap-2 group">
+                      <button
+                        onClick={() => onViewChange("playlists")}
+                        className="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
+                      >
+                        <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all">
+                          <Music className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="text-sm truncate">{playlist.name}</p>
+                          <p className="text-xs text-muted-foreground">{playlist.trackIds.length} titres</p>
+                        </div>
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingPlaylist({ id: playlist.id, name: playlist.name });
+                            }}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Renommer
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
+                                await deletePlaylist(playlist.id);
+                                toast.success("Playlist supprimée");
+                              }
+                            }}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </PlaylistContextMenu>
                 ))}
                 {playlists.length === 0 && (
                   <p className="px-3 py-2 text-xs text-muted-foreground italic">

@@ -199,6 +199,7 @@ export const MusicPlayer = () => {
               currentTrackIndex={currentTrackIndex}
               isPlaying={isPlaying}
               onTrackSelect={handleTrackSelect}
+              playlists={[]}
             />
           </div>
         </div>
