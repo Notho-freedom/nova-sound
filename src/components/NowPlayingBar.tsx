@@ -30,6 +30,7 @@ interface NowPlayingBarProps {
   volume: number;
   isMuted: boolean;
   isFavorite?: boolean;
+  audioElement?: HTMLAudioElement | null;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;

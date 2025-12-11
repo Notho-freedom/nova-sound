@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useEffect, useState } from "react";
+import { FirebaseProvider } from "@/components/FirebaseProvider";
 import "./globals.css";
 
 const queryClient = new QueryClient();
@@ -31,11 +32,13 @@ export default function RootLayout({
         {mounted ? (
           <QueryClientProvider client={queryClient}>
             <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                {children}
-              </TooltipProvider>
+              <FirebaseProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  {children}
+                </TooltipProvider>
+              </FirebaseProvider>
             </ThemeProvider>
           </QueryClientProvider>
         ) : (

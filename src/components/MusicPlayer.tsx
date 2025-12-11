@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Music, ListMusic } from "lucide-react";
 import { AlbumArt } from "./AlbumArt";
-import { AudioVisualizer } from "./AudioVisualizer";
+import { LegacyAudioVisualizer } from "./LegacyAudioVisualizer";
 import { PlayerControls } from "./PlayerControls";
 import { ProgressBar } from "./ProgressBar";
 import { TrackList } from "./TrackList";
@@ -147,7 +147,7 @@ export const MusicPlayer = () => {
 
           {/* Visualizer */}
           <div className="mb-6">
-            <AudioVisualizer isPlaying={isPlaying} barCount={50} />
+            <LegacyAudioVisualizer isPlaying={isPlaying} barCount={50} />
           </div>
 
           {/* Progress Bar */}

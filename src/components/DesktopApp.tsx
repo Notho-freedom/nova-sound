@@ -14,6 +14,7 @@ import { SettingsView } from "./views/SettingsView";
 // Lazy load heavy components
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
 const DownloadsView = lazy(() => import("./views/DownloadsView").then(m => ({ default: m.DownloadsView })));
+const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })));
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +29,8 @@ import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Track } from "@/types/music";
+import { VibrantUI, BassPulse } from "@/components/VibrantUI";
+import { useAudioVibes } from "@/hooks/useAudioVibes";
 
 export const DesktopApp = () => {
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
@@ -632,6 +635,12 @@ export const DesktopApp = () => {
             <DownloadsView />
           </Suspense>
         );
+      case "audio-senses":
+        return (
+          <Suspense fallback={<div className="p-6">Chargement des sens audio...</div>}>
+            {audioRef.current && <AudioSensesView audioElement={audioRef.current} />}
+          </Suspense>
+        );
       case "settings":
         return <SettingsView />;
       default:
@@ -676,26 +685,35 @@ export const DesktopApp = () => {
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
         {/* Fullscreen Player */}
         {isFullscreen && currentTrack && (
-          <FullscreenPlayer
-            currentTrack={currentTrack}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            isShuffle={isShuffle}
-            repeatMode={repeatMode}
-            volume={volume}
-            isMuted={isMuted}
-            onPlayPause={handlePlayPause}
-            onPrevious={handlePrevious}
-            onNext={handleNext}
-            onShuffle={handleShuffle}
-            onRepeat={handleRepeat}
-            onSeek={handleSeek}
-            onVolumeChange={handleVolumeChange}
-            onMuteToggle={() => setIsMuted(!isMuted)}
-            onClose={() => setIsFullscreen(false)}
-            isFavorite={isFavorite(currentTrack.id)}
-            onToggleFavorite={handleToggleFavorite}
-          />
+          <VibrantUI
+            audioElement={audioRef.current}
+            enableBassPulse={true}
+            enableEnergyGlow={true}
+            enableShake={false}
+            intensity={0.8}
+          >
+            <FullscreenPlayer
+              currentTrack={currentTrack}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              isShuffle={isShuffle}
+              repeatMode={repeatMode}
+              volume={volume}
+              isMuted={isMuted}
+              audioElement={audioRef.current}
+              onPlayPause={handlePlayPause}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+              onShuffle={handleShuffle}
+              onRepeat={handleRepeat}
+              onSeek={handleSeek}
+              onVolumeChange={handleVolumeChange}
+              onMuteToggle={() => setIsMuted(!isMuted)}
+              onClose={() => setIsFullscreen(false)}
+              isFavorite={isFavorite(currentTrack.id)}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          </VibrantUI>
         )}
 
         {/* Title Bar */}

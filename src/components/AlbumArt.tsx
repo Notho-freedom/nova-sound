@@ -49,9 +49,10 @@ export const AlbumArt = ({ src, alt, isPlaying, className }: AlbumArtProps) => {
           src={coverUrl}
           alt={alt}
           className={cn(
-            "w-full h-full object-cover transition-transform duration-[20000ms] ease-linear",
+            "w-full h-full object-cover transition-transform ease-linear",
             isPlaying && "animate-rotate-slow"
           )}
+          style={{ transitionDuration: '20000ms' }}
         />
         
         {/* Center hole overlay */}

@@ -22,8 +22,10 @@ import {
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { AlbumArt } from "./AlbumArt";
-import { AudioVisualizer } from "./AudioVisualizer";
+import { LegacyAudioVisualizer } from "./LegacyAudioVisualizer";
 import { BackgroundEffects } from "./BackgroundEffects";
+import { VibrantUI, BassPulse } from "@/components/VibrantUI";
+import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -38,6 +40,7 @@ interface FullscreenPlayerProps {
   isMuted: boolean;
   isFavorite?: boolean;
   isInline?: boolean;
+  audioElement?: HTMLAudioElement | null;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -77,6 +80,7 @@ export const FullscreenPlayer = ({
   isMuted,
   isFavorite = false,
   isInline = false,
+  audioElement,
   onPlayPause,
   onPrevious,
   onNext,
@@ -177,7 +181,16 @@ export const FullscreenPlayer = ({
 
             {/* Visualizer */}
             <div className="w-full max-w-sm mb-4">
-              <AudioVisualizer isPlaying={isPlaying} barCount={40} />
+              {audioElement ? (
+                <AudioVisualizer
+                  audioElement={audioElement}
+                  type="bars"
+                  height={80}
+                  color="#3b82f6"
+                />
+              ) : (
+                <LegacyAudioVisualizer isPlaying={isPlaying} barCount={40} />
+              )}
             </div>
 
             {/* Progress Bar */}
@@ -426,12 +439,14 @@ export const FullscreenPlayer = ({
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-8">
         {/* Album Art */}
-        <AlbumArt
-          src={getCoverUrl(currentTrack.coverUrl)}
-          alt={currentTrack.album}
-          isPlaying={isPlaying}
-          className="w-72 h-72 md:w-80 md:h-80 lg:w-96 lg:h-96 mb-8"
-        />
+        <BassPulse audioElement={audioElement} intensity={0.6}>
+          <AlbumArt
+            src={getCoverUrl(currentTrack.coverUrl)}
+            alt={currentTrack.album}
+            isPlaying={isPlaying}
+            className="w-72 h-72 md:w-80 md:h-80 lg:w-96 lg:h-96 mb-8"
+          />
+        </BassPulse>
 
         {/* Track Info */}
         <div className="text-center mb-6">
@@ -445,7 +460,16 @@ export const FullscreenPlayer = ({
 
         {/* Visualizer */}
         <div className="w-full max-w-2xl mb-8">
-          <AudioVisualizer isPlaying={isPlaying} barCount={60} />
+          {audioElement ? (
+            <AudioVisualizer
+              audioElement={audioElement}
+              type="spectrum"
+              height={120}
+              color="#3b82f6"
+            />
+          ) : (
+            <LegacyAudioVisualizer isPlaying={isPlaying} barCount={60} />
+          )}
         </div>
       </div>
 

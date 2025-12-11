@@ -120,11 +120,17 @@ class FirebaseSyncService {
 
   // Initialize sync for a user
   private isInitializing: boolean = false;
+  private isInitialized: boolean = false;
   
   async initializeSync(userId: string): Promise<void> {
     if (!db) {
       console.warn('Firestore not initialized, cannot sync');
       return;
+    }
+
+    // Empêcher l'initialisation multiple
+    if (this.isInitialized && this.currentUserId === userId) {
+      return; // Déjà initialisé pour cet utilisateur
     }
 
     // Prevent concurrent initialization
@@ -169,9 +175,12 @@ class FirebaseSyncService {
       if (!this.syncListeners.has('appData')) {
         console.log(`✅ Firebase sync initialized for user: ${userId}`);
       }
+      
+      this.isInitialized = true;
     } catch (error) {
       console.error('Error initializing sync:', error);
       this.cleanup();
+      this.isInitialized = false;
       throw error;
     } finally {
       this.isInitializing = false;
@@ -244,37 +253,40 @@ class FirebaseSyncService {
     this.syncListeners.set('appData', unsubscribeAppData);
 
     // Playlists subcollection listener
-    const playlistsRef = collection(db!, 'users', userId, 'playlists');
-    const unsubscribePlaylists = onSnapshot(
-      playlistsRef,
-      (snapshot) => {
-        // Reset reconnect attempts on successful connection
-        this.reconnectAttempts.set('playlists', 0);
-        
-        if (!this.isSyncing) {
-          const playlists: Playlist[] = [];
-          snapshot.forEach((doc) => {
-            playlists.push({ id: doc.id, ...doc.data() } as Playlist);
-          });
-          this.handlePlaylistsUpdate(playlists);
-        }
-      },
-      (error) => {
-        // Only log actual errors, not normal connection issues
-        if (error.code !== 'unavailable' && error.code !== 'cancelled') {
-          console.error('Error in playlists listener:', error);
-        }
-        this.handleListenerError('playlists', userId, () => {
-          // Retry setup
-          const existingUnsubscribe = this.syncListeners.get('playlists');
-          if (existingUnsubscribe) {
-            existingUnsubscribe();
+    if (!this.syncListeners.has('playlists')) {
+      const playlistsRef = collection(db!, 'users', userId, 'playlists');
+      const unsubscribePlaylists = onSnapshot(
+        playlistsRef,
+        (snapshot) => {
+          // Reset reconnect attempts on successful connection
+          this.reconnectAttempts.set('playlists', 0);
+          
+          if (!this.isSyncing) {
+            const playlists: Playlist[] = [];
+            snapshot.forEach((doc) => {
+              playlists.push({ id: doc.id, ...doc.data() } as Playlist);
+            });
+            this.handlePlaylistsUpdate(playlists);
           }
-          this.setupRealtimeListeners(userId);
-        });
-      }
-    );
-    this.syncListeners.set('playlists', unsubscribePlaylists);
+        },
+        (error) => {
+          // Only log actual errors, not normal connection issues
+          if (error.code !== 'unavailable' && error.code !== 'cancelled') {
+            console.error('Error in playlists listener:', error);
+          }
+          this.handleListenerError('playlists', userId, () => {
+            // Retry setup
+            const existingUnsubscribe = this.syncListeners.get('playlists');
+            if (existingUnsubscribe) {
+              existingUnsubscribe();
+              this.syncListeners.delete('playlists');
+            }
+            this.setupRealtimeListeners(userId);
+          });
+        }
+      );
+      this.syncListeners.set('playlists', unsubscribePlaylists);
+    }
   }
 
   // Handle listener errors with exponential backoff

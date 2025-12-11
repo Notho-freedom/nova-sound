@@ -17,7 +17,8 @@ import {
   Music,
   MoreVertical,
   Edit,
-  Trash2
+  Trash2,
+  Radio
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -47,6 +48,7 @@ export type ViewType =
   | "local"
   | "downloads"
   | "settings"
+  | "audio-senses"
   | "album-detail"
   | "artist-detail"
   | "player";
@@ -77,6 +79,7 @@ const libraryItems = [
 
 const mediaItems = [
   { id: "videos" as ViewType, icon: Video, label: "Vidéos" },
+  { id: "audio-senses" as ViewType, icon: Radio, label: "Sens Audio" },
 ];
 
 const localItems = [

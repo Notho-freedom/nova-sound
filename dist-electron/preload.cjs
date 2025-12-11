@@ -104,6 +104,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAudioDuration: (filePath) => ipcRenderer.invoke('audio:duration', filePath),
   readFileAsBase64: (filePath) => ipcRenderer.invoke('file:readAsBase64', filePath),
   openPath: (filePath) => ipcRenderer.invoke('fs:openPath', filePath),
+  
+  // File open event (from "Open with..." or command line)
+  onFileOpen: (callback) => {
+    const listener = (_event, filePath) => callback(filePath);
+    ipcRenderer.on('file:open', listener);
+    return () => ipcRenderer.removeListener('file:open', listener);
+  },
 });
 
 console.log('Preload script loaded successfully');
