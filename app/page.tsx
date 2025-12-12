@@ -1,8 +1,19 @@
 'use client';
 
-import LandingPage from "@/components/LandingPage";
+import { DesktopApp } from "@/components/DesktopApp";
+import { useEffect, useState } from "react";
 
 export default function Home() {
-  return <LandingPage />;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return <DesktopApp />;
 }
 

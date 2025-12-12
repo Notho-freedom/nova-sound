@@ -114,91 +114,49 @@ function detectPitch(frequencyData: number[], sampleRate: number): {
 
 /**
  * Estime le BPM à partir de l'historique des pics
- * Utilise une détection adaptative basée sur les variations d'énergie
  */
-function estimateBPM(peakHistory: number[], analysisFps: number = 60): {
+function estimateBPM(peakHistory: number[], sampleRate: number): {
   bpm: number;
   confidence: number;
   beatPhase: number;
 } {
-  if (peakHistory.length < 30) {
+  if (peakHistory.length < 10) {
     return { bpm: 0, confidence: 0, beatPhase: 0 };
   }
   
-  // Calculer la moyenne et l'écart-type pour un seuil adaptatif
-  const mean = peakHistory.reduce((sum, val) => sum + val, 0) / peakHistory.length;
-  const variance = peakHistory.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / peakHistory.length;
-  const stdDev = Math.sqrt(variance);
-  
-  // Seuil adaptatif : moyenne + 1.5 * écart-type (plus sensible que 0.7 fixe)
-  const threshold = Math.max(0.3, Math.min(0.8, mean + 1.5 * stdDev));
-  
-  // Détecter les pics (montées significatives)
-  const peaks: number[] = [];
-  for (let i = 2; i < peakHistory.length; i++) {
-    // Détecter une montée significative (pic)
-    const current = peakHistory[i];
-    const previous = peakHistory[i - 1];
-    const beforePrevious = peakHistory[i - 2];
-    
-    // Pic si : montée rapide ET valeur au-dessus du seuil
-    if (current > threshold && current > previous && previous > beforePrevious) {
-      peaks.push(i);
-    }
-  }
-  
-  if (peaks.length < 3) {
-    return { bpm: 0, confidence: 0, beatPhase: 0 };
-  }
-  
-  // Calculer les intervalles entre les pics (en frames)
+  // Détecter les intervalles entre les pics
   const intervals: number[] = [];
-  for (let i = 1; i < peaks.length; i++) {
-    intervals.push(peaks[i] - peaks[i - 1]);
+  let lastPeakTime = 0;
+  
+  for (let i = 1; i < peakHistory.length; i++) {
+    if (peakHistory[i] > 0.7 && peakHistory[i - 1] <= 0.7) {
+      if (lastPeakTime > 0) {
+        intervals.push(i - lastPeakTime);
+      }
+      lastPeakTime = i;
+    }
   }
   
   if (intervals.length < 2) {
     return { bpm: 0, confidence: 0, beatPhase: 0 };
   }
   
-  // Trier les intervalles et prendre la médiane pour éviter les outliers
-  const sortedIntervals = [...intervals].sort((a, b) => a - b);
-  const medianInterval = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
+  // Calculer la moyenne des intervalles
+  const avgInterval = intervals.reduce((sum, val) => sum + val, 0) / intervals.length;
+  const bpm = (60 * sampleRate) / (avgInterval * 1024); // Approximation
   
-  // Filtrer les intervalles proches de la médiane (dans ±30%)
-  const filteredIntervals = intervals.filter(
-    interval => interval >= medianInterval * 0.7 && interval <= medianInterval * 1.3
-  );
+  // Confiance basée sur la régularité
+  const variance = intervals.reduce((sum, val) => sum + Math.pow(val - avgInterval, 2), 0) / intervals.length;
+  const confidence = Math.max(0, 1 - Math.min(1, variance / (avgInterval * avgInterval)));
   
-  if (filteredIntervals.length < 2) {
-    return { bpm: 0, confidence: 0, beatPhase: 0 };
-  }
-  
-  // Calculer la moyenne des intervalles filtrés (en frames)
-  const avgInterval = filteredIntervals.reduce((sum, val) => sum + val, 0) / filteredIntervals.length;
-  
-  // Convertir en BPM : chaque frame = 1/analysisFps secondes
-  // BPM = 60 secondes / (intervalle en secondes)
-  // intervalle en secondes = avgInterval / analysisFps
-  const bpm = (60 * analysisFps) / avgInterval;
-  
-  // Confiance basée sur la régularité des intervalles
-  const intervalVariance = filteredIntervals.reduce(
-    (sum, val) => sum + Math.pow(val - avgInterval, 2), 
-    0
-  ) / filteredIntervals.length;
-  const intervalStdDev = Math.sqrt(intervalVariance);
-  const coefficientOfVariation = intervalStdDev / avgInterval;
-  const confidence = Math.max(0, Math.min(1, 1 - coefficientOfVariation));
-  
-  // Phase du beat (0-1) : position actuelle dans le cycle
+  // Phase du beat (0-1)
   const currentTime = peakHistory.length;
-  const beatPhase = ((currentTime - (peaks[peaks.length - 1] || 0)) % avgInterval) / avgInterval;
+  const beatPhase = (currentTime % avgInterval) / avgInterval;
   
   return {
-    bpm: Math.max(60, Math.min(200, Math.round(bpm))),
+    bpm: Math.max(60, Math.min(200, bpm)),
     confidence,
-    beatPhase: Math.max(0, Math.min(1, beatPhase)),
+    beatPhase,
   };
 }
 
@@ -322,14 +280,9 @@ export function useAudioSenses(
       const volume = data.energy / 255;
       const rms = data.rms / 255;
 
-      // Peak Detection - Utiliser l'énergie des basses pour une meilleure détection du rythme
+      // Peak Detection
       const peak = data.peak / 255;
-      // Pour le BPM, utiliser l'énergie des basses plutôt que le pic global
-      // car les basses sont plus représentatives du rythme
-      const bassEnergyNormalized = data.bass / 255;
-      // Combiner pic global et énergie des basses pour une détection plus robuste
-      const combinedPeak = Math.max(peak, bassEnergyNormalized * 0.8);
-      peakHistoryRef.current.push(combinedPeak);
+      peakHistoryRef.current.push(peak);
       if (peakHistoryRef.current.length > 1000) {
         peakHistoryRef.current.shift();
       }
@@ -345,10 +298,9 @@ export function useAudioSenses(
       }
 
       // BPM / Tempo
-      // Utiliser la fréquence d'analyse (environ 60 fps pour requestAnimationFrame)
       let tempo = { bpm: 0, confidence: 0, beatPhase: 0 };
       if (optionsRef.current.enableBPMDetection) {
-        tempo = estimateBPM(peakHistoryRef.current, 60); // ~60 fps pour requestAnimationFrame
+        tempo = estimateBPM(peakHistoryRef.current, sampleRate);
       }
 
       // Créer les données complètes

@@ -264,7 +264,7 @@ export const DownloadsView = () => {
       }
 
       // Create blob and download
-      const blob = new Blob(chunks.map(chunk => new Uint8Array(chunk.buffer as ArrayBuffer)));
+      const blob = new Blob(chunks);
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
