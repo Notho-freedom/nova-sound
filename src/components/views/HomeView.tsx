@@ -11,6 +11,7 @@ interface HomeViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTracks?: (trackIds: string[]) => void;
   recentTracks?: Track[];
   favoriteTracks?: Track[];
 }
@@ -60,6 +61,7 @@ export const HomeView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTracks,
   recentTracks = [],
   favoriteTracks = [],
 }: HomeViewProps) => {
@@ -270,7 +272,16 @@ export const HomeView = ({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Discoveries Playlist */}
-          <div className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer">
+          <div 
+            className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer"
+            onClick={() => {
+              if (discoveries.length > 0) {
+                const firstTrack = discoveries[0];
+                const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                if (idx !== -1) onTrackSelect(idx);
+              }
+            }}
+          >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/80 to-purple-600/80" />
             <div className="absolute inset-0 p-6 flex flex-col justify-between">
               <div>
@@ -299,7 +310,16 @@ export const HomeView = ({
           </div>
 
           {/* Similar to Favorites */}
-          <div className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer">
+          <div 
+            className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer"
+            onClick={() => {
+              if (similar.length > 0) {
+                const firstTrack = similar[0];
+                const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                if (idx !== -1) onTrackSelect(idx);
+              }
+            }}
+          >
             <div className="absolute inset-0 bg-gradient-to-br from-pink-500/80 to-rose-600/80" />
             <div className="absolute inset-0 p-6 flex flex-col justify-between">
               <div>
@@ -328,7 +348,17 @@ export const HomeView = ({
           </div>
 
           {/* Mix based on time */}
-          <div className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer">
+          <div 
+            className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer"
+            onClick={() => {
+              if (tracks.length > 0) {
+                // Shuffle and play a random mix
+                const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+                const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                if (idx !== -1) onTrackSelect(idx);
+              }
+            }}
+          >
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/80 to-blue-600/80" />
             <div className="absolute inset-0 p-6 flex flex-col justify-between">
               <div>

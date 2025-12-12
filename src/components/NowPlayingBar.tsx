@@ -13,13 +13,25 @@ import {
   ListMusic,
   Maximize2,
   Mic2,
-  MoreHorizontal
+  MoreHorizontal,
+  Share2,
+  Info,
+  Radio,
+  Disc3,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Track } from "@/types/music";
+import { toast } from "sonner";
 
 interface NowPlayingBarProps {
   currentTrack: Track;
@@ -287,14 +299,42 @@ export const NowPlayingBar = ({
               <TooltipContent>Plein écran</TooltipContent>
             </Tooltip>
 
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger asChild>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent>Plus d'options</TooltipContent>
-            </Tooltip>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: currentTrack.title,
+                      text: `${currentTrack.title} - ${currentTrack.artist}`,
+                    }).catch(() => {});
+                  } else {
+                    navigator.clipboard.writeText(`${currentTrack.title} - ${currentTrack.artist}`);
+                    toast.success("Copié dans le presse-papier");
+                  }
+                }}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Partager
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast.info(`Album: ${currentTrack.album}\nArtiste: ${currentTrack.artist}`)}>
+                  <Info className="w-4 h-4 mr-2" />
+                  Infos de la piste
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => toast.info("Radio basée sur ce titre - Bientôt disponible")}>
+                  <Radio className="w-4 h-4 mr-2" />
+                  Démarrer une radio
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast.info(`Aller à l'album "${currentTrack.album}"`)}>
+                  <Disc3 className="w-4 h-4 mr-2" />
+                  Aller à l'album
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

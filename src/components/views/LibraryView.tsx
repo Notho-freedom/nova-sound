@@ -268,12 +268,22 @@ export const LibraryView = ({
                 <Play className="w-4 h-4 fill-current" />
                 Lecture
               </Button>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => {
+                const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
+                const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                if (idx !== -1) onTrackSelect(idx);
+              }}>
                 <Shuffle className="w-4 h-4" />
                 Aléatoire
               </Button>
-              <Button variant="ghost" size="icon">
-                <Heart className="w-4 h-4" />
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => {
+                  album.tracks.forEach(track => toggleFavorite(track.id));
+                }}
+              >
+                <Heart className={cn("w-4 h-4", album.tracks.some(t => isFavorite(t.id)) && "fill-red-500 text-red-500")} />
               </Button>
             </div>
           </div>

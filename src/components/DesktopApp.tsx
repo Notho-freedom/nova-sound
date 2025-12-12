@@ -5,6 +5,7 @@ import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
+import { LyricsDisplay } from "./LyricsDisplay";
 import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
@@ -85,6 +86,7 @@ export const DesktopApp = () => {
   });
   const [isMuted, setIsMuted] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -762,6 +764,18 @@ export const DesktopApp = () => {
                 />
               </div>
             )}
+
+            {/* Lyrics Panel */}
+            {isLyricsOpen && currentTrack && (
+              <div className="absolute right-0 top-0 bottom-0 z-20 w-80 animate-in slide-in-from-right duration-300">
+                <LyricsDisplay
+                  currentTrack={currentTrack}
+                  currentTime={currentTime}
+                  isPlaying={isPlaying}
+                  className="h-full"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -784,10 +798,17 @@ export const DesktopApp = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={() => setIsMuted(!isMuted)}
-            onToggleQueue={() => setIsQueueOpen(!isQueueOpen)}
+            onToggleQueue={() => {
+              setIsQueueOpen(!isQueueOpen);
+              if (!isQueueOpen) setIsLyricsOpen(false);
+            }}
             onFullscreen={() => setIsFullscreen(true)}
             onToggleFavorite={handleToggleFavorite}
             onShowPlayer={handleShowPlayer}
+            onShowLyrics={() => {
+              setIsLyricsOpen(!isLyricsOpen);
+              if (!isLyricsOpen) setIsQueueOpen(false);
+            }}
             isQueueOpen={isQueueOpen}
           />
         )}
