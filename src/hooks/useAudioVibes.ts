@@ -142,10 +142,10 @@ export function useAudioVibes(
         }
 
         // Obtenir les données de fréquence (FFT)
-        analyser.getByteFrequencyData(bufferRef.current);
+        analyser.getByteFrequencyData(bufferRef.current as Uint8Array<ArrayBuffer>);
         
         // Obtenir les données de waveform (amplitude temporelle)
-        analyser.getByteTimeDomainData(waveformBufferRef.current);
+        analyser.getByteTimeDomainData(waveformBufferRef.current as Uint8Array<ArrayBuffer>);
 
         const frequencyData = bufferRef.current;
         const waveformData = waveformBufferRef.current;
