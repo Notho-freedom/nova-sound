@@ -126,13 +126,33 @@ export const DesktopApp = () => {
       const audioSrc = getAudioSrc(currentTrack.filePath);
       if (audioSrc) {
         console.log('Loading audio:', audioSrc);
+        
+        // Attendre que l'audio soit chargé avant de jouer pour éviter l'erreur
+        const handleCanPlay = () => {
+          if (isPlaying && audioRef.current) {
+            audioRef.current.play().catch((err) => {
+              console.error('Failed to play audio:', err);
+            });
+          }
+          audioRef.current?.removeEventListener('canplay', handleCanPlay);
+        };
+        
+        const handleLoadedData = () => {
+          if (isPlaying && audioRef.current) {
+            audioRef.current.play().catch((err) => {
+              console.error('Failed to play audio:', err);
+            });
+          }
+          audioRef.current?.removeEventListener('loadeddata', handleLoadedData);
+        };
+        
+        // Ajouter les listeners avant de changer la source
+        audioRef.current.addEventListener('canplay', handleCanPlay);
+        audioRef.current.addEventListener('loadeddata', handleLoadedData);
+        
+        // Changer la source et charger
         audioRef.current.src = audioSrc;
         audioRef.current.load();
-        if (isPlaying) {
-          audioRef.current.play().catch((err) => {
-            console.error('Failed to play audio:', err);
-          });
-        }
       }
     }
 
@@ -140,7 +160,7 @@ export const DesktopApp = () => {
     if (currentTrack) {
       addToHistory(currentTrack.id);
     }
-  }, [currentTrack?.id]);
+  }, [currentTrack?.id, isPlaying]);
 
   // Handle play/pause
   useEffect(() => {

@@ -264,11 +264,11 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
 
   if (!sensesData) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Music className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Aucun audio en cours de lecture</p>
-          <p className="text-sm text-muted-foreground/70 mt-2">
+      <div className="flex items-center justify-center h-full w-full min-h-screen">
+        <div className="text-center max-w-md mx-auto px-4">
+          <Music className="w-16 h-16 mx-auto mb-4 text-muted-foreground animate-pulse" />
+          <p className="text-lg text-muted-foreground mb-2">Aucun audio en cours de lecture</p>
+          <p className="text-sm text-muted-foreground/70">
             Lancez une piste pour voir les sens audio en action
           </p>
         </div>

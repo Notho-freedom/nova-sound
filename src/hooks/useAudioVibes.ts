@@ -59,6 +59,7 @@ export function useAudioVibes(
   // Initialiser l'analyseur audio
   useEffect(() => {
     if (!audioElement) {
+      setVibesData(null);
       return;
     }
 
@@ -66,158 +67,193 @@ export function useAudioVibes(
     let analyser: AnalyserNode | null = null;
     let source: MediaElementAudioSourceNode | null = null;
     let bassFilter: BiquadFilterNode | null = null;
+    let cleanupListener: (() => void) | null = null;
 
-    try {
-      // Utiliser le gestionnaire centralisé pour obtenir ou créer l'AudioContext et la source
-      audioContext = getOrCreateAudioContext();
-      audioContextRef.current = audioContext;
-      
-      // S'assurer que l'AudioContext est actif (résumé si suspendu)
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(err => {
-          console.warn('Failed to resume AudioContext:', err);
-        });
-      }
-
-      // Obtenir ou créer la source depuis l'élément audio/vidéo
-      source = getOrCreateMediaElementSource(audioElement);
-      sourceRef.current = source;
-
-      // Créer l'analyseur
-      analyser = audioContext.createAnalyser();
-      // S'assurer que fftSize est valide (doit être une puissance de 2 entre 32 et 32768)
-      const validFFTSize = optionsRef.current.fftSize && optionsRef.current.fftSize >= 32 && optionsRef.current.fftSize <= 32768
-        ? optionsRef.current.fftSize
-        : DEFAULT_OPTIONS.fftSize;
-      analyser.fftSize = validFFTSize;
-      // S'assurer que smoothingTimeConstant est valide (doit être un nombre fini entre 0 et 1)
-      const validSmoothing = typeof optionsRef.current.smoothingTimeConstant === 'number' 
-        && isFinite(optionsRef.current.smoothingTimeConstant)
-        && optionsRef.current.smoothingTimeConstant >= 0
-        && optionsRef.current.smoothingTimeConstant <= 1
-        ? optionsRef.current.smoothingTimeConstant
-        : DEFAULT_OPTIONS.smoothingTimeConstant;
-      analyser.smoothingTimeConstant = validSmoothing;
-      analyserRef.current = analyser;
-
-      // Créer les buffers
-      const bufferLength = analyser.frequencyBinCount;
-      bufferRef.current = new Uint8Array(bufferLength);
-      waveformBufferRef.current = new Uint8Array(bufferLength);
-
-      // Si on a une source, la connecter
-      if (source) {
-        // IMPORTANT: La source est déjà connectée à la destination via directDestinationConnection
-        // dans audio-context-manager. On n'a qu'à connecter l'analyseur à la source pour l'analyse.
-        // Le son passera toujours grâce à la connexion directe source -> destination.
+    // Fonction d'initialisation de l'analyseur
+    const initAnalyzer = () => {
+      try {
+        // Utiliser le gestionnaire centralisé pour obtenir ou créer l'AudioContext et la source
+        audioContext = getOrCreateAudioContext();
+        audioContextRef.current = audioContext;
         
-        // Optionnel : Filtrer les basses pour une meilleure détection
-        if (optionsRef.current.enableBassFilter) {
-          bassFilter = audioContext.createBiquadFilter();
-          bassFilter.type = 'lowshelf';
-          bassFilter.frequency.value = optionsRef.current.bassFrequency;
-          bassFilter.gain.value = 20; // Amplifier les basses
+        // S'assurer que l'AudioContext est actif (résumé si suspendu)
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().catch(err => {
+            console.warn('Failed to resume AudioContext:', err);
+          });
+        }
 
-          // Connecter source -> filtre -> analyseur (pour l'analyse uniquement)
-          // Le son passe déjà via directDestinationConnection dans audio-context-manager
-          source.connect(bassFilter);
-          bassFilter.connect(analyser);
-          bassFilterRef.current = bassFilter;
+        // Obtenir ou créer la source depuis l'élément audio/vidéo
+        source = getOrCreateMediaElementSource(audioElement);
+        sourceRef.current = source;
+
+        // Créer l'analyseur
+        analyser = audioContext.createAnalyser();
+        // S'assurer que fftSize est valide (doit être une puissance de 2 entre 32 et 32768)
+        const validFFTSize = optionsRef.current.fftSize && optionsRef.current.fftSize >= 32 && optionsRef.current.fftSize <= 32768
+          ? optionsRef.current.fftSize
+          : DEFAULT_OPTIONS.fftSize;
+        analyser.fftSize = validFFTSize;
+        // S'assurer que smoothingTimeConstant est valide (doit être un nombre fini entre 0 et 1)
+        const validSmoothing = typeof optionsRef.current.smoothingTimeConstant === 'number' 
+          && isFinite(optionsRef.current.smoothingTimeConstant)
+          && optionsRef.current.smoothingTimeConstant >= 0
+          && optionsRef.current.smoothingTimeConstant <= 1
+          ? optionsRef.current.smoothingTimeConstant
+          : DEFAULT_OPTIONS.smoothingTimeConstant;
+        analyser.smoothingTimeConstant = validSmoothing;
+        analyserRef.current = analyser;
+
+        // Créer les buffers
+        const bufferLength = analyser.frequencyBinCount;
+        bufferRef.current = new Uint8Array(bufferLength);
+        waveformBufferRef.current = new Uint8Array(bufferLength);
+
+        // Si on a une source, la connecter
+        if (source) {
+          // IMPORTANT: La source est déjà connectée à la destination via directDestinationConnection
+          // dans audio-context-manager. On n'a qu'à connecter l'analyseur à la source pour l'analyse.
+          // Le son passera toujours grâce à la connexion directe source -> destination.
+          
+          // Optionnel : Filtrer les basses pour une meilleure détection
+          if (optionsRef.current.enableBassFilter) {
+            bassFilter = audioContext.createBiquadFilter();
+            bassFilter.type = 'lowshelf';
+            bassFilter.frequency.value = optionsRef.current.bassFrequency;
+            bassFilter.gain.value = 20; // Amplifier les basses
+
+            // Connecter source -> filtre -> analyseur (pour l'analyse uniquement)
+            // Le son passe déjà via directDestinationConnection dans audio-context-manager
+            source.connect(bassFilter);
+            bassFilter.connect(analyser);
+            bassFilterRef.current = bassFilter;
+          } else {
+            // Connecter source -> analyseur (pour l'analyse uniquement)
+            // Le son passe déjà via directDestinationConnection dans audio-context-manager
+            source.connect(analyser);
+          }
         } else {
-          // Connecter source -> analyseur (pour l'analyse uniquement)
-          // Le son passe déjà via directDestinationConnection dans audio-context-manager
-          source.connect(analyser);
-        }
-      } else {
-        // Si pas de source (élément déjà connecté), on ne peut pas analyser
-        // mais l'élément audio devrait quand même jouer car il est connecté ailleurs
-        console.warn('Cannot create MediaElementSourceNode, audio analysis disabled but playback should still work');
-      }
-
-      // Fonction d'analyse
-      const analyze = () => {
-        // Si on n'a pas de source, on ne peut pas analyser
-        if (!source || !analyser || !bufferRef.current || !waveformBufferRef.current) {
-          return;
+          // Si pas de source (élément déjà connecté), on ne peut pas analyser
+          // mais l'élément audio devrait quand même jouer car il est connecté ailleurs
+          console.warn('Cannot create MediaElementSourceNode, audio analysis disabled but playback should still work');
         }
 
-        // Obtenir les données de fréquence (FFT)
-        analyser.getByteFrequencyData(bufferRef.current as Uint8Array<ArrayBuffer>);
-        
-        // Obtenir les données de waveform (amplitude temporelle)
-        analyser.getByteTimeDomainData(waveformBufferRef.current as Uint8Array<ArrayBuffer>);
+        // Fonction d'analyse
+        const analyze = () => {
+          // Si on n'a pas de source, on ne peut pas analyser
+          if (!source || !analyser || !bufferRef.current || !waveformBufferRef.current) {
+            animationFrameRef.current = requestAnimationFrame(analyze);
+            return;
+          }
 
-        const frequencyData = bufferRef.current;
-        const waveformData = waveformBufferRef.current;
-        const bufferLength = frequencyData.length;
+          // Vérifier que l'audio est en cours de lecture et chargé
+          if (audioElement && (audioElement.paused || audioElement.readyState < 2)) {
+            // Audio pas encore prêt ou en pause, continuer à analyser mais avec des données nulles
+            animationFrameRef.current = requestAnimationFrame(analyze);
+            return;
+          }
 
-        // Calculer les bandes de fréquence
-        const sampleRate = audioContext?.sampleRate || 44100;
-        const nyquist = sampleRate / 2;
-        const binWidth = nyquist / bufferLength;
+          // Obtenir les données de fréquence (FFT)
+          analyser.getByteFrequencyData(bufferRef.current as Uint8Array<ArrayBuffer>);
+          
+          // Obtenir les données de waveform (amplitude temporelle)
+          analyser.getByteTimeDomainData(waveformBufferRef.current as Uint8Array<ArrayBuffer>);
 
-        // Basses : 0-100Hz (environ les premiers bins)
-        const bassBins = Math.floor(optionsRef.current.bassFrequency / binWidth);
-        const bassEnergy = Array.from(frequencyData.slice(0, bassBins))
-          .reduce((sum, val) => sum + val, 0) / bassBins;
+          const frequencyData = bufferRef.current;
+          const waveformData = waveformBufferRef.current;
+          const bufferLength = frequencyData.length;
 
-        // Médiums : 100-2000Hz
-        const midStartBin = bassBins;
-        const midEndBin = Math.floor(optionsRef.current.midFrequency / binWidth);
-        const midEnergy = Array.from(frequencyData.slice(midStartBin, midEndBin))
-          .reduce((sum, val) => sum + val, 0) / (midEndBin - midStartBin);
+          // Calculer les bandes de fréquence
+          const sampleRate = audioContext?.sampleRate || 44100;
+          const nyquist = sampleRate / 2;
+          const binWidth = nyquist / bufferLength;
 
-        // Aigus : 2000Hz+
-        const trebleEnergy = Array.from(frequencyData.slice(midEndBin))
-          .reduce((sum, val) => sum + val, 0) / (bufferLength - midEndBin);
+          // Basses : 0-100Hz (environ les premiers bins)
+          const bassBins = Math.floor(optionsRef.current.bassFrequency / binWidth);
+          const bassEnergy = Array.from(frequencyData.slice(0, bassBins))
+            .reduce((sum, val) => sum + val, 0) / bassBins;
 
-        // Énergie globale
-        const energy = Array.from(frequencyData)
-          .reduce((sum, val) => sum + val, 0) / bufferLength;
+          // Médiums : 100-2000Hz
+          const midStartBin = bassBins;
+          const midEndBin = Math.floor(optionsRef.current.midFrequency / binWidth);
+          const midEnergy = Array.from(frequencyData.slice(midStartBin, midEndBin))
+            .reduce((sum, val) => sum + val, 0) / (midEndBin - midStartBin);
 
-        // Pic maximum
-        const peak = Math.max(...Array.from(frequencyData));
+          // Aigus : 2000Hz+
+          const trebleEnergy = Array.from(frequencyData.slice(midEndBin))
+            .reduce((sum, val) => sum + val, 0) / (bufferLength - midEndBin);
 
-        // RMS (Root Mean Square) - puissance moyenne
-        const rms = Math.sqrt(
-          Array.from(frequencyData)
-            .reduce((sum, val) => sum + val * val, 0) / bufferLength
-        );
+          // Énergie globale
+          const energy = Array.from(frequencyData)
+            .reduce((sum, val) => sum + val, 0) / bufferLength;
 
-        // Créer l'objet de données
-        const data: AudioVibesData = {
-          bass: Math.min(255, Math.max(0, bassEnergy)),
-          mid: Math.min(255, Math.max(0, midEnergy)),
-          treble: Math.min(255, Math.max(0, trebleEnergy)),
-          energy: Math.min(255, Math.max(0, energy)),
-          waveform: Array.from(waveformData),
-          frequency: Array.from(frequencyData),
-          peak: Math.min(255, Math.max(0, peak)),
-          rms: Math.min(255, Math.max(0, rms)),
+          // Pic maximum
+          const peak = Math.max(...Array.from(frequencyData));
+
+          // RMS (Root Mean Square) - puissance moyenne
+          const rms = Math.sqrt(
+            Array.from(frequencyData)
+              .reduce((sum, val) => sum + val * val, 0) / bufferLength
+          );
+
+          // Créer l'objet de données
+          const data: AudioVibesData = {
+            bass: Math.min(255, Math.max(0, bassEnergy)),
+            mid: Math.min(255, Math.max(0, midEnergy)),
+            treble: Math.min(255, Math.max(0, trebleEnergy)),
+            energy: Math.min(255, Math.max(0, energy)),
+            waveform: Array.from(waveformData),
+            frequency: Array.from(frequencyData),
+            peak: Math.min(255, Math.max(0, peak)),
+            rms: Math.min(255, Math.max(0, rms)),
+          };
+
+          setVibesData(data);
+
+          // Callback personnalisé
+          if (optionsRef.current.onAnalyze) {
+            optionsRef.current.onAnalyze(data);
+          }
+
+          // Continuer l'analyse
+          animationFrameRef.current = requestAnimationFrame(analyze);
         };
 
-        setVibesData(data);
+        // Démarrer l'analyse
+        analyze();
 
-        // Callback personnalisé
-        if (optionsRef.current.onAnalyze) {
-          optionsRef.current.onAnalyze(data);
-        }
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation de l\'analyseur audio:', error);
+        setVibesData(null);
+      }
+    };
 
-        // Continuer l'analyse
-        animationFrameRef.current = requestAnimationFrame(analyze);
+    // Si l'audio est déjà chargé, initialiser immédiatement
+    if (audioElement.readyState >= 2) {
+      initAnalyzer();
+    } else {
+      // Sinon, attendre que l'audio soit chargé
+      const handleLoadedData = () => {
+        initAnalyzer();
+        audioElement.removeEventListener('loadeddata', handleLoadedData);
       };
-
-      // Démarrer l'analyse
-      analyze();
-
-    } catch (error) {
-      console.error('Erreur lors de l\'initialisation de l\'analyseur audio:', error);
+      audioElement.addEventListener('loadeddata', handleLoadedData);
+      
+      // Sauvegarder la fonction de nettoyage
+      cleanupListener = () => {
+        audioElement.removeEventListener('loadeddata', handleLoadedData);
+      };
     }
 
     // Nettoyage
     return () => {
+      if (cleanupListener) {
+        cleanupListener();
+      }
+      
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
 
       // IMPORTANT: Ne pas déconnecter la source partagée car elle est utilisée par d'autres hooks
@@ -251,6 +287,7 @@ export function useAudioVibes(
       analyserRef.current = null;
       sourceRef.current = null;
       bassFilterRef.current = null;
+      setVibesData(null);
     };
   }, [audioElement]);
 

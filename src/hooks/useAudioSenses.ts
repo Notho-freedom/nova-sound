@@ -262,6 +262,22 @@ export function useAudioSenses(
     optionsRef.current = { ...DEFAULT_OPTIONS, ...options };
   }, [options]);
 
+  // Réinitialiser les données quand l'élément audio change
+  useEffect(() => {
+    if (!audioElement) {
+      setSensesData(null);
+      peakHistoryRef.current = [];
+      previousEnergyRef.current = 0;
+      envelopeStateRef.current = {
+        attack: 0,
+        decay: 0,
+        sustain: 0,
+        release: 0,
+        state: 'release',
+      };
+    }
+  }, [audioElement]);
+
   // Utiliser useAudioVibes pour les données de base
   const vibesData = useAudioVibes(audioElement, {
     fftSize: optionsRef.current.fftSize,

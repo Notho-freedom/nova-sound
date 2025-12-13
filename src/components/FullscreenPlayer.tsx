@@ -117,7 +117,7 @@ export const FullscreenPlayer = ({
       }
     };
     loadLyrics();
-  }, [currentTrack.id]);
+  }, [currentTrack.id, currentTrack.artist, currentTrack.title]);
 
   const progress = currentTrack.duration > 0 
     ? (currentTime / currentTrack.duration) * 100 
@@ -182,7 +182,7 @@ export const FullscreenPlayer = ({
       <div className="relative z-10 flex items-center justify-between p-6">
         <button
           onClick={onClose}
-          className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+          className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground backdrop-blur-sm bg-background/30"
         >
           <ChevronDown className="w-6 h-6" />
         </button>
@@ -190,12 +190,11 @@ export const FullscreenPlayer = ({
           <p className="text-xs text-muted-foreground uppercase tracking-widest">
             En Lecture
           </p>
-          <p className="text-sm text-foreground">{currentTrack.album}</p>
         </div>
         <button
           onClick={onToggleFavorite}
           className={cn(
-            "p-2 rounded-full transition-all duration-200",
+            "p-2 rounded-full transition-all duration-200 backdrop-blur-sm bg-background/30",
             isFavorite 
               ? "text-red-500" 
               : "text-muted-foreground hover:text-red-500"
@@ -205,54 +204,53 @@ export const FullscreenPlayer = ({
         </button>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-8 w-full">
-        <div className="flex flex-col items-center justify-center w-full max-w-4xl">
-          {/* Album Art */}
-          <div className="flex items-center justify-center mb-8">
-            <BassPulse audioElement={audioElement} intensity={0.6}>
-              <AlbumArt
-                src={getCoverUrl(currentTrack.coverUrl)}
-                alt={currentTrack.album}
-                isPlaying={isPlaying}
-                className="w-72 h-72 md:w-80 md:h-80 lg:w-96 lg:h-96"
-              />
-            </BassPulse>
-          </div>
-
-          {/* Track Info */}
-          <div className="text-center mb-6 w-full px-4">
-            <h1 className="font-display text-3xl md:text-4xl font-bold mb-2 text-foreground mx-auto max-w-2xl">
-              {currentTrack.title}
-            </h1>
-            <p className="text-xl text-muted-foreground mx-auto max-w-2xl">
-              {currentTrack.artist}
-            </p>
-          </div>
-
-          {/* Visualizer */}
-          <div className="w-full max-w-2xl mb-8 flex items-center justify-center">
-            {audioElement ? (
-              <AudioVisualizer
-                audioElement={audioElement}
-                type="spectrum"
-                height={120}
-                color="#3b82f6"
-              />
-            ) : (
-              <LegacyAudioVisualizer isPlaying={isPlaying} barCount={60} />
-            )}
-          </div>
+      {/* Panneau latéral avec tous les éléments */}
+      <div className="absolute right-0 top-0 bottom-0 z-10 w-96 backdrop-blur-xl bg-background/20 border-l border-border/30 p-6 flex flex-col">
+        {/* Album Art */}
+        <div className="flex items-center justify-center mb-6">
+          <BassPulse audioElement={audioElement} intensity={0.6}>
+            <AlbumArt
+              src={getCoverUrl(currentTrack.coverUrl)}
+              alt={currentTrack.album}
+              isPlaying={isPlaying}
+              className="w-64 h-64"
+            />
+          </BassPulse>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="relative z-10 p-8 bg-card/50 backdrop-blur-lg border-t border-border/30 w-full">
-        <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
+        {/* Track Info */}
+        <div className="text-center mb-6">
+          <h1 className="font-display text-2xl font-bold mb-2 text-foreground">
+            {currentTrack.title}
+          </h1>
+          <p className="text-lg text-muted-foreground mb-1">
+            {currentTrack.artist}
+          </p>
+          <p className="text-sm text-muted-foreground/70">
+            {currentTrack.album}
+          </p>
+        </div>
+
+        {/* Visualizer */}
+        <div className="w-full mb-6 flex items-center justify-center">
+          {audioElement ? (
+            <AudioVisualizer
+              audioElement={audioElement}
+              type="spectrum"
+              height={100}
+              color="#3b82f6"
+            />
+          ) : (
+            <LegacyAudioVisualizer isPlaying={isPlaying} barCount={60} />
+          )}
+        </div>
+
+        {/* Controls - Déplacés dans le panneau latéral */}
+        <div className="mt-auto flex flex-col gap-4">
           {/* Progress Bar */}
-          <div className="w-full max-w-2xl mb-6">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground w-12 text-right font-mono">
+          <div className="w-full mb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs text-muted-foreground w-10 text-right font-mono">
                 {formatTime(currentTime)}
               </span>
               <Slider
@@ -262,82 +260,82 @@ export const FullscreenPlayer = ({
                 onValueChange={onSeek}
                 className="flex-1"
               />
-              <span className="text-sm text-muted-foreground w-12 font-mono">
+              <span className="text-xs text-muted-foreground w-10 font-mono">
                 {formatTime(currentTrack.duration)}
               </span>
             </div>
           </div>
 
           {/* Playback Controls */}
-          <div className="flex items-center justify-center gap-6 mb-6 w-full">
+          <div className="flex items-center justify-center gap-3 w-full">
             <button
               onClick={onShuffle}
               className={cn(
-                "p-3 rounded-full transition-all duration-200",
+                "p-2 rounded-full transition-all duration-200 backdrop-blur-sm bg-background/30",
                 isShuffle 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Shuffle className="w-5 h-5" />
+              <Shuffle className="w-4 h-4" />
             </button>
             
             <button
               onClick={onPrevious}
-              className="p-3 text-foreground hover:text-primary transition-colors"
+              className="p-2 text-foreground hover:text-primary transition-colors backdrop-blur-sm bg-background/30 rounded-full"
             >
-              <SkipBack className="w-8 h-8 fill-current" />
+              <SkipBack className="w-5 h-5 fill-current" />
             </button>
             
             <button
               onClick={onPlayPause}
-              className="w-16 h-16 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 shadow-lg shadow-primary/30 transition-all duration-200"
+              className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 shadow-lg transition-all duration-200 backdrop-blur-sm"
             >
               {isPlaying ? (
-                <Pause className="w-8 h-8 fill-current" />
+                <Pause className="w-6 h-6 fill-current" />
               ) : (
-                <Play className="w-8 h-8 fill-current ml-1" />
+                <Play className="w-6 h-6 fill-current ml-0.5" />
               )}
             </button>
             
             <button
               onClick={onNext}
-              className="p-3 text-foreground hover:text-primary transition-colors"
+              className="p-2 text-foreground hover:text-primary transition-colors backdrop-blur-sm bg-background/30 rounded-full"
             >
-              <SkipForward className="w-8 h-8 fill-current" />
+              <SkipForward className="w-5 h-5 fill-current" />
             </button>
             
             <button
               onClick={onRepeat}
               className={cn(
-                "p-3 rounded-full transition-all duration-200",
+                "p-2 rounded-full transition-all duration-200 backdrop-blur-sm bg-background/30",
                 repeatMode !== "off" 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               {repeatMode === "one" ? (
-                <Repeat1 className="w-5 h-5" />
+                <Repeat1 className="w-4 h-4" />
               ) : (
-                <Repeat className="w-5 h-5" />
+                <Repeat className="w-4 h-4" />
               )}
             </button>
           </div>
 
           {/* Volume */}
-          <div className="flex items-center justify-center gap-3 w-full">
+          <div className="flex items-center justify-center gap-2 w-full">
             <button
               onClick={onMuteToggle}
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors backdrop-blur-sm bg-background/30 rounded-full"
             >
-              <VolumeIcon className="w-5 h-5" />
+              <VolumeIcon className="w-4 h-4" />
             </button>
             <Slider
               value={[isMuted ? 0 : volume]}
               max={100}
               step={1}
               onValueChange={onVolumeChange}
-              className="w-32"
+              className="flex-1"
             />
           </div>
         </div>
