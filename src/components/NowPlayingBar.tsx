@@ -337,7 +337,16 @@ export const NowPlayingBar = ({
                   Infos de la piste
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => toast.info("Radio basée sur ce titre - Bientôt disponible")}>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    // Radio functionality: play similar tracks based on current track
+                    // This would require implementing a recommendation algorithm
+                    toast.info("Fonctionnalité radio - En développement", {
+                      description: "Cette fonctionnalité sera disponible dans une prochaine mise à jour"
+                    });
+                  }}
+                  disabled
+                >
                   <Radio className="w-4 h-4 mr-2" />
                   Démarrer une radio
                 </DropdownMenuItem>

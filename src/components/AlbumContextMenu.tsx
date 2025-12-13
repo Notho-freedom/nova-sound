@@ -17,6 +17,7 @@ import {
   Disc3,
   MoreHorizontal,
   Heart,
+  User,
 } from "lucide-react";
 import { Playlist } from "@/types/music";
 
@@ -115,7 +116,7 @@ export const AlbumContextMenu = ({
         )}
         {onViewArtist && (
           <ContextMenuItem onClick={onViewArtist}>
-            <ListMusic className="w-4 h-4 mr-2" />
+            <User className="w-4 h-4 mr-2" />
             Voir l'artiste
           </ContextMenuItem>
         )}

@@ -48,8 +48,7 @@ export const VideosView = () => {
   const [urlInput, setUrlInput] = useState("");
   const [urlTitle, setUrlTitle] = useState("");
 
-  // Debug: log videos
-  console.log("VideosView - videos:", videos, "loading:", loading, "error:", error);
+  // Debug logging removed for production
 
   const displayVideos = useMemo(() => {
     if (!searchQuery.trim()) return videos;

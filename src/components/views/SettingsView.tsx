@@ -565,7 +565,8 @@ export const SettingsView = () => {
                   <Switch checked={settings.showLyrics} onCheckedChange={(v) => updateSetting("showLyrics", v)} />
                 </SettingRow>
                 <SettingRow label="Paroles synchronisées" description="Défilement automatique">
-                  <Switch checked={true} disabled />
+                  <Switch checked={settings.showLyrics} disabled />
+                  <span className="text-xs text-muted-foreground ml-2">Toujours activé</span>
                 </SettingRow>
               </SettingsCard>
 
@@ -712,7 +713,8 @@ export const SettingsView = () => {
                   <Switch checked={settings.autoScanOnStartup} onCheckedChange={(v) => updateSetting("autoScanOnStartup", v)} />
                 </SettingRow>
                 <SettingRow label="Surveiller les dossiers" description="Détection en temps réel">
-                  <Switch checked={true} disabled />
+                  <Switch checked={false} disabled />
+                  <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
                 </SettingRow>
               </SettingsCard>
             </div>
@@ -766,6 +768,7 @@ export const SettingsView = () => {
                 </SettingRow>
                 <SettingRow label="Son de notification" description="Joue un son">
                   <Switch checked={false} disabled />
+                  <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
                 </SettingRow>
               </SettingsCard>
 
