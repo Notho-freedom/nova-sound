@@ -138,8 +138,13 @@ export function useAudioVibes(
           console.warn('Cannot create MediaElementSourceNode, audio analysis disabled but playback should still work');
         }
 
-        // Fonction d'analyse
+        // Fonction d'analyse avec throttling pour performance
+        let lastAnalysisTime = 0;
+        const ANALYSIS_INTERVAL = 1000 / 30; // 30 FPS max pour l'analyse audio
+        
         const analyze = () => {
+          const now = performance.now();
+          
           // Si on n'a pas de source, on ne peut pas analyser
           if (!source || !analyser || !bufferRef.current || !waveformBufferRef.current) {
             animationFrameRef.current = requestAnimationFrame(analyze);
@@ -152,6 +157,13 @@ export function useAudioVibes(
             animationFrameRef.current = requestAnimationFrame(analyze);
             return;
           }
+
+          // Throttle analysis to 30 FPS for better performance
+          if (now - lastAnalysisTime < ANALYSIS_INTERVAL) {
+            animationFrameRef.current = requestAnimationFrame(analyze);
+            return;
+          }
+          lastAnalysisTime = now;
 
           // Obtenir les données de fréquence (FFT)
           analyser.getByteFrequencyData(bufferRef.current as Uint8Array<ArrayBuffer>);

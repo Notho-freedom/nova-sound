@@ -3,7 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 
 interface HistoryEntry {
@@ -69,8 +69,8 @@ export const HomeView = ({
   favoriteTracks = [],
   history = [],
 }: HomeViewProps) => {
-  // Remove duplicates by ID before slicing
-  const getUniqueTracks = (trackList: Track[]) => {
+  // Remove duplicates by ID before slicing - memoized
+  const getUniqueTracks = useCallback((trackList: Track[]) => {
     const seen = new Set<string>();
     return trackList.filter(track => {
       if (seen.has(track.id)) {
@@ -79,7 +79,7 @@ export const HomeView = ({
       seen.add(track.id);
       return true;
     });
-  };
+  }, []);
 
   const displayRecent = recentTracks.length > 0 
     ? getUniqueTracks(recentTracks).slice(0, 20) 

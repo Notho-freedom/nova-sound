@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { 
   X, 
   Play, 
@@ -24,8 +24,7 @@ import { Slider } from "@/components/ui/slider";
 import { AlbumArt } from "./AlbumArt";
 import { LegacyAudioVisualizer } from "./LegacyAudioVisualizer";
 import { BackgroundEffects } from "./BackgroundEffects";
-import { VibrantUI, BassPulse } from "@/components/VibrantUI";
-import { AudioVisualizer } from "@/components/AudioVisualizer";
+import { useAudioVibes } from "@/hooks/useAudioVibes";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -94,6 +93,73 @@ export const FullscreenPlayer = ({
 }: FullscreenPlayerProps) => {
   const [showLyrics, setShowLyrics] = useState(false);
   const [lyrics, setLyrics] = useState<string | null>(null);
+  
+  // Use FFT data for visualization
+  const vibesData = useAudioVibes(audioElement, {
+    fftSize: 1024, // Reduced from 2048 for better performance
+    enableBassFilter: false,
+  });
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Render FFT to canvas with throttling for better performance
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !vibesData?.frequency) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    let animationFrameId: number;
+    let lastRenderTime = 0;
+    const RENDER_INTERVAL = 1000 / 30; // 30 FPS max pour le rendu
+    
+    const render = () => {
+      const now = performance.now();
+      
+      // Throttle rendering to 30 FPS
+      if (now - lastRenderTime < RENDER_INTERVAL) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+      lastRenderTime = now;
+      
+      const width = canvas.width = canvas.offsetWidth;
+      const height = canvas.height = canvas.offsetHeight;
+      
+      ctx.clearRect(0, 0, width, height);
+      
+      const barCount = 60;
+      const step = Math.max(1, Math.floor(vibesData.frequency.length / barCount));
+      const barWidth = width / barCount;
+      
+      for (let i = 0; i < barCount; i++) {
+        const index = i * step;
+        const value = vibesData.frequency[index] || 0;
+        const barHeight = (value / 255) * height;
+        const x = i * barWidth;
+        const y = height - barHeight;
+        
+        // Reduced opacity gradient
+        const gradient = ctx.createLinearGradient(x, y, x, height);
+        gradient.addColorStop(0, `rgba(59, 130, 246, ${value / 255 * 0.3})`);
+        gradient.addColorStop(1, `rgba(59, 130, 246, ${value / 255 * 0.1})`);
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, barWidth - 0.5, barHeight);
+      }
+      
+      animationFrameId = requestAnimationFrame(render);
+    };
+    
+    render();
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [vibesData?.frequency]);
 
   const VolumeIcon = isMuted || volume === 0 
     ? VolumeX 
@@ -168,15 +234,28 @@ export const FullscreenPlayer = ({
     <div className="fixed inset-0 z-[10000] bg-background flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
       <BackgroundEffects />
       
-      {/* Background blur from album art */}
-      <div 
-        className="absolute inset-0 opacity-30 blur-3xl scale-150"
-        style={{
-          backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+      {/* Main Panel - Background with album cover and FFT */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Album cover background - blurred and faded */}
+        <div 
+          className="absolute inset-0 opacity-20 blur-3xl scale-150 transition-opacity duration-500"
+          style={{
+            backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+        
+        {/* FFT Visualizer - Full width, reduced height and opacity */}
+        <canvas
+          ref={canvasRef}
+          className="absolute bottom-0 left-0 right-0 w-full opacity-20"
+          style={{ 
+            height: '20%',
+            imageRendering: 'pixelated' 
+          }}
+        />
+      </div>
 
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between p-6">
@@ -208,14 +287,12 @@ export const FullscreenPlayer = ({
       <div className="absolute right-0 top-0 bottom-0 z-10 w-96 backdrop-blur-xl bg-background/20 border-l border-border/30 p-6 flex flex-col">
         {/* Album Art */}
         <div className="flex items-center justify-center mb-6">
-          <BassPulse audioElement={audioElement} intensity={0.6}>
-            <AlbumArt
-              src={getCoverUrl(currentTrack.coverUrl)}
-              alt={currentTrack.album}
-              isPlaying={isPlaying}
-              className="w-64 h-64"
-            />
-          </BassPulse>
+          <AlbumArt
+            src={getCoverUrl(currentTrack.coverUrl)}
+            alt={currentTrack.album}
+            isPlaying={isPlaying}
+            className="w-64 h-64"
+          />
         </div>
 
         {/* Track Info */}
@@ -231,19 +308,6 @@ export const FullscreenPlayer = ({
           </p>
         </div>
 
-        {/* Visualizer */}
-        <div className="w-full mb-6 flex items-center justify-center">
-          {audioElement ? (
-            <AudioVisualizer
-              audioElement={audioElement}
-              type="spectrum"
-              height={100}
-              color="#3b82f6"
-            />
-          ) : (
-            <LegacyAudioVisualizer isPlaying={isPlaying} barCount={60} />
-          )}
-        </div>
 
         {/* Controls - Déplacés dans le panneau latéral */}
         <div className="mt-auto flex flex-col gap-4">

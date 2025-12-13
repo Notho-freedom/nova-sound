@@ -4,7 +4,6 @@ import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
-import { ImmersiveFullscreenPlayer } from "./ImmersiveFullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { lazy, Suspense } from "react";
@@ -325,7 +324,7 @@ export const DesktopApp = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullscreen, showInlinePlayer]);
 
-  const handlePlayPause = () => setIsPlaying(!isPlaying);
+  const handlePlayPause = useCallback(() => setIsPlaying(prev => !prev), []);
 
   const handlePrevious = useCallback(() => {
     if (tracks.length === 0) return;
@@ -369,26 +368,26 @@ export const DesktopApp = () => {
     setCurrentTime(0);
   }, [repeatMode, isShuffle, currentTrackIndex, tracks.length, setCurrentIndex]);
 
-  const handleSeek = (value: number[]) => {
+  const handleSeek = useCallback((value: number[]) => {
     const newTime = value[0];
     setCurrentTime(newTime);
     if (audioRef.current) {
       audioRef.current.currentTime = newTime;
     }
-  };
+  }, []);
 
-  const handleVolumeChange = (value: number[]) => {
+  const handleVolumeChange = useCallback((value: number[]) => {
     setVolume(value[0]);
-    if (isMuted && value[0] > 0) setIsMuted(false);
-  };
+    setIsMuted(prev => prev && value[0] > 0 ? false : prev);
+  }, []);
 
-  const handleRepeat = () => {
+  const handleRepeat = useCallback(() => {
     const modes: ("off" | "all" | "one")[] = ["off", "all", "one"];
     const currentIndex = modes.indexOf(repeatMode);
     setRepeatMode(modes[(currentIndex + 1) % modes.length]);
-  };
+  }, [repeatMode]);
 
-  const handleTrackSelect = (index: number) => {
+  const handleTrackSelect = useCallback((index: number) => {
     setCurrentIndex(index);
     setCurrentTime(0);
     setIsPlaying(true);
@@ -416,7 +415,7 @@ export const DesktopApp = () => {
         }
       }
     }
-  };
+  }, [tracks, libraryTracks, queue.tracks, setCurrentIndex, addToQueueNext]);
 
   // Queue management handlers
   const handlePlayNext = useCallback((track: Track | Track[]) => {
@@ -511,16 +510,16 @@ export const DesktopApp = () => {
     toast.success(`Lecture aléatoire de "${playlist.name}"`);
   }, [playlists, libraryTracks, setQueue, setCurrentIndex]);
 
-  const handleToggleFavorite = () => {
+  const handleToggleFavorite = useCallback(() => {
     if (!currentTrack) return;
     if (isFavorite(currentTrack.id)) {
       removeFavorite(currentTrack.id);
     } else {
       addFavorite(currentTrack.id);
     }
-  };
+  }, [currentTrack, isFavorite, addFavorite, removeFavorite]);
 
-  const handleShowPlayer = () => {
+  const handleShowPlayer = useCallback(() => {
     if (showInlinePlayer) {
       setShowInlinePlayer(false);
       setCurrentView(previousView);
@@ -529,14 +528,14 @@ export const DesktopApp = () => {
       setShowInlinePlayer(true);
       setCurrentView("player");
     }
-  };
+  }, [showInlinePlayer, currentView, previousView]);
 
-  const handleOpenSettings = () => {
+  const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
     setShowInlinePlayer(false);
-  };
+  }, []);
 
-  const handleNavigateToAlbum = () => {
+  const handleNavigateToAlbum = useCallback(() => {
     if (!currentTrack) return;
     setShowInlinePlayer(false);
     // Set the album key to open (format: "albumName-artistName")
@@ -546,15 +545,15 @@ export const DesktopApp = () => {
     // Reset albumToOpen after a short delay to allow LibraryView to process it
     setTimeout(() => setAlbumToOpen(null), 100);
     toast.success(`Ouverture de l'album "${currentTrack.album}"`);
-  };
+  }, [currentTrack]);
 
-  const handleNavigateToArtist = () => {
+  const handleNavigateToArtist = useCallback(() => {
     if (!currentTrack) return;
     setShowInlinePlayer(false);
     setCurrentView("artists");
     // Note: LibraryView will handle artist filtering internally when in artists view mode
     toast.success(`Affichage de l'artiste "${currentTrack.artist}"`);
-  };
+  }, [currentTrack]);
 
   // Utility function to remove duplicates from track lists
   const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
@@ -921,9 +920,9 @@ export const DesktopApp = () => {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-        {/* Fullscreen Player - Immersive Mode */}
+        {/* Fullscreen Player */}
         {isFullscreen && currentTrack && (
-          <ImmersiveFullscreenPlayer
+          <FullscreenPlayer
             currentTrack={currentTrack}
             isPlaying={isPlaying}
             currentTime={currentTime}
