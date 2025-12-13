@@ -122,9 +122,9 @@ export const NowPlayingBar = ({
 
       {/* Main Content - Compact 2 rows */}
       <div className="px-3 py-2">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative">
           {/* Cover + Track Info - Left */}
-          <div className="flex items-center gap-3 min-w-0 w-64">
+          <div className="flex items-center gap-3 min-w-0 w-64 flex-shrink-0">
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
@@ -169,8 +169,8 @@ export const NowPlayingBar = ({
             </div>
           </div>
 
-          {/* Center Controls */}
-          <div className="flex-1 flex items-center justify-center gap-1">
+          {/* Center Controls - Absolutely centered */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center gap-1">
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
@@ -237,13 +237,12 @@ export const NowPlayingBar = ({
             </Tooltip>
           </div>
 
-          {/* Time Display */}
-          <div className="text-xs text-muted-foreground font-mono w-24 text-center">
-            {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
-          </div>
-
           {/* Right Controls */}
-          <div className="flex items-center gap-0.5 w-64 justify-end">
+          <div className="flex items-center gap-0.5 w-64 justify-end ml-auto flex-shrink-0">
+            {/* Time Display */}
+            <div className="text-xs text-muted-foreground font-mono w-24 text-center mr-2">
+              {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
+            </div>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import axios from 'axios';
+// @ts-expect-error - unzipper n'a pas de types TypeScript officiels
 import unzipper from 'unzipper';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -86,9 +87,9 @@ export async function downloadAndReplaceBuild(remoteUrl: string): Promise<void> 
     const writer = fs.createWriteStream(tmpZip);
     response.data.pipe(writer);
 
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', (err) => {
+    await new Promise<void>((resolve, reject) => {
+      writer.on('finish', () => resolve());
+      writer.on('error', (err: Error) => {
         console.error('Error writing temporary zip file:', err);
         reject(err);
       });
@@ -103,8 +104,8 @@ export async function downloadAndReplaceBuild(remoteUrl: string): Promise<void> 
     await new Promise<void>((resolve, reject) => {
       fs.createReadStream(tmpZip)
         .pipe(unzipper.Extract({ path: localUIPath }))
-        .on('close', resolve)
-        .on('error', (err) => {
+        .on('close', () => resolve())
+        .on('error', (err: Error) => {
           console.error('Error extracting zip file:', err);
           reject(err);
         });

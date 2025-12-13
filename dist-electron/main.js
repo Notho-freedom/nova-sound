@@ -12,6 +12,7 @@ import { initPlaylistManager } from './services/playlist-manager.js';
 import { initEqualizer } from './services/equalizer.js';
 import { initLyricsProvider } from './services/lyrics-provider.js';
 import { initScrobbler } from './services/scrobbler.js';
+import { initUpdater } from './updater/updater.js';
 // Import CLI parser
 import { parseArgs, showHelp, showVersion, applyCLIOptions } from './cli.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -144,7 +145,22 @@ function createWindow() {
         }
     }
     else {
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        // Offline-first: toujours charger depuis local-ui
+        const localUIPath = path.join(__dirname, '../local-ui/index.html');
+        // Si local-ui n'existe pas, fallback vers dist (pour compatibilité)
+        if (fs.existsSync(localUIPath)) {
+            mainWindow.loadFile(localUIPath);
+        }
+        else {
+            // Fallback vers dist si local-ui n'existe pas encore
+            const distPath = path.join(__dirname, '../dist/index.html');
+            if (fs.existsSync(distPath)) {
+                mainWindow.loadFile(distPath);
+            }
+            else {
+                console.error('Aucun build trouvé (ni local-ui ni dist)');
+            }
+        }
     }
     mainWindow.on('closed', () => {
         mainWindow = null;
@@ -163,9 +179,23 @@ function createWindow() {
     });
 }
 // Initialize all services
-function initServices() {
+async function initServices() {
     // Initialize storage first (other services depend on it)
     initStorage();
+    // Initialize updater with callback for UI notification
+    if (!isDev && !cliOptions.dev) {
+        await initUpdater((versionInfo) => {
+            // Notifier l'UI qu'une mise à jour a été effectuée
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update:available', {
+                    version: versionInfo.version,
+                    changelog: versionInfo.changelog,
+                    buildDate: versionInfo.buildDate,
+                    commits: versionInfo.commits || [],
+                });
+            }
+        });
+    }
     // Initialize other services
     initMetadataExtractor();
     initAudioScanner();
@@ -424,7 +454,7 @@ app.whenReady().then(async () => {
     registerLocalVideoProtocol();
     // Initialize storage and services
     await storage.init();
-    initServices();
+    await initServices();
     createWindow();
     // Handle files passed as arguments on first launch
     handleFileArgs();

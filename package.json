@@ -64,6 +64,7 @@
     "@tanstack/react-query": "^5.83.0",
     "@types/multer": "^2.0.0",
     "@types/react-helmet": "^6.1.11",
+    "archiver": "^7.0.1",
     "axios": "^1.13.2",
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
@@ -94,10 +95,10 @@
     "stripe": "^20.0.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "unzipper": "^0.10.14",
     "uuid": "^11.0.3",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76",
-    "archiver": "^7.0.1"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
