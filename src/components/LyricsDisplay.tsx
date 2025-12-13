@@ -67,18 +67,26 @@ export const LyricsDisplay = ({
     setOffset(0);
   }, [currentTrack?.id]);
 
-  // Find current lyrics line
+  // Find current lyrics line with improved precision
   const getCurrentLineIndex = useCallback((): number => {
-    if (!lyrics?.syncedLyrics) return -1;
+    if (!lyrics?.syncedLyrics || lyrics.syncedLyrics.length === 0) return -1;
     
     const adjustedTime = currentTime + offset;
+    
+    // Binary search for better performance with large lyrics
+    let left = 0;
+    let right = lyrics.syncedLyrics.length - 1;
     let currentIndex = -1;
 
-    for (let i = 0; i < lyrics.syncedLyrics.length; i++) {
-      if (lyrics.syncedLyrics[i].time <= adjustedTime) {
-        currentIndex = i;
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const lineTime = lyrics.syncedLyrics[mid].time;
+      
+      if (lineTime <= adjustedTime) {
+        currentIndex = mid;
+        left = mid + 1; // Continue searching right for the latest matching line
       } else {
-        break;
+        right = mid - 1;
       }
     }
 
@@ -87,15 +95,35 @@ export const LyricsDisplay = ({
 
   const currentLineIndex = getCurrentLineIndex();
 
-  // Auto-scroll to current line
+  // Auto-scroll to current line with better timing
   useEffect(() => {
-    if (currentLineRef.current && isPlaying) {
-      currentLineRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+    if (currentLineRef.current && (isPlaying || currentLineIndex >= 0)) {
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        if (currentLineRef.current) {
+          currentLineRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+          });
+        }
       });
     }
   }, [currentLineIndex, isPlaying]);
+
+  // Also scroll when lyrics are first loaded
+  useEffect(() => {
+    if (lyrics?.syncedLyrics && currentLineIndex >= 0 && currentLineRef.current) {
+      setTimeout(() => {
+        if (currentLineRef.current) {
+          currentLineRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 300);
+    }
+  }, [lyrics?.syncedLyrics]);
 
   // Search for lyrics
   const handleSearch = async () => {
@@ -136,39 +164,63 @@ export const LyricsDisplay = ({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Render synced lyrics
+  // Render synced lyrics - ensure all lines are displayed
   const renderSyncedLyrics = () => {
     if (!lyrics?.syncedLyrics) return null;
 
     return (
-      <div className="space-y-4 py-4">
-        {lyrics.syncedLyrics.map((line, index) => (
-          <div
-            key={index}
-            ref={index === currentLineIndex ? currentLineRef : null}
-            className={cn(
-              "px-4 py-2 rounded-lg transition-all duration-300 cursor-pointer",
-              index === currentLineIndex
-                ? "text-primary text-lg font-semibold scale-105 bg-primary/10"
-                : index < currentLineIndex
-                ? "text-muted-foreground/50"
-                : "text-foreground/80 hover:text-foreground"
-            )}
-          >
-            {line.text || "♪"}
-          </div>
-        ))}
+      <div className="space-y-3 py-6">
+        {lyrics.syncedLyrics.map((line, index) => {
+          const isCurrent = index === currentLineIndex;
+          const isPast = index < currentLineIndex;
+          const isNext = index === currentLineIndex + 1;
+          
+          return (
+            <div
+              key={`${line.time}-${index}`}
+              ref={isCurrent ? currentLineRef : null}
+              className={cn(
+                "px-6 py-3 rounded-lg transition-all duration-500 ease-in-out",
+                "min-h-[3rem] flex items-center",
+                isCurrent
+                  ? "text-primary text-xl font-bold scale-105 bg-primary/20 shadow-lg shadow-primary/20 border-2 border-primary/30"
+                  : isPast
+                  ? "text-muted-foreground/40 text-base"
+                  : isNext
+                  ? "text-foreground/90 text-lg font-medium bg-muted/20"
+                  : "text-foreground/70 text-base hover:text-foreground hover:bg-muted/10"
+              )}
+            >
+              <div className="flex-1">
+                {line.text || "♪"}
+              </div>
+              {isCurrent && (
+                <div className="ml-4 w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
-  // Render plain lyrics
+  // Render plain lyrics - ensure complete display
   const renderPlainLyrics = () => {
     if (!lyrics?.plainLyrics) return null;
 
+    // Split into lines for better display
+    const lines = lyrics.plainLyrics.split('\n').filter(line => line.trim());
+
     return (
-      <div className="whitespace-pre-wrap text-foreground/80 leading-relaxed p-4">
-        {lyrics.plainLyrics}
+      <div className="space-y-2 py-6 px-4">
+        {lines.map((line, index) => (
+          <div
+            key={`plain-${index}`}
+            className="text-foreground/80 leading-relaxed text-base py-1"
+          >
+            {line.trim() || '\u00A0'}
+          </div>
+        ))}
       </div>
     );
   };
@@ -255,58 +307,76 @@ export const LyricsDisplay = ({
         </div>
       )}
 
-      {/* Lyrics content */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
-        {loading ? (
-          <div className="flex items-center justify-center h-full p-8">
-            <div className="flex flex-col items-center gap-4 text-muted-foreground">
-              <RefreshCw className="w-8 h-8 animate-spin" />
-              <span>Chargement des paroles...</span>
+      {/* Lyrics content - ensure full height and scrolling */}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+        <div className="min-h-full">
+          {loading ? (
+            <div className="flex items-center justify-center h-full min-h-[400px] p-8">
+              <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                <RefreshCw className="w-8 h-8 animate-spin" />
+                <span>Chargement des paroles...</span>
+              </div>
             </div>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-full p-8">
-            <div className="flex flex-col items-center gap-4 text-muted-foreground">
-              <AlignLeft className="w-8 h-8 opacity-50" />
-              <span>{error}</span>
-              {currentTrack && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSearch(true)}
-                >
-                  Rechercher manuellement
-                </Button>
-              )}
+          ) : error ? (
+            <div className="flex items-center justify-center h-full min-h-[400px] p-8">
+              <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                <AlignLeft className="w-8 h-8 opacity-50" />
+                <span>{error}</span>
+                {currentTrack && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSearch(true)}
+                  >
+                    Rechercher manuellement
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        ) : !currentTrack ? (
-          <div className="flex items-center justify-center h-full p-8">
-            <div className="flex flex-col items-center gap-4 text-muted-foreground">
-              <Music2 className="w-8 h-8 opacity-50" />
-              <span>Aucune piste en cours</span>
+          ) : !currentTrack ? (
+            <div className="flex items-center justify-center h-full min-h-[400px] p-8">
+              <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                <Music2 className="w-8 h-8 opacity-50" />
+                <span>Aucune piste en cours</span>
+              </div>
             </div>
-          </div>
-        ) : lyrics?.syncedLyrics ? (
-          renderSyncedLyrics()
-        ) : lyrics?.plainLyrics ? (
-          renderPlainLyrics()
-        ) : (
-          <div className="flex items-center justify-center h-full p-8">
-            <div className="flex flex-col items-center gap-4 text-muted-foreground">
-              <AlignLeft className="w-8 h-8 opacity-50" />
-              <span>Paroles non disponibles</span>
+          ) : lyrics?.syncedLyrics ? (
+            renderSyncedLyrics()
+          ) : lyrics?.plainLyrics ? (
+            renderPlainLyrics()
+          ) : (
+            <div className="flex items-center justify-center h-full min-h-[400px] p-8">
+              <div className="flex flex-col items-center gap-4 text-muted-foreground">
+                <AlignLeft className="w-8 h-8 opacity-50" />
+                <span>Paroles non disponibles</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </ScrollArea>
 
-      {/* Current line indicator (synced mode) */}
+      {/* Current line indicator and progress (synced mode) */}
       {lyrics?.syncedLyrics && currentLineIndex >= 0 && (
-        <div className="p-3 border-t border-border/50 bg-primary/5">
-          <p className="text-sm text-primary text-center font-medium truncate">
-            {lyrics.syncedLyrics[currentLineIndex]?.text || "♪"}
-          </p>
+        <div className="p-4 border-t border-border/50 bg-primary/5">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <p className="text-sm text-primary text-center font-semibold flex-1 truncate">
+              {lyrics.syncedLyrics[currentLineIndex]?.text || "♪"}
+            </p>
+            {currentTrack && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
+              </span>
+            )}
+          </div>
+          {/* Progress indicator */}
+          {currentTrack && currentTrack.duration > 0 && (
+            <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${(currentTime / currentTrack.duration) * 100}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
