@@ -90,6 +90,7 @@ export const DesktopApp = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
 
   // Audio element ref for real playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -465,9 +466,13 @@ export const DesktopApp = () => {
   const handleNavigateToAlbum = () => {
     if (!currentTrack) return;
     setShowInlinePlayer(false);
+    // Set the album key to open (format: "albumName-artistName")
+    const albumKey = `${currentTrack.album}-${currentTrack.artist}`;
+    setAlbumToOpen(albumKey);
     setCurrentView("albums");
-    // Note: LibraryView will handle album filtering internally when in albums view mode
-    toast.success(`Affichage de l'album "${currentTrack.album}"`);
+    // Reset albumToOpen after a short delay to allow LibraryView to process it
+    setTimeout(() => setAlbumToOpen(null), 100);
+    toast.success(`Ouverture de l'album "${currentTrack.album}"`);
   };
 
   const handleNavigateToArtist = () => {
@@ -607,6 +612,7 @@ export const DesktopApp = () => {
             onTrackSelect={handleTrackSelect}
             title="Albums"
             viewMode="albums"
+            initialSelectedAlbum={albumToOpen}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
@@ -750,6 +756,8 @@ export const DesktopApp = () => {
             onViewChange={(view) => {
               setShowInlinePlayer(false);
               setCurrentView(view);
+              // Clear album selection when changing views
+              if (view !== "albums") setAlbumToOpen(null);
             }}
             favoritesCount={favoriteTracks.length}
             collapsed={sidebarCollapsed}

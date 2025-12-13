@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { 
   Play, 
   Grid, 
@@ -55,6 +55,7 @@ interface LibraryViewProps {
   viewMode?: "tracks" | "albums" | "artists" | "folders";
   emptyMessage?: string;
   showHistory?: boolean;
+  initialSelectedAlbum?: string | null;
 }
 
 const formatTime = (seconds: number) => {
@@ -148,12 +149,14 @@ export const LibraryView = ({
   viewMode = "tracks",
   emptyMessage = "Aucun titre trouvé",
   showHistory = false,
+  initialSelectedAlbum,
 }: LibraryViewProps) => {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("list");
   const [sortMode, setSortMode] = useState<SortMode>("title");
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const currentTrackRef = useRef<HTMLTableRowElement>(null);
   
   // Cloudinary upload
   const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
@@ -209,6 +212,22 @@ export const LibraryView = ({
   const folders = useMemo(() => groupByFolder(tracks), [tracks]);
 
   const totalDuration = tracks.reduce((acc, track) => acc + track.duration, 0);
+
+  // Handle initial album selection from props
+  useEffect(() => {
+    if (initialSelectedAlbum && viewMode === "albums") {
+      setSelectedAlbum(initialSelectedAlbum);
+    }
+  }, [initialSelectedAlbum, viewMode]);
+
+  // Scroll to current track when album is opened
+  useEffect(() => {
+    if (selectedAlbum && currentTrackRef.current) {
+      setTimeout(() => {
+        currentTrackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, [selectedAlbum, currentTrackIndex]);
 
   // Handle back navigation from detail view
   const handleBack = () => {
@@ -308,6 +327,7 @@ export const LibraryView = ({
                 return (
                   <tr
                     key={track.id}
+                    ref={isCurrentTrack ? currentTrackRef : null}
                     onClick={() => onTrackSelect(actualIndex)}
                     className={cn(
                       "group cursor-pointer transition-all duration-200",
