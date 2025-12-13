@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Nexus — Subspace Dive</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/gsap@3/dist/gsap.min.js"></script>
+
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(circle at center, #050913, #01020a);
+    overflow: hidden;
+    font-family: system-ui, sans-serif;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    backdrop-filter: blur(0px);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .ui {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  button {
+    pointer-events: auto;
+    padding: 20px 48px;
+    font-size: 18px;
+    letter-spacing: 2px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    background: linear-gradient(135deg,#5da9ff,#8b5cf6);
+    color: white;
+    box-shadow: 0 0 50px rgba(120,150,255,.6);
+  }
+</style>
+</head>
+
+<body>
+
+<canvas id="c"></canvas>
+<div class="overlay" id="overlay"></div>
+
+<div class="ui">
+  <button id="play">PLAY</button>
+</div>
+
+<script>
+/* =====================================================
+   CORE
+===================================================== */
+
+const canvas = document.getElementById("c");
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  70,
+  innerWidth / innerHeight,
+  0.1,
+  3000
+);
+camera.position.z = 90;
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  alpha: true,
+  antialias: true
+});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+/* =====================================================
+   STARFIELD (MAIN IMMERSION)
+===================================================== */
+
+const STAR_COUNT = 7000;
+const positions = new Float32Array(STAR_COUNT * 3);
+
+for (let i = 0; i < STAR_COUNT; i++) {
+  positions[i * 3]     = (Math.random() - 0.5) * 1400;
+  positions[i * 3 + 1] = (Math.random() - 0.5) * 1400;
+  positions[i * 3 + 2] = Math.random() * -3000;
+}
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(positions, 3)
+);
+
+const material = new THREE.PointsMaterial({
+  color: 0x8bbcff,
+  size: 1,
+  transparent: true,
+  opacity: 0.85
+});
+
+const stars = new THREE.Points(geometry, material);
+scene.add(stars);
+
+/* =====================================================
+   AUDIO SENSE ENGINE (SIMULATION)
+===================================================== */
+
+let audioCtx, analyser, freq;
+let fakeTime = 0;
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  freq = new Uint8Array(analyser.frequencyBinCount);
+
+  // Oscillator fantôme → déclenche l'analyse
+  const osc = audioCtx.createOscillator();
+  osc.frequency.value = 55;
+  osc.connect(analyser);
+  osc.start();
+}
+
+function getBands() {
+  if (!analyser) {
+    fakeTime += 0.04;
+    return {
+      bass: (Math.sin(fakeTime) * 0.5 + 0.5),
+      mid:  (Math.sin(fakeTime * 1.6) * 0.5 + 0.5),
+      high: (Math.sin(fakeTime * 2.4) * 0.5 + 0.5)
+    };
+  }
+
+  analyser.getByteFrequencyData(freq);
+
+  const bass = freq.slice(0, 10).reduce((a,b)=>a+b,0) / 2550;
+  const mid  = freq.slice(10, 40).reduce((a,b)=>a+b,0) / 7650;
+  const high = freq.slice(40, 80).reduce((a,b)=>a+b,0) / 10200;
+
+  return { bass, mid, high };
+}
+
+/* =====================================================
+   LOOP
+===================================================== */
+
+let speed = 1.3;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const { bass, mid, high } = getBands();
+
+  const arr = geometry.attributes.position.array;
+
+  for (let i = 0; i < STAR_COUNT; i++) {
+    arr[i * 3 + 2] += speed + bass * 25;
+
+    if (arr[i * 3 + 2] > 120) {
+      arr[i * 3 + 2] = -3000;
+    }
+  }
+  geometry.attributes.position.needsUpdate = true;
+
+  /* AUDIO → VISUAL */
+
+  material.size = 1 + bass * 3.5;
+  material.opacity = 0.6 + mid * 0.4;
+
+  camera.position.x = Math.sin(performance.now() * 0.0012) * bass * 7;
+  camera.position.y = Math.cos(performance.now() * 0.0015) * bass * 7;
+
+  scene.rotation.z = high * 0.04;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* =====================================================
+   SUBSPACE DIVE TIMELINE
+===================================================== */
+
+const overlay = document.getElementById("overlay");
+const playBtn = document.getElementById("play");
+
+playBtn.onclick = async () => {
+  playBtn.remove();
+  await initAudio();
+
+  const tl = gsap.timeline();
+
+  tl.to(overlay, {
+    backdropFilter: "blur(8px)",
+    duration: 0.3
+  });
+
+  tl.to(camera, {
+    fov: 120,
+    duration: 0.7,
+    ease: "power3.in",
+    onUpdate: () => camera.updateProjectionMatrix()
+  }, 0);
+
+  tl.to({ v: speed }, {
+    v: 20,
+    duration: 0.9,
+    onUpdate() {
+      speed = this.targets()[0].v;
+    }
+  }, 0);
+
+  tl.to(scene.rotation, {
+    x: 0.35,
+    y: 0.25,
+    duration: 0.8
+  }, 0);
+
+  /* SNAP DE SORTIE */
+
+  tl.to(overlay, {
+    backdropFilter: "blur(0px)",
+    duration: 0.15
+  });
+
+  tl.to(camera, {
+    fov: 70,
+    duration: 0.25,
+    onUpdate: () => camera.updateProjectionMatrix()
+  });
+
+  tl.to({ v: speed }, {
+    v: 1.4,
+    duration: 0.25,
+    onUpdate() {
+      speed = this.targets()[0].v;
+    }
+  });
+};
+
+/* =====================================================
+   RESIZE
+===================================================== */
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+
+</body>
+</html>

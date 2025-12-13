@@ -962,11 +962,23 @@ export const DesktopApp = () => {
           <div className="flex-1 flex overflow-hidden relative z-10">
             {noTracksMessage}
             
-            <ScrollArea className={cn("flex-1 transition-all duration-300", isQueueOpen && "mr-80")}>
-              <div className="animate-in fade-in duration-200">
-                {renderView()}
-              </div>
-            </ScrollArea>
+            <div className={cn(
+              "flex-1 transition-all duration-300 relative",
+              isQueueOpen && "mr-80",
+              showInlinePlayer && "flex items-center justify-center"
+            )}>
+              {showInlinePlayer ? (
+                <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
+                  {renderView()}
+                </div>
+              ) : (
+                <ScrollArea className="h-full w-full">
+                  <div className="animate-in fade-in duration-200">
+                    {renderView()}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
 
             {/* Queue Panel */}
             {isQueueOpen && (
