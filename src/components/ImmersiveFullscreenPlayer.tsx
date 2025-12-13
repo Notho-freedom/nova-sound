@@ -279,7 +279,7 @@ export const ImmersiveFullscreenPlayer = ({
       particlesRef.current = [particleSystem, particles, velocitiesRef];
 
       // Animation loop
-      let speed = 1.3;
+      const speed = 1.3;
       const animate = () => {
         animationId = requestAnimationFrame(animate);
 
