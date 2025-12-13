@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Play, X, Clock, TrendingUp, Disc3, User, Music } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,18 @@ export const SearchView = ({
     })();
   };
 
+  // Utility function to remove duplicates
+  const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
+    const seen = new Set<string>();
+    return trackList.filter(track => {
+      if (seen.has(track.id)) {
+        return false;
+      }
+      seen.add(track.id);
+      return true;
+    });
+  }, []);
+
   // Search results
   const searchResults = useMemo(() => {
     if (!query.trim()) return { tracks: [], albums: [], artists: [] };
@@ -102,10 +114,13 @@ export const SearchView = ({
       t.artist.toLowerCase().includes(q) ||
       t.album.toLowerCase().includes(q)
     );
+    
+    // Remove duplicates
+    const uniqueMatchedTracks = getUniqueTracks(matchedTracks);
 
     // Group by album
     const albumsMap = new Map<string, { name: string; artist: string; coverUrl: string; count: number }>();
-    matchedTracks.forEach(t => {
+    uniqueMatchedTracks.forEach(t => {
       const key = `${t.album}-${t.artist}`;
       if (!albumsMap.has(key)) {
         albumsMap.set(key, { name: t.album, artist: t.artist, coverUrl: t.coverUrl, count: 0 });
@@ -115,7 +130,7 @@ export const SearchView = ({
 
     // Group by artist
     const artistsMap = new Map<string, { name: string; coverUrl: string; count: number }>();
-    matchedTracks.forEach(t => {
+    uniqueMatchedTracks.forEach(t => {
       if (!artistsMap.has(t.artist)) {
         artistsMap.set(t.artist, { name: t.artist, coverUrl: t.coverUrl, count: 0 });
       }
@@ -123,11 +138,11 @@ export const SearchView = ({
     });
 
     return {
-      tracks: matchedTracks,
+      tracks: uniqueMatchedTracks,
       albums: Array.from(albumsMap.values()).slice(0, 6),
       artists: Array.from(artistsMap.values()).slice(0, 6)
     };
-  }, [query, tracks]);
+  }, [query, tracks, getUniqueTracks]);
 
   // Get unique genres from tracks
   const genres = useMemo(() => {

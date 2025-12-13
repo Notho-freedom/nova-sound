@@ -508,42 +508,61 @@ export const DesktopApp = () => {
     toast.success(`Affichage de l'artiste "${currentTrack.artist}"`);
   };
 
-  // Get favorite tracks
-  const favoriteTracks = tracks.filter(track => isFavorite(track.id));
+  // Utility function to remove duplicates from track lists
+  const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
+    const seen = new Set<string>();
+    return trackList.filter(track => {
+      if (seen.has(track.id)) {
+        return false;
+      }
+      seen.add(track.id);
+      return true;
+    });
+  }, []);
 
-  // Get recently played tracks from history (for QueuePanel)
-  const historyTracks = history
-    .map(h => libraryTracks.find(t => t.id === h.trackId))
-    .filter((t): t is Track => t !== undefined)
-    .slice(0, 50); // More tracks for history tab
+  // Get favorite tracks (without duplicates)
+  const favoriteTracks = useMemo(() => {
+    return getUniqueTracks(tracks.filter(track => isFavorite(track.id)));
+  }, [tracks, isFavorite, getUniqueTracks]);
 
-  // Get recently played tracks from history (for HomeView)
-  const recentTracks = history
-    .map(h => tracks.find(t => t.id === h.trackId))
-    .filter((t): t is Track => t !== undefined)
-    .slice(0, 20);
+  // Get recently played tracks from history (for QueuePanel) - without duplicates
+  const historyTracks = useMemo(() => {
+    const mapped = history
+      .map(h => libraryTracks.find(t => t.id === h.trackId))
+      .filter((t): t is Track => t !== undefined);
+    return getUniqueTracks(mapped).slice(0, 50);
+  }, [history, libraryTracks, getUniqueTracks]);
 
-  // Get recently added tracks (sorted by addedAt date)
+  // Get recently played tracks from history (for HomeView) - without duplicates
+  const recentTracks = useMemo(() => {
+    const mapped = history
+      .map(h => tracks.find(t => t.id === h.trackId))
+      .filter((t): t is Track => t !== undefined);
+    return getUniqueTracks(mapped).slice(0, 20);
+  }, [history, tracks, getUniqueTracks]);
+
+  // Get recently added tracks (sorted by addedAt date) - without duplicates
   const recentlyAddedTracks = useMemo(() => {
-    return libraryTracks
-      .filter(t => t.addedAt)
+    const filtered = libraryTracks.filter(t => t.addedAt);
+    const unique = getUniqueTracks(filtered);
+    return unique
       .sort((a, b) => {
         const dateA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
         const dateB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
         return dateB - dateA; // Most recent first
       })
       .slice(0, 50);
-  }, [libraryTracks]);
+  }, [libraryTracks, getUniqueTracks]);
 
-  // Get album tracks for current track
+  // Get album tracks for current track - without duplicates
   const albumTracks = useMemo(() => {
     if (!currentTrack) return [];
-    return libraryTracks
-      .filter(t => t.album === currentTrack.album && t.artist === currentTrack.artist)
-      .sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
-  }, [currentTrack, libraryTracks]);
+    const filtered = libraryTracks.filter(t => t.album === currentTrack.album && t.artist === currentTrack.artist);
+    const unique = getUniqueTracks(filtered);
+    return unique.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+  }, [currentTrack, libraryTracks, getUniqueTracks]);
 
-  // Get similar tracks (same artist or genre, random selection)
+  // Get similar tracks (same artist or genre, random selection) - without duplicates
   const similarTracks = useMemo(() => {
     if (!currentTrack) return [];
     
@@ -554,10 +573,11 @@ export const DesktopApp = () => {
        (currentTrack.genre && t.genre === currentTrack.genre))
     );
     
-    // Shuffle and take up to 20 tracks
-    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    // Remove duplicates and shuffle
+    const unique = getUniqueTracks(candidates);
+    const shuffled = [...unique].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 20);
-  }, [currentTrack, libraryTracks]);
+  }, [currentTrack, libraryTracks, getUniqueTracks]);
 
   const handlePlayTrack = useCallback((track: Track) => {
     const trackIndex = tracks.findIndex(t => t.id === track.id);

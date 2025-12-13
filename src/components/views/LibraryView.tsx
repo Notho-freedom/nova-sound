@@ -175,13 +175,27 @@ export const LibraryView = ({
 
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Utility function to remove duplicates
+  const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
+    const seen = new Set<string>();
+    return trackList.filter(track => {
+      if (seen.has(track.id)) {
+        return false;
+      }
+      seen.add(track.id);
+      return true;
+    });
+  }, []);
+
   const filteredAndSortedTracks = useMemo(() => {
-    let filtered = tracks;
+    // First remove duplicates from input tracks
+    const uniqueTracks = getUniqueTracks(tracks);
+    let filtered = uniqueTracks;
     
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = tracks.filter(track =>
+      filtered = uniqueTracks.filter(track =>
         track.title.toLowerCase().includes(query) ||
         track.artist.toLowerCase().includes(query) ||
         track.album.toLowerCase().includes(query)
@@ -205,7 +219,7 @@ export const LibraryView = ({
           return 0;
       }
     });
-  }, [tracks, sortMode, searchQuery]);
+  }, [tracks, sortMode, searchQuery, getUniqueTracks]);
 
   const albums = useMemo(() => groupByAlbum(tracks), [tracks]);
   const artists = useMemo(() => groupByArtist(tracks), [tracks]);
