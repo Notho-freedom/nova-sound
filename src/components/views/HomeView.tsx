@@ -6,6 +6,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { useState, useMemo } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 
+interface HistoryEntry {
+  trackId: string;
+  playedAt: string;
+  playCount: number;
+}
+
 interface HomeViewProps {
   tracks: Track[];
   currentTrackIndex: number;
@@ -14,6 +20,7 @@ interface HomeViewProps {
   onPlayTracks?: (trackIds: string[]) => void;
   recentTracks?: Track[];
   favoriteTracks?: Track[];
+  history?: HistoryEntry[];
 }
 
 const formatTime = (seconds: number) => {
@@ -22,38 +29,34 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-// Generate dynamic recommendations based on listening history
-const generateRecommendations = (tracks: Track[], recentTracks: Track[], favoriteTracks: Track[]) => {
-  // Get unique artists from favorites and recent
-  const preferredArtists = new Set([
-    ...favoriteTracks.map(t => t.artist),
-    ...recentTracks.map(t => t.artist)
-  ]);
-  
-  // Get unique genres
-  const preferredGenres = new Set([
-    ...favoriteTracks.filter(t => t.genre).map(t => t.genre!),
-    ...recentTracks.filter(t => t.genre).map(t => t.genre!)
-  ]);
+// Generate random selections from most played tracks
+const generateMostPlayedSelections = (tracks: Track[], history: HistoryEntry[] = []) => {
+  // Create a map of trackId -> playCount
+  const playCountMap = new Map<string, number>();
+  history.forEach(entry => {
+    playCountMap.set(entry.trackId, entry.playCount || 1);
+  });
 
-  // Discoveries - tracks not in recent or favorites
-  const recentIds = new Set(recentTracks.map(t => t.id));
-  const favoriteIds = new Set(favoriteTracks.map(t => t.id));
-  
-  const discoveries = tracks
-    .filter(t => !recentIds.has(t.id) && !favoriteIds.has(t.id))
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 10);
+  // Get tracks with play counts, sort by play count
+  const tracksWithCounts = tracks
+    .map(track => ({
+      track,
+      playCount: playCountMap.get(track.id) || 0
+    }))
+    .filter(item => item.playCount > 0)
+    .sort((a, b) => b.playCount - a.playCount)
+    .slice(0, 50); // Take top 50 most played
 
-  // Similar to favorites - same artist or genre
-  const similar = tracks
-    .filter(t => !favoriteIds.has(t.id) && (
-      preferredArtists.has(t.artist) || 
-      (t.genre && preferredGenres.has(t.genre))
-    ))
-    .slice(0, 10);
+  // Create 3 random selections from the most played tracks
+  const shuffled1 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
+  const shuffled2 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
+  const shuffled3 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
 
-  return { discoveries, similar };
+  return {
+    discoveries: shuffled1.slice(0, 10).map(item => item.track),
+    similar: shuffled2.slice(0, 10).map(item => item.track),
+    mix: shuffled3.slice(0, 10).map(item => item.track),
+  };
 };
 
 export const HomeView = ({
@@ -64,6 +67,7 @@ export const HomeView = ({
   onPlayTracks,
   recentTracks = [],
   favoriteTracks = [],
+  history = [],
 }: HomeViewProps) => {
   // Remove duplicates by ID before slicing
   const getUniqueTracks = (trackList: Track[]) => {
@@ -78,18 +82,18 @@ export const HomeView = ({
   };
 
   const displayRecent = recentTracks.length > 0 
-    ? getUniqueTracks(recentTracks).slice(0, 4) 
-    : getUniqueTracks(tracks).slice(0, 4);
+    ? getUniqueTracks(recentTracks).slice(0, 20) 
+    : getUniqueTracks(tracks).slice(0, 20);
   
   const displayFavorites = favoriteTracks.length > 0 
     ? getUniqueTracks(favoriteTracks).slice(0, 6) 
     : getUniqueTracks(tracks).slice(0, 6);
   
-  const { discoveries: rawDiscoveries, similar: rawSimilar } = generateRecommendations(tracks, recentTracks, favoriteTracks);
-  
-  // Remove duplicates from recommendations
-  const discoveries = getUniqueTracks(rawDiscoveries);
-  const similar = getUniqueTracks(rawSimilar);
+  // Get random selections from most played tracks
+  const { discoveries, similar, mix } = generateMostPlayedSelections(tracks, history);
+  const uniqueDiscoveries = getUniqueTracks(discoveries);
+  const uniqueSimilar = getUniqueTracks(similar);
+  const uniqueMix = getUniqueTracks(mix);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -133,7 +137,7 @@ export const HomeView = ({
               {recentTracks.length > 0 ? "ÉCOUTÉ RÉCEMMENT" : "À DÉCOUVRIR"}
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {displayRecent.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrentTrack = currentTrackIndex === actualIndex;
@@ -286,128 +290,230 @@ export const HomeView = ({
       )}
 
       {/* For You Section - Dynamic Recommendations */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-amber-500" />
-          <h2 className="font-display text-lg tracking-wider">POUR VOUS</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Discoveries Playlist */}
-          <div 
-            className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer"
-            onClick={() => {
-              if (discoveries.length > 0) {
-                const firstTrack = discoveries[0];
-                const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                if (idx !== -1) onTrackSelect(idx);
-              }
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 to-purple-600/80" />
-            <div className="absolute inset-0 p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="font-display text-xl font-bold text-white mb-1">
-                  Découvertes
-                </h3>
-                <p className="text-white/70 text-sm">
-                  {discoveries.length} nouveaux titres à explorer
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {discoveries.slice(0, 3).map((track, i) => (
-                  <div 
-                    key={`discovery-${track.id}-${i}`} 
-                    className="w-10 h-10 rounded overflow-hidden border-2 border-white/30"
-                    style={{ marginLeft: i > 0 ? '-8px' : 0 }}
-                  >
-                    <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <div className="ml-auto w-10 h-10 rounded-full bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110">
-                  <Play className="w-5 h-5 text-white fill-current ml-0.5" />
-                </div>
-              </div>
-            </div>
+      {(uniqueDiscoveries.length > 0 || uniqueSimilar.length > 0 || uniqueMix.length > 0) && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            <h2 className="font-display text-lg tracking-wider">POUR VOUS</h2>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Discoveries Playlist - Style explorateur */}
+            {uniqueDiscoveries.length > 0 && (
+              <div 
+                className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                onClick={() => {
+                  if (uniqueDiscoveries.length > 0) {
+                    const firstTrack = uniqueDiscoveries[0];
+                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                    if (idx !== -1) onTrackSelect(idx);
+                  }
+                }}
+              >
+                {/* Background avec image de la première piste */}
+                <img
+                  src={getCoverUrl(uniqueDiscoveries[0]?.coverUrl)}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-600/90 via-purple-600/80 to-indigo-700/90" />
+                
+                {/* Pattern décoratif */}
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-2xl" />
+                </div>
 
-          {/* Similar to Favorites */}
-          <div 
-            className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer"
-            onClick={() => {
-              if (similar.length > 0) {
-                const firstTrack = similar[0];
-                const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                if (idx !== -1) onTrackSelect(idx);
-              }
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/80 to-rose-600/80" />
-            <div className="absolute inset-0 p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="font-display text-xl font-bold text-white mb-1">
-                  Similaires
-                </h3>
-                <p className="text-white/70 text-sm">
-                  Basé sur vos favoris
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {similar.slice(0, 3).map((track, i) => (
-                  <div 
-                    key={`similar-${track.id}-${i}`} 
-                    className="w-10 h-10 rounded overflow-hidden border-2 border-white/30"
-                    style={{ marginLeft: i > 0 ? '-8px' : 0 }}
-                  >
-                    <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 p-5 flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
+                        <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
+                          Découvertes
+                        </h3>
+                      </div>
+                      <p className="text-white/80 text-sm font-medium">
+                        {uniqueDiscoveries.length} perles cachées
+                      </p>
+                      <p className="text-white/60 text-xs mt-1">
+                        Explorations musicales
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
+                      <Play className="w-5 h-5 text-white fill-current ml-0.5" />
+                    </div>
                   </div>
-                ))}
-                <div className="ml-auto w-10 h-10 rounded-full bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110">
-                  <Play className="w-5 h-5 text-white fill-current ml-0.5" />
+                  
+                  <div className="flex items-center gap-2">
+                    {uniqueDiscoveries.slice(0, 4).map((track, i) => (
+                      <div 
+                        key={`discovery-${track.id}-${i}`} 
+                        className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
+                        style={{ marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i }}
+                      >
+                        <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    {uniqueDiscoveries.length > 4 && (
+                      <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold">
+                        +{uniqueDiscoveries.length - 4}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Mix based on time */}
-          <div 
-            className="group relative aspect-[4/3] rounded-xl overflow-hidden cursor-pointer"
-            onClick={() => {
-              if (tracks.length > 0) {
-                // Shuffle and play a random mix
-                const shuffled = [...tracks].sort(() => Math.random() - 0.5);
-                const idx = tracks.findIndex(t => t.id === shuffled[0].id);
-                if (idx !== -1) onTrackSelect(idx);
-              }
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/80 to-blue-600/80" />
-            <div className="absolute inset-0 p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="font-display text-xl font-bold text-white mb-1">
-                  {new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
-                </h3>
-                <p className="text-white/70 text-sm">
-                  Parfait pour ce moment
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {tracks.slice(0, 3).map((track, i) => (
-                  <div 
-                    key={`mix-${track.id}-${i}`} 
-                    className="w-10 h-10 rounded overflow-hidden border-2 border-white/30"
-                    style={{ marginLeft: i > 0 ? '-8px' : 0 }}
-                  >
-                    <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
+            {/* Similar to Favorites - Style chaleureux */}
+            {uniqueSimilar.length > 0 && (
+              <div 
+                className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                onClick={() => {
+                  if (uniqueSimilar.length > 0) {
+                    const firstTrack = uniqueSimilar[0];
+                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                    if (idx !== -1) onTrackSelect(idx);
+                  }
+                }}
+              >
+                {/* Background avec image de la première piste */}
+                <img
+                  src={getCoverUrl(uniqueSimilar[0]?.coverUrl)}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-rose-500/90 via-pink-600/80 to-fuchsia-700/90" />
+                
+                {/* Pattern décoratif */}
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute top-0 left-0 w-28 h-28 bg-yellow-300/30 rounded-full blur-3xl" />
+                  <div className="absolute bottom-0 right-0 w-32 h-32 bg-pink-400/20 rounded-full blur-3xl" />
+                </div>
+
+                <div className="absolute inset-0 p-5 flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Heart className="w-4 h-4 text-red-300 fill-red-300" />
+                        <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
+                          Similaires
+                        </h3>
+                      </div>
+                      <p className="text-white/80 text-sm font-medium">
+                        {uniqueSimilar.length} titres qui vous ressemblent
+                      </p>
+                      <p className="text-white/60 text-xs mt-1">
+                        Basé sur vos goûts
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
+                      <Play className="w-5 h-5 text-white fill-current ml-0.5" />
+                    </div>
                   </div>
-                ))}
-                <div className="ml-auto w-10 h-10 rounded-full bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110">
-                  <Play className="w-5 h-5 text-white fill-current ml-0.5" />
+                  
+                  <div className="flex items-center gap-2">
+                    {uniqueSimilar.slice(0, 4).map((track, i) => (
+                      <div 
+                        key={`similar-${track.id}-${i}`} 
+                        className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
+                        style={{ marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i }}
+                      >
+                        <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    {uniqueSimilar.length > 4 && (
+                      <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold">
+                        +{uniqueSimilar.length - 4}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Mix based on time - Style dynamique */}
+            {uniqueMix.length > 0 && (
+              <div 
+                className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                onClick={() => {
+                  if (uniqueMix.length > 0) {
+                    const firstTrack = uniqueMix[0];
+                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                    if (idx !== -1) onTrackSelect(idx);
+                  }
+                }}
+              >
+                {/* Background avec image de la première piste */}
+                <img
+                  src={getCoverUrl(uniqueMix[0]?.coverUrl)}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
+                />
+                <div className={cn(
+                  "absolute inset-0 transition-all duration-500",
+                  new Date().getHours() < 18 
+                    ? "bg-gradient-to-br from-amber-500/90 via-orange-600/80 to-red-600/90"
+                    : "bg-gradient-to-br from-indigo-600/90 via-blue-700/80 to-cyan-800/90"
+                )} />
+                
+                {/* Pattern décoratif animé */}
+                <div className="absolute inset-0 opacity-20">
+                  <div className={cn(
+                    "absolute top-0 right-0 w-36 h-36 rounded-full blur-3xl transition-all duration-500",
+                    new Date().getHours() < 18 ? "bg-yellow-300/30" : "bg-cyan-300/30"
+                  )} />
+                  <div className={cn(
+                    "absolute bottom-0 left-0 w-28 h-28 rounded-full blur-2xl transition-all duration-500",
+                    new Date().getHours() < 18 ? "bg-orange-400/20" : "bg-blue-400/20"
+                  )} />
+                </div>
+
+                <div className="absolute inset-0 p-5 flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className={cn(
+                          "w-4 h-4 transition-colors duration-500",
+                          new Date().getHours() < 18 ? "text-yellow-300" : "text-cyan-300"
+                        )} />
+                        <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
+                          {new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
+                        </h3>
+                      </div>
+                      <p className="text-white/80 text-sm font-medium">
+                        {uniqueMix.length} titres pour {new Date().getHours() < 18 ? "vous booster" : "vous détendre"}
+                      </p>
+                      <p className="text-white/60 text-xs mt-1">
+                        {new Date().getHours() < 18 ? "⚡ Énergisant" : "🌙 Apaisant"}
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
+                      <Play className="w-5 h-5 text-white fill-current ml-0.5" />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {uniqueMix.slice(0, 4).map((track, i) => (
+                      <div 
+                        key={`mix-${track.id}-${i}`} 
+                        className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
+                        style={{ marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i }}
+                      >
+                        <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    {uniqueMix.length > 4 && (
+                      <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold">
+                        +{uniqueMix.length - 4}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Empty state */}
       {tracks.length === 0 && (

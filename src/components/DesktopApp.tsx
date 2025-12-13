@@ -672,14 +672,15 @@ export const DesktopApp = () => {
     switch (currentView) {
       case "home":
         return (
-          <HomeView
-            tracks={tracks}
-            currentTrackIndex={currentTrackIndex}
-            isPlaying={isPlaying}
-            onTrackSelect={handleTrackSelect}
-            recentTracks={recentTracks}
-            favoriteTracks={favoriteTracks}
-          />
+        <HomeView
+          tracks={tracks}
+          currentTrackIndex={currentTrackIndex}
+          isPlaying={isPlaying}
+          onTrackSelect={handleTrackSelect}
+          recentTracks={recentTracks}
+          favoriteTracks={favoriteTracks}
+          history={history}
+        />
         );
       case "search":
         return (
