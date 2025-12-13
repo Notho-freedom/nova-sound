@@ -239,8 +239,8 @@ export const NowPlayingBar = ({
 
           {/* Right Controls */}
           <div className="flex items-center gap-0.5 w-64 justify-end ml-auto flex-shrink-0">
-            {/* Time Display */}
-            <div className="text-xs text-muted-foreground font-mono w-24 text-center mr-2">
+            {/* Time Display - Hidden when volume slider expands */}
+            <div className="text-xs text-muted-foreground font-mono w-24 text-center mr-2 transition-all duration-200 group-hover/volume:opacity-0 group-hover/volume:w-0 group-hover/volume:overflow-hidden group-hover/volume:mr-0">
               {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
             </div>
             <Tooltip delayDuration={0}>
@@ -290,33 +290,23 @@ export const NowPlayingBar = ({
             </Tooltip>
             
             {/* Volume */}
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex items-center gap-1 ml-2 group/volume">
               <button
                 onClick={onMuteToggle}
                 className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <VolumeIcon className="w-4 h-4" />
               </button>
-              <Slider
-                value={[isMuted ? 0 : volume]}
-                max={100}
-                step={1}
-                onValueChange={onVolumeChange}
-                className="w-20"
-              />
+              <div className="w-0 group-hover/volume:w-20 overflow-hidden transition-all duration-200">
+                <Slider
+                  value={[isMuted ? 0 : volume]}
+                  max={100}
+                  step={1}
+                  onValueChange={onVolumeChange}
+                  className="w-20"
+                />
+              </div>
             </div>
-
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onFullscreen}
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors ml-1"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Plein écran</TooltipContent>
-            </Tooltip>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -370,6 +360,11 @@ export const NowPlayingBar = ({
                 }}>
                   <Users className="w-4 h-4 mr-2" />
                   Aller à l'artiste
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onFullscreen}>
+                  <Maximize2 className="w-4 h-4 mr-2" />
+                  Plein écran
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
