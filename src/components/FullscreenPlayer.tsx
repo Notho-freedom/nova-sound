@@ -100,66 +100,56 @@ export const FullscreenPlayer = ({
     enableBassFilter: false,
   });
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  // Render FFT to canvas with throttling for better performance
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !vibesData?.frequency) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    let animationFrameId: number;
-    let lastRenderTime = 0;
-    const RENDER_INTERVAL = 1000 / 30; // 30 FPS max pour le rendu
-    
-    const render = () => {
-      const now = performance.now();
-      
-      // Throttle rendering to 30 FPS
-      if (now - lastRenderTime < RENDER_INTERVAL) {
-        animationFrameId = requestAnimationFrame(render);
-        return;
-      }
-      lastRenderTime = now;
-      
-      const width = canvas.width = canvas.offsetWidth;
-      const height = canvas.height = canvas.offsetHeight;
-      
-      ctx.clearRect(0, 0, width, height);
-      
-      const barCount = 60;
-      const step = Math.max(1, Math.floor(vibesData.frequency.length / barCount));
-      const barWidth = width / barCount;
-      
-      for (let i = 0; i < barCount; i++) {
-        const index = i * step;
-        const value = vibesData.frequency[index] || 0;
-        const barHeight = (value / 255) * height;
-        const x = i * barWidth;
-        const y = height - barHeight;
-        
-        // Reduced opacity gradient
-        const gradient = ctx.createLinearGradient(x, y, x, height);
-        gradient.addColorStop(0, `rgba(59, 130, 246, ${value / 255 * 0.3})`);
-        gradient.addColorStop(1, `rgba(59, 130, 246, ${value / 255 * 0.1})`);
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x, y, barWidth - 0.5, barHeight);
-      }
-      
-      animationFrameId = requestAnimationFrame(render);
-    };
-    
-    render();
-    
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [vibesData?.frequency]);
+// Inside your component
+const canvasRef = useRef<HTMLCanvasElement>(null);
+const barCount = 32; // plus léger et rapide
+const bars = useMemo(() => Array.from({ length: barCount }, (_, i) => i), []);
+
+// Render FFT optimized
+useEffect(() => {
+  if (!audioElement) return;
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const renderFFT = () => {
+    const freqData = vibesData?.frequency;
+    if (!freqData) return;
+
+    const width = canvas.width = canvas.offsetWidth;
+    const height = canvas.height = canvas.offsetHeight;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const barWidth = width / barCount;
+
+    for (let i of bars) {
+      const index = Math.floor((i / barCount) * freqData.length);
+      const value = freqData[index] || 0;
+      const barHeight = (value / 255) * height;
+
+      ctx.fillStyle = `rgba(59, 130, 246, ${0.2 + (value / 255) * 0.3})`;
+      ctx.fillRect(i * barWidth, height - barHeight, barWidth * 0.8, barHeight);
+    }
+  };
+
+  let rafId: number;
+  let lastTime = 0;
+  const fps = 30;
+  const interval = 1000 / fps;
+
+  const loop = (time: number) => {
+    if (time - lastTime > interval) {
+      lastTime = time;
+      renderFFT();
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  rafId = requestAnimationFrame(loop);
+
+  return () => cancelAnimationFrame(rafId);
+}, [vibesData?.frequency, bars]);
 
   const VolumeIcon = isMuted || volume === 0 
     ? VolumeX 

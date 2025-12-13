@@ -111,6 +111,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('file:open', listener);
     return () => ipcRenderer.removeListener('file:open', listener);
   },
+  
+  // Update notifications
+  onUpdateAvailable: (callback) => {
+    const listener = (_event, updateInfo) => callback(updateInfo);
+    ipcRenderer.on('update:available', listener);
+    return () => ipcRenderer.removeListener('update:available', listener);
+  },
 });
 
 console.log('Preload script loaded successfully');

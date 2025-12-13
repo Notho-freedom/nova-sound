@@ -48,4 +48,5 @@ firebase-adminsdk-*.json
 !package-lock.json
 !tsconfig.json
 !tsconfig.*.json
-
+local-ui/
+!local-ui/.gitkeep

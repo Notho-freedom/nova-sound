@@ -6,6 +6,7 @@ import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
+import { UpdateNotification } from "./UpdateNotification";
 import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
@@ -919,6 +920,7 @@ export const DesktopApp = () => {
 
   return (
     <TooltipProvider delayDuration={0}>
+      <UpdateNotification />
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
         {/* Fullscreen Player */}
         {isFullscreen && currentTrack && (

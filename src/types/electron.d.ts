@@ -92,6 +92,19 @@ export interface ElectronAPI {
   
   // File open event (from "Open with..." or command line)
   onFileOpen: (callback: (filePath: string) => void) => () => void;
+  
+  // Update notifications
+  onUpdateAvailable?: (callback: (updateInfo: {
+    version: string;
+    changelog?: string;
+    buildDate?: string;
+    commits?: Array<{
+      hash: string;
+      message: string;
+      author: string;
+      date: string;
+    }>;
+  }) => void) => () => void;
 }
 
 declare global {

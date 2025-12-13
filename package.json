@@ -14,7 +14,8 @@
     "dev:all": "concurrently -k \"next dev\" \"npm run dev:backend\" \"npm run electron:dev\"",
     "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && electron .",
     "build": "next build",
-    "build:electron": "npm run build && tsc -p electron/tsconfig.json",
+    "build:electron": "npm run build && node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
+    "postbuild": "node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js",
     "build:backend": "cd server && npm run build",
     "start": "next start",
     "electron": "electron .",
@@ -95,7 +96,8 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.0.3",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "archiver": "^7.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
