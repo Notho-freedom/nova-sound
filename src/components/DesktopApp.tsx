@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
@@ -343,6 +343,30 @@ export const DesktopApp = () => {
     setCurrentIndex(index);
     setCurrentTime(0);
     setIsPlaying(true);
+    
+    // Auto-fill queue with album tracks from current track
+    const track = tracks[index];
+    if (track) {
+      const albumTracks = libraryTracks.filter(
+        t => t.album === track.album && t.artist === track.artist
+      ).sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+      
+      const currentTrackIndexInAlbum = albumTracks.findIndex(t => t.id === track.id);
+      if (currentTrackIndexInAlbum >= 0) {
+        const remainingAlbumTracks = albumTracks.slice(currentTrackIndexInAlbum + 1);
+        // Add remaining album tracks to queue after current position
+        if (remainingAlbumTracks.length > 0) {
+          const currentQueueTracks = queue.tracks;
+          const insertIndex = index + 1;
+          const tracksToAdd = remainingAlbumTracks.filter(
+            t => !currentQueueTracks.slice(insertIndex).some(qt => qt.id === t.id)
+          );
+          if (tracksToAdd.length > 0) {
+            addToQueueNext(tracksToAdd);
+          }
+        }
+      }
+    }
   };
 
   // Queue management handlers
@@ -491,6 +515,45 @@ export const DesktopApp = () => {
     .map(h => tracks.find(t => t.id === h.trackId))
     .filter((t): t is Track => t !== undefined)
     .slice(0, 20);
+
+  // Get album tracks for current track
+  const albumTracks = useMemo(() => {
+    if (!currentTrack) return [];
+    return libraryTracks
+      .filter(t => t.album === currentTrack.album && t.artist === currentTrack.artist)
+      .sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+  }, [currentTrack, libraryTracks]);
+
+  // Get similar tracks (same artist or genre, random selection)
+  const similarTracks = useMemo(() => {
+    if (!currentTrack) return [];
+    
+    // Find tracks with same artist or genre
+    const candidates = libraryTracks.filter(t => 
+      t.id !== currentTrack.id && 
+      (t.artist === currentTrack.artist || 
+       (currentTrack.genre && t.genre === currentTrack.genre))
+    );
+    
+    // Shuffle and take up to 20 tracks
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 20);
+  }, [currentTrack, libraryTracks]);
+
+  const handlePlayTrack = useCallback((track: Track) => {
+    const trackIndex = tracks.findIndex(t => t.id === track.id);
+    if (trackIndex >= 0) {
+      handleTrackSelect(trackIndex);
+    } else {
+      // Track not in current queue, add it and play
+      addToQueueNext(track);
+      const newIndex = queue.tracks.length;
+      setTimeout(() => {
+        setCurrentIndex(newIndex);
+        setIsPlaying(true);
+      }, 100);
+    }
+  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect]);
 
   const renderView = () => {
     // Inline player view
@@ -785,6 +848,9 @@ export const DesktopApp = () => {
                   isPlaying={isPlaying}
                   onTrackSelect={handleTrackSelect}
                   onClose={() => setIsQueueOpen(false)}
+                  albumTracks={albumTracks}
+                  similarTracks={similarTracks}
+                  onPlayTrack={handlePlayTrack}
                 />
               </div>
             )}
