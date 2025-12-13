@@ -4,6 +4,7 @@ import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
+import { ImmersiveFullscreenPlayer } from "./ImmersiveFullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { lazy, Suspense } from "react";
@@ -920,37 +921,29 @@ export const DesktopApp = () => {
   return (
     <TooltipProvider delayDuration={0}>
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-        {/* Fullscreen Player */}
+        {/* Fullscreen Player - Immersive Mode */}
         {isFullscreen && currentTrack && (
-          <VibrantUI
+          <ImmersiveFullscreenPlayer
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            isShuffle={isShuffle}
+            repeatMode={repeatMode}
+            volume={volume}
+            isMuted={isMuted}
             audioElement={audioRef.current}
-            enableBassPulse={true}
-            enableEnergyGlow={true}
-            enableShake={false}
-            intensity={0.8}
-          >
-            <FullscreenPlayer
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              isShuffle={isShuffle}
-              repeatMode={repeatMode}
-              volume={volume}
-              isMuted={isMuted}
-              audioElement={audioRef.current}
-              onPlayPause={handlePlayPause}
-              onPrevious={handlePrevious}
-              onNext={handleNext}
-              onShuffle={handleShuffle}
-              onRepeat={handleRepeat}
-              onSeek={handleSeek}
-              onVolumeChange={handleVolumeChange}
-              onMuteToggle={() => setIsMuted(!isMuted)}
-              onClose={() => setIsFullscreen(false)}
-              isFavorite={isFavorite(currentTrack.id)}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          </VibrantUI>
+            onPlayPause={handlePlayPause}
+            onPrevious={handlePrevious}
+            onNext={handleNext}
+            onShuffle={handleShuffle}
+            onRepeat={handleRepeat}
+            onSeek={handleSeek}
+            onVolumeChange={handleVolumeChange}
+            onMuteToggle={() => setIsMuted(!isMuted)}
+            onClose={() => setIsFullscreen(false)}
+            isFavorite={isFavorite(currentTrack.id)}
+            onToggleFavorite={handleToggleFavorite}
+          />
         )}
 
         {/* Title Bar */}

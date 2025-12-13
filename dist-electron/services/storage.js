@@ -91,12 +91,34 @@ class Storage {
         }
         this.initialized = true;
     }
+    // Utility function to remove duplicate tracks by ID
+    removeDuplicateTracks(tracks) {
+        const seen = new Map();
+        for (const track of tracks) {
+            // Keep the first occurrence, or the one with the most recent addedAt
+            if (!seen.has(track.id)) {
+                seen.set(track.id, track);
+            }
+            else {
+                const existing = seen.get(track.id);
+                const existingDate = existing.addedAt ? new Date(existing.addedAt).getTime() : 0;
+                const trackDate = track.addedAt ? new Date(track.addedAt).getTime() : 0;
+                // Keep the most recent one
+                if (trackDate > existingDate) {
+                    seen.set(track.id, track);
+                }
+            }
+        }
+        return Array.from(seen.values());
+    }
     // Library
     async getLibrary() {
-        return readJSON(PATHS.library, []);
+        const tracks = await readJSON(PATHS.library, []);
+        return this.removeDuplicateTracks(tracks);
     }
     async saveLibrary(tracks) {
-        await writeJSON(PATHS.library, tracks);
+        const uniqueTracks = this.removeDuplicateTracks(tracks);
+        await writeJSON(PATHS.library, uniqueTracks);
     }
     async getTrack(trackId) {
         const library = await this.getLibrary();
@@ -104,13 +126,21 @@ class Storage {
     }
     async addTrack(track) {
         const library = await this.getLibrary();
-        const existingIndex = library.findIndex(t => t.filePath === track.filePath);
-        if (existingIndex >= 0) {
-            library[existingIndex] = { ...library[existingIndex], ...track };
+        // Check by filePath first, then by ID to avoid duplicates
+        const existingByPath = library.findIndex(t => t.filePath === track.filePath);
+        const existingById = library.findIndex(t => t.id === track.id);
+        if (existingByPath >= 0) {
+            // Update existing track by filePath
+            library[existingByPath] = { ...library[existingByPath], ...track };
+        }
+        else if (existingById >= 0) {
+            // Update existing track by ID (duplicate with different path)
+            library[existingById] = { ...library[existingById], ...track };
         }
         else {
             library.push(track);
         }
+        // saveLibrary will remove any remaining duplicates
         await this.saveLibrary(library);
     }
     async removeTrackByPath(filePath) {
