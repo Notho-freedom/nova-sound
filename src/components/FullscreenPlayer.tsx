@@ -179,20 +179,6 @@ export const FullscreenPlayer = ({
               </p>
             </div>
 
-            {/* Visualizer */}
-            <div className="w-full max-w-sm mb-4">
-              {audioElement ? (
-                <AudioVisualizer
-                  audioElement={audioElement}
-                  type="bars"
-                  height={80}
-                  color="#3b82f6"
-                />
-              ) : (
-                <LegacyAudioVisualizer isPlaying={isPlaying} barCount={40} />
-              )}
-            </div>
-
             {/* Progress Bar */}
             <div className="w-full max-w-sm mb-4">
               <Slider
@@ -268,52 +254,6 @@ export const FullscreenPlayer = ({
               </button>
             </div>
 
-            {/* Additional Controls */}
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={onToggleFavorite}
-                className={cn(
-                  "p-2 rounded-full transition-all duration-200",
-                  isFavorite 
-                    ? "text-red-500" 
-                    : "text-muted-foreground hover:text-red-500"
-                )}
-              >
-                <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
-              </button>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={onMuteToggle}
-                  className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <VolumeIcon className="w-5 h-5" />
-                </button>
-                <Slider
-                  value={[isMuted ? 0 : volume]}
-                  max={100}
-                  step={1}
-                  onValueChange={onVolumeChange}
-                  className="w-24"
-                />
-              </div>
-
-              <button
-                onClick={() => setShowLyrics(!showLyrics)}
-                className={cn(
-                  "p-2 rounded-full transition-all duration-200",
-                  showLyrics 
-                    ? "text-primary" 
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Music2 className="w-5 h-5" />
-              </button>
-
-              <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-                <Share2 className="w-5 h-5" />
-              </button>
-            </div>
           </div>
 
           {/* Right: Track details and lyrics */}
