@@ -510,7 +510,13 @@ export const DesktopApp = () => {
   // Get favorite tracks
   const favoriteTracks = tracks.filter(track => isFavorite(track.id));
 
-  // Get recently played tracks from history
+  // Get recently played tracks from history (for QueuePanel)
+  const historyTracks = history
+    .map(h => libraryTracks.find(t => t.id === h.trackId))
+    .filter((t): t is Track => t !== undefined)
+    .slice(0, 50); // More tracks for history tab
+
+  // Get recently played tracks from history (for HomeView)
   const recentTracks = history
     .map(h => tracks.find(t => t.id === h.trackId))
     .filter((t): t is Track => t !== undefined)
@@ -850,6 +856,7 @@ export const DesktopApp = () => {
                   onClose={() => setIsQueueOpen(false)}
                   albumTracks={albumTracks}
                   similarTracks={similarTracks}
+                  historyTracks={historyTracks}
                   onPlayTrack={handlePlayTrack}
                 />
               </div>

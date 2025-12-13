@@ -1,4 +1,4 @@
-import { X, GripVertical, Play, Pause, Disc3, Radio } from "lucide-react";
+import { X, GripVertical, Play, Pause, Disc3, Radio, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Track } from "@/types/music";
@@ -13,6 +13,7 @@ interface QueuePanelProps {
   onClose: () => void;
   albumTracks?: Track[];
   similarTracks?: Track[];
+  historyTracks?: Track[];
   onPlayTrack?: (track: Track) => void;
 }
 
@@ -70,13 +71,12 @@ export const QueuePanel = ({
   onClose,
   albumTracks = [],
   similarTracks = [],
+  historyTracks = [],
   onPlayTrack,
 }: QueuePanelProps) => {
   const currentTrack = tracks[currentTrackIndex];
-  const upNext = tracks.slice(currentTrackIndex + 1);
-  const history = tracks.slice(0, currentTrackIndex);
 
-  // Album tracks from current track onwards
+  // File: Album tracks from current track onwards (suite de l'album)
   const albumTracksFromCurrent = albumTracks.length > 0 && currentTrack
     ? (() => {
         const currentIndex = albumTracks.findIndex(t => t.id === currentTrack.id);
@@ -135,21 +135,15 @@ export const QueuePanel = ({
       )}
 
       {/* Tabs */}
-      <Tabs defaultValue="queue" className="flex-1 flex flex-col overflow-hidden">
+      <Tabs defaultValue="file" className="flex-1 flex flex-col overflow-hidden">
         <div className="px-4 pt-2 border-b border-border">
           <TabsList className="w-full grid grid-cols-3 h-auto bg-muted/30">
             <TabsTrigger 
-              value="queue" 
-              className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
-            >
-              File ({upNext.length})
-            </TabsTrigger>
-            <TabsTrigger 
-              value="album" 
+              value="file" 
               className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
             >
               <Disc3 className="w-3 h-3 mr-1" />
-              Album ({albumTracksFromCurrent.length})
+              File ({albumTracksFromCurrent.length})
             </TabsTrigger>
             <TabsTrigger 
               value="similar" 
@@ -158,76 +152,50 @@ export const QueuePanel = ({
               <Radio className="w-3 h-3 mr-1" />
               Similaire ({similarTracks.length})
             </TabsTrigger>
+            <TabsTrigger 
+              value="history" 
+              className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+            >
+              <Clock className="w-3 h-3 mr-1" />
+              Historique ({historyTracks.length})
+            </TabsTrigger>
           </TabsList>
         </div>
 
         <ScrollArea className="flex-1">
-          <TabsContent value="queue" className="p-4 space-y-6 mt-0">
-            {/* Up Next */}
-            {upNext.length > 0 ? (
+          {/* File: Suite de l'album */}
+          <TabsContent value="file" className="p-4 mt-0">
+            {albumTracksFromCurrent.length > 0 ? (
               <div>
-                <h3 className="text-xs font-display uppercase tracking-widest text-muted-foreground mb-3">
-                  À Suivre
-                </h3>
-                <div className="space-y-1">
-                  {upNext.map((track, idx) => {
-                    const actualIndex = currentTrackIndex + 1 + idx;
-                    return (
-                      <TrackItem
-                        key={track.id}
-                        track={track}
-                        onClick={() => onTrackSelect(actualIndex)}
-                        showGrip
-                      />
-                    );
-                  })}
+                <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <p className="text-xs text-muted-foreground mb-1">Album en lecture</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {currentTrack?.album}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {currentTrack?.artist}
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Aucune piste à suivre
-              </div>
-            )}
-
-            {/* History */}
-            {history.length > 0 && (
-              <div>
-                <h3 className="text-xs font-display uppercase tracking-widest text-muted-foreground/50 mb-3">
-                  Historique ({history.length})
-                </h3>
-                <div className="space-y-1 opacity-60">
-                  {history.map((track, idx) => (
+                <div className="space-y-1">
+                  {albumTracksFromCurrent.map((track) => (
                     <TrackItem
                       key={track.id}
                       track={track}
-                      onClick={() => onTrackSelect(idx)}
+                      onClick={() => onPlayTrack?.(track)}
                     />
                   ))}
                 </div>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="album" className="p-4 mt-0">
-            {albumTracksFromCurrent.length > 0 ? (
-              <div className="space-y-1">
-                {albumTracksFromCurrent.map((track) => (
-                  <TrackItem
-                    key={track.id}
-                    track={track}
-                    onClick={() => onPlayTrack?.(track)}
-                  />
-                ))}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 {currentTrack 
                   ? `Aucune autre piste dans l'album "${currentTrack.album}"`
-                  : "Aucun album disponible"}
+                  : "Aucun album en lecture"}
               </div>
             )}
           </TabsContent>
 
+          {/* Similaire */}
           <TabsContent value="similar" className="p-4 mt-0">
             {similarTracks.length > 0 ? (
               <div className="space-y-1">
@@ -242,6 +210,25 @@ export const QueuePanel = ({
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 Aucune piste similaire trouvée
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Historique */}
+          <TabsContent value="history" className="p-4 mt-0">
+            {historyTracks.length > 0 ? (
+              <div className="space-y-1">
+                {historyTracks.map((track) => (
+                  <TrackItem
+                    key={track.id}
+                    track={track}
+                    onClick={() => onPlayTrack?.(track)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Aucun historique disponible
               </div>
             )}
           </TabsContent>

@@ -65,8 +65,25 @@ export const HomeView = ({
   recentTracks = [],
   favoriteTracks = [],
 }: HomeViewProps) => {
-  const displayRecent = recentTracks.length > 0 ? recentTracks.slice(0, 4) : tracks.slice(0, 4);
-  const displayFavorites = favoriteTracks.length > 0 ? favoriteTracks.slice(0, 6) : tracks.slice(0, 6);
+  // Remove duplicates by ID before slicing
+  const getUniqueTracks = (trackList: Track[]) => {
+    const seen = new Set<string>();
+    return trackList.filter(track => {
+      if (seen.has(track.id)) {
+        return false;
+      }
+      seen.add(track.id);
+      return true;
+    });
+  };
+
+  const displayRecent = recentTracks.length > 0 
+    ? getUniqueTracks(recentTracks).slice(0, 4) 
+    : getUniqueTracks(tracks).slice(0, 4);
+  
+  const displayFavorites = favoriteTracks.length > 0 
+    ? getUniqueTracks(favoriteTracks).slice(0, 6) 
+    : getUniqueTracks(tracks).slice(0, 6);
   
   const { discoveries, similar } = generateRecommendations(tracks, recentTracks, favoriteTracks);
 
@@ -113,13 +130,13 @@ export const HomeView = ({
             </h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {displayRecent.map((track) => {
+            {displayRecent.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrentTrack = currentTrackIndex === actualIndex;
               
               return (
                 <button
-                  key={track.id}
+                  key={`recent-${track.id}-${idx}`}
                   onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                   className={cn(
                     "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-300",
@@ -196,7 +213,7 @@ export const HomeView = ({
                   
                   return (
                     <tr
-                      key={track.id}
+                      key={`favorite-${track.id}-${idx}`}
                       onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                       className={cn(
                         "group cursor-pointer transition-all duration-200",
