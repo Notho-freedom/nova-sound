@@ -462,6 +462,22 @@ export const DesktopApp = () => {
     setShowInlinePlayer(false);
   };
 
+  const handleNavigateToAlbum = () => {
+    if (!currentTrack) return;
+    setShowInlinePlayer(false);
+    setCurrentView("albums");
+    // Note: LibraryView will handle album filtering internally when in albums view mode
+    toast.success(`Affichage de l'album "${currentTrack.album}"`);
+  };
+
+  const handleNavigateToArtist = () => {
+    if (!currentTrack) return;
+    setShowInlinePlayer(false);
+    setCurrentView("artists");
+    // Note: LibraryView will handle artist filtering internally when in artists view mode
+    toast.success(`Affichage de l'artiste "${currentTrack.artist}"`);
+  };
+
   // Get favorite tracks
   const favoriteTracks = tracks.filter(track => isFavorite(track.id));
 
@@ -809,6 +825,8 @@ export const DesktopApp = () => {
               setIsLyricsOpen(!isLyricsOpen);
               if (!isLyricsOpen) setIsQueueOpen(false);
             }}
+            onNavigateToAlbum={handleNavigateToAlbum}
+            onNavigateToArtist={handleNavigateToArtist}
             isQueueOpen={isQueueOpen}
           />
         )}

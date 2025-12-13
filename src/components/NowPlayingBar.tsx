@@ -18,6 +18,7 @@ import {
   Info,
   Radio,
   Disc3,
+  Users,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -56,6 +57,8 @@ interface NowPlayingBarProps {
   onToggleFavorite?: () => void;
   onShowPlayer?: () => void;
   onShowLyrics?: () => void;
+  onNavigateToAlbum?: () => void;
+  onNavigateToArtist?: () => void;
   isQueueOpen: boolean;
 }
 
@@ -87,6 +90,8 @@ export const NowPlayingBar = ({
   onToggleFavorite,
   onShowPlayer,
   onShowLyrics,
+  onNavigateToAlbum,
+  onNavigateToArtist,
   isQueueOpen,
 }: NowPlayingBarProps) => {
   const VolumeIcon = isMuted || volume === 0 
@@ -140,12 +145,27 @@ export const NowPlayingBar = ({
             </Tooltip>
             
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-foreground hover:text-primary cursor-pointer transition-colors">
+              <p 
+                onClick={onShowPlayer}
+                className="text-sm font-medium truncate text-foreground hover:text-primary cursor-pointer transition-colors"
+              >
                 {currentTrack.title}
               </p>
-              <p className="text-xs text-muted-foreground truncate hover:text-foreground cursor-pointer transition-colors">
-                {currentTrack.artist} • {currentTrack.album}
-              </p>
+              <div className="text-xs text-muted-foreground truncate">
+                <span 
+                  onClick={onNavigateToArtist}
+                  className="hover:text-foreground cursor-pointer transition-colors"
+                >
+                  {currentTrack.artist}
+                </span>
+                <span className="mx-1">•</span>
+                <span 
+                  onClick={onNavigateToAlbum}
+                  className="hover:text-foreground cursor-pointer transition-colors"
+                >
+                  {currentTrack.album}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -320,7 +340,10 @@ export const NowPlayingBar = ({
                   <Share2 className="w-4 h-4 mr-2" />
                   Partager
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.info(`Album: ${currentTrack.album}\nArtiste: ${currentTrack.artist}`)}>
+                <DropdownMenuItem onClick={() => {
+                  const info = `Titre: ${currentTrack.title}\nArtiste: ${currentTrack.artist}\nAlbum: ${currentTrack.album}\nDurée: ${formatTime(currentTrack.duration)}${currentTrack.genre ? `\nGenre: ${currentTrack.genre}` : ''}${currentTrack.year ? `\nAnnée: ${currentTrack.year}` : ''}`;
+                  toast.info(info, { duration: 5000 });
+                }}>
                   <Info className="w-4 h-4 mr-2" />
                   Infos de la piste
                 </DropdownMenuItem>
@@ -329,9 +352,25 @@ export const NowPlayingBar = ({
                   <Radio className="w-4 h-4 mr-2" />
                   Démarrer une radio
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.info(`Aller à l'album "${currentTrack.album}"`)}>
+                <DropdownMenuItem onClick={() => {
+                  if (onNavigateToAlbum) {
+                    onNavigateToAlbum();
+                  } else {
+                    toast.info(`Aller à l'album "${currentTrack.album}"`);
+                  }
+                }}>
                   <Disc3 className="w-4 h-4 mr-2" />
                   Aller à l'album
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  if (onNavigateToArtist) {
+                    onNavigateToArtist();
+                  } else {
+                    toast.info(`Aller à l'artiste "${currentTrack.artist}"`);
+                  }
+                }}>
+                  <Users className="w-4 h-4 mr-2" />
+                  Aller à l'artiste
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
