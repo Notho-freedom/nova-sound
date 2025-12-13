@@ -139,7 +139,7 @@ function createWindow() {
     if (isDev || cliOptions.dev) {
         const port = cliOptions.port || 3000;
         mainWindow.loadURL(`http://localhost:${port}`);
-        if (cliOptions.debug) {
+        if (cliOptions.debug || isDev) {
             mainWindow.webContents.openDevTools();
         }
     }

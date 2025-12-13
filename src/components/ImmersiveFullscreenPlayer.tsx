@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   X, 
   Play, 
@@ -79,6 +79,8 @@ export const ImmersiveFullscreenPlayer = ({
   const starsRef = useRef<any>(null);
   const [showControls, setShowControls] = useState(true);
   const [dominantColor, setDominantColor] = useState("#3b82f6");
+  const [isUserActive, setIsUserActive] = useState(true); // Start with Nexus background
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Audio analysis
   const sensesData = useAudioSenses(audioElement, {
@@ -306,10 +308,11 @@ export const ImmersiveFullscreenPlayer = ({
           for (let i = 0; i < particleCount; i++) {
             const idx = i * 3;
             
-            // Update position with velocity (free movement)
-            particleArray[idx] += velocities[i * 3];
-            particleArray[idx + 1] += velocities[i * 3 + 1];
-            particleArray[idx + 2] += velocities[i * 3 + 2];
+            // Update position with velocity (free movement) - fixed speed, no external factors
+            const fixedSpeed = 0.5; // Fixed speed multiplier
+            particleArray[idx] += velocities[i * 3] * fixedSpeed;
+            particleArray[idx + 1] += velocities[i * 3 + 1] * fixedSpeed;
+            particleArray[idx + 2] += velocities[i * 3 + 2] * fixedSpeed;
             
             // Wrap around boundaries for continuous flow
             if (Math.abs(particleArray[idx]) > 100) {
@@ -379,12 +382,117 @@ export const ImmersiveFullscreenPlayer = ({
     return () => clearTimeout(timer);
   }, [showControls]);
 
+  // Inactivity detection - switch to space mode after 10 seconds
+  useEffect(() => {
+    // Ensure we start with active state (Nexus background)
+    setIsUserActive(true);
+    
+    const resetInactivityTimer = () => {
+      setIsUserActive(true);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = setTimeout(() => {
+        setIsUserActive(false);
+      }, 10000); // 10 seconds
+    };
+
+    // Initial timer - start counting after component mount
+    // Don't start timer immediately, wait for first user interaction or 10s
+    inactivityTimerRef.current = setTimeout(() => {
+      setIsUserActive(false);
+    }, 10000);
+
+    // Listen to user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'wheel'];
+    events.forEach(event => {
+      document.addEventListener(event, resetInactivityTimer, { passive: true });
+    });
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      events.forEach(event => {
+        document.removeEventListener(event, resetInactivityTimer);
+      });
+    };
+  }, []);
+
+  // Handle activity on the main container - unified with inactivity timer
+  const handleContainerActivity = useCallback(() => {
+    setShowControls(true);
+    setIsUserActive(true);
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = setTimeout(() => {
+      setIsUserActive(false);
+    }, 10000);
+  }, []);
+
+  // Debug: log state changes
+  useEffect(() => {
+    console.log('isUserActive changed:', isUserActive);
+  }, [isUserActive]);
+
   return (
     <div 
-      className="fixed inset-0 z-[10000] bg-background flex flex-col overflow-hidden"
-      onMouseMove={() => setShowControls(true)}
-      onClick={() => setShowControls(true)}
+      className="fixed inset-0 z-[10000] flex flex-col overflow-hidden transition-all duration-1000"
+      style={{
+        background: isUserActive 
+          ? "radial-gradient(circle at center, #050913, #01020a)" // Nexus background
+          : "radial-gradient(circle at center, #000000, #000011)" // Space background
+      }}
+      onMouseMove={handleContainerActivity}
+      onClick={handleContainerActivity}
+      onTouchStart={handleContainerActivity}
     >
+      {/* Nexus Background Effects - only when user is active */}
+      {isUserActive && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden transition-opacity duration-1000">
+          {/* Grid pattern */}
+          <div 
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage: `
+                linear-gradient(hsl(230 30% 20% / 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, hsl(230 30% 20% / 0.5) 1px, transparent 1px)
+              `,
+              backgroundSize: "80px 80px",
+            }}
+          />
+          
+          {/* Gradient orbs */}
+          <div 
+            className="absolute top-1/4 -left-32 w-96 h-96 rounded-full opacity-20 blur-3xl"
+            style={{
+              background: "radial-gradient(circle, hsl(180 100% 50%) 0%, transparent 70%)"
+            }}
+          />
+          <div 
+            className="absolute bottom-1/4 -right-32 w-96 h-96 rounded-full opacity-20 blur-3xl"
+            style={{
+              background: "radial-gradient(circle, hsl(320 100% 60%) 0%, transparent 70%)"
+            }}
+          />
+          <div 
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-10 blur-3xl"
+            style={{
+              background: "radial-gradient(circle, hsl(270 80% 60%) 0%, transparent 70%)"
+            }}
+          />
+          
+        {/* Scanline effect */}
+        <div 
+          className="absolute inset-0 opacity-[0.02]"
+          style={{
+            backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(200 100% 95%) 2px, hsl(200 100% 95%) 4px)"
+          }}
+        />
+        </div>
+      )}
+
       {/* Three.js Canvas Background */}
       <canvas 
         ref={canvasRef}
