@@ -85,7 +85,11 @@ export const HomeView = ({
     ? getUniqueTracks(favoriteTracks).slice(0, 6) 
     : getUniqueTracks(tracks).slice(0, 6);
   
-  const { discoveries, similar } = generateRecommendations(tracks, recentTracks, favoriteTracks);
+  const { discoveries: rawDiscoveries, similar: rawSimilar } = generateRecommendations(tracks, recentTracks, favoriteTracks);
+  
+  // Remove duplicates from recommendations
+  const discoveries = getUniqueTracks(rawDiscoveries);
+  const similar = getUniqueTracks(rawSimilar);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -312,7 +316,7 @@ export const HomeView = ({
               <div className="flex items-center gap-2">
                 {discoveries.slice(0, 3).map((track, i) => (
                   <div 
-                    key={track.id} 
+                    key={`discovery-${track.id}-${i}`} 
                     className="w-10 h-10 rounded overflow-hidden border-2 border-white/30"
                     style={{ marginLeft: i > 0 ? '-8px' : 0 }}
                   >
@@ -350,7 +354,7 @@ export const HomeView = ({
               <div className="flex items-center gap-2">
                 {similar.slice(0, 3).map((track, i) => (
                   <div 
-                    key={track.id} 
+                    key={`similar-${track.id}-${i}`} 
                     className="w-10 h-10 rounded overflow-hidden border-2 border-white/30"
                     style={{ marginLeft: i > 0 ? '-8px' : 0 }}
                   >
@@ -389,7 +393,7 @@ export const HomeView = ({
               <div className="flex items-center gap-2">
                 {tracks.slice(0, 3).map((track, i) => (
                   <div 
-                    key={track.id} 
+                    key={`mix-${track.id}-${i}`} 
                     className="w-10 h-10 rounded overflow-hidden border-2 border-white/30"
                     style={{ marginLeft: i > 0 ? '-8px' : 0 }}
                   >
