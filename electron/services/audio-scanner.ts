@@ -193,10 +193,11 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
       }
     }
 
-    // Phase 3: Merge with existing tracks and save to storage
+    // Phase 3: Merge with existing tracks and save to storage (duplicates removed in saveLibrary)
     sendProgress({ current: total, total, file: '', phase: 'indexing' });
     if (newTracks.length > 0) {
       const allTracks = [...existingTracks, ...newTracks];
+      // saveLibrary will automatically remove duplicates
       await storage.saveLibrary(allTracks);
     }
 

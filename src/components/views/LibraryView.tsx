@@ -340,7 +340,7 @@ export const LibraryView = ({
 
                 return (
                   <tr
-                    key={track.id}
+                    key={`album-track-${track.id}-${idx}`}
                     ref={isCurrentTrack ? currentTrackRef : null}
                     onClick={() => onTrackSelect(actualIndex)}
                     className={cn(
@@ -701,7 +701,7 @@ export const LibraryView = ({
 
                 return (
                   <tr
-                    key={track.id}
+                    key={`track-${track.id}-${idx}`}
                     onClick={() => onTrackSelect(actualIndex)}
                     className={cn(
                       "group cursor-pointer transition-all duration-200",
@@ -832,13 +832,13 @@ export const LibraryView = ({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredAndSortedTracks.map((track) => {
+          {filteredAndSortedTracks.map((track, idx) => {
             const actualIndex = tracks.findIndex(t => t.id === track.id);
             const isCurrentTrack = currentTrackIndex === actualIndex;
 
             return (
               <TrackContextMenu
-                key={track.id}
+                key={`track-grid-${track.id}-${idx}`}
                 track={track}
                 playlists={playlists}
                 isFavorite={isFavorite(track.id)}

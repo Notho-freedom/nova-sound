@@ -35,7 +35,11 @@ export function useLibrary(): UseLibraryReturn {
 
       try {
         const library = await window.electronAPI!.getLibrary();
-        setTracks(library);
+        // Remove duplicates by ID (additional safety check)
+        const uniqueTracks = library.filter((track, index, self) => 
+          index === self.findIndex(t => t.id === track.id)
+        );
+        setTracks(uniqueTracks);
       } catch (err) {
         console.error("Failed to load library:", err);
         setError("Erreur lors du chargement de la bibliothèque");
@@ -56,8 +60,14 @@ export function useLibrary(): UseLibraryReturn {
       if (progress.phase === "complete") {
         setScanning(false);
         setScanProgress(null);
-        // Reload library after scan
-        window.electronAPI!.getLibrary().then(setTracks);
+        // Reload library after scan (duplicates already removed in storage)
+        window.electronAPI!.getLibrary().then((library) => {
+          // Additional safety check to remove duplicates
+          const uniqueTracks = library.filter((track, index, self) => 
+            index === self.findIndex(t => t.id === track.id)
+          );
+          setTracks(uniqueTracks);
+        });
       }
     });
 
@@ -131,7 +141,11 @@ export function useLibrary(): UseLibraryReturn {
     setLoading(true);
     try {
       const library = await window.electronAPI!.getLibrary();
-      setTracks(library);
+      // Remove duplicates by ID (additional safety check)
+      const uniqueTracks = library.filter((track, index, self) => 
+        index === self.findIndex(t => t.id === track.id)
+      );
+      setTracks(uniqueTracks);
     } catch (err) {
       console.error("Failed to refresh library:", err);
       setError("Erreur lors du rafraîchissement");
