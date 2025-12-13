@@ -19,6 +19,7 @@ const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => (
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Clock, Music } from "lucide-react";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
@@ -522,6 +523,18 @@ export const DesktopApp = () => {
     .filter((t): t is Track => t !== undefined)
     .slice(0, 20);
 
+  // Get recently added tracks (sorted by addedAt date)
+  const recentlyAddedTracks = useMemo(() => {
+    return libraryTracks
+      .filter(t => t.addedAt)
+      .sort((a, b) => {
+        const dateA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+        const dateB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+        return dateB - dateA; // Most recent first
+      })
+      .slice(0, 50);
+  }, [libraryTracks]);
+
   // Get album tracks for current track
   const albumTracks = useMemo(() => {
     if (!currentTrack) return [];
@@ -655,22 +668,85 @@ export const DesktopApp = () => {
         );
       case "recent":
         return (
-          <LibraryView
-            tracks={recentTracks}
-            currentTrackIndex={currentTrackIndex}
-            isPlaying={isPlaying}
-            onTrackSelect={(index) => {
-              const track = recentTracks[index];
-              const realIndex = tracks.findIndex(t => t.id === track.id);
-              if (realIndex !== -1) handleTrackSelect(realIndex);
-            }}
-            title="Écouté récemment"
-            showHistory={true}
-            emptyMessage="Aucun historique d'écoute."
-            onPlayNext={handlePlayNext}
-            onAddToQueue={handleAddToQueue}
-            onAddToPlaylist={handleAddToPlaylist}
-          />
+          <div className="h-full flex flex-col animate-in fade-in duration-300">
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6 space-y-8">
+                {/* Section: Récemment écoutées */}
+                {recentTracks.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Clock className="w-5 h-5 text-primary" />
+                      <h2 className="font-display text-xl font-bold tracking-wider">
+                        ÉCOUTÉ RÉCEMMENT
+                      </h2>
+                      <span className="text-sm text-muted-foreground">
+                        ({recentTracks.length})
+                      </span>
+                    </div>
+                    <LibraryView
+                      tracks={recentTracks}
+                      currentTrackIndex={currentTrackIndex}
+                      isPlaying={isPlaying}
+                      onTrackSelect={(index) => {
+                        const track = recentTracks[index];
+                        const realIndex = tracks.findIndex(t => t.id === track.id);
+                        if (realIndex !== -1) handleTrackSelect(realIndex);
+                      }}
+                      title=""
+                      showFilters={false}
+                      showHistory={true}
+                      emptyMessage="Aucun historique d'écoute."
+                      onPlayNext={handlePlayNext}
+                      onAddToQueue={handleAddToQueue}
+                      onAddToPlaylist={handleAddToPlaylist}
+                    />
+                  </div>
+                )}
+
+                {/* Section: Récemment ajoutées */}
+                {recentlyAddedTracks.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Music className="w-5 h-5 text-primary" />
+                      <h2 className="font-display text-xl font-bold tracking-wider">
+                        RÉCEMMENT AJOUTÉES
+                      </h2>
+                      <span className="text-sm text-muted-foreground">
+                        ({recentlyAddedTracks.length})
+                      </span>
+                    </div>
+                    <LibraryView
+                      tracks={recentlyAddedTracks}
+                      currentTrackIndex={currentTrackIndex}
+                      isPlaying={isPlaying}
+                      onTrackSelect={(index) => {
+                        const track = recentlyAddedTracks[index];
+                        const realIndex = tracks.findIndex(t => t.id === track.id);
+                        if (realIndex !== -1) handleTrackSelect(realIndex);
+                      }}
+                      title=""
+                      showFilters={false}
+                      emptyMessage="Aucune musique récemment ajoutée."
+                      onPlayNext={handlePlayNext}
+                      onAddToQueue={handleAddToQueue}
+                      onAddToPlaylist={handleAddToPlaylist}
+                    />
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {recentTracks.length === 0 && recentlyAddedTracks.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Clock className="w-16 h-16 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Aucun historique</h3>
+                    <p className="text-muted-foreground text-sm max-w-md">
+                      Vos pistes récemment écoutées et récemment ajoutées apparaîtront ici.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         );
       case "albums":
         return (
