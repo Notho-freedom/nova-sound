@@ -3,7 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 
 interface HistoryEntry {
@@ -89,11 +89,37 @@ export const HomeView = ({
     ? getUniqueTracks(favoriteTracks).slice(0, 6) 
     : getUniqueTracks(tracks).slice(0, 6);
   
-  // Get random selections from most played tracks
-  const { discoveries, similar, mix } = generateMostPlayedSelections(tracks, history);
-  const uniqueDiscoveries = getUniqueTracks(discoveries);
-  const uniqueSimilar = getUniqueTracks(similar);
-  const uniqueMix = getUniqueTracks(mix);
+  // Get random selections from most played tracks - recalculated dynamically when history or tracks change
+  const mostPlayedSelections = useMemo(() => {
+    if (history.length === 0 || tracks.length === 0) {
+      return { discoveries: [], similar: [], mix: [] };
+    }
+    return generateMostPlayedSelections(tracks, history);
+  }, [tracks, history]);
+
+  const uniqueDiscoveries = useMemo(() => 
+    getUniqueTracks(mostPlayedSelections.discoveries), 
+    [mostPlayedSelections.discoveries]
+  );
+  const uniqueSimilar = useMemo(() => 
+    getUniqueTracks(mostPlayedSelections.similar), 
+    [mostPlayedSelections.similar]
+  );
+  const uniqueMix = useMemo(() => 
+    getUniqueTracks(mostPlayedSelections.mix), 
+    [mostPlayedSelections.mix]
+  );
+
+  // Force re-render when history updates to ensure fresh random selections
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    // Update selections when history changes significantly
+    const timer = setTimeout(() => {
+      setRefreshKey(prev => prev + 1);
+    }, 1000); // Small delay to batch updates
+    
+    return () => clearTimeout(timer);
+  }, [history.length]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
