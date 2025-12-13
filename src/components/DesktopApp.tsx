@@ -175,13 +175,31 @@ export const DesktopApp = () => {
     return () => clearTimeout(timeoutId);
   }, [volume, isMuted]);
 
-  // Update current time from audio element
+  // Update current time from audio element with higher precision
   useEffect(() => {
     if (!audioRef.current) return;
 
+    // Use requestAnimationFrame for smoother, more frequent updates
+    let animationFrameId: number;
+    let lastUpdateTime = 0;
+
+    const updateTime = () => {
+      if (audioRef.current) {
+        const now = audioRef.current.currentTime;
+        // Update more frequently (every ~50ms or on significant change)
+        if (Math.abs(now - lastUpdateTime) >= 0.05 || !lastUpdateTime) {
+          setCurrentTime(now); // Keep decimal precision for lyrics sync
+          lastUpdateTime = now;
+        }
+        if (isPlaying) {
+          animationFrameId = requestAnimationFrame(updateTime);
+        }
+      }
+    };
+
     const handleTimeUpdate = () => {
       if (audioRef.current) {
-        setCurrentTime(Math.floor(audioRef.current.currentTime));
+        setCurrentTime(audioRef.current.currentTime); // Keep precision
       }
     };
 
@@ -189,16 +207,25 @@ export const DesktopApp = () => {
       handleNext();
     };
 
+    // Start animation frame loop for smooth updates when playing
+    if (isPlaying) {
+      animationFrameId = requestAnimationFrame(updateTime);
+    }
+
+    // Also listen to timeupdate as backup
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     audioRef.current.addEventListener('ended', handleEnded);
 
     return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, []);
+  }, [isPlaying]);
 
   // Fallback: Simulate playback progress when no real audio file
   useEffect(() => {

@@ -67,11 +67,13 @@ export const LyricsDisplay = ({
     setOffset(0);
   }, [currentTrack?.id]);
 
-  // Find current lyrics line with improved precision
+  // Find current lyrics line with improved precision and anticipation
   const getCurrentLineIndex = useCallback((): number => {
     if (!lyrics?.syncedLyrics || lyrics.syncedLyrics.length === 0) return -1;
     
-    const adjustedTime = currentTime + offset;
+    // Add small anticipation (0.2s) to compensate for display delay
+    const anticipation = 0.2;
+    const adjustedTime = currentTime + offset + anticipation;
     
     // Binary search for better performance with large lyrics
     let left = 0;
