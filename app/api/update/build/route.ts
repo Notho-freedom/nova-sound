@@ -38,54 +38,45 @@ export async function GET() {
       '/vercel/path0/local-ui',
     ];
     
-    // Sur Vercel, les fonctions serverless s'exécutent dans /var/task
-    // Les fichiers du build sont dans un emplacement différent
-    // Utiliser __dirname pour trouver le répertoire de la fonction
-    const functionDir = __dirname || path.dirname(new URL(import.meta.url).pathname);
+    // Sur Vercel, les fonctions serverless sont dans /var/task/app/api/...
+    // Le build standalone est déployé mais peut être dans un emplacement différent
+    // Essayer plusieurs stratégies pour trouver le build
     
-    // Chercher depuis le répertoire de la fonction (qui devrait être dans .next/server)
-    const serverDir = path.join(functionDir, '../..');
-    const standaloneDir = path.join(serverDir, 'standalone');
-    const standaloneLocalUIDir = path.join(standaloneDir, 'local-ui');
+    // Stratégie 1: Depuis la fonction (remonter jusqu'à .next/standalone)
+    const functionDir = __dirname;
+    // Depuis /var/task/app/api/update/build, remonter à /var/task puis chercher .next
+    const taskRoot = path.join(functionDir, '../../..'); // /var/task
+    const nextStandalone = path.join(taskRoot, '.next', 'standalone');
+    const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     
-    // Chemins à vérifier (priorité: local-ui dans standalone > standalone lui-même)
+    // Stratégie 2: Chemins absolus possibles sur Vercel
     const vercelPaths = [
-      standaloneLocalUIDir,
-      standaloneDir,
-      path.join(standaloneDir, 'app'),
+      nextStandaloneLocalUI,
+      nextStandalone,
+      path.join(nextStandalone, 'app'),
+      // Chemins alternatifs
+      '/var/task/.next/standalone/local-ui',
+      '/var/task/.next/standalone',
+      '/var/task/.next/standalone/app',
     ];
     
     // Log pour déboguer
     console.log('Searching for build directory.');
     console.log('CWD:', cwd);
     console.log('Function dir:', functionDir);
-    console.log('Server dir:', serverDir);
-    console.log('Standalone dir:', standaloneDir);
+    console.log('Task root:', taskRoot);
+    console.log('Next standalone:', nextStandalone);
     
     let buildDir: string | null = null;
     
-    // D'abord vérifier les chemins relatifs à la fonction
-    for (const possiblePath of vercelPaths) {
+    // Vérifier tous les chemins
+    for (const possiblePath of [...vercelPaths, ...possiblePaths]) {
       if (fs.existsSync(possiblePath)) {
         const files = fs.readdirSync(possiblePath);
         if (files.length > 0) {
           buildDir = possiblePath;
-          console.log('Found build directory (relative to function):', buildDir);
+          console.log('Found build directory:', buildDir);
           break;
-        }
-      }
-    }
-    
-    // Si pas trouvé, vérifier les chemins absolus
-    if (!buildDir) {
-      for (const possiblePath of possiblePaths) {
-        if (fs.existsSync(possiblePath)) {
-          const files = fs.readdirSync(possiblePath);
-          if (files.length > 0) {
-            buildDir = possiblePath;
-            console.log('Found build directory (absolute):', buildDir);
-            break;
-          }
         }
       }
     }

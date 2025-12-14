@@ -18,21 +18,23 @@ export const revalidate = 0;
  */
 export async function GET() {
   try {
-    // En production Vercel, les fonctions serverless s'exécutent dans /var/task
-    // Utiliser __dirname pour trouver le répertoire de la fonction
+    // En production Vercel, les fonctions serverless sont dans /var/task/app/api/...
     const cwd = process.cwd();
     const functionDir = __dirname;
-    const serverDir = path.join(functionDir, '../..');
-    const standaloneDir = path.join(serverDir, 'standalone');
-    const standaloneLocalUIDir = path.join(standaloneDir, 'local-ui');
+    // Depuis /var/task/app/api/update/version, remonter à /var/task
+    const taskRoot = path.join(functionDir, '../../..');
+    const nextStandalone = path.join(taskRoot, '.next', 'standalone');
+    const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     
     // Chercher version.json dans plusieurs emplacements possibles
     // Priorité: local-ui dans standalone (créé pendant le build) > standalone > autres
     const possiblePaths = [
-      path.join(standaloneLocalUIDir, 'version.json'),
-      path.join(standaloneDir, 'local-ui', 'version.json'),
-      path.join(standaloneDir, 'version.json'),
-      path.join(standaloneDir, 'app', 'version.json'),
+      path.join(nextStandaloneLocalUI, 'version.json'),
+      path.join(nextStandalone, 'local-ui', 'version.json'),
+      path.join(nextStandalone, 'version.json'),
+      path.join(nextStandalone, 'app', 'version.json'),
+      '/var/task/.next/standalone/local-ui/version.json',
+      '/var/task/.next/standalone/version.json',
       path.join(cwd, '.next', 'standalone', 'local-ui', 'version.json'),
       path.join(cwd, 'local-ui', 'version.json'),
       path.join(cwd, '.next', 'standalone', 'version.json'),
