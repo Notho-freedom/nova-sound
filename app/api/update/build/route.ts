@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import archiver from 'archiver';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,229 +9,143 @@ const __dirname = path.dirname(__filename);
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Limite de taille (1000MB)
-const MAX_BUILD_SIZE = 1000 * 1024 * 1024;
-
 /**
- * API Route pour servir le build complet en ZIP
+ * API Route pour servir l'URL du build ZIP
  * GET /api/update/build
  * 
- * Crée un ZIP du build actuel et le retourne
+ * SOLUTION PRO : Le ZIP est généré au build et servi statiquement
+ * Cette route retourne simplement l'URL du ZIP le plus récent
+ * 
  * Utilisé par l'application Electron pour télécharger les mises à jour
  */
 export async function GET() {
   try {
-    // En production Vercel, le build est dans .next/standalone
-    // Chercher le build dans plusieurs emplacements possibles
-    // Priorité: public/local-ui (accessible depuis les routes API) > .next/standalone/local-ui > .next/standalone > local-ui
+    // Lire latest.json qui contient les métadonnées du build le plus récent
+    // Ce fichier est généré au build par generate-build-zip.js
     const cwd = process.cwd();
-    const possiblePaths = [
-      path.join(cwd, 'public', 'local-ui'), // Priorité: accessible depuis les routes API
-      path.join(cwd, '.next', 'standalone', 'local-ui'),
-      path.join(cwd, '.next', 'standalone'),
-      path.join(cwd, '.next', 'standalone', 'app'),
-      path.join(cwd, 'local-ui'),
-      path.join(cwd, 'dist'),
-      // Chemins alternatifs pour Vercel
-      '/var/task/public/local-ui',
-      '/vercel/path0/public/local-ui',
-      '/vercel/path0/.next/standalone/local-ui',
-      '/vercel/path0/.next/standalone',
-      '/vercel/path0/local-ui',
+    const possibleLatestPaths = [
+      path.join(cwd, 'public', 'updates', 'latest.json'),
+      '/var/task/public/updates/latest.json',
+      '/vercel/path0/public/updates/latest.json',
     ];
-    
-    // Sur Vercel, les fonctions serverless sont dans /var/task/app/api/...
-    // Le build standalone est déployé mais peut être dans un emplacement différent
-    // Essayer plusieurs stratégies pour trouver le build
-    
-    // Stratégie 1: Depuis la fonction (remonter jusqu'à .next/standalone)
-    const functionDir = __dirname;
-    // Sur Vercel, on est dans /var/task/app/api/update/build
-    // Donc /var/task est à ../../../.. depuis functionDir (4 niveaux)
-    // Mais vérifions d'abord avec 3 niveaux (../../..) qui donne /var/task/app
-    // Puis remontons encore d'un niveau si nécessaire
-    let taskRoot = path.join(functionDir, '../../..'); // /var/task/app
-    // Si on est dans /var/task/app, remonter à /var/task
-    if (taskRoot.endsWith('/app') || taskRoot.endsWith('\\app')) {
-      taskRoot = path.join(taskRoot, '..'); // /var/task
-    }
-    const nextStandalone = path.join(taskRoot, '.next', 'standalone');
-    const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
-    
-    // Stratégie 2: Chemins absolus possibles sur Vercel
-    const vercelPaths = [
-      nextStandaloneLocalUI,
-      nextStandalone,
-      path.join(nextStandalone, 'app'),
-      // Chemins alternatifs
-      '/var/task/.next/standalone/local-ui',
-      '/var/task/.next/standalone',
-      '/var/task/.next/standalone/app',
-    ];
-    
-    // Log pour déboguer
-    console.log('Searching for build directory.');
-    console.log('CWD:', cwd);
-    console.log('Function dir:', functionDir);
-    console.log('Task root:', taskRoot);
-    console.log('Next standalone:', nextStandalone);
-    
-    let buildDir: string | null = null;
-    
-    // Vérifier tous les chemins
-    for (const possiblePath of [...vercelPaths, ...possiblePaths]) {
+
+    let latestJsonPath: string | null = null;
+    for (const possiblePath of possibleLatestPaths) {
       if (fs.existsSync(possiblePath)) {
-        const files = fs.readdirSync(possiblePath);
-        if (files.length > 0) {
-          buildDir = possiblePath;
-          console.log('Found build directory:', buildDir);
+        latestJsonPath = possiblePath;
+        break;
+      }
+    }
+
+    if (!latestJsonPath) {
+      // Si latest.json n'existe pas, essayer de trouver le ZIP le plus récent
+      const updatesDirs = [
+        path.join(cwd, 'public', 'updates'),
+        '/var/task/public/updates',
+        '/vercel/path0/public/updates',
+      ];
+
+      let updatesDir: string | null = null;
+      for (const dir of updatesDirs) {
+        if (fs.existsSync(dir)) {
+          updatesDir = dir;
           break;
         }
       }
-    }
-    
-    if (!buildDir) {
-      console.error('Build directory not found.');
-      console.error('CWD:', cwd);
-      console.error('Function dir:', functionDir);
-      console.error('Task root:', taskRoot);
-      
-      // Lister les fichiers disponibles pour déboguer
-      try {
-        const cwdFiles = fs.existsSync(cwd) ? fs.readdirSync(cwd) : [];
-        const functionFiles = fs.existsSync(functionDir) ? fs.readdirSync(functionDir) : [];
-        const taskRootFiles = fs.existsSync(taskRoot) ? fs.readdirSync(taskRoot) : [];
-        console.error('Files in CWD:', cwdFiles);
-        console.error('Files in function dir:', functionFiles);
-        console.error('Files in task root:', taskRootFiles);
-        
-        // Vérifier spécifiquement public/
-        const publicDir = path.join(cwd, 'public');
-        const publicLocalUI = path.join(publicDir, 'local-ui');
-        if (fs.existsSync(publicDir)) {
-          try {
-            const publicFiles = fs.readdirSync(publicDir);
-            console.error('Files in public/:', publicFiles);
-            if (fs.existsSync(publicLocalUI)) {
-              const localUIFiles = fs.readdirSync(publicLocalUI);
-              console.error('Files in public/local-ui:', localUIFiles);
-            } else {
-              console.error('public/local-ui does not exist');
-            }
-          } catch (e) {
-            console.error('Cannot read public/:', e);
-          }
-        } else {
-          console.error('public/ directory does not exist');
-        }
-        
-        // Essayer de lister les fichiers dans les chemins parents
-        const parentDirs = [
-          path.join(functionDir, '..'),
-          path.join(functionDir, '../..'),
-          path.join(functionDir, '../../..'),
-          path.join(functionDir, '../../../..'),
-        ];
-        for (const parentDir of parentDirs) {
-          if (fs.existsSync(parentDir)) {
-            try {
-              const files = fs.readdirSync(parentDir);
-              console.error(`Files in ${parentDir}:`, files);
-            } catch (e) {
-              // Ignorer les erreurs
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Cannot list files:', e);
+
+      if (!updatesDir) {
+        return NextResponse.json(
+          { 
+            error: 'No build available',
+            message: 'Build ZIP not found. Make sure the build process completed successfully.'
+          },
+          { status: 404 }
+        );
       }
+
+      // Trouver le ZIP le plus récent
+      const files = fs.readdirSync(updatesDir);
+      const zipFiles = files.filter(f => f.endsWith('.zip'));
       
+      if (zipFiles.length === 0) {
+        return NextResponse.json(
+          { 
+            error: 'No build ZIP found',
+            message: 'No ZIP files found in updates directory.'
+          },
+          { status: 404 }
+        );
+      }
+
+      // Trier par date de modification (le plus récent en premier)
+      const zipFilesWithStats = zipFiles.map(file => {
+        const filePath = path.join(updatesDir!, file);
+        const stats = fs.statSync(filePath);
+        return { file, mtime: stats.mtime };
+      }).sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+      const latestZip = zipFilesWithStats[0].file;
+      const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        : process.env.UPDATE_BASE_URL || 'https://nova-sound-nine.vercel.app';
+
+      return NextResponse.json({
+        url: `${baseUrl}/updates/${latestZip}`,
+        fileName: latestZip,
+        size: fs.statSync(path.join(updatesDir, latestZip)).size,
+        buildDate: zipFilesWithStats[0].mtime.toISOString(),
+      }, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    // Lire latest.json
+    const latestData = JSON.parse(fs.readFileSync(latestJsonPath, 'utf-8'));
+    
+    // Construire l'URL complète
+    const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : process.env.UPDATE_BASE_URL || 'https://nova-sound-nine.vercel.app';
+
+    const zipUrl = latestData.zipUrl?.startsWith('http')
+      ? latestData.zipUrl
+      : `${baseUrl}${latestData.zipUrl || `/updates/${latestData.zipFileName}`}`;
+
+    // Vérifier que le fichier ZIP existe
+    const zipPath = path.join(path.dirname(latestJsonPath), latestData.zipFileName);
+    if (!fs.existsSync(zipPath)) {
       return NextResponse.json(
         { 
-          error: 'Build directory not found', 
-          cwd, 
-          functionDir,
-          taskRoot,
-          checkedPaths: [...vercelPaths, ...possiblePaths] 
+          error: 'Build ZIP not found',
+          message: `ZIP file ${latestData.zipFileName} not found on server.`
         },
         { status: 404 }
       );
     }
 
-    // Vérifier la taille du build
-    const getTotalSize = (dirPath: string): number => {
-      let totalSize = 0;
-      const items = fs.readdirSync(dirPath);
-      
-      for (const item of items) {
-        const itemPath = path.join(dirPath, item);
-        const stats = fs.statSync(itemPath);
-        
-        if (stats.isDirectory()) {
-          totalSize += getTotalSize(itemPath);
-        } else {
-          totalSize += stats.size;
-        }
-      }
-      
-      return totalSize;
-    };
+    const zipStats = fs.statSync(zipPath);
 
-    const buildSize = getTotalSize(buildDir);
-    
-    if (buildSize > MAX_BUILD_SIZE) {
-      return NextResponse.json(
-        { error: 'Build too large', size: buildSize, limit: MAX_BUILD_SIZE },
-        { status: 413 }
-      );
-    }
-    
-    // Créer le zip en mémoire
-    const archive = archiver('zip', {
-      zlib: { level: 9 } // Compression maximale
-    });
-    
-    const chunks: Buffer[] = [];
-    
-    return new Promise<NextResponse>((resolve, reject) => {
-      archive.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-      
-      archive.on('end', () => {
-        const buffer = Buffer.concat(chunks);
-        
-        console.log(`Build archive created: ${buffer.length} bytes`);
-        
-        resolve(new NextResponse(buffer, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/zip',
-            'Content-Disposition': 'attachment; filename="nexus-build.zip"',
-            'Content-Length': buffer.length.toString(),
-            'Cache-Control': 'no-cache',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }));
-      });
-      
-      archive.on('error', (err) => {
-        console.error('Archive creation error:', err);
-        reject(new NextResponse(
-          JSON.stringify({ error: 'Failed to create archive', details: err.message }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
-        ));
-      });
-      
-      // Ajouter tout le contenu de buildDir au zip
-      archive.directory(buildDir, false);
-      archive.finalize();
+    return NextResponse.json({
+      url: zipUrl,
+      fileName: latestData.zipFileName,
+      version: latestData.version,
+      buildNumber: latestData.buildNumber,
+      size: zipStats.size,
+      buildDate: latestData.buildDate || zipStats.mtime.toISOString(),
+    }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
   } catch (error) {
-    console.error('Failed to create build archive:', error);
+    console.error('Failed to get build URL:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to create build archive',
+        error: 'Failed to get build URL',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

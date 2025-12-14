@@ -59,6 +59,23 @@ export async function GET() {
     if (versionFile) {
       const versionData = JSON.parse(fs.readFileSync(versionFile, 'utf-8'));
       
+      // Ajouter l'URL du ZIP si latest.json existe
+      const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        : process.env.UPDATE_BASE_URL || 'https://nova-sound-nine.vercel.app';
+      
+      const latestJsonPath = path.join(path.dirname(versionFile), '..', '..', 'public', 'updates', 'latest.json');
+      if (fs.existsSync(latestJsonPath)) {
+        try {
+          const latestData = JSON.parse(fs.readFileSync(latestJsonPath, 'utf-8'));
+          versionData.downloadUrl = latestData.zipUrl?.startsWith('http')
+            ? latestData.zipUrl
+            : `${baseUrl}${latestData.zipUrl || `/updates/${latestData.zipFileName}`}`;
+        } catch (e) {
+          // Ignorer si latest.json n'est pas lisible
+        }
+      }
+      
       return NextResponse.json(versionData, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',

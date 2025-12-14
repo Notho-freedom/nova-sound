@@ -15,7 +15,7 @@
     "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && electron .",
     "build": "next build",
     "build:electron": "npm run build && node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
-    "postbuild": "node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js",
+    "postbuild": "node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js && node scripts/generate-build-zip.js",
     "build:backend": "cd server && npm run build",
     "start": "next start",
     "electron": "electron .",
