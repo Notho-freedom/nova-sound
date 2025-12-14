@@ -39,16 +39,25 @@ if (!fs.existsSync(distPath)) {
   process.exit(1);
 }
 
-// Fonction pour copier récursivement
-function copyRecursive(src, dest) {
+// Fonction pour copier récursivement (avec exclusion de dossiers)
+function copyRecursive(src, dest, excludeDirs = []) {
   const stat = fs.statSync(src);
   if (stat.isDirectory()) {
+    // Vérifier si ce dossier doit être exclu
+    const dirName = path.basename(src);
+    if (excludeDirs.includes(dirName)) {
+      return; // Ignorer ce dossier
+    }
+    
     if (!fs.existsSync(dest)) {
       fs.mkdirSync(dest, { recursive: true });
     }
     const items = fs.readdirSync(src);
     for (const item of items) {
-      copyRecursive(path.join(src, item), path.join(dest, item));
+      // Vérifier si l'item doit être exclu
+      if (!excludeDirs.includes(item)) {
+        copyRecursive(path.join(src, item), path.join(dest, item), excludeDirs);
+      }
     }
   } else {
     fs.copyFileSync(src, dest);
@@ -56,7 +65,7 @@ function copyRecursive(src, dest) {
 }
 
 // Fonction pour copier vers un dossier local-ui
-function copyToLocalUI(targetPath) {
+function copyToLocalUI(targetPath, excludeDirs = []) {
   // Créer le dossier s'il n'existe pas
   if (!fs.existsSync(targetPath)) {
     fs.mkdirSync(targetPath, { recursive: true });
@@ -76,19 +85,23 @@ function copyToLocalUI(targetPath) {
   // Copier le contenu de .next/standalone vers local-ui
   const items = fs.readdirSync(distPath);
   for (const item of items) {
-    copyRecursive(path.join(distPath, item), path.join(targetPath, item));
+    // Exclure les dossiers spécifiés
+    if (!excludeDirs.includes(item)) {
+      copyRecursive(path.join(distPath, item), path.join(targetPath, item), excludeDirs);
+    }
   }
 }
 
 // Copier vers .next/standalone/local-ui (pour Vercel)
+// IMPORTANT: Exclure 'local-ui' pour éviter la boucle infinie
 if (fs.existsSync(path.join(__dirname, '../.next/standalone'))) {
   console.log('📦 Copie du build vers .next/standalone/local-ui (pour Vercel)...');
-  copyToLocalUI(standaloneLocalUIPath);
+  copyToLocalUI(standaloneLocalUIPath, ['local-ui']); // Exclure local-ui pour éviter la boucle
   console.log('✅ Build copié vers .next/standalone/local-ui avec succès');
 }
 
 // Copier vers local-ui à la racine (pour développement local)
 console.log('📦 Copie du build vers local-ui (pour développement local)...');
-copyToLocalUI(localUIPath);
+copyToLocalUI(localUIPath, []); // Pas besoin d'exclure à la racine
 console.log('✅ Build copié vers local-ui avec succès');
 
