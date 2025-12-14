@@ -34,13 +34,19 @@ let zipFileName = 'nexus-build.zip';
 if (fs.existsSync(versionJsonPath)) {
   try {
     const versionData = JSON.parse(fs.readFileSync(versionJsonPath, 'utf-8'));
-    version = versionData.version || '1.0.0';
+    // Utiliser buildNumber comme identifiant principal (unique à chaque build)
     buildNumber = versionData.buildNumber || Date.now();
-    // Nom du fichier : nexus-build-v1.0.0-{buildNumber}.zip
-    zipFileName = `nexus-build-v${version}-${buildNumber}.zip`;
+    version = versionData.version || `${versionData.baseVersion || '1.0.0'}.${buildNumber}`;
+    // Nom du fichier : nexus-build-{buildNumber}.zip (plus simple et unique)
+    zipFileName = `nexus-build-${buildNumber}.zip`;
   } catch (error) {
     console.warn('⚠️  Impossible de lire version.json, utilisation du nom par défaut');
+    buildNumber = Date.now();
+    zipFileName = `nexus-build-${buildNumber}.zip`;
   }
+} else {
+  buildNumber = Date.now();
+  zipFileName = `nexus-build-${buildNumber}.zip`;
 }
 
 // Créer le dossier public/updates s'il n'existe pas

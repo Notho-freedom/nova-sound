@@ -19,9 +19,17 @@ const versionJsonPath = path.join(__dirname, '../local-ui/version.json');
 const standaloneVersionJsonPath = path.join(__dirname, '../.next/standalone/local-ui/version.json');
 const publicVersionJsonPath = path.join(__dirname, '../public/local-ui/version.json');
 
-// Lire la version depuis package.json
+// Lire la version de base depuis package.json (optionnel, pour référence)
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-const version = packageJson.version || '1.0.0';
+const baseVersion = packageJson.version || '1.0.0';
+
+// Générer un buildNumber unique (timestamp)
+const buildNumber = Date.now();
+
+// Utiliser le buildNumber comme version principale
+// Format: {baseVersion}.{buildNumber} ou simplement {buildNumber}
+// Exemple: 1.0.0.1765703056258 ou simplement 1765703056258
+const version = `${baseVersion}.${buildNumber}`;
 
 // Récupérer les commits récents pour le changelog
 function getRecentCommits(limit = 10) {
@@ -79,11 +87,12 @@ const recentCommits = getRecentCommits(5);
 
 // Créer l'objet version
 const versionInfo = {
-  version,
+  version, // Version complète: {baseVersion}.{buildNumber}
+  baseVersion, // Version de base depuis package.json
+  buildNumber, // Numéro de build unique (timestamp)
   buildDate: latestCommitDate,
   changelog: latestCommitMessage,
   commits: recentCommits,
-  buildNumber: Date.now(), // Numéro de build unique
 };
 
 // Fonction pour écrire version.json dans un emplacement
@@ -109,6 +118,8 @@ writeVersionJson(publicVersionJsonPath);
 console.log(`✅ version.json créé dans public/local-ui: ${version}`);
 
 console.log(`✅ version.json créé: ${version}`);
+console.log(`   Build Number: ${buildNumber}`);
+console.log(`   Base Version: ${baseVersion}`);
 console.log(`   Changelog: ${latestCommitMessage}`);
 console.log(`   Commits: ${recentCommits.length}`);
 console.log(`   Chemin: ${versionJsonPath}`);
