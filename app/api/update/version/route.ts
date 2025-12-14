@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * API Route pour servir la version actuelle du build
  * GET /api/update/version
@@ -33,7 +36,9 @@ export async function GET() {
       
       return NextResponse.json(versionData, {
         headers: {
-          'Cache-Control': 'public, max-age=60', // Cache 1 minute
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
           'Access-Control-Allow-Origin': '*',
         },
       });
@@ -49,7 +54,9 @@ export async function GET() {
         changelog: 'Build Vercel',
       }, {
         headers: {
-          'Cache-Control': 'public, max-age=60',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
           'Access-Control-Allow-Origin': '*',
         },
       });
@@ -62,7 +69,10 @@ export async function GET() {
   } catch (error) {
     console.error('Error reading version:', error);
     return NextResponse.json(
-      { error: 'Failed to read version' },
+      { 
+        error: 'Failed to read version',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

@@ -132,14 +132,15 @@
     "vitest": "^4.0.15"
   },
   "build": {
-    "appId": "com.nexus.audio",
-    "productName": "NEXUS Audio",
+    "appId": "com.nexus.player",
+    "productName": "NEXUS Player",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "local-ui/**/*",
       "public/**/*"
     ],
     "fileAssociations": [

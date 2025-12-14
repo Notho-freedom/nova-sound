@@ -19,6 +19,25 @@ const nextConfig = {
         'electron': 'commonjs electron',
       });
     }
+    
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+      };
+    }
+    
+    // Ignorer les modules Electron côté client
+    config.externals = config.externals || [];
+    if (!isServer) {
+      config.externals.push({
+        electron: 'electron',
+      });
+    }
+    
     // Exclure les fichiers Electron du build
     config.module = config.module || {};
     config.module.rules = config.module.rules || [];
@@ -32,6 +51,20 @@ const nextConfig = {
       use: 'ignore-loader',
     });
     return config;
+  },
+  
+  // Headers pour les routes API
+  async headers() {
+    return [
+      {
+        source: '/api/update/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
+        ],
+      },
+    ];
   },
   // Désactiver certaines optimisations pour Electron
   // Mark native Node.js modules as external (server-only)

@@ -3,6 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+// Limite de taille (1000MB)
+const MAX_BUILD_SIZE = 1000 * 1024 * 1024;
+
 /**
  * API Route pour servir le build complet en ZIP
  * GET /api/update/build
@@ -34,65 +40,89 @@ export async function GET() {
     }
     
     if (!buildDir) {
+      console.error('Build directory not found');
       return NextResponse.json(
         { error: 'Build directory not found' },
         { status: 404 }
       );
     }
-    
-    // Créer un stream pour le ZIP
-    const archive = archiver('zip', {
-      zlib: { level: 9 }, // Compression maximale
-    });
-    
-    // Créer un ReadableStream pour la réponse
-    const chunks: Buffer[] = [];
-    
-    archive.on('data', (chunk: Buffer) => {
-      chunks.push(chunk);
-    });
-    
-    archive.on('error', (err) => {
-      console.error('Archive error:', err);
-    });
-    
-    // Ajouter tous les fichiers du build au ZIP
-    const files = fs.readdirSync(buildDir);
-    for (const file of files) {
-      const filePath = path.join(buildDir, file);
-      const stat = fs.statSync(filePath);
+
+    // Vérifier la taille du build
+    const getTotalSize = (dirPath: string): number => {
+      let totalSize = 0;
+      const items = fs.readdirSync(dirPath);
       
-      if (stat.isDirectory()) {
-        archive.directory(filePath, file);
-      } else {
-        archive.file(filePath, { name: file });
+      for (const item of items) {
+        const itemPath = path.join(dirPath, item);
+        const stats = fs.statSync(itemPath);
+        
+        if (stats.isDirectory()) {
+          totalSize += getTotalSize(itemPath);
+        } else {
+          totalSize += stats.size;
+        }
       }
+      
+      return totalSize;
+    };
+
+    const buildSize = getTotalSize(buildDir);
+    
+    if (buildSize > MAX_BUILD_SIZE) {
+      return NextResponse.json(
+        { error: 'Build too large', size: buildSize, limit: MAX_BUILD_SIZE },
+        { status: 413 }
+      );
     }
     
-    // Finaliser l'archive
-    archive.finalize();
-    
-    // Attendre que tous les chunks soient collectés
-    await new Promise<void>((resolve, reject) => {
-      archive.on('end', resolve);
-      archive.on('error', reject);
+    // Créer le zip en mémoire
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Compression maximale
     });
     
-    // Concaténer tous les chunks
-    const buffer = Buffer.concat(chunks);
+    const chunks: Buffer[] = [];
     
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': 'attachment; filename="build.zip"',
-        'Cache-Control': 'public, max-age=3600', // Cache 1 heure
-        'Access-Control-Allow-Origin': '*',
-      },
+    return new Promise<NextResponse>((resolve, reject) => {
+      archive.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      
+      archive.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        
+        console.log(`Build archive created: ${buffer.length} bytes`);
+        
+        resolve(new NextResponse(buffer, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/zip',
+            'Content-Disposition': 'attachment; filename="nexus-build.zip"',
+            'Content-Length': buffer.length.toString(),
+            'Cache-Control': 'no-cache',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }));
+      });
+      
+      archive.on('error', (err) => {
+        console.error('Archive creation error:', err);
+        reject(new NextResponse(
+          JSON.stringify({ error: 'Failed to create archive', details: err.message }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        ));
+      });
+      
+      // Ajouter tout le contenu de buildDir au zip
+      archive.directory(buildDir, false);
+      archive.finalize();
     });
   } catch (error) {
-    console.error('Error creating build zip:', error);
+    console.error('Failed to create build archive:', error);
     return NextResponse.json(
-      { error: 'Failed to create build zip' },
+      { 
+        error: 'Failed to create build archive',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

@@ -22,7 +22,7 @@ const getVercelUrl = (): string => {
   
   // En production Electron, on peut aussi lire depuis un fichier de config
   // ou utiliser une valeur hardcodée pour votre app Vercel
-  return process.env.NEXT_PUBLIC_VERCEL_URL || 'https://your-app.vercel.app';
+  return process.env.NEXT_PUBLIC_VERCEL_URL || 'https://nexus-player.vercel.app';
 };
 
 const VERCEL_BASE_URL = getVercelUrl();
