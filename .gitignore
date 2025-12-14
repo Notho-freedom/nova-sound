@@ -14,16 +14,17 @@ dist-ssr
 *.local
 
 # Environment variables
+*.env
 .env
-.env.local
-.env.production
+*.env.local
+env.example
 
 # Backend
-server/node_modules/
-server/dist/
-server/storage/
-server/.env
-server/*.log
+backend/node_modules/
+backend/.next/
+backend/out/
+backend/.env
+backend/*.log
 
 # Editor directories and files
 .vscode/*

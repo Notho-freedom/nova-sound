@@ -45,7 +45,7 @@ interface UseCloudSyncReturn {
 export function useCloudSync(): UseCloudSyncReturn {
   // Service status
   const [authInitialized] = useState(true); // Auth service is always initialized
-  const [stripeInitialized] = useState(stripeService.isInitialized());
+  const [stripeInitialized, setStripeInitialized] = useState(false);
 
   // Cloudinary state
   const [cloudinaryConfig, setCloudinaryConfig] = useState<CloudinaryConfig | null>(null);
@@ -74,6 +74,9 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   // Initialize on mount
   useEffect(() => {
+    // Check Stripe initialization status
+    stripeService.isInitialized().then(setStripeInitialized).catch(() => setStripeInitialized(false));
+    
     // Load Cloudinary config
     const config = cloudinaryService.loadConfig();
     setCloudinaryConfig(config);

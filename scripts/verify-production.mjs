@@ -292,8 +292,8 @@ class ProductionVerifier {
 
     // Vérifier les variables critiques (optionnel, car peut être dans Vercel)
     const criticalVars = [
-      'NEXT_PUBLIC_FIREBASE_API_KEY',
-      'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+      'FIREBASE_API_KEY',
+      'FIREBASE_PROJECT_ID',
     ];
 
     for (const varName of criticalVars) {
@@ -307,7 +307,7 @@ class ProductionVerifier {
     }
 
     // Vérifier UPDATE_BASE_URL
-    const updateUrl = process.env.UPDATE_BASE_URL || process.env.NEXT_PUBLIC_VERCEL_URL;
+    const updateUrl = process.env.UPDATE_BASE_URL || process.env.VERCEL_URL;
     const hasValidUpdateUrl = updateUrl && !updateUrl.includes('your-app');
     this.check(
       'UPDATE_BASE_URL configurée',

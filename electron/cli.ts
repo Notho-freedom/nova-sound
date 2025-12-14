@@ -3,7 +3,6 @@
  */
 
 export interface CLIOptions {
-  dev?: boolean;
   port?: number;
   noScan?: boolean;
   autoScan?: boolean;
@@ -27,11 +26,6 @@ export function parseArgs(): CLIOptions {
     const nextArg = args[i + 1];
 
     switch (arg) {
-      case '--dev':
-      case '-d':
-        options.dev = true;
-        break;
-
       case '--port':
       case '-p':
         if (nextArg && !nextArg.startsWith('-')) {
@@ -106,8 +100,7 @@ NEXUS Audio Player - CLI Options
 Usage: nexus-audio [options]
 
 Options:
-  -d, --dev                    Run in development mode
-  -p, --port <number>          Set Next.js dev server port (default: 3000)
+  -p, --port <number>          Set Next.js server port (default: 3000)
   --no-scan, --no-auto-scan    Disable automatic library scan on startup
   --auto-scan                  Enable automatic library scan on startup
   -m, --music-dir <path>       Add music directory to scan (can be used multiple times)
@@ -118,7 +111,6 @@ Options:
   -v, --version                Show version information
 
 Examples:
-  nexus-audio --dev
   nexus-audio --port 3001
   nexus-audio --music-dir "C:\\Music" --music-dir "D:\\Audio"
   nexus-audio --no-scan --debug
@@ -140,17 +132,10 @@ export function showVersion(): void {
 export function applyCLIOptions(options: CLIOptions): void {
   if (options.port) {
     process.env.PORT = options.port.toString();
-    process.env.NEXT_PUBLIC_PORT = options.port.toString();
-  }
-
-  if (options.dev) {
-    process.env.NODE_ENV = 'development';
   }
 
   if (options.debug) {
     process.env.DEBUG = 'true';
-    // Enable verbose logging
-    process.env.NODE_ENV = process.env.NODE_ENV || 'development';
   }
 }
 

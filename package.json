@@ -1,22 +1,22 @@
 {
-  "name": "nexus-audio",
+  "name": "nexus player",
   "private": true,
-  "version": "1.0.0",
-  "description": "NEXUS - Futuristic Audio Player",
-  "author": "NEXUS Team",
+  "version": "1.0.7",
+  "description": "nexus player",
+  "author": "Nexus Team",
   "license": "MIT",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev",
-    "dev:electron": "concurrently -k \"next dev\" \"npm run electron:dev\"",
-    "dev:backend": "cd server && npm run dev",
+    "dev:electron": "concurrently -k -n \"NEXT,ELECTRON\" -c \"blue,green\" \"next dev\" \"npm run electron:dev\"",
+    "dev:backend": "cd backend && npm run dev",
     "dev:all": "concurrently -k \"next dev\" \"npm run dev:backend\" \"npm run electron:dev\"",
-    "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && electron .",
+    "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && cross-env NODE_ENV=development electron .",
     "build": "next build",
-    "build:electron": "npm run build && node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
-    "postbuild": "node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js && node scripts/generate-build-zip.js",
-    "build:backend": "cd server && npm run build",
+    "build:electron": "npm run build && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
+    "postbuild": "node scripts/generate-version.js && node scripts/generate-build-zip.js",
+    "build:backend": "cd backend && npm run build",
     "start": "next start",
     "electron": "electron .",
     "package": "npm run build:electron && electron-builder",
@@ -26,6 +26,7 @@
     "lint": "eslint .",
     "preview": "next start",
     "test:api": "node scripts/test-api-routes.mjs",
+    "test:backend": "node scripts/test-backend-connection.js",
     "validate:env": "node scripts/validate-env.js",
     "validate:env:all": "node scripts/validate-env.js --check-all"
   },
@@ -116,6 +117,7 @@
     "browserslist": "^4.28.1",
     "caniuse-lite": "^1.0.30001760",
     "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
     "dotenv": "^17.2.3",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
@@ -140,10 +142,12 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
       "dist-electron/**/*",
-      "local-ui/**/*",
-      "public/**/*"
+      "out/**/*",
+      "public/**/*",
+      "!.next/cache/**/*",
+      "!local-ui/**/*",
+      "!public/local-ui/**/*"
     ],
     "fileAssociations": [
       {

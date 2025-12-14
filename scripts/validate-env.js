@@ -33,38 +33,38 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Environment variable definitions
 const envDefinitions = {
-  // Client-side (NEXT_PUBLIC_*)
+  // Client-side config (server-only, exposed via API routes)
   client: {
     required: [
       {
-        key: 'NEXT_PUBLIC_FIREBASE_API_KEY',
+        key: 'FIREBASE_API_KEY',
         description: 'Firebase API Key',
         validate: (val) => val && val.length > 20,
       },
       {
-        key: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+        key: 'FIREBASE_AUTH_DOMAIN',
         description: 'Firebase Auth Domain',
         validate: (val) => val && val.includes('.firebaseapp.com'),
       },
       {
-        key: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+        key: 'FIREBASE_PROJECT_ID',
         description: 'Firebase Project ID',
         validate: (val) => val && val.length > 0,
       },
     ],
     optional: [
       {
-        key: 'NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID',
+        key: 'GOOGLE_OAUTH_CLIENT_ID',
         description: 'Google OAuth Client ID',
         validate: (val) => !val || val.includes('.apps.googleusercontent.com'),
       },
       {
-        key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+        key: 'STRIPE_PUBLISHABLE_KEY',
         description: 'Stripe Publishable Key',
         validate: (val) => !val || val.startsWith('pk_'),
       },
       {
-        key: 'NEXT_PUBLIC_FRONTEND_URL',
+        key: 'FRONTEND_URL',
         description: 'Frontend URL',
         validate: (val) => !val || val.startsWith('http'),
       },
@@ -245,7 +245,7 @@ function main() {
   console.log(`${colors.cyan}🔍 Validation des variables d'environnement${colors.reset}`);
   console.log(`${colors.blue}Fichiers vérifiés: .env.local, .env${colors.reset}`);
 
-  const clientCheck = checkEnvSection(envDefinitions.client, 'Client-side (NEXT_PUBLIC_*)', checkAll);
+    const clientCheck = checkEnvSection(envDefinitions.client, 'Client-side config (server-only, exposed via API routes)', checkAll);
   const serverCheck = checkEnvSection(envDefinitions.server, 'Server-side', checkAll);
 
   const clientIssues = printResults(clientCheck);

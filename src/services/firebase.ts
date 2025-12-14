@@ -22,38 +22,63 @@ import {
   Firestore,
 } from "firebase/firestore";
 
-// Firebase configuration - loaded from environment variables
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
-const firebaseConfig = {
-  apiKey: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_API_KEY : '',
-  authDomain: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN : '',
-  projectId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID : '',
-  storageBucket: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET : '',
-  messagingSenderId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID : '',
-  appId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_APP_ID : '',
-};
-
-// Validate config
-const isConfigValid = Object.values(firebaseConfig).every(
-  (value) => value && value !== "undefined"
-);
+// Firebase configuration - loaded from API route (server-only, no secrets exposed)
+let firebaseConfig: {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+} | null = null;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
+let configLoadPromise: Promise<void> | null = null;
 
-// Initialize Firebase only if config is valid
-if (isConfigValid) {
+// API base URL - defaults to Vercel backend or local dev
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
+
+// Load Firebase config from API route
+async function loadFirebaseConfig(): Promise<void> {
+  if (firebaseConfig) {
+    return; // Already loaded
+  }
+
   try {
-    app = initializeApp(firebaseConfig);
+    const response = await fetch(`${API_BASE_URL}/api/config/firebase`);
+    if (!response.ok) {
+      throw new Error(`Failed to load Firebase config: ${response.status}`);
+    }
+    firebaseConfig = await response.json();
+
+    // Validate config
+    const isValid = firebaseConfig && Object.values(firebaseConfig).every(
+      (value) => value && value !== "undefined"
+    );
+
+    if (!isValid) {
+      throw new Error("Firebase config incomplete");
+    }
+
+    // Initialize Firebase
+    app = initializeApp(firebaseConfig!);
     auth = getAuth(app);
     db = getFirestore(app);
     console.log("Firebase initialized successfully");
   } catch (error) {
     console.error("Firebase initialization error:", error);
+    firebaseConfig = null;
+    app = null;
+    auth = null;
+    db = null;
   }
-} else {
-  console.warn("Firebase config incomplete. Please check your .env file.");
+}
+
+// Initialize Firebase on first access (client-side only)
+if (typeof window !== 'undefined') {
+  configLoadPromise = loadFirebaseConfig();
 }
 
 // Google Auth Provider
@@ -87,6 +112,20 @@ class FirebaseService {
   private authStateListeners: Set<(user: User | null) => void> = new Set();
 
   constructor() {
+    // Initialize auth listener when Firebase is ready
+    if (typeof window !== 'undefined') {
+      // Wait for config to load, then set up listener
+      if (configLoadPromise) {
+        configLoadPromise.then(() => {
+          this.setupAuthListener();
+        });
+      } else {
+        this.setupAuthListener();
+      }
+    }
+  }
+
+  private setupAuthListener() {
     // Listen for auth state changes
     if (auth) {
       onAuthStateChanged(auth, async (user) => {
@@ -136,6 +175,7 @@ class FirebaseService {
 
   // Handle redirect result after Google sign-in (call this on app initialization)
   async handleRedirectResult(): Promise<UserProfile | null> {
+    await this.ensureInitialized();
     if (!auth) return null;
 
     try {
@@ -168,8 +208,25 @@ class FirebaseService {
   }
 
   // Check if Firebase is initialized
-  isInitialized(): boolean {
+  async isInitialized(): Promise<boolean> {
+    // Ensure config is loaded
+    if (typeof window !== 'undefined' && !firebaseConfig && configLoadPromise) {
+      await configLoadPromise;
+    }
     return app !== null && auth !== null;
+  }
+
+  // Ensure Firebase is initialized (call this before using Firebase)
+  async ensureInitialized(): Promise<void> {
+    if (typeof window === 'undefined') {
+      throw new Error("Firebase can only be initialized on the client side");
+    }
+    if (!firebaseConfig && configLoadPromise) {
+      await configLoadPromise;
+    }
+    if (!app || !auth) {
+      throw new Error("Firebase not initialized. Check your configuration.");
+    }
   }
 
   // Get current user
@@ -192,6 +249,7 @@ class FirebaseService {
 
   // Sign in anonymously (Firebase handles persistence automatically)
   async signInAnonymously(): Promise<UserProfile> {
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized. Check your configuration.");
     }
@@ -272,6 +330,7 @@ class FirebaseService {
 
   // Sign in with Google
   async signInWithGoogle(): Promise<void> {
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized. Check your configuration.");
     }
@@ -322,6 +381,7 @@ class FirebaseService {
 
   // Sign out
   async signOut(): Promise<void> {
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized");
     }

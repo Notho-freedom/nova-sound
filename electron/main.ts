@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import { Readable } from 'stream';
+import http from 'http';
+import dotenv from 'dotenv';
 
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
@@ -45,8 +47,6 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow: BrowserWindow | null = null;
-
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
@@ -164,28 +164,148 @@ function createWindow() {
   });
 
   // Load the app
-  if (isDev || cliOptions.dev) {
-    const port = cliOptions.port || 3000;
-    mainWindow.loadURL(`http://localhost:${port}`);
-    if (cliOptions.debug || isDev) {
-      mainWindow.webContents.openDevTools();
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  if (isDev) {
+    // In development, load from Next.js dev server
+    const devUrl = 'http://localhost:3000';
+    console.log(`🔧 Development mode: Loading from ${devUrl}`);
+    
+    // Wait for window to be ready before loading
+    let isLoaded = false;
+    let windowReady = false;
+    
+    mainWindow.once('ready-to-show', () => {
+      windowReady = true;
+      if (!isLoaded) {
+        checkServer();
+      }
+    });
+    
+    // Wait for Next.js dev server to be ready
+    let isChecking = false;
+    const maxAttempts = 30;
+    let attempts = 0;
+    
+    const checkServer = () => {
+      if (isLoaded || isChecking || !windowReady) {
+        return; // Already loaded, currently checking, or window not ready
+      }
+      
+      isChecking = true;
+      const req = http.get('http://localhost:3000', (res) => {
+        isChecking = false;
+        
+        if (isLoaded || !mainWindow || mainWindow.isDestroyed()) {
+          return; // Already loaded or window destroyed
+        }
+        
+        if (res.statusCode === 200 || res.statusCode === 304) {
+          console.log('✅ Next.js dev server is ready');
+          if (!isLoaded) {
+            isLoaded = true;
+            mainWindow.loadURL(devUrl).catch((error) => {
+              console.error('Failed to load URL:', error);
+              isLoaded = false; // Allow retry on error
+            });
+          }
+        } else {
+          // Server responded but with error, try again
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkServer, 1000);
+          } else {
+            showServerError();
+          }
+        }
+      });
+      
+      req.on('error', () => {
+        isChecking = false;
+        
+        if (isLoaded || !mainWindow || mainWindow.isDestroyed()) {
+          return;
+        }
+        
+        // Server not ready yet
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkServer, 1000);
+        } else {
+          showServerError();
+        }
+      });
+      
+      req.setTimeout(1000, () => {
+        req.destroy();
+        isChecking = false;
+        
+        if (isLoaded || !mainWindow || mainWindow.isDestroyed()) {
+          return;
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkServer, 1000);
+        } else {
+          showServerError();
+        }
+      });
+    };
+    
+    const showServerError = () => {
+      console.error('❌ Next.js dev server not available after 30 attempts');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(`
+          document.body.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; font-family: system-ui; color: #fff; background: #0a0a0f;">
+            <h1 style="font-size: 24px; margin-bottom: 16px;">⏳ Attente du serveur Next.js</h1>
+            <p style="font-size: 16px; margin-bottom: 8px;">Le serveur de développement n\\'est pas encore prêt</p>
+            <p style="font-size: 14px; color: #888;">URL: ${devUrl}</p>
+            <p style="font-size: 12px; color: #666; margin-top: 24px;">Assurez-vous que "npm run dev" est en cours d\\'exécution</p>
+          </div>';
+        `);
+      }
+    };
+    
+    // If window is already ready, start checking immediately
+    if (mainWindow.webContents.isLoading() === false) {
+      windowReady = true;
+      setTimeout(checkServer, 500);
     }
   } else {
-    // Offline-first: toujours charger depuis local-ui
-    const localUIPath = path.join(__dirname, '../local-ui/index.html');
+    // In production, load from static build
+    const appPath = app.isPackaged 
+      ? path.dirname(app.getAppPath())
+      : path.join(__dirname, '..');
     
-    // Si local-ui n'existe pas, fallback vers dist (pour compatibilité)
-    if (fs.existsSync(localUIPath)) {
-      mainWindow.loadFile(localUIPath);
-    } else {
-      // Fallback vers dist si local-ui n'existe pas encore
-      const distPath = path.join(__dirname, '../dist/index.html');
-      if (fs.existsSync(distPath)) {
-        mainWindow.loadFile(distPath);
-      } else {
-        console.error('Aucun build trouvé (ni local-ui ni dist)');
+    const htmlPath = path.join(appPath, 'out', 'index.html');
+    
+    console.log(`📦 Production mode: Loading static build from: ${htmlPath}`);
+    
+    if (!fs.existsSync(htmlPath)) {
+      const errorMsg = `Build not found at: ${htmlPath}\nPlease run "npm run build" first.`;
+      console.error(`❌ ${errorMsg}`);
+      
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(`
+          document.body.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; font-family: system-ui; color: #fff; background: #0a0a0f;">
+            <h1 style="font-size: 24px; margin-bottom: 16px;">❌ Build introuvable</h1>
+            <p style="font-size: 16px; margin-bottom: 8px;">Le build statique n\\'a pas été trouvé</p>
+            <p style="font-size: 14px; color: #888;">Chemin: ${htmlPath}</p>
+            <p style="font-size: 12px; color: #666; margin-top: 24px;">Exécutez "npm run build" pour générer le build statique</p>
+          </div>';
+        `);
       }
+      return;
     }
+    
+    mainWindow.loadFile(htmlPath).catch((error) => {
+      console.error('Failed to load file:', error);
+    });
+  }
+  
+  if (cliOptions.debug) {
+    mainWindow.webContents.openDevTools();
   }
 
   mainWindow.on('closed', () => {
@@ -214,19 +334,17 @@ async function initServices() {
   initStorage();
   
   // Initialize updater with callback for UI notification
-  if (!isDev && !cliOptions.dev) {
-    await initUpdater((versionInfo) => {
-      // Notifier l'UI qu'une mise à jour a été effectuée
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update:available', {
-          version: versionInfo.version,
-          changelog: versionInfo.changelog,
-          buildDate: versionInfo.buildDate,
-          commits: versionInfo.commits || [],
-        });
-      }
-    });
-  }
+  await initUpdater((versionInfo) => {
+    // Notifier l'UI qu'une mise à jour a été effectuée
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update:available', {
+        version: versionInfo.version,
+        changelog: versionInfo.changelog,
+        buildDate: versionInfo.buildDate,
+        commits: versionInfo.commits || [],
+      });
+    }
+  });
   
   // Initialize other services
   initMetadataExtractor();
@@ -501,17 +619,37 @@ if (!gotTheLock) {
   });
 }
 
+/**
+ * Démarrer le serveur Next.js standalone
+ * En production, charge le serveur depuis .next/standalone
+ * En développement, utilise le serveur Next.js en cours d'exécution
+ */
+// Removed waitForNextServer - production mode only, server starts directly
+
+
 // App lifecycle
 app.whenReady().then(async () => {
-  // Register custom protocols
-  registerLocalAudioProtocol();
-  registerLocalVideoProtocol();
-  
-  // Initialize storage and services
-  await storage.init();
-  await initServices();
-  
-  createWindow();
+  try {
+    // Register custom protocols
+    registerLocalAudioProtocol();
+    registerLocalVideoProtocol();
+    
+    // Load environment variables
+    const appPath = app.isPackaged 
+      ? path.dirname(app.getAppPath())
+      : path.join(__dirname, '..');
+    const envPath = path.join(appPath, '.env');
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+      console.log(`✅ Environment variables loaded from: ${envPath}`);
+    }
+    
+    // Initialize storage and services
+    await storage.init();
+    await initServices();
+    
+    // Créer la fenêtre après que le serveur est prêt
+    createWindow();
   
   // Handle files passed as arguments on first launch
   handleFileArgs();
@@ -561,27 +699,35 @@ app.whenReady().then(async () => {
     }
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Fatal error during app initialization:', error);
+    // Afficher une boîte de dialogue d'erreur
+    dialog.showErrorBox(
+      'Erreur de démarrage',
+      `Impossible de démarrer l'application:\n\n${error.message || error}\n\nVérifiez les logs pour plus de détails.`
+    );
+    // Quitter l'application après un délai
+    setTimeout(() => {
+      app.quit();
+    }, 5000);
+  }
 });
 
 app.on('window-all-closed', () => {
+  // On macOS, keep app running even when all windows are closed
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// Handle certificate errors (for development)
+// Handle certificate errors (production only - reject invalid certificates)
 app.on('certificate-error', (event, _webContents, _url, _error, _certificate, callback) => {
-  if (isDev) {
-    event.preventDefault();
-    callback(true);
-  } else {
-    callback(false);
-  }
+  callback(false);
 });
 
 // Export for services to use

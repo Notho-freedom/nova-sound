@@ -1,36 +1,60 @@
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { authService } from "./auth";
 
-// Stripe configuration
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
-const STRIPE_PUBLISHABLE_KEY = typeof window !== 'undefined' 
-  ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
-  : undefined;
+// Stripe configuration - loaded from API route (server-only, no secrets exposed)
+let stripeConfig: {
+  publishableKey: string;
+  priceIds: {
+    proMonthly: string;
+    proYearly: string;
+  };
+} | null = null;
 
-// Next.js: Use same-origin API routes (no base URL needed)
-// With Next.js, API routes are on the same origin, so we don't need a base URL
-const API_BASE_URL = '';
-
-// Validate config
-const isConfigValid = STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== "undefined";
-
+let configLoadPromise: Promise<void> | null = null;
 let stripePromise: Promise<Stripe | null> | null = null;
 
-// Initialize Stripe
-if (isConfigValid && typeof window !== 'undefined') {
-  stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
-} else if (typeof window !== 'undefined') {
-  console.warn("Stripe publishable key not configured. Check your .env file.");
+// API base URL - defaults to Vercel backend or local dev
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
+
+// Load Stripe config from API route
+async function loadStripeConfig(): Promise<void> {
+  if (stripeConfig) {
+    return; // Already loaded
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/config/stripe`);
+    if (!response.ok) {
+      throw new Error(`Failed to load Stripe config: ${response.status}`);
+    }
+    stripeConfig = await response.json();
+
+    // Validate config
+    if (!stripeConfig?.publishableKey) {
+      throw new Error("Stripe config incomplete");
+    }
+
+    // Initialize Stripe
+    if (typeof window !== 'undefined') {
+      stripePromise = loadStripe(stripeConfig.publishableKey);
+    }
+    console.log("Stripe initialized successfully");
+  } catch (error) {
+    console.error("Stripe initialization error:", error);
+    stripeConfig = null;
+    stripePromise = null;
+  }
 }
 
-// Price IDs - these should be configured in your Stripe dashboard
+// Initialize Stripe on first access (client-side only)
+if (typeof window !== 'undefined') {
+  configLoadPromise = loadStripeConfig();
+}
+
+// Price IDs - loaded from config
 export const PRICE_IDS = {
-  PRO_MONTHLY: typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || "price_pro_monthly")
-    : "price_pro_monthly",
-  PRO_YEARLY: typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY || "price_pro_yearly")
-    : "price_pro_yearly",
+  PRO_MONTHLY: "price_pro_monthly", // Will be updated after config loads
+  PRO_YEARLY: "price_pro_yearly", // Will be updated after config loads
 };
 
 export interface CheckoutSessionResponse {
@@ -51,13 +75,37 @@ export interface SubscriptionStatus {
 }
 
 class StripeService {
+  // Ensure Stripe is initialized
+  async ensureInitialized(): Promise<void> {
+    if (typeof window === 'undefined') {
+      throw new Error("Stripe can only be initialized on the client side");
+    }
+    if (!stripeConfig && configLoadPromise) {
+      await configLoadPromise;
+    }
+    if (!stripeConfig || !stripePromise) {
+      throw new Error("Stripe not initialized. Check your configuration.");
+    }
+    // Update price IDs from config
+    if (stripeConfig.priceIds.proMonthly) {
+      PRICE_IDS.PRO_MONTHLY = stripeConfig.priceIds.proMonthly;
+    }
+    if (stripeConfig.priceIds.proYearly) {
+      PRICE_IDS.PRO_YEARLY = stripeConfig.priceIds.proYearly;
+    }
+  }
+
   // Check if Stripe is initialized
-  isInitialized(): boolean {
-    return isConfigValid;
+  async isInitialized(): Promise<boolean> {
+    if (typeof window !== 'undefined' && !stripeConfig && configLoadPromise) {
+      await configLoadPromise;
+    }
+    return stripeConfig !== null && stripePromise !== null;
   }
 
   // Get Stripe instance
   async getStripe(): Promise<Stripe | null> {
+    await this.ensureInitialized();
     if (!stripePromise) {
       throw new Error("Stripe not initialized. Check your configuration.");
     }
@@ -65,7 +113,9 @@ class StripeService {
   }
 
   // Create checkout session for Pro subscription
-  async createCheckoutSession(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<string> {
+  async createCheckoutSession(priceId?: string): Promise<string> {
+    await this.ensureInitialized();
+    const finalPriceId = priceId || PRICE_IDS.PRO_MONTHLY;
     const accessToken = await authService.getAccessToken();
     if (!accessToken) {
       throw new Error("User not authenticated");
@@ -78,7 +128,7 @@ class StripeService {
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        priceId,
+        priceId: finalPriceId,
         successUrl: `${window.location.origin}/settings?success=true`,
         cancelUrl: `${window.location.origin}/settings?canceled=true`,
       }),
@@ -114,8 +164,10 @@ class StripeService {
   }
 
   // Redirect to Stripe Checkout
-  async redirectToCheckout(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<void> {
-    const checkoutUrl = await this.createCheckoutSession(priceId);
+  async redirectToCheckout(priceId?: string): Promise<void> {
+    await this.ensureInitialized();
+    const finalPriceId = priceId || PRICE_IDS.PRO_MONTHLY;
+    const checkoutUrl = await this.createCheckoutSession(finalPriceId);
     window.location.href = checkoutUrl;
   }
 

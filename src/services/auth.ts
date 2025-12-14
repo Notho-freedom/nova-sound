@@ -32,15 +32,52 @@ const GOOGLE_OAUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";
 
-// Backend proxy endpoint (optional - if not set, will try direct OAuth)
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
-const OAUTH_PROXY_ENDPOINT = 
-  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_OAUTH_PROXY_URL : null) || null;
+// Auth configuration - loaded from API route (server-only, no secrets exposed)
+let authConfig: {
+  googleClientId: string;
+} | null = null;
 
-// Client secret (optional - for Desktop/Electron apps only, not recommended for web)
-// Should only be used in Electron/Desktop apps where the secret is bundled
-const GOOGLE_CLIENT_SECRET = 
-  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET : null) || null;
+let authConfigLoadPromise: Promise<void> | null = null;
+
+// API base URL - defaults to Vercel backend or local dev
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
+
+// Load auth config from API route
+async function loadAuthConfig(): Promise<void> {
+  if (authConfig) {
+    return; // Already loaded
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/config/auth`);
+    if (!response.ok) {
+      throw new Error(`Failed to load auth config: ${response.status}`);
+    }
+    authConfig = await response.json();
+
+    if (!authConfig?.googleClientId) {
+      throw new Error("Auth config incomplete");
+    }
+
+    console.log("Auth config loaded successfully");
+  } catch (error) {
+    console.error("Auth config loading error:", error);
+    authConfig = null;
+  }
+}
+
+// Initialize auth config on first access (client-side only)
+if (typeof window !== 'undefined') {
+  authConfigLoadPromise = loadAuthConfig();
+}
+
+// Backend proxy endpoint (optional - if not set, will try direct OAuth)
+// Note: OAUTH_PROXY_URL is no longer exposed to client (server-only if needed)
+const OAUTH_PROXY_ENDPOINT = null;
+
+// Client secret is NEVER exposed to client (server-only)
+// For Electron apps, use server-side OAuth flow via API routes
+const GOOGLE_CLIENT_SECRET = null;
 
 class AuthService {
   private currentUser: UserProfile | null = null;
@@ -136,11 +173,12 @@ class AuthService {
   }
 
   // Get Google OAuth Client ID
-  getGoogleClientId(): string | null {
-    const envClientId = typeof window !== 'undefined' 
-      ? process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID 
-      : null;
-    return this.googleClientId || envClientId || null;
+  async getGoogleClientId(): Promise<string | null> {
+    // Ensure config is loaded
+    if (typeof window !== 'undefined' && !authConfig && authConfigLoadPromise) {
+      await authConfigLoadPromise;
+    }
+    return this.googleClientId || authConfig?.googleClientId || null;
   }
 
   // Generate code verifier and challenge for PKCE
@@ -179,11 +217,11 @@ class AuthService {
 
   // Build Google OAuth URL with PKCE
   private async buildAuthUrl(): Promise<string> {
-    const clientId = this.getGoogleClientId();
+    const clientId = await this.getGoogleClientId();
     if (!clientId) {
       throw new Error(
         "Google OAuth Client ID not configured. " +
-        "Please set it in settings or add NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID to .env"
+        "Please check your .env file and ensure GOOGLE_OAUTH_CLIENT_ID is set."
       );
     }
 
@@ -217,7 +255,7 @@ class AuthService {
 
   // Exchange authorization code for tokens with PKCE
   private async exchangeCodeForTokens(code: string): Promise<AuthTokens> {
-    const clientId = this.getGoogleClientId();
+    const clientId = await this.getGoogleClientId();
     if (!clientId) {
       throw new Error("Google OAuth Client ID not configured");
     }
@@ -275,10 +313,9 @@ class AuthService {
       code_verifier: codeVerifier,
     };
 
-    // Add client_secret if available (for Electron/Desktop apps)
-    if (GOOGLE_CLIENT_SECRET) {
-      tokenParams.client_secret = GOOGLE_CLIENT_SECRET;
-    }
+    // Note: client_secret is NEVER exposed to client
+    // For Electron apps, use server-side OAuth flow via API routes
+    // The server will handle the client_secret securely
 
     const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
       method: "POST",
@@ -336,7 +373,7 @@ class AuthService {
       throw new Error("No refresh token available");
     }
 
-    const clientId = this.getGoogleClientId();
+    const clientId = await this.getGoogleClientId();
     if (!clientId) {
       throw new Error("Google OAuth Client ID not configured");
     }

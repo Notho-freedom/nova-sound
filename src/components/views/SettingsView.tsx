@@ -48,10 +48,8 @@ import type { Settings } from "@/types/music";
 import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
-const API_BASE_URL = typeof window !== 'undefined' 
-  ? (process.env.NEXT_PUBLIC_API_URL || "") 
-  : "";
+// API routes are on the same origin (no base URL needed)
+const API_BASE_URL = "";
 
 interface SettingRowProps {
   label: string;

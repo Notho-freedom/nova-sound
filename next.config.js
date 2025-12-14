@@ -1,7 +1,14 @@
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  output: 'export',
+  trailingSlash: true,
   images: {
     remotePatterns: [
       {
@@ -38,13 +45,36 @@ const nextConfig = {
       });
     }
     
-    // Exclure les fichiers Electron du build
+    // Exclure les fichiers Electron du build (tous les emplacements)
     config.module = config.module || {};
     config.module.rules = config.module.rules || [];
+    
+    // Exclure electron/ (racine)
     config.module.rules.push({
       test: /electron\/.*\.ts$/,
       use: 'ignore-loader',
     });
+    
+    // Exclure public/local-ui/** (tout le dossier)
+    config.module.rules.push({
+      test: /public\/local-ui\/.*\.ts$/,
+      use: 'ignore-loader',
+    });
+    
+    // Exclure local-ui/** (tout le dossier)
+    config.module.rules.push({
+      test: /local-ui\/.*\.ts$/,
+      use: 'ignore-loader',
+    });
+    // Exclure tout le dossier local-ui et public/local-ui du build Next.js
+    config.watchOptions = config.watchOptions || {};
+    config.watchOptions.ignored = [
+      ...(Array.isArray(config.watchOptions.ignored) ? config.watchOptions.ignored : [config.watchOptions.ignored || []]),
+      '**/local-ui/**',
+      '**/public/local-ui/**',
+      '**/electron/**',
+      '**/backend/**',
+    ];
     // Exclure les fichiers de test et config Vitest
     config.module.rules.push({
       test: /(vitest\.config|vitest\.setup|\.test|\.spec)\.ts$/,
@@ -53,24 +83,29 @@ const nextConfig = {
     return config;
   },
   
-  // Headers pour les routes API
-  async headers() {
-    return [
-      {
-        source: '/api/update/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
-        ],
-      },
-    ];
-  },
   // Désactiver certaines optimisations pour Electron
   // Mark native Node.js modules as external (server-only)
-  serverExternalPackages: ['electron', 'ssh2', 'ssh2-sftp-client'],
-  // Configuration Turbopack (vide pour permettre webpack)
-  turbopack: {},
+  serverExternalPackages: ['electron'],
+  // Configuration Turbopack
+  turbopack: {
+    root: __dirname, // Définir explicitement la racine pour éviter l'avertissement
+  },
+  
+  // Exclure les dossiers du build TypeScript
+  typescript: {
+    // Ignorer les erreurs TypeScript dans ces dossiers
+    ignoreBuildErrors: false,
+  },
+  
+  // Exclure les dossiers du scan de fichiers (static export)
+  outputFileTracingExcludes: {
+    '*': [
+      '**/local-ui/**',
+      '**/public/local-ui/**',
+      '**/electron/**',
+      '**/backend/**',
+    ],
+  },
 };
 
 export default nextConfig;

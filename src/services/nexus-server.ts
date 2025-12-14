@@ -16,8 +16,8 @@ export interface UploadResult {
   size: number;
 }
 
-// Use Next.js API routes (same origin - no base URL needed)
-const API_BASE_URL = '';
+// API base URL - defaults to Vercel backend or local dev
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
 
 class NexusServerService {
   // Check if authenticated
