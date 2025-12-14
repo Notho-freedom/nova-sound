@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Middleware pour optimiser les rechargements et le cache
+ * Proxy pour optimiser les rechargements et le cache
  * Empêche les recompilations inutiles pour certaines routes
+ * 
+ * Note: Anciennement middleware.ts, migré vers proxy.ts selon Next.js 16
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const response = NextResponse.next();
   
   // Empêcher les rechargements inutiles pour certaines routes

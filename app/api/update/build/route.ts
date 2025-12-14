@@ -21,13 +21,22 @@ export async function GET() {
     // En production Vercel, le build est dans .next/standalone
     // Chercher le build dans plusieurs emplacements possibles
     // Priorité: .next/standalone/local-ui (créé pendant le build) > .next/standalone > local-ui
+    const cwd = process.cwd();
     const possiblePaths = [
-      path.join(process.cwd(), '.next', 'standalone', 'local-ui'),
-      path.join(process.cwd(), '.next', 'standalone'),
-      path.join(process.cwd(), '.next', 'standalone', 'app'),
-      path.join(process.cwd(), 'local-ui'),
-      path.join(process.cwd(), 'dist'),
+      path.join(cwd, '.next', 'standalone', 'local-ui'),
+      path.join(cwd, '.next', 'standalone'),
+      path.join(cwd, '.next', 'standalone', 'app'),
+      path.join(cwd, 'local-ui'),
+      path.join(cwd, 'dist'),
+      // Chemins alternatifs pour Vercel
+      '/vercel/path0/.next/standalone/local-ui',
+      '/vercel/path0/.next/standalone',
+      '/vercel/path0/local-ui',
     ];
+    
+    // Log pour déboguer
+    console.log('Searching for build directory. CWD:', cwd);
+    console.log('Checking paths:', possiblePaths.slice(0, 3));
     
     let buildDir: string | null = null;
     for (const possiblePath of possiblePaths) {
@@ -36,15 +45,24 @@ export async function GET() {
         const files = fs.readdirSync(possiblePath);
         if (files.length > 0) {
           buildDir = possiblePath;
+          console.log('Found build directory:', buildDir);
           break;
         }
       }
     }
     
     if (!buildDir) {
-      console.error('Build directory not found');
+      console.error('Build directory not found. CWD:', cwd);
+      console.error('Checked paths:', possiblePaths);
+      // Lister les fichiers dans le CWD pour déboguer
+      try {
+        const cwdFiles = fs.readdirSync(cwd);
+        console.error('Files in CWD:', cwdFiles);
+      } catch (e) {
+        console.error('Cannot read CWD:', e);
+      }
       return NextResponse.json(
-        { error: 'Build directory not found' },
+        { error: 'Build directory not found', cwd, checkedPaths: possiblePaths },
         { status: 404 }
       );
     }

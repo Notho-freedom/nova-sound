@@ -17,18 +17,23 @@ export async function GET() {
     // En production Vercel, le build est dans .next/standalone
     // Chercher version.json dans plusieurs emplacements possibles
     // Priorité: .next/standalone/local-ui/version.json (créé pendant le build) > autres
+    const cwd = process.cwd();
     const possiblePaths = [
-      path.join(process.cwd(), '.next', 'standalone', 'local-ui', 'version.json'),
-      path.join(process.cwd(), 'local-ui', 'version.json'),
-      path.join(process.cwd(), '.next', 'standalone', 'version.json'),
-      path.join(process.cwd(), '.next', 'standalone', 'app', 'version.json'),
-      path.join(process.cwd(), 'dist', 'version.json'),
+      path.join(cwd, '.next', 'standalone', 'local-ui', 'version.json'),
+      path.join(cwd, 'local-ui', 'version.json'),
+      path.join(cwd, '.next', 'standalone', 'version.json'),
+      path.join(cwd, '.next', 'standalone', 'app', 'version.json'),
+      path.join(cwd, 'dist', 'version.json'),
+      // Chemins alternatifs pour Vercel
+      '/vercel/path0/.next/standalone/local-ui/version.json',
+      '/vercel/path0/local-ui/version.json',
     ];
     
     let versionFile: string | null = null;
     for (const possiblePath of possiblePaths) {
       if (fs.existsSync(possiblePath)) {
         versionFile = possiblePath;
+        console.log('Found version.json at:', versionFile);
         break;
       }
     }
