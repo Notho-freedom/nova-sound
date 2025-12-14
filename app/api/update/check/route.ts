@@ -22,9 +22,22 @@ export async function POST(request: Request) {
     const body: CheckUpdateRequest = await request.json();
     
     // Récupérer la version serveur
-    const versionFile = path.join(process.cwd(), 'local-ui', 'version.json');
+    // Chercher version.json dans plusieurs emplacements (priorité: .next/standalone/local-ui)
+    const possiblePaths = [
+      path.join(process.cwd(), '.next', 'standalone', 'local-ui', 'version.json'),
+      path.join(process.cwd(), 'local-ui', 'version.json'),
+      path.join(process.cwd(), '.next', 'standalone', 'version.json'),
+    ];
     
-    if (!fs.existsSync(versionFile)) {
+    let versionFile: string | null = null;
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        versionFile = possiblePath;
+        break;
+      }
+    }
+    
+    if (!versionFile) {
       return NextResponse.json({
         available: false,
         reason: 'Version file not found on server',

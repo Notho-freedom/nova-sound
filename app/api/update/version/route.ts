@@ -16,11 +16,13 @@ export async function GET() {
   try {
     // En production Vercel, le build est dans .next/standalone
     // Chercher version.json dans plusieurs emplacements possibles
+    // Priorité: .next/standalone/local-ui/version.json (créé pendant le build) > autres
     const possiblePaths = [
+      path.join(process.cwd(), '.next', 'standalone', 'local-ui', 'version.json'),
       path.join(process.cwd(), 'local-ui', 'version.json'),
-      path.join(process.cwd(), 'dist', 'version.json'),
       path.join(process.cwd(), '.next', 'standalone', 'version.json'),
       path.join(process.cwd(), '.next', 'standalone', 'app', 'version.json'),
+      path.join(process.cwd(), 'dist', 'version.json'),
     ];
     
     let versionFile: string | null = null;

@@ -20,11 +20,13 @@ export async function GET() {
   try {
     // En production Vercel, le build est dans .next/standalone
     // Chercher le build dans plusieurs emplacements possibles
+    // Priorité: .next/standalone/local-ui (créé pendant le build) > .next/standalone > local-ui
     const possiblePaths = [
-      path.join(process.cwd(), 'local-ui'),
-      path.join(process.cwd(), 'dist'),
+      path.join(process.cwd(), '.next', 'standalone', 'local-ui'),
       path.join(process.cwd(), '.next', 'standalone'),
       path.join(process.cwd(), '.next', 'standalone', 'app'),
+      path.join(process.cwd(), 'local-ui'),
+      path.join(process.cwd(), 'dist'),
     ];
     
     let buildDir: string | null = null;
