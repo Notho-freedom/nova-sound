@@ -27,12 +27,14 @@ export async function GET() {
     const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     
     // Chercher version.json dans plusieurs emplacements possibles
-    // Priorité: local-ui dans standalone (créé pendant le build) > standalone > autres
+    // Priorité: public/local-ui (accessible depuis les routes API) > standalone > autres
     const possiblePaths = [
+      path.join(cwd, 'public', 'local-ui', 'version.json'), // Priorité: accessible depuis les routes API
       path.join(nextStandaloneLocalUI, 'version.json'),
       path.join(nextStandalone, 'local-ui', 'version.json'),
       path.join(nextStandalone, 'version.json'),
       path.join(nextStandalone, 'app', 'version.json'),
+      '/var/task/public/local-ui/version.json',
       '/var/task/.next/standalone/local-ui/version.json',
       '/var/task/.next/standalone/version.json',
       path.join(cwd, '.next', 'standalone', 'local-ui', 'version.json'),

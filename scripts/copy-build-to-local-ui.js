@@ -27,9 +27,12 @@ for (const possiblePath of possiblePaths) {
   }
 }
 
-// Créer local-ui dans .next/standalone pour qu'il soit accessible sur Vercel
-// Aussi créer à la racine pour le développement local
+// Créer local-ui dans plusieurs emplacements pour différentes utilisations:
+// 1. .next/standalone/local-ui (pour Vercel - peut ne pas être accessible)
+// 2. public/local-ui (pour Vercel - accessible depuis les routes API)
+// 3. local-ui à la racine (pour développement local)
 const standaloneLocalUIPath = path.join(__dirname, '../.next/standalone/local-ui');
+const publicLocalUIPath = path.join(__dirname, '../public/local-ui');
 const localUIPath = path.join(__dirname, '../local-ui');
 
 // Vérifier si le build existe
@@ -92,13 +95,18 @@ function copyToLocalUI(targetPath, excludeDirs = []) {
   }
 }
 
-// Copier vers .next/standalone/local-ui (pour Vercel)
+// Copier vers .next/standalone/local-ui (pour Vercel - peut ne pas être accessible)
 // IMPORTANT: Exclure 'local-ui' pour éviter la boucle infinie
 if (fs.existsSync(path.join(__dirname, '../.next/standalone'))) {
   console.log('📦 Copie du build vers .next/standalone/local-ui (pour Vercel)...');
   copyToLocalUI(standaloneLocalUIPath, ['local-ui']); // Exclure local-ui pour éviter la boucle
   console.log('✅ Build copié vers .next/standalone/local-ui avec succès');
 }
+
+// Copier vers public/local-ui (pour Vercel - accessible depuis les routes API)
+console.log('📦 Copie du build vers public/local-ui (pour Vercel API routes)...');
+copyToLocalUI(publicLocalUIPath, []); // Pas de local-ui dans public, pas besoin d'exclure
+console.log('✅ Build copié vers public/local-ui avec succès');
 
 // Copier vers local-ui à la racine (pour développement local)
 console.log('📦 Copie du build vers local-ui (pour développement local)...');

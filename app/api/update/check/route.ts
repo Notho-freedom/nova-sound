@@ -33,16 +33,19 @@ export async function POST(request: Request) {
     const nextStandalone = path.join(taskRoot, '.next', 'standalone');
     const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     
-    // Chercher version.json dans plusieurs emplacements (priorité: local-ui dans standalone)
+    // Chercher version.json dans plusieurs emplacements (priorité: public/local-ui)
+    const cwd = process.cwd();
     const possiblePaths = [
+      path.join(cwd, 'public', 'local-ui', 'version.json'), // Priorité: accessible depuis les routes API
       path.join(nextStandaloneLocalUI, 'version.json'),
       path.join(nextStandalone, 'local-ui', 'version.json'),
       path.join(nextStandalone, 'version.json'),
+      '/var/task/public/local-ui/version.json',
       '/var/task/.next/standalone/local-ui/version.json',
       '/var/task/.next/standalone/version.json',
-      path.join(process.cwd(), '.next', 'standalone', 'local-ui', 'version.json'),
-      path.join(process.cwd(), 'local-ui', 'version.json'),
-      path.join(process.cwd(), '.next', 'standalone', 'version.json'),
+      path.join(cwd, '.next', 'standalone', 'local-ui', 'version.json'),
+      path.join(cwd, 'local-ui', 'version.json'),
+      path.join(cwd, '.next', 'standalone', 'version.json'),
     ];
     
     let versionFile: string | null = null;

@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 const packageJsonPath = path.join(__dirname, '../package.json');
 const versionJsonPath = path.join(__dirname, '../local-ui/version.json');
 const standaloneVersionJsonPath = path.join(__dirname, '../.next/standalone/local-ui/version.json');
+const publicVersionJsonPath = path.join(__dirname, '../public/local-ui/version.json');
 
 // Lire la version depuis package.json
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
@@ -102,6 +103,10 @@ if (fs.existsSync(path.join(__dirname, '../.next/standalone'))) {
   writeVersionJson(standaloneVersionJsonPath);
   console.log(`✅ version.json créé dans .next/standalone/local-ui: ${version}`);
 }
+
+// Écrire version.json dans public/local-ui (pour Vercel - accessible depuis les routes API)
+writeVersionJson(publicVersionJsonPath);
+console.log(`✅ version.json créé dans public/local-ui: ${version}`);
 
 console.log(`✅ version.json créé: ${version}`);
 console.log(`   Changelog: ${latestCommitMessage}`);

@@ -24,15 +24,18 @@ export async function GET() {
   try {
     // En production Vercel, le build est dans .next/standalone
     // Chercher le build dans plusieurs emplacements possibles
-    // Priorité: .next/standalone/local-ui (créé pendant le build) > .next/standalone > local-ui
+    // Priorité: public/local-ui (accessible depuis les routes API) > .next/standalone/local-ui > .next/standalone > local-ui
     const cwd = process.cwd();
     const possiblePaths = [
+      path.join(cwd, 'public', 'local-ui'), // Priorité: accessible depuis les routes API
       path.join(cwd, '.next', 'standalone', 'local-ui'),
       path.join(cwd, '.next', 'standalone'),
       path.join(cwd, '.next', 'standalone', 'app'),
       path.join(cwd, 'local-ui'),
       path.join(cwd, 'dist'),
       // Chemins alternatifs pour Vercel
+      '/var/task/public/local-ui',
+      '/vercel/path0/public/local-ui',
       '/vercel/path0/.next/standalone/local-ui',
       '/vercel/path0/.next/standalone',
       '/vercel/path0/local-ui',
@@ -85,15 +88,34 @@ export async function GET() {
       console.error('Build directory not found.');
       console.error('CWD:', cwd);
       console.error('Function dir:', functionDir);
-      console.error('Checked relative paths:', vercelPaths);
-      console.error('Checked absolute paths:', possiblePaths);
+      console.error('Task root:', taskRoot);
       
       // Lister les fichiers disponibles pour déboguer
       try {
         const cwdFiles = fs.existsSync(cwd) ? fs.readdirSync(cwd) : [];
         const functionFiles = fs.existsSync(functionDir) ? fs.readdirSync(functionDir) : [];
+        const taskRootFiles = fs.existsSync(taskRoot) ? fs.readdirSync(taskRoot) : [];
         console.error('Files in CWD:', cwdFiles);
         console.error('Files in function dir:', functionFiles);
+        console.error('Files in task root:', taskRootFiles);
+        
+        // Essayer de lister les fichiers dans les chemins parents
+        const parentDirs = [
+          path.join(functionDir, '..'),
+          path.join(functionDir, '../..'),
+          path.join(functionDir, '../../..'),
+          path.join(functionDir, '../../../..'),
+        ];
+        for (const parentDir of parentDirs) {
+          if (fs.existsSync(parentDir)) {
+            try {
+              const files = fs.readdirSync(parentDir);
+              console.error(`Files in ${parentDir}:`, files);
+            } catch (e) {
+              // Ignorer les erreurs
+            }
+          }
+        }
       } catch (e) {
         console.error('Cannot list files:', e);
       }
@@ -103,6 +125,7 @@ export async function GET() {
           error: 'Build directory not found', 
           cwd, 
           functionDir,
+          taskRoot,
           checkedPaths: [...vercelPaths, ...possiblePaths] 
         },
         { status: 404 }
