@@ -47,8 +47,15 @@ export async function GET() {
     
     // Stratégie 1: Depuis la fonction (remonter jusqu'à .next/standalone)
     const functionDir = __dirname;
-    // Depuis /var/task/app/api/update/build, remonter à /var/task puis chercher .next
-    const taskRoot = path.join(functionDir, '../../..'); // /var/task
+    // Sur Vercel, on est dans /var/task/app/api/update/build
+    // Donc /var/task est à ../../../.. depuis functionDir (4 niveaux)
+    // Mais vérifions d'abord avec 3 niveaux (../../..) qui donne /var/task/app
+    // Puis remontons encore d'un niveau si nécessaire
+    let taskRoot = path.join(functionDir, '../../..'); // /var/task/app
+    // Si on est dans /var/task/app, remonter à /var/task
+    if (taskRoot.endsWith('/app') || taskRoot.endsWith('\\app')) {
+      taskRoot = path.join(taskRoot, '..'); // /var/task
+    }
     const nextStandalone = path.join(taskRoot, '.next', 'standalone');
     const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     
@@ -98,6 +105,26 @@ export async function GET() {
         console.error('Files in CWD:', cwdFiles);
         console.error('Files in function dir:', functionFiles);
         console.error('Files in task root:', taskRootFiles);
+        
+        // Vérifier spécifiquement public/
+        const publicDir = path.join(cwd, 'public');
+        const publicLocalUI = path.join(publicDir, 'local-ui');
+        if (fs.existsSync(publicDir)) {
+          try {
+            const publicFiles = fs.readdirSync(publicDir);
+            console.error('Files in public/:', publicFiles);
+            if (fs.existsSync(publicLocalUI)) {
+              const localUIFiles = fs.readdirSync(publicLocalUI);
+              console.error('Files in public/local-ui:', localUIFiles);
+            } else {
+              console.error('public/local-ui does not exist');
+            }
+          } catch (e) {
+            console.error('Cannot read public/:', e);
+          }
+        } else {
+          console.error('public/ directory does not exist');
+        }
         
         // Essayer de lister les fichiers dans les chemins parents
         const parentDirs = [

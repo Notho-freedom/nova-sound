@@ -22,7 +22,11 @@ export async function GET() {
     const cwd = process.cwd();
     const functionDir = __dirname;
     // Depuis /var/task/app/api/update/version, remonter à /var/task
-    const taskRoot = path.join(functionDir, '../../..');
+    let taskRoot = path.join(functionDir, '../../..'); // /var/task/app
+    // Si on est dans /var/task/app, remonter à /var/task
+    if (taskRoot.endsWith('/app') || taskRoot.endsWith('\\app')) {
+      taskRoot = path.join(taskRoot, '..'); // /var/task
+    }
     const nextStandalone = path.join(taskRoot, '.next', 'standalone');
     const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     

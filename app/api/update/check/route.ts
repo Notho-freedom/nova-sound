@@ -29,7 +29,11 @@ export async function POST(request: Request) {
     // Sur Vercel, les fonctions serverless sont dans /var/task/app/api/...
     const functionDir = __dirname;
     // Remonter à /var/task puis chercher .next/standalone
-    const taskRoot = path.join(functionDir, '../../..');
+    let taskRoot = path.join(functionDir, '../../..'); // /var/task/app
+    // Si on est dans /var/task/app, remonter à /var/task
+    if (taskRoot.endsWith('/app') || taskRoot.endsWith('\\app')) {
+      taskRoot = path.join(taskRoot, '..'); // /var/task
+    }
     const nextStandalone = path.join(taskRoot, '.next', 'standalone');
     const nextStandaloneLocalUI = path.join(nextStandalone, 'local-ui');
     
