@@ -50,3 +50,4 @@ firebase-adminsdk-*.json
 !tsconfig.*.json
 local-ui/
 !local-ui/.gitkeep
+.vercel

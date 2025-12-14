@@ -9,8 +9,13 @@
  * et valide leur format si possible.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Colors for terminal output
 const colors = {
@@ -23,8 +28,8 @@ const colors = {
 };
 
 // Load environment variables
-require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Environment variable definitions
 const envDefinitions = {
