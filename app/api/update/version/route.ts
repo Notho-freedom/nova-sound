@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,19 +18,25 @@ export const revalidate = 0;
  */
 export async function GET() {
   try {
-    // En production Vercel, le build est dans .next/standalone
-    // Chercher version.json dans plusieurs emplacements possibles
-    // Priorité: .next/standalone/local-ui/version.json (créé pendant le build) > autres
+    // En production Vercel, les fonctions serverless s'exécutent dans /var/task
+    // Utiliser __dirname pour trouver le répertoire de la fonction
     const cwd = process.cwd();
+    const functionDir = __dirname;
+    const serverDir = path.join(functionDir, '../..');
+    const standaloneDir = path.join(serverDir, 'standalone');
+    const standaloneLocalUIDir = path.join(standaloneDir, 'local-ui');
+    
+    // Chercher version.json dans plusieurs emplacements possibles
+    // Priorité: local-ui dans standalone (créé pendant le build) > standalone > autres
     const possiblePaths = [
+      path.join(standaloneLocalUIDir, 'version.json'),
+      path.join(standaloneDir, 'local-ui', 'version.json'),
+      path.join(standaloneDir, 'version.json'),
+      path.join(standaloneDir, 'app', 'version.json'),
       path.join(cwd, '.next', 'standalone', 'local-ui', 'version.json'),
       path.join(cwd, 'local-ui', 'version.json'),
       path.join(cwd, '.next', 'standalone', 'version.json'),
-      path.join(cwd, '.next', 'standalone', 'app', 'version.json'),
       path.join(cwd, 'dist', 'version.json'),
-      // Chemins alternatifs pour Vercel
-      '/vercel/path0/.next/standalone/local-ui/version.json',
-      '/vercel/path0/local-ui/version.json',
     ];
     
     let versionFile: string | null = null;

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -22,8 +26,17 @@ export async function POST(request: Request) {
     const body: CheckUpdateRequest = await request.json();
     
     // Récupérer la version serveur
-    // Chercher version.json dans plusieurs emplacements (priorité: .next/standalone/local-ui)
+    // Utiliser __dirname pour trouver le répertoire de la fonction
+    const functionDir = __dirname;
+    const serverDir = path.join(functionDir, '../..');
+    const standaloneDir = path.join(serverDir, 'standalone');
+    const standaloneLocalUIDir = path.join(standaloneDir, 'local-ui');
+    
+    // Chercher version.json dans plusieurs emplacements (priorité: local-ui dans standalone)
     const possiblePaths = [
+      path.join(standaloneLocalUIDir, 'version.json'),
+      path.join(standaloneDir, 'local-ui', 'version.json'),
+      path.join(standaloneDir, 'version.json'),
       path.join(process.cwd(), '.next', 'standalone', 'local-ui', 'version.json'),
       path.join(process.cwd(), 'local-ui', 'version.json'),
       path.join(process.cwd(), '.next', 'standalone', 'version.json'),
@@ -33,6 +46,7 @@ export async function POST(request: Request) {
     for (const possiblePath of possiblePaths) {
       if (fs.existsSync(possiblePath)) {
         versionFile = possiblePath;
+        console.log('Found version.json at:', versionFile);
         break;
       }
     }

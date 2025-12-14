@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import archiver from 'archiver';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -34,35 +38,82 @@ export async function GET() {
       '/vercel/path0/local-ui',
     ];
     
+    // Sur Vercel, les fonctions serverless s'exécutent dans /var/task
+    // Les fichiers du build sont dans un emplacement différent
+    // Utiliser __dirname pour trouver le répertoire de la fonction
+    const functionDir = __dirname || path.dirname(new URL(import.meta.url).pathname);
+    
+    // Chercher depuis le répertoire de la fonction (qui devrait être dans .next/server)
+    const serverDir = path.join(functionDir, '../..');
+    const standaloneDir = path.join(serverDir, 'standalone');
+    const standaloneLocalUIDir = path.join(standaloneDir, 'local-ui');
+    
+    // Chemins à vérifier (priorité: local-ui dans standalone > standalone lui-même)
+    const vercelPaths = [
+      standaloneLocalUIDir,
+      standaloneDir,
+      path.join(standaloneDir, 'app'),
+    ];
+    
     // Log pour déboguer
-    console.log('Searching for build directory. CWD:', cwd);
-    console.log('Checking paths:', possiblePaths.slice(0, 3));
+    console.log('Searching for build directory.');
+    console.log('CWD:', cwd);
+    console.log('Function dir:', functionDir);
+    console.log('Server dir:', serverDir);
+    console.log('Standalone dir:', standaloneDir);
     
     let buildDir: string | null = null;
-    for (const possiblePath of possiblePaths) {
+    
+    // D'abord vérifier les chemins relatifs à la fonction
+    for (const possiblePath of vercelPaths) {
       if (fs.existsSync(possiblePath)) {
-        // Vérifier qu'il y a des fichiers (pas juste un dossier vide)
         const files = fs.readdirSync(possiblePath);
         if (files.length > 0) {
           buildDir = possiblePath;
-          console.log('Found build directory:', buildDir);
+          console.log('Found build directory (relative to function):', buildDir);
           break;
         }
       }
     }
     
+    // Si pas trouvé, vérifier les chemins absolus
     if (!buildDir) {
-      console.error('Build directory not found. CWD:', cwd);
-      console.error('Checked paths:', possiblePaths);
-      // Lister les fichiers dans le CWD pour déboguer
-      try {
-        const cwdFiles = fs.readdirSync(cwd);
-        console.error('Files in CWD:', cwdFiles);
-      } catch (e) {
-        console.error('Cannot read CWD:', e);
+      for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+          const files = fs.readdirSync(possiblePath);
+          if (files.length > 0) {
+            buildDir = possiblePath;
+            console.log('Found build directory (absolute):', buildDir);
+            break;
+          }
+        }
       }
+    }
+    
+    if (!buildDir) {
+      console.error('Build directory not found.');
+      console.error('CWD:', cwd);
+      console.error('Function dir:', functionDir);
+      console.error('Checked relative paths:', vercelPaths);
+      console.error('Checked absolute paths:', possiblePaths);
+      
+      // Lister les fichiers disponibles pour déboguer
+      try {
+        const cwdFiles = fs.existsSync(cwd) ? fs.readdirSync(cwd) : [];
+        const functionFiles = fs.existsSync(functionDir) ? fs.readdirSync(functionDir) : [];
+        console.error('Files in CWD:', cwdFiles);
+        console.error('Files in function dir:', functionFiles);
+      } catch (e) {
+        console.error('Cannot list files:', e);
+      }
+      
       return NextResponse.json(
-        { error: 'Build directory not found', cwd, checkedPaths: possiblePaths },
+        { 
+          error: 'Build directory not found', 
+          cwd, 
+          functionDir,
+          checkedPaths: [...vercelPaths, ...possiblePaths] 
+        },
         { status: 404 }
       );
     }
