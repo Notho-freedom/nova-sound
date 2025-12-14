@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,121 +16,167 @@ export const revalidate = 0;
  */
 export async function GET() {
   try {
-    // Lire latest.json qui contient les métadonnées du build le plus récent
-    // Ce fichier est généré au build par generate-build-zip.js
-    const cwd = process.cwd();
-    const possibleLatestPaths = [
-      path.join(cwd, 'public', 'updates', 'latest.json'),
-      '/var/task/public/updates/latest.json',
-      '/vercel/path0/public/updates/latest.json',
-    ];
-
-    let latestJsonPath: string | null = null;
-    for (const possiblePath of possibleLatestPaths) {
-      if (fs.existsSync(possiblePath)) {
-        latestJsonPath = possiblePath;
-        break;
+    // SOLUTION PRO : latest.json est servi via /api/updates/latest
+    // Cette route API peut accéder au filesystem et sert latest.json
+    // On fait un fetch HTTP interne vers cette route API
+    const baseUrl = process.env.UPDATE_BASE_URL 
+      || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : null)
+      || 'https://nova-sound-nine.vercel.app';
+    
+    // Essayer d'abord la route API interne (plus fiable)
+    const latestApiUrl = `${baseUrl}/api/updates/latest`;
+    // Fallback vers le fichier statique
+    const latestStaticUrl = `${baseUrl}/updates/latest.json`;
+    
+    let latestData;
+    let fetchError: Error | null = null;
+    
+    // Essayer la route API d'abord
+    try {
+      const response = await fetch(latestApiUrl, {
+        cache: 'no-store',
+        headers: {
+          'User-Agent': 'NEXUS-Update-API/1.0',
+        },
+      });
+      
+      if (response.ok) {
+        latestData = await response.json();
+        console.log('Successfully fetched latest.json via API route');
+      } else {
+        throw new Error(`API route returned ${response.status}`);
+      }
+    } catch (apiError) {
+      console.warn('Failed to fetch via API route, trying static file:', apiError);
+      fetchError = apiError as Error;
+      
+      // Fallback : essayer le fichier statique
+      try {
+        const response = await fetch(latestStaticUrl, {
+          cache: 'no-store',
+          headers: {
+            'User-Agent': 'NEXUS-Update-API/1.0',
+          },
+        });
+        
+        if (response.ok) {
+          latestData = await response.json();
+          console.log('Successfully fetched latest.json via static file');
+        } else {
+          throw new Error(`Static file returned ${response.status}`);
+        }
+      } catch (staticError) {
+        console.error('Failed to fetch latest.json via both methods:', staticError);
+        fetchError = staticError as Error;
       }
     }
-
-    if (!latestJsonPath) {
-      // Si latest.json n'existe pas, essayer de trouver le ZIP le plus récent
-      const updatesDirs = [
-        path.join(cwd, 'public', 'updates'),
-        '/var/task/public/updates',
-        '/vercel/path0/public/updates',
+    
+    if (!latestData) {
+      // Fallback : essayer de lire via fs (pour développement local uniquement)
+      const cwd = process.cwd();
+      const possibleLatestPaths = [
+        path.join(cwd, 'public', 'updates', 'latest.json'),
+        '/var/task/public/updates/latest.json',
+        '/vercel/path0/public/updates/latest.json',
       ];
 
-      let updatesDir: string | null = null;
-      for (const dir of updatesDirs) {
-        if (fs.existsSync(dir)) {
-          updatesDir = dir;
+      let latestJsonPath: string | null = null;
+      for (const possiblePath of possibleLatestPaths) {
+        if (fs.existsSync(possiblePath)) {
+          latestJsonPath = possiblePath;
           break;
         }
       }
 
-      if (!updatesDir) {
-        return NextResponse.json(
-          { 
-            error: 'No build available',
-            message: 'Build ZIP not found. Make sure the build process completed successfully.'
+      if (latestJsonPath) {
+        // Lire latest.json via fs (fallback pour développement local)
+        latestData = JSON.parse(fs.readFileSync(latestJsonPath, 'utf-8'));
+      } else {
+        // Dernier recours : essayer de trouver le ZIP le plus récent via fs
+        const updatesDirs = [
+          path.join(cwd, 'public', 'updates'),
+          '/var/task/public/updates',
+          '/vercel/path0/public/updates',
+        ];
+
+        let updatesDir: string | null = null;
+        for (const dir of updatesDirs) {
+          if (fs.existsSync(dir)) {
+            updatesDir = dir;
+            break;
+          }
+        }
+
+        if (!updatesDir) {
+          return NextResponse.json(
+            { 
+              error: 'No build available',
+              message: 'Build ZIP not found. Make sure the build process completed successfully.'
+            },
+            { status: 404 }
+          );
+        }
+
+        // Trouver le ZIP le plus récent
+        const files = fs.readdirSync(updatesDir);
+        const zipFiles = files.filter(f => f.endsWith('.zip'));
+        
+        if (zipFiles.length === 0) {
+          return NextResponse.json(
+            { 
+              error: 'No build ZIP found',
+              message: 'No ZIP files found in updates directory.'
+            },
+            { status: 404 }
+          );
+        }
+
+        // Trier par date de modification (le plus récent en premier)
+        const zipFilesWithStats = zipFiles.map(file => {
+          const filePath = path.join(updatesDir!, file);
+          const stats = fs.statSync(filePath);
+          return { file, mtime: stats.mtime };
+        }).sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+        const latestZip = zipFilesWithStats[0].file;
+
+        return NextResponse.json({
+          url: `${baseUrl}/updates/${latestZip}`,
+          fileName: latestZip,
+          size: fs.statSync(path.join(updatesDir, latestZip)).size,
+          buildDate: zipFilesWithStats[0].mtime.toISOString(),
+        }, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Access-Control-Allow-Origin': '*',
           },
-          { status: 404 }
-        );
+        });
       }
-
-      // Trouver le ZIP le plus récent
-      const files = fs.readdirSync(updatesDir);
-      const zipFiles = files.filter(f => f.endsWith('.zip'));
-      
-      if (zipFiles.length === 0) {
-        return NextResponse.json(
-          { 
-            error: 'No build ZIP found',
-            message: 'No ZIP files found in updates directory.'
-          },
-          { status: 404 }
-        );
-      }
-
-      // Trier par date de modification (le plus récent en premier)
-      const zipFilesWithStats = zipFiles.map(file => {
-        const filePath = path.join(updatesDir!, file);
-        const stats = fs.statSync(filePath);
-        return { file, mtime: stats.mtime };
-      }).sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-
-      const latestZip = zipFilesWithStats[0].file;
-      const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
-        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-        : process.env.UPDATE_BASE_URL || 'https://nova-sound-nine.vercel.app';
-
-      return NextResponse.json({
-        url: `${baseUrl}/updates/${latestZip}`,
-        fileName: latestZip,
-        size: fs.statSync(path.join(updatesDir, latestZip)).size,
-        buildDate: zipFilesWithStats[0].mtime.toISOString(),
-      }, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
     }
-
-    // Lire latest.json
-    const latestData = JSON.parse(fs.readFileSync(latestJsonPath, 'utf-8'));
     
-    // Construire l'URL complète
-    const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : process.env.UPDATE_BASE_URL || 'https://nova-sound-nine.vercel.app';
-
+    // Construire l'URL complète du ZIP
     const zipUrl = latestData.zipUrl?.startsWith('http')
       ? latestData.zipUrl
       : `${baseUrl}${latestData.zipUrl || `/updates/${latestData.zipFileName}`}`;
 
-    // Vérifier que le fichier ZIP existe
-    const zipPath = path.join(path.dirname(latestJsonPath), latestData.zipFileName);
-    if (!fs.existsSync(zipPath)) {
-      return NextResponse.json(
-        { 
-          error: 'Build ZIP not found',
-          message: `ZIP file ${latestData.zipFileName} not found on server.`
-        },
-        { status: 404 }
-      );
+    // Essayer de vérifier la taille du fichier (optionnel, peut échouer sur Vercel)
+    let zipSize: number | undefined;
+    try {
+      const zipPath = path.join(process.cwd(), 'public', 'updates', latestData.zipFileName);
+      if (fs.existsSync(zipPath)) {
+        zipSize = fs.statSync(zipPath).size;
+      }
+    } catch (e) {
+      // Ignorer si on ne peut pas accéder au fichier (normal sur Vercel)
     }
-
-    const zipStats = fs.statSync(zipPath);
 
     return NextResponse.json({
       url: zipUrl,
       fileName: latestData.zipFileName,
       version: latestData.version,
       buildNumber: latestData.buildNumber,
-      size: zipStats.size,
-      buildDate: latestData.buildDate || zipStats.mtime.toISOString(),
+      size: zipSize,
+      buildDate: latestData.buildDate || new Date().toISOString(),
     }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
