@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import { Readable } from 'stream';
 import http from 'http';
+import { createServer } from 'http';
 import dotenv from 'dotenv';
 
 // Import services
@@ -47,6 +48,7 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let staticServer: http.Server | null = null;
 
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
@@ -274,33 +276,208 @@ function createWindow() {
     }
   } else {
     // In production, load from static build
-    const appPath = app.isPackaged 
-      ? path.dirname(app.getAppPath())
-      : path.join(__dirname, '..');
+    let htmlPath: string;
     
-    const htmlPath = path.join(appPath, 'out', 'index.html');
+    if (app.isPackaged) {
+      // En production packagée, le dossier out/ est dans resources/ à côté de app.asar
+      const resourcesPath = path.dirname(app.getAppPath());
+      htmlPath = path.join(resourcesPath, 'out', 'index.html');
+      
+      // Si pas trouvé, essayer dans app.asar
+      if (!fs.existsSync(htmlPath)) {
+        htmlPath = path.join(app.getAppPath(), 'out', 'index.html');
+      }
+    } else {
+      // En développement/production non packagée
+      htmlPath = path.join(__dirname, '..', 'out', 'index.html');
+    }
     
     console.log(`📦 Production mode: Loading static build from: ${htmlPath}`);
+    console.log(`   App path: ${app.getAppPath()}`);
+    console.log(`   Is packaged: ${app.isPackaged}`);
+    console.log(`   File exists: ${fs.existsSync(htmlPath)}`);
     
     if (!fs.existsSync(htmlPath)) {
       const errorMsg = `Build not found at: ${htmlPath}\nPlease run "npm run build" first.`;
       console.error(`❌ ${errorMsg}`);
       
+      // Afficher une erreur dans la fenêtre
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(`
-          document.body.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; font-family: system-ui; color: #fff; background: #0a0a0f;">
-            <h1 style="font-size: 24px; margin-bottom: 16px;">❌ Build introuvable</h1>
-            <p style="font-size: 16px; margin-bottom: 8px;">Le build statique n\\'a pas été trouvé</p>
-            <p style="font-size: 14px; color: #888;">Chemin: ${htmlPath}</p>
-            <p style="font-size: 12px; color: #666; margin-top: 24px;">Exécutez "npm run build" pour générer le build statique</p>
-          </div>';
-        `);
+        mainWindow.webContents.once('did-finish-load', () => {
+          mainWindow?.webContents.executeJavaScript(`
+            document.body.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; font-family: system-ui; color: #fff; background: #0a0a0f;">
+              <h1 style="font-size: 24px; margin-bottom: 16px;">❌ Build introuvable</h1>
+              <p style="font-size: 16px; margin-bottom: 8px;">Le build statique n\\'a pas été trouvé</p>
+              <p style="font-size: 14px; color: #888;">Chemin: ${htmlPath}</p>
+              <p style="font-size: 12px; color: #666; margin-top: 24px;">App path: ${app.getAppPath()}</p>
+            </div>';
+          `);
+        });
       }
+      
+      // Charger une page vide pour afficher l'erreur
+      mainWindow.loadURL('data:text/html,<html><body style="background:#0a0a0f;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column"><h1>❌ Build introuvable</h1><p>Chemin: ' + htmlPath + '</p></body></html>').catch((error) => {
+        console.error('Failed to load error page:', error);
+      });
       return;
     }
     
-    mainWindow.loadFile(htmlPath).catch((error) => {
-      console.error('Failed to load file:', error);
+    // Démarrer un serveur HTTP local pour servir les fichiers statiques
+    // Cela permet d'utiliser les chemins absolus (/_next/static/...) comme prévu par Next.js
+    const port = 3001; // Utiliser un port différent de 3000 pour éviter les conflits
+    
+    // Déterminer le chemin de base
+    let basePath: string;
+    if (app.isPackaged) {
+      const resourcesPath = path.dirname(app.getAppPath());
+      basePath = path.join(resourcesPath, 'out');
+      
+      // Si pas trouvé, essayer dans app.asar.unpacked
+      if (!fs.existsSync(basePath)) {
+        basePath = path.join(resourcesPath, 'app.asar.unpacked', 'out');
+      }
+    } else {
+      basePath = path.join(__dirname, '..', 'out');
+    }
+    
+    staticServer = createServer((req, res) => {
+      if (!req.url) {
+        res.writeHead(400);
+        res.end('Bad Request');
+        return;
+      }
+      
+      // Parser l'URL
+      const urlPath = req.url === '/' ? '/index.html' : req.url;
+      const filePath = path.join(basePath, urlPath);
+      
+      // Sécurité : s'assurer que le chemin est dans basePath
+      const normalizedBase = path.normalize(basePath);
+      const normalizedFull = path.normalize(filePath);
+      if (!normalizedFull.startsWith(normalizedBase)) {
+        console.error('Security: Attempted to access file outside base path');
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+      
+      // Lire le fichier
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          if (err.code === 'ENOENT') {
+            res.writeHead(404);
+            res.end('File not found');
+          } else {
+            console.error('Error reading file:', err);
+            res.writeHead(500);
+            res.end('Internal server error');
+          }
+          return;
+        }
+        
+        // Déterminer le type MIME
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.html': 'text/html',
+          '.js': 'application/javascript',
+          '.css': 'text/css',
+          '.json': 'application/json',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.woff': 'font/woff',
+          '.woff2': 'font/woff2',
+          '.ttf': 'font/ttf',
+          '.ico': 'image/x-icon',
+          '.txt': 'text/plain',
+        };
+        const mimeType = mimeTypes[ext] || 'application/octet-stream';
+        
+        res.writeHead(200, {
+          'Content-Type': mimeType,
+          'Content-Length': data.length.toString(),
+        });
+        res.end(data);
+      });
+    });
+    
+    staticServer.listen(port, '127.0.0.1', () => {
+      console.log(`✅ Static server started on http://127.0.0.1:${port}`);
+      const url = `http://127.0.0.1:${port}/`;
+      console.log(`Loading from: ${url}`);
+      
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.loadURL(url).catch((error) => {
+          console.error('Failed to load URL:', error);
+        });
+      }
+    });
+    
+    staticServer.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use. Trying port ${port + 1}...`);
+        // Essayer le port suivant
+        const newPort = port + 1;
+        staticServer?.close();
+        staticServer = createServer((req, res) => {
+          if (!req.url) {
+            res.writeHead(400);
+            res.end('Bad Request');
+            return;
+          }
+          const urlPath = req.url === '/' ? '/index.html' : req.url;
+          const filePath = path.join(basePath, urlPath);
+          const normalizedBase = path.normalize(basePath);
+          const normalizedFull = path.normalize(filePath);
+          if (!normalizedFull.startsWith(normalizedBase)) {
+            res.writeHead(403);
+            res.end('Forbidden');
+            return;
+          }
+          fs.readFile(filePath, (err, data) => {
+            if (err) {
+              res.writeHead(err.code === 'ENOENT' ? 404 : 500);
+              res.end(err.code === 'ENOENT' ? 'File not found' : 'Internal server error');
+              return;
+            }
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes: Record<string, string> = {
+              '.html': 'text/html',
+              '.js': 'application/javascript',
+              '.css': 'text/css',
+              '.json': 'application/json',
+              '.png': 'image/png',
+              '.jpg': 'image/jpeg',
+              '.jpeg': 'image/jpeg',
+              '.gif': 'image/gif',
+              '.svg': 'image/svg+xml',
+              '.woff': 'font/woff',
+              '.woff2': 'font/woff2',
+              '.ttf': 'font/ttf',
+              '.ico': 'image/x-icon',
+              '.txt': 'text/plain',
+            };
+            const mimeType = mimeTypes[ext] || 'application/octet-stream';
+            res.writeHead(200, {
+              'Content-Type': mimeType,
+              'Content-Length': data.length.toString(),
+            });
+            res.end(data);
+          });
+        });
+        staticServer.listen(newPort, '127.0.0.1', () => {
+          const url = `http://127.0.0.1:${newPort}/`;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.loadURL(url).catch((error) => {
+              console.error('Failed to load URL:', error);
+            });
+          }
+        });
+      } else {
+        console.error('Static server error:', err);
+      }
     });
   }
   
@@ -437,6 +614,60 @@ ipcMain.handle('fs:openPath', async (_event, filePath: string) => {
     throw error;
   }
 });
+
+// Register custom protocol for serving static files from out/ directory
+function registerNexusProtocol() {
+  protocol.registerFileProtocol('nexus', (request, callback) => {
+    try {
+      const url = new URL(request.url);
+      let filePath = url.pathname;
+      
+      // Déterminer le chemin de base selon si l'app est packagée ou non
+      let basePath: string;
+      if (app.isPackaged) {
+        const resourcesPath = path.dirname(app.getAppPath());
+        basePath = path.join(resourcesPath, 'out');
+      } else {
+        basePath = path.join(__dirname, '..', 'out');
+      }
+      
+      // Si le chemin commence par /, l'enlever
+      if (filePath.startsWith('/')) {
+        filePath = filePath.slice(1);
+      }
+      
+      // Si le chemin est vide ou juste '/', utiliser index.html
+      if (!filePath || filePath === '') {
+        filePath = 'index.html';
+      }
+      
+      // Construire le chemin complet du fichier
+      const fullPath = path.join(basePath, filePath);
+      
+      // Sécurité : s'assurer que le chemin est dans basePath
+      const normalizedBase = path.normalize(basePath);
+      const normalizedFull = path.normalize(fullPath);
+      if (!normalizedFull.startsWith(normalizedBase)) {
+        console.error('Security: Attempted to access file outside base path');
+        callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+        return;
+      }
+      
+      // Vérifier si le fichier existe
+      if (!fs.existsSync(fullPath)) {
+        console.error('File not found:', fullPath);
+        callback({ error: -6 }); // ERR_FILE_NOT_FOUND
+        return;
+      }
+      
+      // Retourner le chemin du fichier
+      callback({ path: fullPath });
+    } catch (error: any) {
+      console.error('Failed to load file via nexus protocol:', request.url, error);
+      callback({ error: -2 }); // ERR_FAILED
+    }
+  });
+}
 
 // Register custom protocol for local audio files
 function registerLocalAudioProtocol() {
@@ -631,6 +862,7 @@ if (!gotTheLock) {
 app.whenReady().then(async () => {
   try {
     // Register custom protocols
+    registerNexusProtocol(); // Doit être enregistré en premier pour servir les fichiers statiques
     registerLocalAudioProtocol();
     registerLocalVideoProtocol();
     
@@ -715,6 +947,14 @@ app.whenReady().then(async () => {
     setTimeout(() => {
       app.quit();
     }, 5000);
+  }
+});
+
+// Fermer le serveur statique quand l'app se ferme
+app.on('before-quit', () => {
+  if (staticServer) {
+    staticServer.close();
+    staticServer = null;
   }
 });
 

@@ -28,10 +28,17 @@ export const TitleBar = ({
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
+  const [isDev, setIsDev] = useState(false);
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync();
 
   useEffect(() => {
     setIsElectron(!!window.electronAPI);
+    // Détecter si on est en mode développement
+    // En dev: on charge depuis http://localhost:3000
+    // En prod Electron: on charge depuis file:// (pas de hostname)
+    // En prod web: on charge depuis un domaine de production
+    const isDevelopment = window.location.hostname === 'localhost' && window.location.port === '3000';
+    setIsDev(isDevelopment);
   }, []);
 
   const handleLogout = async () => {
@@ -81,6 +88,22 @@ export const TitleBar = ({
               <span className="ml-2 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[9px]">
                 WEB
               </span>
+            )}
+            {isDev && (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <span className="ml-2 w-2 h-2 rounded-full bg-yellow-500 animate-pulse inline-block" title="Mode développement" />
+                </TooltipTrigger>
+                <TooltipContent>Mode développement</TooltipContent>
+              </Tooltip>
+            )}
+            {!isDev && isElectron && (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <span className="ml-2 w-2 h-2 rounded-full bg-green-500 inline-block" title="Mode production" />
+                </TooltipTrigger>
+                <TooltipContent>Mode production</TooltipContent>
+              </Tooltip>
             )}
           </span>
         </div>

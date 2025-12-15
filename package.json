@@ -1,5 +1,5 @@
 {
-  "name": "nexus player",
+  "name": "nexus-player",
   "private": true,
   "version": "1.0.7",
   "description": "nexus player",
@@ -18,7 +18,8 @@
     "postbuild": "node scripts/generate-version.js && node scripts/generate-build-zip.js",
     "build:backend": "cd backend && npm run build",
     "start": "next start",
-    "electron": "electron .",
+    "electron": "cross-env NODE_ENV=production electron .",
+    "electron:prod": "npm run build && npm run build:electron && cross-env NODE_ENV=production electron .",
     "package": "npm run build:electron && electron-builder",
     "package:win": "npm run build:electron && electron-builder --win",
     "package:mac": "npm run build:electron && electron-builder --mac",
@@ -31,6 +32,7 @@
     "validate:env:all": "node scripts/validate-env.js --check-all"
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
     "@fontsource/orbitron": "^5.2.8",
     "@fontsource/rajdhani": "^5.2.7",
     "@hookform/resolvers": "^3.10.0",
@@ -118,7 +120,6 @@
     "caniuse-lite": "^1.0.30001760",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "dotenv": "^17.2.3",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "eslint": "^9.32.0",
@@ -137,7 +138,7 @@
   },
   "build": {
     "appId": "com.nexus.player",
-    "productName": "NEXUS Player",
+    "productName": "Nexus Player",
     "directories": {
       "output": "release"
     },
@@ -148,6 +149,9 @@
       "!.next/cache/**/*",
       "!local-ui/**/*",
       "!public/local-ui/**/*"
+    ],
+    "asarUnpack": [
+      "out/**/*"
     ],
     "fileAssociations": [
       {
@@ -308,7 +312,10 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/favicon.ico",
+      "uninstallerIcon": "public/favicon.ico",
+      "installerHeaderIcon": "public/favicon.ico"
     }
   }
 }

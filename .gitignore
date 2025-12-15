@@ -25,7 +25,8 @@ backend/.next/
 backend/out/
 backend/.env
 backend/*.log
-
+out
+public/updates
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

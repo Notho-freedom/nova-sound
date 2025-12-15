@@ -1,15 +1,30 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { app } from 'electron';
 import axios from 'axios';
 // @ts-expect-error - unzipper n'a pas de types TypeScript officiels
 import unzipper from 'unzipper';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Chemin vers le build local
-const localUIPath = path.join(__dirname, '../../local-ui');
+// Chemin vers le build local - utiliser userData en production
+function getLocalUIPath() {
+    if (app.isPackaged) {
+        // En production, utiliser userData pour éviter les problèmes de permissions
+        return path.join(app.getPath('userData'), 'local-ui');
+    }
+    // En développement, utiliser le chemin relatif
+    return path.join(__dirname, '../../local-ui');
+}
+function getBackupUIPath() {
+    if (app.isPackaged) {
+        return path.join(app.getPath('userData'), 'local-ui-backup');
+    }
+    return path.join(__dirname, '../../local-ui-backup');
+}
+const localUIPath = getLocalUIPath();
 const versionFile = path.join(localUIPath, 'version.json');
-const backupUIPath = path.join(__dirname, '../../local-ui-backup');
+const backupUIPath = getBackupUIPath();
 // Fonction pour obtenir l'URL Vercel (peut être surchargée par variable d'environnement)
 const getVercelUrl = () => {
     // Priorité: UPDATE_BASE_URL > NEXT_PUBLIC_VERCEL_URL > valeur par défaut
@@ -57,7 +72,10 @@ async function restoreBackup() {
     }
 }
 export async function downloadAndReplaceBuild(remoteUrl) {
-    const tmpZip = path.join(__dirname, '../../tmp-build.zip'); // Temp file outside local-ui
+    // Utiliser userData pour le fichier temporaire en production
+    const tmpZip = app.isPackaged
+        ? path.join(app.getPath('temp'), 'nexus-build-tmp.zip')
+        : path.join(__dirname, '../../tmp-build.zip');
     try {
         await createBackup(); // Create backup before attempting update
         console.log('Downloading new build from:', remoteUrl);
