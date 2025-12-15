@@ -38,6 +38,9 @@ if (process.platform === 'win32') {
 }
 let mainWindow = null;
 let staticServer = null;
+let currentStaticServerPort = null;
+let backendServer = null;
+let backendPort = 3002; // Use different port from UI static server (3001)
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
     'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'opus', 'wma', 'aiff', 'mp2', 'mp1',
@@ -136,10 +139,15 @@ function createWindow() {
             contextIsolation: true,
             sandbox: false,
             webSecurity: false, // Allow loading local files
+            devTools: true, // Enable DevTools
         },
     });
-    // Load the app
+    // Open DevTools for debugging (always open in development, optional in production)
     const isDev = process.env.NODE_ENV === 'development';
+    if (isDev || process.env.ELECTRON_OPEN_DEVTOOLS === '1') {
+        mainWindow.webContents.openDevTools();
+    }
+    // Load the app
     // En développement ET production, utiliser le build statique depuis out/
     // Cela permet des tests plus rapides en dev (pas besoin d'attendre Next.js dev server)
     {
@@ -442,7 +450,8 @@ function createWindow() {
             }
         });
     }
-    if (cliOptions.debug) {
+    // Ouvrir DevTools en mode développement ou si debug est activé
+    if (isDev || cliOptions.debug) {
         mainWindow.webContents.openDevTools();
     }
     mainWindow.on('closed', () => {
@@ -461,10 +470,98 @@ function createWindow() {
         return { action: 'deny' };
     });
 }
+/**
+ * Start the Express backend server
+ */
+async function startBackendServer() {
+    if (backendServer) {
+        console.log('Backend server already running');
+        return;
+    }
+    try {
+        // Determine backend path
+        let backendPath;
+        if (app.isPackaged) {
+            const resourcesPath = path.dirname(app.getAppPath());
+            backendPath = path.join(resourcesPath, 'backend', 'dist');
+            // If not found, try in app.asar.unpacked
+            if (!fs.existsSync(backendPath)) {
+                backendPath = path.join(resourcesPath, 'app.asar.unpacked', 'backend', 'dist');
+            }
+        }
+        else {
+            backendPath = path.join(__dirname, '..', 'backend', 'dist');
+        }
+        const serverFile = path.join(backendPath, 'server.js');
+        if (!fs.existsSync(serverFile)) {
+            console.warn(`⚠️ Backend server file not found at: ${serverFile}`);
+            console.warn('⚠️ Backend API will not be available');
+            return;
+        }
+        // Load backend environment variables
+        const appPath = app.isPackaged
+            ? path.dirname(app.getAppPath())
+            : path.join(__dirname, '..');
+        const envPath = path.join(appPath, '.env');
+        if (fs.existsSync(envPath)) {
+            dotenv.config({ path: envPath });
+        }
+        // Import and start the Express server
+        // Use dynamic import to load the compiled backend
+        // Convert Windows path to file:// URL format
+        const normalizedPath = serverFile.replace(/\\/g, '/');
+        const serverUrl = normalizedPath.startsWith('/')
+            ? `file://${normalizedPath}`
+            : `file:///${normalizedPath}`;
+        const backendModule = await import(serverUrl);
+        const expressApp = backendModule.default;
+        // Start the Express server on the specified port
+        if (expressApp && typeof expressApp.listen === 'function') {
+            backendServer = expressApp.listen(backendPort, '127.0.0.1', () => {
+                console.log(`✅ Backend Express server started on http://127.0.0.1:${backendPort}`);
+                // Set environment variable for frontend to use
+                process.env.ELECTRON_BACKEND_URL = `http://127.0.0.1:${backendPort}`;
+            });
+            backendServer.on('error', (err) => {
+                if (err.code === 'EADDRINUSE') {
+                    console.error(`❌ Port ${backendPort} is already in use. Trying port ${backendPort + 1}...`);
+                    backendPort += 1;
+                    backendServer?.close();
+                    startBackendServer();
+                }
+                else {
+                    console.error('Backend server error:', err);
+                }
+            });
+        }
+        else {
+            console.warn('⚠️ Backend server module does not export an Express app');
+        }
+    }
+    catch (error) {
+        console.error('❌ Failed to start backend server:', error);
+        // Don't throw - app can still work without backend
+    }
+}
+/**
+ * Stop the Express backend server
+ */
+function stopBackendServer() {
+    if (backendServer) {
+        backendServer.close(() => {
+            console.log('Backend server stopped');
+        });
+        backendServer = null;
+    }
+}
 // Initialize all services
 async function initServices() {
     // Initialize storage first (other services depend on it)
     initStorage();
+    // Start backend Express server in production
+    if (process.env.NODE_ENV === 'production' || app.isPackaged) {
+        await startBackendServer();
+    }
     // Initialize updater with callback for UI notification
     await initUpdater((versionInfo) => {
         // Notifier l'UI qu'une mise à jour a été effectuée
@@ -858,16 +955,26 @@ app.whenReady().then(async () => {
         }, 5000);
     }
 });
-// Fermer le serveur statique quand l'app se ferme
+// Fermer le serveur statique et backend quand l'app se ferme
 app.on('before-quit', () => {
     if (staticServer) {
         staticServer.close();
         staticServer = null;
+        currentStaticServerPort = null;
     }
+    stopBackendServer();
 });
 app.on('window-all-closed', () => {
     // On macOS, keep app running even when all windows are closed
     if (process.platform !== 'darwin') {
+        if (staticServer) {
+            staticServer.close(() => {
+                console.log('Static server closed.');
+            });
+            staticServer = null;
+            currentStaticServerPort = null;
+        }
+        stopBackendServer();
         app.quit();
     }
 });

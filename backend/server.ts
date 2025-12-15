@@ -10,6 +10,7 @@ import stripeRoutes from './routes/stripe.js';
 import syncRoutes from './routes/sync.js';
 import updateRoutes from './routes/update.js';
 import adminRoutes from './routes/admin.js';
+import authRoutes from './routes/auth.js';
 
 // Load environment variables (only in development, Vercel provides env vars automatically)
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
@@ -43,6 +44,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/update', updateRoutes);
 app.use('/api/updates', updateRoutes); // Alias for /api/updates/latest
 app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -58,8 +60,11 @@ app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Start server locally
-if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+// Start server locally (but not when running in Electron - Electron will start it)
+// Check if we're in Electron by looking for electron in process.versions
+const isElectron = typeof process !== 'undefined' && process.versions && 'electron' in process.versions;
+
+if (!isElectron && (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1')) {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
   });

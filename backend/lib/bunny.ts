@@ -1,10 +1,11 @@
 import axios from 'axios';
 
+// Use environment variables from .env (lines 79-83)
 const BUNNY_STORAGE_NAME = process.env.BUNNY_STORAGE_NAME;
 const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
 const BUNNY_CDN_URL = process.env.BUNNY_CDN_URL;
 const BUNNY_TOKEN_KEY = process.env.BUNNY_TOKEN_KEY; // Secret key for signing URLs
-const BUNNY_STORAGE_URL = `https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}`;
+const BUNNY_STORAGE_URL = BUNNY_STORAGE_NAME ? `https://storage.bunnycdn.com/${BUNNY_STORAGE_NAME}` : '';
 
 /**
  * Check if Bunny Storage is configured

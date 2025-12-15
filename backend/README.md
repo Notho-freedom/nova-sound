@@ -1,60 +1,107 @@
-# NEXUS Audio Backend API
+# Backend Express - Guide Local
 
-Backend API séparé pour NEXUS Audio Player, déployé sur Vercel.
+## Démarrage en local
 
-## Installation
+### 1. Installation des dépendances
 
 ```bash
 cd backend
 npm install
 ```
 
-## Configuration
+### 2. Configuration des variables d'environnement
 
-Copiez `.env.example` vers `.env` et remplissez les variables d'environnement :
+Créez un fichier `.env` dans le dossier `backend/` avec :
 
 ```bash
-cp .env.example .env
+# Google OAuth
+GOOGLE_OAUTH_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-oauth-client-secret
+
+# Firebase Admin (optionnel)
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_PRIVATE_KEY=your-private-key
+FIREBASE_CLIENT_EMAIL=your-client-email
+
+# Stripe (optionnel)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_PRICE_PRO_MONTHLY=price_...
+STRIPE_PRICE_PRO_YEARLY=price_...
+
+# CORS (optionnel)
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3001
+
+# Port (optionnel, par défaut 3001)
+PORT=3001
 ```
 
-## Développement
+### 3. Démarrage du serveur
 
+**Mode développement (avec rechargement automatique) :**
 ```bash
 npm run dev
 ```
 
-Le serveur démarre sur `http://localhost:3001`
-
-## Build
-
+**Mode production (après build) :**
 ```bash
 npm run build
+npm start
 ```
+
+Le serveur démarre sur `http://localhost:3001`
+
+### 4. Configuration du frontend
+
+Dans le fichier `.env` à la racine du projet, configurez :
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+### 5. Test du backend
+
+Testez que le backend fonctionne :
+
+```bash
+curl http://localhost:3001/api/health
+```
+
+Vous devriez recevoir :
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+## Scripts disponibles
+
+- `npm run dev` : Démarre le serveur en mode développement avec rechargement automatique
+- `npm run build` : Compile TypeScript vers JavaScript
+- `npm start` : Démarre le serveur en mode production (nécessite un build préalable)
+- `npm run lint` : Vérifie le code avec ESLint
+
+## Routes disponibles
+
+- `GET /api/health` : Health check
+- `GET /api/config/firebase` : Configuration Firebase
+- `GET /api/config/stripe` : Configuration Stripe
+- `GET /api/config/auth` : Configuration OAuth
+- `POST /api/auth/oauth/token` : Échange de code OAuth pour tokens
+- `POST /api/storage/upload` : Upload de fichiers
+- `GET /api/storage/files` : Liste des fichiers
+- `POST /api/stripe/create-checkout-session` : Créer une session Stripe
+- `GET /api/sync/status` : Statut de synchronisation
+- `POST /api/sync/start` : Démarrer la synchronisation
 
 ## Déploiement sur Vercel
 
-1. Connectez votre projet Vercel au dossier `backend/`
-2. Configurez les variables d'environnement dans Vercel Dashboard
-3. Déployez automatiquement via Git ou manuellement avec `vercel`
+Le backend peut aussi être déployé sur Vercel :
 
-## Routes API
+```bash
+cd backend
+vercel --prod
+```
 
-Toutes les routes API sont disponibles sous `/api/*` :
-
-- `/api/health` - Health check
-- `/api/config/*` - Configuration publique (Firebase, Stripe, Auth)
-- `/api/storage/*` - Gestion des fichiers
-- `/api/stripe/*` - Gestion des abonnements Stripe
-- `/api/sync/*` - Synchronisation cloud
-- `/api/update/*` - Mises à jour Electron
-- `/api/admin/*` - Routes admin
-
-## CORS
-
-Le backend est configuré pour accepter les requêtes depuis :
-- `file://` (Electron)
-- `http://localhost:3000` (dev frontend)
-- `http://localhost:5173` (dev Vite)
-
-Pour la production, configurez `CORS_ORIGINS` dans les variables d'environnement Vercel.
-
+Assurez-vous de configurer toutes les variables d'environnement dans le dashboard Vercel.

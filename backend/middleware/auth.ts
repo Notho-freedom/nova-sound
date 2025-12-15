@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { getFirebaseAdmin, isFirebaseAdminInitialized } from '../lib/firebaseAdmin.js';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID);
 
 export interface AuthenticatedRequest extends Request {
   userId?: string;
@@ -71,7 +71,7 @@ export async function verifyAuth(req: AuthenticatedRequest, res: Response, next:
     try {
       const ticket = await client.verifyIdToken({
         idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
       });
 
       const payload = ticket.getPayload();
@@ -136,7 +136,7 @@ export async function getAuthUser(req: Request): Promise<{ userId: string; userE
     try {
       const ticket = await client.verifyIdToken({
         idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
       });
 
       const payload = ticket.getPayload();

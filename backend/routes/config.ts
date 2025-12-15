@@ -45,7 +45,7 @@ router.get('/stripe', (req: Request, res: Response) => {
 
 // GET /api/config/auth
 router.get('/auth', (req: Request, res: Response) => {
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
   
   if (!googleClientId) {
     res.status(500).json({ error: 'Google OAuth not configured' });

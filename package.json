@@ -12,13 +12,13 @@
     "dev:electron": "concurrently -k -n \"NEXT,ELECTRON\" -c \"blue,green\" \"next dev\" \"npm run electron:dev\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:all": "concurrently -k \"next dev\" \"npm run dev:backend\" \"npm run electron:dev\"",
-    "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && cross-env NODE_ENV=development electron .",
+    "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && cross-env NODE_ENV=development ELECTRON_OPEN_DEVTOOLS=1 electron .",
     "build": "next build",
-    "build:electron": "npm run build && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
+    "build:electron": "npm run build && npm run build:backend && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
     "postbuild": "node scripts/generate-version.js && node scripts/generate-build-zip.js",
     "build:backend": "cd backend && npm run build",
     "start": "next start",
-    "electron": "cross-env NODE_ENV=production electron .",
+    "electron": "cross-env NODE_ENV=production ELECTRON_OPEN_DEVTOOLS=1 electron .",
     "electron:prod": "npm run build && npm run build:electron && cross-env NODE_ENV=production electron .",
     "package": "npm run build:electron && electron-builder",
     "package:win": "npm run build:electron && electron-builder --win",
@@ -142,17 +142,25 @@
     "directories": {
       "output": "release"
     },
-    "files": [
-      "dist-electron/**/*",
-      "out/**/*",
-      "public/**/*",
-      "!.next/cache/**/*",
-      "!local-ui/**/*",
-      "!public/local-ui/**/*"
-    ],
-    "asarUnpack": [
-      "out/**/*"
-    ],
+          "files": [
+            "dist-electron/**/*",
+            "out/**/*",
+            "public/**/*",
+            "backend/dist/**/*",
+            "backend/node_modules/**/*",
+            "backend/package.json",
+            "!.next/cache/**/*",
+            "!local-ui/**/*",
+            "!public/local-ui/**/*",
+            "!backend/**/*.ts",
+            "!backend/**/*.ts.map",
+            "!backend/.env*",
+            "!backend/node_modules/.cache/**/*"
+          ],
+          "asarUnpack": [
+            "out/**",
+            "backend/dist/**"
+          ],
     "fileAssociations": [
       {
         "ext": [

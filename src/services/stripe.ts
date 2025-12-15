@@ -14,7 +14,11 @@ let configLoadPromise: Promise<void> | null = null;
 let stripePromise: Promise<Stripe | null> | null = null;
 
 // API base URL - defaults to Vercel backend or local dev
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
+// In Electron production, use local backend server
+const isElectron = typeof window !== 'undefined' && (window as any).electronAPI;
+const API_BASE_URL = isElectron && process.env.NODE_ENV === 'production'
+  ? 'http://127.0.0.1:3002' // Local backend in Electron
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app');
 
 // Load Stripe config from API route
 async function loadStripeConfig(): Promise<void> {

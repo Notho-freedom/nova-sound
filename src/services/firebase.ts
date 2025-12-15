@@ -38,7 +38,11 @@ let db: Firestore | null = null;
 let configLoadPromise: Promise<void> | null = null;
 
 // API base URL - defaults to Vercel backend or local dev
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
+// In Electron production, use local backend server
+const isElectron = typeof window !== 'undefined' && (window as any).electronAPI;
+const API_BASE_URL = isElectron && process.env.NODE_ENV === 'production'
+  ? 'http://127.0.0.1:3002' // Local backend in Electron
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app');
 
 // Load Firebase config from API route
 async function loadFirebaseConfig(): Promise<void> {
@@ -176,12 +180,19 @@ class FirebaseService {
   // Handle redirect result after Google sign-in (call this on app initialization)
   async handleRedirectResult(): Promise<UserProfile | null> {
     await this.ensureInitialized();
-    if (!auth) return null;
+    if (!auth) {
+      console.log('⚠️ [Firebase] Auth not initialized in handleRedirectResult');
+      return null;
+    }
 
     try {
+      console.log('🔍 [Firebase] Calling getRedirectResult...');
+      console.log('🔍 [Firebase] Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
       const result = await getRedirectResult(auth);
+      console.log('🔍 [Firebase] getRedirectResult returned:', result ? 'Has result' : 'No result');
+      
       if (result && result.user) {
-        console.log("Redirect result received, user:", result.user.email);
+        console.log("✅ [Firebase] Redirect result received, user:", result.user.email);
         
         // Set current user
         this.currentUser = result.user;
@@ -189,20 +200,26 @@ class FirebaseService {
         // Get and verify token is available
         try {
           const token = await result.user.getIdToken();
-          console.log("ID token retrieved after redirect:", token ? "✓ Token length: " + token.length : "✗");
+          console.log("✅ [Firebase] ID token retrieved after redirect:", token ? "✓ Token length: " + token.length : "✗");
         } catch (tokenError) {
-          console.error("Error getting token after redirect:", tokenError);
+          console.error("❌ [Firebase] Error getting token after redirect:", tokenError);
         }
         
         const profile = await this.createOrUpdateProfile(result.user);
+        console.log("✅ [Firebase] Profile created/updated:", profile);
         
         // Force notify listeners
         this.authStateListeners.forEach((listener) => listener(result.user));
         
         return profile;
+      } else {
+        console.log('⚠️ [Firebase] getRedirectResult returned no user');
+        if (result) {
+          console.log('⚠️ [Firebase] Result exists but no user:', result);
+        }
       }
     } catch (error) {
-      console.error("Error handling redirect result:", error);
+      console.error("❌ [Firebase] Error handling redirect result:", error);
     }
     return null;
   }

@@ -40,7 +40,12 @@ let authConfig: {
 let authConfigLoadPromise: Promise<void> | null = null;
 
 // API base URL - defaults to Vercel backend or local dev
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app';
+// In Electron production, use local backend server
+// Otherwise use NEXT_PUBLIC_API_URL or default to Vercel
+const isElectron = typeof window !== 'undefined' && (window as any).electronAPI;
+const API_BASE_URL = isElectron && process.env.NODE_ENV === 'production'
+  ? 'http://127.0.0.1:3002' // Local backend in Electron
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app');
 
 // Load auth config from API route
 async function loadAuthConfig(): Promise<void> {
@@ -71,9 +76,12 @@ if (typeof window !== 'undefined') {
   authConfigLoadPromise = loadAuthConfig();
 }
 
-// Backend proxy endpoint (optional - if not set, will try direct OAuth)
-// Note: OAUTH_PROXY_URL is no longer exposed to client (server-only if needed)
-const OAUTH_PROXY_ENDPOINT = null;
+// Backend proxy endpoint for OAuth token exchange
+// Uses the Express backend to securely exchange OAuth code with client_secret
+// In Electron production, use local backend server
+const OAUTH_PROXY_ENDPOINT = isElectron && process.env.NODE_ENV === 'production'
+  ? 'http://127.0.0.1:3002' // Local backend in Electron
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://api.nexus-audio.vercel.app');
 
 // Client secret is NEVER exposed to client (server-only)
 // For Electron apps, use server-side OAuth flow via API routes
@@ -271,7 +279,8 @@ class AuthService {
     // Try using backend proxy if available (handles client_secret securely)
     if (OAUTH_PROXY_ENDPOINT) {
       try {
-        const response = await fetch(`${OAUTH_PROXY_ENDPOINT}/oauth/token`, {
+        console.log('🔍 [Auth] Exchanging OAuth code via backend:', `${OAUTH_PROXY_ENDPOINT}/api/auth/oauth/token`);
+        const response = await fetch(`${OAUTH_PROXY_ENDPOINT}/api/auth/oauth/token`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -285,6 +294,7 @@ class AuthService {
 
         if (response.ok) {
           const data = await response.json();
+          console.log('✅ [Auth] Token exchange successful via backend');
           sessionStorage.removeItem("oauth_code_verifier");
           
           const expiresIn = data.expires_in || 3600;
@@ -296,9 +306,22 @@ class AuthService {
             idToken: data.id_token,
             expiresAt: expiresAt,
           };
+        } else {
+          let errorText = 'Unknown error';
+          try {
+            const errorData = await response.json();
+            errorText = JSON.stringify(errorData);
+            console.error(`❌ [Auth] Backend token exchange failed: ${response.status}`, errorData);
+          } catch {
+            errorText = await response.text();
+            console.error(`❌ [Auth] Backend token exchange failed: ${response.status}`, errorText);
+          }
+          throw new Error(`Backend token exchange failed: ${response.status} - ${errorText}`);
         }
       } catch (error) {
-        console.warn("OAuth proxy failed, trying direct OAuth:", error);
+        console.error("❌ [Auth] OAuth proxy error:", error);
+        // Don't fallback to direct OAuth - it will fail without client_secret
+        throw error;
       }
     }
 
@@ -474,40 +497,73 @@ class AuthService {
 
     try {
       // Exchange code for tokens
+      console.log("🔍 [Auth] Exchanging code for tokens...");
       const tokens = await this.exchangeCodeForTokens(code);
+      console.log("✅ [Auth] Tokens received:", {
+        hasAccessToken: !!tokens.accessToken,
+        hasIdToken: !!tokens.idToken,
+        hasRefreshToken: !!tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      });
       this.authTokens = tokens;
       this.saveToStorage();
 
       // Get user info - try multiple methods
       let userInfo: any;
-      try {
-        userInfo = await this.getUserInfo(tokens.accessToken);
-      } catch (error) {
-        console.error("Error getting user info from Google API:", error);
-        // If we have an idToken, decode it to get user info
-        if (tokens.idToken) {
-          try {
-            // Decode JWT idToken (base64url decode the payload)
-            const parts = tokens.idToken.split(".");
-            if (parts.length === 3) {
-              const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-              userInfo = {
-                id: payload.sub,
-                sub: payload.sub,
-                email: payload.email,
-                name: payload.name,
-                picture: payload.picture,
-              };
-            } else {
-              throw new Error("Invalid idToken format");
-            }
-          } catch (decodeError) {
-            console.error("Error decoding idToken:", decodeError);
+      
+      // Priority 1: Try to decode idToken first (most reliable, doesn't require API call)
+      if (tokens.idToken) {
+        try {
+          console.log("🔍 [Auth] Attempting to decode idToken...");
+          // Decode JWT idToken (base64url decode the payload)
+          const parts = tokens.idToken.split(".");
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+            userInfo = {
+              id: payload.sub,
+              sub: payload.sub,
+              email: payload.email,
+              name: payload.name,
+              picture: payload.picture,
+            };
+            console.log("✅ [Auth] User info decoded from idToken:", {
+              email: userInfo.email,
+              name: userInfo.name,
+              hasPicture: !!userInfo.picture,
+            });
+          } else {
+            throw new Error("Invalid idToken format");
+          }
+        } catch (decodeError) {
+          console.error("❌ [Auth] Error decoding idToken:", decodeError);
+          // Fall through to try access token
+        }
+      }
+      
+      // Priority 2: If idToken decode failed or no idToken, try access token API
+      if (!userInfo && tokens.accessToken) {
+        try {
+          console.log("🔍 [Auth] Attempting to get user info from Google API with access token...");
+          userInfo = await this.getUserInfo(tokens.accessToken);
+          console.log("✅ [Auth] User info retrieved from Google API:", {
+            email: userInfo.email,
+            name: userInfo.name,
+            hasPicture: !!userInfo.picture,
+          });
+        } catch (error) {
+          console.error("❌ [Auth] Error getting user info from Google API:", error);
+          // If we already tried idToken and it failed, throw error
+          if (!tokens.idToken) {
             throw new Error("Failed to get user information. Please try signing in again.");
           }
-        } else {
-          throw error;
+          // If idToken decode also failed, throw error
+          throw new Error("Failed to get user information from both idToken and access token. Please try signing in again.");
         }
+      }
+      
+      // If we still don't have user info, throw error
+      if (!userInfo) {
+        throw new Error("Failed to get user information. No valid tokens available.");
       }
 
       // Check if we're linking an anonymous Firebase account
@@ -540,7 +596,19 @@ class AuthService {
       }
 
       // Create new Google profile (manual OAuth, not Firebase)
+      console.log("🔍 [Auth] Creating Google profile from userInfo:", {
+        email: userInfo.email,
+        name: userInfo.name,
+        hasPicture: !!userInfo.picture,
+      });
       const profile = this.createGoogleProfile(userInfo, tokens);
+      console.log("✅ [Auth] Profile created:", {
+        uid: profile.uid,
+        email: profile.email,
+        displayName: profile.displayName,
+        photoURL: profile.photoURL,
+        plan: profile.plan,
+      });
 
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);

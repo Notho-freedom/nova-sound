@@ -86,6 +86,16 @@ export function useCloudSync(): UseCloudSyncReturn {
     // If a Google user exists locally, merge it with Firebase anonymous user
     const initAnonymousUser = async () => {
       try {
+        // First check if user is already authenticated via authService (manual OAuth)
+        const existingAuthUser = authService.getUserProfile();
+        if (existingAuthUser && !existingAuthUser.isAnonymous) {
+          console.log('✅ [useCloudSync] User already authenticated via authService, skipping anonymous user');
+          setNexusUser(existingAuthUser);
+          setNexusAuthenticated(true);
+          setNexusIsPro(authService.isPro());
+          return;
+        }
+        
         // Check Firebase first (for anonymous auth)
         if (firebaseService.isInitialized()) {
           const firebaseUser = firebaseService.getCurrentUser();
@@ -238,66 +248,159 @@ export function useCloudSync(): UseCloudSyncReturn {
     // Handle redirect result on mount (if user just came back from Google auth)
     const initRedirect = async () => {
       try {
+        console.log('🔍 [useCloudSync] Checking redirect result...');
+        console.log('🔍 [useCloudSync] Current URL:', window.location.href);
+        console.log('🔍 [useCloudSync] URL search:', window.location.search);
+        
         // First, check Firebase redirect (if using Firebase Google auth)
+        // Firebase handleRedirectResult() should be called FIRST before checking OAuth params
+        // because Firebase handles its own redirect flow
         if (firebaseService.isInitialized()) {
-          const firebaseProfile = await firebaseService.handleRedirectResult();
-          if (firebaseProfile) {
-            setNexusUser(firebaseProfile);
-            setNexusAuthenticated(true);
-            setNexusIsPro(firebaseService.isPro());
-            
-            toast.success("Connecté avec succès", {
-              description: `Bienvenue ${firebaseProfile.displayName}!`,
-            });
-            
-            const status = await nexusServerService.getSyncStatus();
-            setSyncStatus({
-              lastSyncAt: status.lastSyncAt || null,
-              tracksUploaded: status.tracksUploaded,
-              tracksDownloaded: status.tracksDownloaded,
-            });
-            return;
+          console.log('🔍 [useCloudSync] Firebase initialized, checking redirect result...');
+          try {
+            const firebaseProfile = await firebaseService.handleRedirectResult();
+            if (firebaseProfile) {
+              console.log('✅ [useCloudSync] Firebase profile received:', firebaseProfile);
+              setNexusUser(firebaseProfile);
+              setNexusAuthenticated(true);
+              setNexusIsPro(firebaseService.isPro());
+              
+              toast.success("Connecté avec succès", {
+                description: `Bienvenue ${firebaseProfile.displayName}!`,
+              });
+              
+              const status = await nexusServerService.getSyncStatus();
+              setSyncStatus({
+                lastSyncAt: status.lastSyncAt || null,
+                tracksUploaded: status.tracksUploaded,
+                tracksDownloaded: status.tracksDownloaded,
+              });
+              
+              // Clean URL after successful Firebase auth
+              if (typeof window !== 'undefined') {
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
+              return;
+            } else {
+              console.log('⚠️ [useCloudSync] No Firebase profile from redirect result');
+            }
+          } catch (firebaseError) {
+            console.error('❌ [useCloudSync] Firebase handleRedirectResult error:', firebaseError);
           }
+        } else {
+          console.log('⚠️ [useCloudSync] Firebase not initialized');
         }
 
-        // Then check manual OAuth callback (only if there are OAuth params in URL)
+        // Then check manual OAuth callback (only if there are OAuth params in URL AND Firebase didn't handle it)
         // Only check on client side
         if (typeof window === 'undefined') {
+          console.log('⚠️ [useCloudSync] Window undefined, initializing anonymous user');
           await initAnonymousUser();
           return;
         }
         
         const urlParams = new URLSearchParams(window.location.search);
         const hasOAuthParams = urlParams.has("code") && urlParams.has("state");
+        console.log('🔍 [useCloudSync] OAuth params check:', { 
+          hasCode: urlParams.has("code"), 
+          hasState: urlParams.has("state"),
+          hasOAuthParams 
+        });
         
+        // Try manual OAuth callback if we have OAuth params
+        // This uses the backend Express API to exchange the code (client_secret is server-side)
         if (hasOAuthParams) {
-          const profile = await authService.handleCallback();
-          if (profile) {
-            // User just authenticated via manual OAuth redirect
-            setNexusUser(profile);
-            setNexusAuthenticated(true);
-            setNexusIsPro(authService.isPro());
-            
-            // Show success message
-            toast.success("Connecté avec succès", {
-              description: `Bienvenue ${profile.displayName}!`,
-            });
-            
-            // Load sync status
-            const status = await nexusServerService.getSyncStatus();
-            setSyncStatus({
-              lastSyncAt: status.lastSyncAt || null,
-              tracksUploaded: status.tracksUploaded,
-              tracksDownloaded: status.tracksDownloaded,
-            });
-            return;
+          console.log('🔍 [useCloudSync] OAuth params found, trying manual OAuth via backend...');
+          try {
+            console.log('🔍 [useCloudSync] Calling authService.handleCallback()...');
+            const profile = await authService.handleCallback();
+            console.log('🔍 [useCloudSync] handleCallback returned:', profile ? 'Profile received' : 'null');
+            if (profile) {
+              console.log('✅ [useCloudSync] Auth profile received via backend:', profile);
+              console.log('✅ [useCloudSync] Profile details:', {
+                uid: profile.uid,
+                email: profile.email,
+                displayName: profile.displayName,
+                photoURL: profile.photoURL,
+                plan: profile.plan,
+                subscriptionStatus: profile.subscriptionStatus,
+              });
+              
+              // User just authenticated via manual OAuth redirect
+              // Force update state immediately
+              console.log('🔍 [useCloudSync] Setting state with profile...');
+              setNexusUser(profile);
+              setNexusAuthenticated(true);
+              setNexusIsPro(authService.isPro());
+              console.log('✅ [useCloudSync] State set successfully');
+              
+              // Verify the state was set by checking authService
+              const currentProfile = authService.getUserProfile();
+              console.log('✅ [useCloudSync] Verification - authService.getUserProfile():', currentProfile ? {
+                email: currentProfile.email,
+                displayName: currentProfile.displayName,
+              } : 'null');
+              
+              // Verify the state was set
+              console.log('✅ [useCloudSync] State updated, verifying...');
+              setTimeout(() => {
+                console.log('✅ [useCloudSync] State check after 100ms:', {
+                  nexusUser: profile,
+                  nexusAuthenticated: true,
+                  nexusIsPro: authService.isPro(),
+                });
+              }, 100);
+              
+              // Show success message
+              toast.success("Connecté avec succès", {
+                description: `Bienvenue ${profile.displayName || profile.email || 'Utilisateur'}!`,
+              });
+              
+              // Load sync status
+              try {
+                const status = await nexusServerService.getSyncStatus();
+                setSyncStatus({
+                  lastSyncAt: status.lastSyncAt || null,
+                  tracksUploaded: status.tracksUploaded,
+                  tracksDownloaded: status.tracksDownloaded,
+                });
+              } catch (syncError) {
+                console.error('❌ [useCloudSync] Error loading sync status:', syncError);
+              }
+              
+              // Clean URL after successful auth
+              window.history.replaceState({}, document.title, window.location.pathname);
+              
+              // Don't initialize anonymous user - we're already authenticated
+              console.log('✅ [useCloudSync] Authentication successful, skipping anonymous user initialization');
+              return;
+            } else {
+              console.log('⚠️ [useCloudSync] No profile from authService.handleCallback()');
+            }
+          } catch (error) {
+            console.error('❌ [useCloudSync] Error in authService.handleCallback():', error);
+            // Clean URL on error
+            window.history.replaceState({}, document.title, window.location.pathname);
           }
+        } else {
+          console.log('⚠️ [useCloudSync] No OAuth params in URL');
         }
         
         // No OAuth redirect, check if we need to create anonymous user
+        // But first check if user is already authenticated via authService
+        const existingProfile = authService.getUserProfile();
+        if (existingProfile && !existingProfile.isAnonymous) {
+          console.log('✅ [useCloudSync] User already authenticated, skipping anonymous user initialization');
+          setNexusUser(existingProfile);
+          setNexusAuthenticated(true);
+          setNexusIsPro(authService.isPro());
+          return;
+        }
+        
+        console.log('🔍 [useCloudSync] No redirect detected, initializing anonymous user...');
         await initAnonymousUser();
       } catch (error) {
-        console.error("Error handling redirect:", error);
+        console.error("❌ [useCloudSync] Error handling redirect:", error);
         // Try to create anonymous user on error
         await initAnonymousUser();
       }
@@ -307,7 +410,9 @@ export function useCloudSync(): UseCloudSyncReturn {
     // Subscribe to Firebase auth state changes (priority - uses merged Google data from Firestore)
     let unsubscribeFirebase: (() => void) | null = null;
     if (firebaseService.isInitialized()) {
+      console.log('🔍 [useCloudSync] Subscribing to Firebase auth state changes...');
       unsubscribeFirebase = firebaseService.onAuthStateChange(async (firebaseUser) => {
+        console.log('🔔 [useCloudSync] Firebase auth state changed:', firebaseUser ? `User: ${firebaseUser.email}` : 'No user');
         if (firebaseUser) {
           // Always get the latest profile from Firestore (contains merged Google data with priority)
           const profile = firebaseService.getUserProfile();
@@ -396,8 +501,10 @@ export function useCloudSync(): UseCloudSyncReturn {
           }
         }
         
+        console.log('✅ [useCloudSync] Setting user state:', { email: user.email, displayName: user.displayName, isPro: authService.isPro() });
         setNexusUser(user);
         setNexusAuthenticated(true);
+        console.log('✅ [useCloudSync] User state updated');
         setNexusIsPro(authService.isPro());
 
         // Load sync status
