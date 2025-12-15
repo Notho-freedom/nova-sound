@@ -168,113 +168,9 @@ function createWindow() {
   // Load the app
   const isDev = process.env.NODE_ENV === 'development';
   
-  if (isDev) {
-    // In development, load from Next.js dev server
-    const devUrl = 'http://localhost:3000';
-    console.log(`🔧 Development mode: Loading from ${devUrl}`);
-    
-    // Wait for window to be ready before loading
-    let isLoaded = false;
-    let windowReady = false;
-    
-    mainWindow.once('ready-to-show', () => {
-      windowReady = true;
-      if (!isLoaded) {
-        checkServer();
-      }
-    });
-    
-    // Wait for Next.js dev server to be ready
-    let isChecking = false;
-    const maxAttempts = 30;
-    let attempts = 0;
-    
-    const checkServer = () => {
-      if (isLoaded || isChecking || !windowReady) {
-        return; // Already loaded, currently checking, or window not ready
-      }
-      
-      isChecking = true;
-      const req = http.get('http://localhost:3000', (res) => {
-        isChecking = false;
-        
-        if (isLoaded || !mainWindow || mainWindow.isDestroyed()) {
-          return; // Already loaded or window destroyed
-        }
-        
-        if (res.statusCode === 200 || res.statusCode === 304) {
-          console.log('✅ Next.js dev server is ready');
-          if (!isLoaded) {
-            isLoaded = true;
-            mainWindow.loadURL(devUrl).catch((error) => {
-              console.error('Failed to load URL:', error);
-              isLoaded = false; // Allow retry on error
-            });
-          }
-        } else {
-          // Server responded but with error, try again
-          attempts++;
-          if (attempts < maxAttempts) {
-            setTimeout(checkServer, 1000);
-          } else {
-            showServerError();
-          }
-        }
-      });
-      
-      req.on('error', () => {
-        isChecking = false;
-        
-        if (isLoaded || !mainWindow || mainWindow.isDestroyed()) {
-          return;
-        }
-        
-        // Server not ready yet
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(checkServer, 1000);
-        } else {
-          showServerError();
-        }
-      });
-      
-      req.setTimeout(1000, () => {
-        req.destroy();
-        isChecking = false;
-        
-        if (isLoaded || !mainWindow || mainWindow.isDestroyed()) {
-          return;
-        }
-        
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(checkServer, 1000);
-        } else {
-          showServerError();
-        }
-      });
-    };
-    
-    const showServerError = () => {
-      console.error('❌ Next.js dev server not available after 30 attempts');
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(`
-          document.body.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; font-family: system-ui; color: #fff; background: #0a0a0f;">
-            <h1 style="font-size: 24px; margin-bottom: 16px;">⏳ Attente du serveur Next.js</h1>
-            <p style="font-size: 16px; margin-bottom: 8px;">Le serveur de développement n\\'est pas encore prêt</p>
-            <p style="font-size: 14px; color: #888;">URL: ${devUrl}</p>
-            <p style="font-size: 12px; color: #666; margin-top: 24px;">Assurez-vous que "npm run dev" est en cours d\\'exécution</p>
-          </div>';
-        `);
-      }
-    };
-    
-    // If window is already ready, start checking immediately
-    if (mainWindow.webContents.isLoading() === false) {
-      windowReady = true;
-      setTimeout(checkServer, 500);
-    }
-  } else {
+  // En développement ET production, utiliser le build statique depuis out/
+  // Cela permet des tests plus rapides en dev (pas besoin d'attendre Next.js dev server)
+  {
     // In production, load from static build
     let htmlPath: string;
     
@@ -283,9 +179,9 @@ function createWindow() {
       const resourcesPath = path.dirname(app.getAppPath());
       htmlPath = path.join(resourcesPath, 'out', 'index.html');
       
-      // Si pas trouvé, essayer dans app.asar
+      // Si pas trouvé, essayer dans app.asar.unpacked
       if (!fs.existsSync(htmlPath)) {
-        htmlPath = path.join(app.getAppPath(), 'out', 'index.html');
+        htmlPath = path.join(resourcesPath, 'app.asar.unpacked', 'out', 'index.html');
       }
     } else {
       // En développement/production non packagée
@@ -347,9 +243,17 @@ function createWindow() {
         return;
       }
       
-      // Parser l'URL
-      const urlPath = req.url === '/' ? '/index.html' : req.url;
-      const filePath = path.join(basePath, urlPath);
+      // Parser l'URL pour enlever les query strings et le hash
+      const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      let urlPath = url.pathname;
+      
+      // Si c'est la racine, servir index.html
+      if (urlPath === '/' || urlPath === '') {
+        urlPath = '/index.html';
+      }
+      
+      // Construire le chemin du fichier
+      let filePath = path.join(basePath, urlPath);
       
       // Sécurité : s'assurer que le chemin est dans basePath
       const normalizedBase = path.normalize(basePath);
@@ -361,45 +265,94 @@ function createWindow() {
         return;
       }
       
-      // Lire le fichier
-      fs.readFile(filePath, (err, data) => {
-        if (err) {
-          if (err.code === 'ENOENT') {
-            res.writeHead(404);
-            res.end('File not found');
-          } else {
-            console.error('Error reading file:', err);
-            res.writeHead(500);
-            res.end('Internal server error');
+      // Fonction pour servir un fichier
+      const serveFile = (filePathToServe: string) => {
+        fs.readFile(filePathToServe, (err, data) => {
+          if (err) {
+            if (err.code === 'ENOENT') {
+              // Si le fichier n'existe pas et que ce n'est pas déjà index.html,
+              // essayer de servir index.html (pour le routing côté client Next.js)
+              if (!urlPath.endsWith('index.html') && !urlPath.includes('_next')) {
+                const indexPath = path.join(basePath, 'index.html');
+                if (fs.existsSync(indexPath)) {
+                  serveFile(indexPath);
+                  return;
+                }
+              }
+              console.error('File not found:', filePathToServe);
+              res.writeHead(404);
+              res.end('File not found');
+            } else {
+              console.error('Error reading file:', err);
+              res.writeHead(500);
+              res.end('Internal server error');
+            }
+            return;
           }
+          
+          // Déterminer le type MIME
+          const ext = path.extname(filePathToServe).toLowerCase();
+          const mimeTypes: Record<string, string> = {
+            '.html': 'text/html',
+            '.js': 'application/javascript',
+            '.css': 'text/css',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml',
+            '.woff': 'font/woff',
+            '.woff2': 'font/woff2',
+            '.ttf': 'font/ttf',
+            '.ico': 'image/x-icon',
+            '.txt': 'text/plain',
+          };
+          const mimeType = mimeTypes[ext] || 'application/octet-stream';
+          
+          res.writeHead(200, {
+            'Content-Type': mimeType,
+            'Content-Length': data.length.toString(),
+          });
+          res.end(data);
+        });
+      };
+      
+      // Vérifier si c'est un fichier (avec extension) ou un dossier
+      fs.stat(filePath, (statErr, stats) => {
+        if (statErr) {
+          // Si le fichier/dossier n'existe pas, vérifier si c'est une route Next.js
+          // Les routes Next.js sont servies par index.html (routing côté client)
+          if (!urlPath.includes('_next') && !urlPath.includes('.')) {
+            const indexPath = path.join(basePath, 'index.html');
+            if (fs.existsSync(indexPath)) {
+              serveFile(indexPath);
+              return;
+            }
+          }
+          serveFile(filePath);
           return;
         }
         
-        // Déterminer le type MIME
-        const ext = path.extname(filePath).toLowerCase();
-        const mimeTypes: Record<string, string> = {
-          '.html': 'text/html',
-          '.js': 'application/javascript',
-          '.css': 'text/css',
-          '.json': 'application/json',
-          '.png': 'image/png',
-          '.jpg': 'image/jpeg',
-          '.jpeg': 'image/jpeg',
-          '.gif': 'image/gif',
-          '.svg': 'image/svg+xml',
-          '.woff': 'font/woff',
-          '.woff2': 'font/woff2',
-          '.ttf': 'font/ttf',
-          '.ico': 'image/x-icon',
-          '.txt': 'text/plain',
-        };
-        const mimeType = mimeTypes[ext] || 'application/octet-stream';
-        
-        res.writeHead(200, {
-          'Content-Type': mimeType,
-          'Content-Length': data.length.toString(),
-        });
-        res.end(data);
+        if (stats.isDirectory()) {
+          // Si c'est un dossier, essayer index.html dans ce dossier
+          const indexPath = path.join(filePath, 'index.html');
+          if (fs.existsSync(indexPath)) {
+            serveFile(indexPath);
+          } else {
+            // Sinon, servir le index.html racine (routing côté client)
+            const rootIndexPath = path.join(basePath, 'index.html');
+            if (fs.existsSync(rootIndexPath)) {
+              serveFile(rootIndexPath);
+            } else {
+              res.writeHead(404);
+              res.end('File not found');
+            }
+          }
+        } else {
+          // C'est un fichier, le servir directement
+          serveFile(filePath);
+        }
       });
     });
     
@@ -421,14 +374,21 @@ function createWindow() {
         // Essayer le port suivant
         const newPort = port + 1;
         staticServer?.close();
+        // Utiliser la même logique que le serveur principal
         staticServer = createServer((req, res) => {
           if (!req.url) {
             res.writeHead(400);
             res.end('Bad Request');
             return;
           }
-          const urlPath = req.url === '/' ? '/index.html' : req.url;
-          const filePath = path.join(basePath, urlPath);
+          
+          const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+          let urlPath = url.pathname;
+          if (urlPath === '/' || urlPath === '') {
+            urlPath = '/index.html';
+          }
+          
+          let filePath = path.join(basePath, urlPath);
           const normalizedBase = path.normalize(basePath);
           const normalizedFull = path.normalize(filePath);
           if (!normalizedFull.startsWith(normalizedBase)) {
@@ -436,35 +396,82 @@ function createWindow() {
             res.end('Forbidden');
             return;
           }
-          fs.readFile(filePath, (err, data) => {
-            if (err) {
-              res.writeHead(err.code === 'ENOENT' ? 404 : 500);
-              res.end(err.code === 'ENOENT' ? 'File not found' : 'Internal server error');
+          
+          const serveFile = (filePathToServe: string) => {
+            fs.readFile(filePathToServe, (err, data) => {
+              if (err) {
+                if (err.code === 'ENOENT') {
+                  if (!urlPath.endsWith('index.html') && !urlPath.includes('_next')) {
+                    const indexPath = path.join(basePath, 'index.html');
+                    if (fs.existsSync(indexPath)) {
+                      serveFile(indexPath);
+                      return;
+                    }
+                  }
+                  res.writeHead(404);
+                  res.end('File not found');
+                } else {
+                  res.writeHead(500);
+                  res.end('Internal server error');
+                }
+                return;
+              }
+              
+              const ext = path.extname(filePathToServe).toLowerCase();
+              const mimeTypes: Record<string, string> = {
+                '.html': 'text/html',
+                '.js': 'application/javascript',
+                '.css': 'text/css',
+                '.json': 'application/json',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+                '.svg': 'image/svg+xml',
+                '.woff': 'font/woff',
+                '.woff2': 'font/woff2',
+                '.ttf': 'font/ttf',
+                '.ico': 'image/x-icon',
+                '.txt': 'text/plain',
+              };
+              const mimeType = mimeTypes[ext] || 'application/octet-stream';
+              res.writeHead(200, {
+                'Content-Type': mimeType,
+                'Content-Length': data.length.toString(),
+              });
+              res.end(data);
+            });
+          };
+          
+          fs.stat(filePath, (statErr, stats) => {
+            if (statErr) {
+              if (!urlPath.includes('_next') && !urlPath.includes('.')) {
+                const indexPath = path.join(basePath, 'index.html');
+                if (fs.existsSync(indexPath)) {
+                  serveFile(indexPath);
+                  return;
+                }
+              }
+              serveFile(filePath);
               return;
             }
-            const ext = path.extname(filePath).toLowerCase();
-            const mimeTypes: Record<string, string> = {
-              '.html': 'text/html',
-              '.js': 'application/javascript',
-              '.css': 'text/css',
-              '.json': 'application/json',
-              '.png': 'image/png',
-              '.jpg': 'image/jpeg',
-              '.jpeg': 'image/jpeg',
-              '.gif': 'image/gif',
-              '.svg': 'image/svg+xml',
-              '.woff': 'font/woff',
-              '.woff2': 'font/woff2',
-              '.ttf': 'font/ttf',
-              '.ico': 'image/x-icon',
-              '.txt': 'text/plain',
-            };
-            const mimeType = mimeTypes[ext] || 'application/octet-stream';
-            res.writeHead(200, {
-              'Content-Type': mimeType,
-              'Content-Length': data.length.toString(),
-            });
-            res.end(data);
+            
+            if (stats.isDirectory()) {
+              const indexPath = path.join(filePath, 'index.html');
+              if (fs.existsSync(indexPath)) {
+                serveFile(indexPath);
+              } else {
+                const rootIndexPath = path.join(basePath, 'index.html');
+                if (fs.existsSync(rootIndexPath)) {
+                  serveFile(rootIndexPath);
+                } else {
+                  res.writeHead(404);
+                  res.end('File not found');
+                }
+              }
+            } else {
+              serveFile(filePath);
+            }
           });
         });
         staticServer.listen(newPort, '127.0.0.1', () => {
