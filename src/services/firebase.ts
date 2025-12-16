@@ -7,6 +7,7 @@ import {
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
+  onIdTokenChanged,
   signInAnonymously as firebaseSignInAnonymously,
   linkWithCredential,
   OAuthCredential,
@@ -157,6 +158,8 @@ class FirebaseService {
   private currentUser: User | null = null;
   private userProfile: UserProfile | null = null;
   private authStateListeners: Set<(user: User | null) => void> = new Set();
+  private tokenRefreshInterval: NodeJS.Timeout | null = null;
+  private idTokenUnsubscribe: (() => void) | null = null;
 
   constructor() {
     // Preload Firebase config from API (non-blocking)
@@ -218,8 +221,60 @@ class FirebaseService {
           // Notify listeners
           this.authStateListeners.forEach((listener) => listener(null));
         }
+        
+        // Setup token refresh listener when user changes
+        this.setupTokenRefreshListener(user);
       });
     }
+  }
+
+  // Setup automatic token refresh listener
+  private setupTokenRefreshListener(user: User | null): void {
+    // Cleanup previous listener
+    if (this.idTokenUnsubscribe) {
+      this.idTokenUnsubscribe();
+      this.idTokenUnsubscribe = null;
+    }
+    
+    // Clear previous interval
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
+    
+    if (!user || user.isAnonymous || !auth) {
+      return;
+    }
+    
+    // Listen to token changes (Firebase automatically refreshes tokens)
+    // This listener is called whenever the token changes (including automatic refresh)
+    this.idTokenUnsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser && !firebaseUser.isAnonymous) {
+        try {
+          // Get token (Firebase automatically refreshes if needed)
+          const token = await firebaseUser.getIdToken(false);
+          if (token) {
+            console.log("🔄 Token updated by Firebase (auto-refresh), length:", token.length);
+          }
+        } catch (error) {
+          console.error("Error getting token after change:", error);
+        }
+      }
+    });
+    
+    // Also set up a proactive refresh interval (refresh 10 minutes before expiration)
+    // Firebase tokens typically expire after 1 hour, so refresh every 50 minutes
+    this.tokenRefreshInterval = setInterval(async () => {
+      if (user && !user.isAnonymous && auth) {
+        try {
+          // Force refresh to get a new token
+          const token = await user.getIdToken(true);
+          console.log("🔄 Token refreshed proactively, length:", token?.length || 0);
+        } catch (error) {
+          console.error("Error in proactive token refresh:", error);
+        }
+      }
+    }, 50 * 60 * 1000); // Every 50 minutes
   }
 
   // Handle redirect result after Google sign-in (call this on app initialization)
@@ -536,6 +591,16 @@ class FirebaseService {
 
   // Sign out
   async signOut(): Promise<void> {
+    // Cleanup token refresh listeners
+    if (this.idTokenUnsubscribe) {
+      this.idTokenUnsubscribe();
+      this.idTokenUnsubscribe = null;
+    }
+    
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
     await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized");

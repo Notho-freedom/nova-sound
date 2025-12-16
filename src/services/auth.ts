@@ -46,6 +46,7 @@ class AuthService {
   private authTokens: AuthTokens | null = null;
   private authStateListeners: Set<(user: UserProfile | null) => void> = new Set();
   private googleClientId: string | null = null;
+  private tokenRefreshInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     // Load persisted data (only for manual OAuth users, not Firebase anonymous)
@@ -73,6 +74,63 @@ class AuthService {
         });
       }
     }
+    
+    // Setup automatic token refresh
+    this.setupTokenRefresh();
+  }
+
+  // Setup automatic token refresh interval
+  private setupTokenRefresh(): void {
+    // Clear previous interval if exists
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
+    
+    // Only setup if we have tokens and user is not anonymous
+    if (!this.authTokens || !this.authTokens.refreshToken || this.currentUser?.isAnonymous) {
+      return;
+    }
+    
+    // Check token expiration every minute
+    this.tokenRefreshInterval = setInterval(async () => {
+      if (!this.authTokens || !this.authTokens.refreshToken || this.currentUser?.isAnonymous) {
+        // Clear interval if no longer needed
+        if (this.tokenRefreshInterval) {
+          clearInterval(this.tokenRefreshInterval);
+          this.tokenRefreshInterval = null;
+        }
+        return;
+      }
+      
+      // Refresh if token expires within 10 minutes (proactive refresh)
+      const timeUntilExpiry = this.authTokens.expiresAt - Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+      
+      if (timeUntilExpiry < tenMinutes && timeUntilExpiry > 0) {
+        console.log("🔄 Token expiring soon, refreshing proactively...");
+        try {
+          await this.refreshAccessToken();
+          console.log("✅ Token refreshed successfully");
+        } catch (error) {
+          console.error("❌ Failed to refresh token:", error);
+          // Don't sign out immediately, let getAccessToken handle it
+        }
+      } else if (timeUntilExpiry <= 0) {
+        // Token already expired, refresh immediately
+        console.log("🔄 Token expired, refreshing immediately...");
+        try {
+          await this.refreshAccessToken();
+          console.log("✅ Token refreshed successfully");
+        } catch (error) {
+          console.error("❌ Failed to refresh expired token:", error);
+          // If refresh fails, sign out
+          if (!this.currentUser?.isAnonymous) {
+            this.signOut();
+          }
+        }
+      }
+    }, 60 * 1000); // Check every minute
   }
 
   // Load data from localStorage
@@ -415,6 +473,10 @@ class AuthService {
     };
 
     this.saveToStorage();
+    
+    // Restart token refresh interval with new expiration time
+    this.setupTokenRefresh();
+    
     return this.authTokens;
   }
 
@@ -486,6 +548,9 @@ class AuthService {
       const tokens = await this.exchangeCodeForTokens(code);
       this.authTokens = tokens;
       this.saveToStorage();
+      
+      // Setup automatic token refresh
+      this.setupTokenRefresh();
 
       // Get user info - try multiple methods
       let userInfo: any;
@@ -594,6 +659,9 @@ class AuthService {
     this.currentUser = profile;
     this.authTokens = tokens;
     this.saveToStorage();
+    
+    // Setup automatic token refresh
+    this.setupTokenRefresh();
 
     // Notify listeners
     this.authStateListeners.forEach((listener) => listener(profile));
@@ -603,6 +671,12 @@ class AuthService {
 
   // Sign out
   async signOut(): Promise<void> {
+    // Clear token refresh interval
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
+    
     this.currentUser = null;
     this.authTokens = null;
     this.clearStorage();
