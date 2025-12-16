@@ -60,10 +60,10 @@ export const TrackListView = ({
         <table className="w-full">
           <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
             <tr className="border-b border-border/30">
-              <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
+              <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
                 {showTrackNumber ? "#" : ""}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+              <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
                 Titre
               </th>
               {showAlbum && (
@@ -76,10 +76,10 @@ export const TrackListView = ({
                   Écouté
                 </th>
               )}
-              <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+              <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
                 Durée
               </th>
-              <th className="px-4 py-3 w-12"></th>
+              <th className="px-4 py-2.5 w-12"></th>
             </tr>
           </thead>
           <tbody>
@@ -92,11 +92,12 @@ export const TrackListView = ({
                 key={track.id}
                 onClick={() => onTrackSelect(actualIndex)}
                 className={cn(
-                  "group cursor-pointer transition-all duration-200",
-                  isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
+                  "group cursor-pointer transition-all duration-200 ease-out",
+                  isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 )}
               >
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5">
                   <div className="w-6 flex items-center justify-center">
                     {isCurrentTrack && isPlaying ? (
                       <div className="flex items-center gap-0.5">
@@ -116,7 +117,7 @@ export const TrackListView = ({
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5">
                   <TrackContextMenu
                     track={track}
                     playlists={playlists}
@@ -169,7 +170,7 @@ export const TrackListView = ({
                 <td className="px-4 py-3 text-right">
                   <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5">
                   <TrackContextMenu
                     track={track}
                     playlists={playlists}

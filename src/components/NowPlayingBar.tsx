@@ -116,30 +116,30 @@ export const NowPlayingBar = ({
         onSeek([percent * currentTrack.duration]);
       }}>
         <div 
-          className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-150 relative"
+          className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-200 ease-out relative"
           style={{ width: `${progress}%` }}
         >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity shadow-lg shadow-primary/50" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out shadow-lg shadow-primary/50" />
         </div>
       </div>
 
       {/* Main Content - Compact 2 rows */}
-      <div className="px-3 py-2">
-        <div className="flex items-center gap-3 relative">
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-4 relative">
           {/* Cover + Track Info - Left */}
           <div className="flex items-center gap-3 min-w-0 w-64 flex-shrink-0">
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
                   onClick={onShowPlayer}
-                  className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group ring-2 ring-transparent hover:ring-primary/50 transition-all duration-300"
+                  className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group ring-2 ring-transparent hover:ring-primary/50 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 >
                   <img 
                     src={getCoverUrl(currentTrack.coverUrl)} 
                     alt={currentTrack.album}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200 ease-out"
                   />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                     <Maximize2 className="w-4 h-4 text-white" />
                   </div>
                 </button>
@@ -150,21 +150,21 @@ export const NowPlayingBar = ({
             <div className="flex-1 min-w-0">
               <p 
                 onClick={onShowPlayer}
-                className="text-sm font-medium truncate text-foreground hover:text-primary cursor-pointer transition-colors"
+                className="text-sm font-medium truncate text-foreground hover:text-primary cursor-pointer transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
               >
                 {currentTrack.title}
               </p>
               <div className="text-xs text-muted-foreground truncate">
                 <span 
                   onClick={onNavigateToArtist}
-                  className="hover:text-foreground cursor-pointer transition-colors"
+                  className="hover:text-foreground cursor-pointer transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                 >
                   {currentTrack.artist}
                 </span>
                 <span className="mx-1">•</span>
                 <span 
                   onClick={onNavigateToAlbum}
-                  className="hover:text-foreground cursor-pointer transition-colors"
+                  className="hover:text-foreground cursor-pointer transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                 >
                   {currentTrack.album}
                 </span>
@@ -179,13 +179,14 @@ export const NowPlayingBar = ({
                 <button
                   onClick={onShuffle}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-200",
+                    "p-1.5 rounded-full transition-all duration-200 ease-out active:scale-95",
                     isShuffle 
                       ? "text-primary" 
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   )}
                 >
-                  <Shuffle className="w-4 h-4" />
+                  <Shuffle className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Lecture aléatoire {isShuffle ? "activée" : "désactivée"}</TooltipContent>
@@ -193,14 +194,14 @@ export const NowPlayingBar = ({
             
             <button
               onClick={onPrevious}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
             >
-              <SkipBack className="w-5 h-5 fill-current" />
+              <SkipBack className="w-5 h-5 fill-current hover:scale-105 transition-transform duration-200 ease-out" />
             </button>
             
             <button
               onClick={onPlayPause}
-              className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 hover:shadow-lg hover:shadow-primary/30 transition-all duration-200"
+              className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 hover:shadow-lg hover:shadow-primary/30 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
             >
               {isPlaying ? (
                 <Pause className="w-4 h-4 fill-current" />
@@ -211,9 +212,9 @@ export const NowPlayingBar = ({
             
             <button
               onClick={onNext}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
             >
-              <SkipForward className="w-5 h-5 fill-current" />
+              <SkipForward className="w-5 h-5 fill-current group-hover:scale-105 transition-transform duration-200 ease-out" />
             </button>
             
             <Tooltip delayDuration={0}>
@@ -221,16 +222,17 @@ export const NowPlayingBar = ({
                 <button
                   onClick={onRepeat}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-200",
+                    "p-1.5 rounded-full transition-all duration-200 ease-out active:scale-95",
                     repeatMode !== "off" 
                       ? "text-primary" 
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   )}
                 >
                   {repeatMode === "one" ? (
-                    <Repeat1 className="w-4 h-4" />
+                    <Repeat1 className="w-4 h-4 group-hover:scale-105 transition-transform duration-200 ease-out" />
                   ) : (
-                    <Repeat className="w-4 h-4" />
+                    <Repeat className="w-4 h-4 group-hover:scale-105 transition-transform duration-200 ease-out" />
                   )}
                 </button>
               </TooltipTrigger>
@@ -241,7 +243,7 @@ export const NowPlayingBar = ({
           </div>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-0.5 w-64 justify-end ml-auto flex-shrink-0">
+          <div className="flex items-center gap-1 w-64 justify-end ml-auto flex-shrink-0">
             {/* Time Display - Hidden when volume slider expands */}
             <div className="text-xs text-muted-foreground font-mono w-24 text-center mr-2 transition-all duration-200 group-hover/volume:opacity-0 group-hover/volume:w-0 group-hover/volume:overflow-hidden group-hover/volume:mr-0">
               {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
@@ -251,13 +253,14 @@ export const NowPlayingBar = ({
                 <button
                   onClick={onToggleFavorite}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-200",
+                    "p-1.5 rounded-full transition-all duration-200 ease-out active:scale-95",
                     isFavorite 
                       ? "text-red-500" 
-                      : "text-muted-foreground hover:text-red-500"
+                      : "text-muted-foreground hover:text-red-500",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   )}
                 >
-                  <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
+                  <Heart className={cn("w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out", isFavorite && "fill-current")} />
                 </button>
               </TooltipTrigger>
               <TooltipContent>{isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}</TooltipContent>
@@ -267,9 +270,9 @@ export const NowPlayingBar = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={onShowLyrics}
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                 >
-                  <Mic2 className="w-4 h-4" />
+                  <Mic2 className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Paroles</TooltipContent>
@@ -280,13 +283,14 @@ export const NowPlayingBar = ({
                 <button
                   onClick={onToggleQueue}
                   className={cn(
-                    "p-1.5 rounded-full transition-all duration-200",
+                    "p-1.5 rounded-full transition-all duration-200 ease-out active:scale-95",
                     isQueueOpen 
                       ? "text-primary" 
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   )}
                 >
-                  <ListMusic className="w-4 h-4" />
+                  <ListMusic className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>File d'attente</TooltipContent>
@@ -296,11 +300,11 @@ export const NowPlayingBar = ({
             <div className="flex items-center gap-1 ml-2 group/volume">
               <button
                 onClick={onMuteToggle}
-                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
               >
-                <VolumeIcon className="w-4 h-4" />
+                <VolumeIcon className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
               </button>
-              <div className="w-0 group-hover/volume:w-20 overflow-hidden transition-all duration-200">
+              <div className="w-0 group-hover/volume:w-20 overflow-hidden transition-all duration-200 ease-out">
                 <Slider
                   value={[isMuted ? 0 : volume]}
                   max={100}
@@ -313,8 +317,8 @@ export const NowPlayingBar = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                  <MoreHorizontal className="w-4 h-4" />
+                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded">
+                  <MoreHorizontal className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">

@@ -65,7 +65,7 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
   return (
     <div className={cn("h-full flex flex-col bg-card border-l border-border/50", className)}>
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-card/80 backdrop-blur-md border-b border-border/50 p-4">
+      <div className="sticky top-0 z-10 bg-card/80 backdrop-blur-md border-b border-border/50 px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-primary" />
@@ -81,9 +81,9 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-8 w-8"
+              className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
             </Button>
           )}
         </div>
@@ -107,7 +107,7 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
               variant={filter === filterType ? "default" : "ghost"}
               size="sm"
               onClick={() => setFilter(filterType)}
-              className="h-7 text-xs capitalize"
+              className="h-7 text-xs capitalize transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
             >
               {filterType === "all" ? "Toutes" : filterType}
               {filterType !== "all" && (
@@ -126,9 +126,9 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
               variant="outline"
               size="sm"
               onClick={clearNotifications}
-              className="h-7 text-xs gap-1.5"
+              className="h-7 text-xs gap-1.5 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash2 className="w-3 h-3 hover:scale-105 transition-transform duration-200 ease-out" />
               Effacer tout
             </Button>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -143,7 +143,7 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
 
       {/* Content */}
       <ScrollArea className="flex-1">
-        <div className="p-4">
+        <div className="px-4 py-3">
           {filteredNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Bell className="w-16 h-16 text-muted-foreground/30 mb-4" />
@@ -163,12 +163,12 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={cn(
-                    "p-4 rounded-lg border transition-all hover:shadow-md",
+                    "px-4 py-3 rounded-lg border transition-all duration-200 ease-out hover:shadow-md hover:scale-[1.01] active:scale-[0.99]",
                     getNotificationColor(notification.type)
                   )}
                 >

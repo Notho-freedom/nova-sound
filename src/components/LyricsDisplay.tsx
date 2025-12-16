@@ -182,7 +182,7 @@ export const LyricsDisplay = ({
               key={`${line.time}-${index}`}
               ref={isCurrent ? currentLineRef : null}
               className={cn(
-                "px-6 py-3 rounded-lg transition-all duration-500 ease-in-out",
+                "px-6 py-3 rounded-lg transition-all duration-200 ease-out",
                 "min-h-[3rem] flex items-center",
                 isCurrent
                   ? "text-primary text-xl font-bold scale-105 bg-primary/20 shadow-lg shadow-primary/20 border-2 border-primary/30"
@@ -230,7 +230,7 @@ export const LyricsDisplay = ({
   return (
     <div className={cn("glass rounded-xl flex flex-col", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
         <div className="flex items-center gap-3">
           <Music2 className="w-5 h-5 text-primary" />
           <h3 className="font-display text-lg tracking-wider">PAROLES</h3>
@@ -243,14 +243,14 @@ export const LyricsDisplay = ({
               <Clock className="w-3 h-3" />
               <button
                 onClick={() => setOffset(o => o - 0.5)}
-                className="px-1 hover:text-primary"
+                className="px-1 hover:text-primary transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
               >
                 -
               </button>
               <span className="w-8 text-center">{offset > 0 ? "+" : ""}{offset}s</span>
               <button
                 onClick={() => setOffset(o => o + 0.5)}
-                className="px-1 hover:text-primary"
+                className="px-1 hover:text-primary transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
               >
                 +
               </button>
@@ -261,9 +261,9 @@ export const LyricsDisplay = ({
             variant="ghost"
             size="icon"
             onClick={() => setShowSearch(!showSearch)}
-            className="h-8 w-8"
+            className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
           </Button>
 
           <Button
@@ -276,26 +276,26 @@ export const LyricsDisplay = ({
                 // Trigger reload
               }
             }}
-            className="h-8 w-8"
+            className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
           </Button>
         </div>
       </div>
 
       {/* Search bar */}
       {showSearch && (
-        <div className="p-4 border-b border-border/50">
+        <div className="px-4 py-3 border-b border-border/50">
           <div className="flex gap-2">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher des paroles..."
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1"
+              className="flex-1 transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/50"
             />
-            <Button onClick={handleSearch} disabled={loading}>
-              <Search className="w-4 h-4" />
+            <Button onClick={handleSearch} disabled={loading} className="transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
+              <Search className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
             </Button>
           </div>
         </div>
@@ -303,7 +303,7 @@ export const LyricsDisplay = ({
 
       {/* Track info */}
       {currentTrack && (
-        <div className="px-4 py-3 border-b border-border/50">
+        <div className="px-4 py-2.5 border-b border-border/50">
           <p className="font-semibold text-foreground">{currentTrack.title}</p>
           <p className="text-sm text-muted-foreground">{currentTrack.artist}</p>
         </div>
@@ -359,7 +359,7 @@ export const LyricsDisplay = ({
 
       {/* Current line indicator and progress (synced mode) */}
       {lyrics?.syncedLyrics && currentLineIndex >= 0 && (
-        <div className="p-4 border-t border-border/50 bg-primary/5">
+        <div className="px-4 py-3 border-t border-border/50 bg-primary/5">
           <div className="flex items-center justify-between gap-4 mb-2">
             <p className="text-sm text-primary text-center font-semibold flex-1 truncate">
               {lyrics.syncedLyrics[currentLineIndex]?.text || "♪"}
@@ -374,7 +374,7 @@ export const LyricsDisplay = ({
           {currentTrack && currentTrack.duration > 0 && (
             <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-primary transition-all duration-300"
+                className="h-full bg-primary transition-all duration-200 ease-out"
                 style={{ width: `${(currentTime / currentTrack.duration) * 100}%` }}
               />
             </div>

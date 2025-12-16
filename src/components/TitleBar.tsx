@@ -59,14 +59,14 @@ export const TitleBar = ({
       {uploadProgress !== undefined && uploadProgress > 0 && uploadProgress < 100 && (
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30">
           <div 
-            className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300"
+            className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-200 ease-out"
             style={{ width: `${uploadProgress}%` }}
           />
         </div>
       )}
 
       <div 
-        className="h-10 flex items-center justify-between bg-card/80 backdrop-blur-sm border-b border-border/50 px-3 select-none"
+        className="h-10 flex items-center justify-between bg-card/80 backdrop-blur-sm border-b border-border/50 px-3 select-none gap-2"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* App Icon & Title */}
@@ -108,9 +108,9 @@ export const TitleBar = ({
             <TooltipTrigger asChild>
               <button
                 onClick={onToggleNotifications}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group relative"
+                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
               >
-                <Bell className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                <Bell className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
                 {hasNotifications && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 )}
@@ -123,8 +123,8 @@ export const TitleBar = ({
           {nexusAuthenticated && nexusUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group">
-                  <Avatar className="w-6 h-6 border border-border/50">
+                <button className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
+                  <Avatar className="w-6 h-6 border border-border/50 group-hover:scale-105 transition-transform duration-200 ease-out">
                     <AvatarImage src={nexusUser.photoURL || undefined} alt={nexusUser.displayName || ""} />
                     <AvatarFallback className="bg-primary/20 text-primary text-xs">
                       {nexusUser.displayName?.charAt(0).toUpperCase() || <User className="w-3.5 h-3.5" />}
@@ -176,9 +176,9 @@ export const TitleBar = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={onOpenSettings}
-                  className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group"
+                  className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 >
-                  <User className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                  <User className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Se connecter</TooltipContent>
@@ -190,9 +190,9 @@ export const TitleBar = ({
             <TooltipTrigger asChild>
               <button
                 onClick={onOpenSettings}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group"
+                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
               >
-                <Settings className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:rotate-45 transition-all duration-300" />
+                <Settings className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:rotate-45 group-hover:scale-105 transition-all duration-200 ease-out" />
               </button>
             </TooltipTrigger>
             <TooltipContent>Paramètres</TooltipContent>
@@ -208,28 +208,28 @@ export const TitleBar = ({
             <>
               <button
                 onClick={handleMinimize}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group"
+                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 title="Réduire"
               >
-                <Minus className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                <Minus className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
               </button>
               <button
                 onClick={handleMaximize}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group"
+                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 title={isMaximized ? "Restaurer" : "Agrandir"}
               >
                 {isMaximized ? (
-                  <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground rotate-90" />
+                  <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 rotate-90 transition-all duration-200 ease-out" />
                 ) : (
-                  <Square className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
+                  <Square className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
                 )}
               </button>
               <button
                 onClick={handleClose}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-destructive/80 transition-colors group"
+                className="w-8 h-7 flex items-center justify-center rounded hover:bg-destructive/80 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2"
                 title="Fermer"
               >
-                <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
               </button>
             </>
           )}

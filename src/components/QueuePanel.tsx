@@ -35,12 +35,13 @@ const TrackItem = ({
   <div
     onClick={onClick}
     className={cn(
-      "flex items-center gap-3 p-2 rounded-lg cursor-pointer group",
-      "hover:bg-muted/50 transition-colors"
+      "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer group",
+      "hover:bg-muted/40 transition-all duration-200 ease-out active:scale-[0.98]",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
     )}
   >
     {showGrip && (
-      <GripVertical className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+      <GripVertical className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out cursor-grab" />
     )}
     <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
       <img
@@ -87,25 +88,25 @@ export const QueuePanel = ({
   return (
     <div className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl">
       {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <h2 className="font-display text-sm tracking-wider text-foreground">
           FILE D'ATTENTE
         </h2>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          className="p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
         </button>
       </div>
 
       {/* Now Playing - Always visible */}
       {currentTrack && (
-        <div className="p-4 border-b border-border">
+        <div className="px-4 py-3 border-b border-border">
           <h3 className="text-xs font-display uppercase tracking-widest text-primary mb-3">
             En Lecture
           </h3>
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
+          <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 transition-all duration-200 ease-out">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
                 <img
@@ -176,7 +177,7 @@ export const QueuePanel = ({
                     {currentTrack?.artist}
                   </p>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {albumTracksFromCurrent.map((track) => (
                     <TrackItem
                       key={track.id}
@@ -198,7 +199,7 @@ export const QueuePanel = ({
           {/* Similaire */}
           <TabsContent value="similar" className="p-4 mt-0">
             {similarTracks.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {similarTracks.map((track) => (
                   <TrackItem
                     key={track.id}
@@ -217,7 +218,7 @@ export const QueuePanel = ({
           {/* Historique */}
           <TabsContent value="history" className="p-4 mt-0">
             {historyTracks.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {historyTracks.map((track) => (
                   <TrackItem
                     key={track.id}

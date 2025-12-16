@@ -86,12 +86,13 @@ export const TrackGridView = ({
             <button
               onClick={() => onTrackSelect(actualIndex)}
               className={cn(
-                "group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50 w-full",
-                isCurrentTrack && "ring-2 ring-primary"
+                "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full",
+                isCurrentTrack && "ring-2 ring-primary",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
               )}
             >
               <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
-                <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105" />
                 {/* Upload progress overlay */}
                 {getTrackProgress?.(track.id) && (
                   <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
@@ -107,13 +108,13 @@ export const TrackGridView = ({
                 {getTrackProgress?.(track.id)?.status === 'uploading' && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30">
                     <div 
-                      className="h-full bg-primary transition-all duration-300"
+                      className="h-full bg-primary transition-all duration-200 ease-out"
                       style={{ width: `${getTrackProgress(track.id)?.progress || 0}%` }}
                     />
                   </div>
                 )}
                 {/* Play overlay */}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                   <div className={cn(
                     "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
                     isCurrentTrack && isPlaying ? "bg-primary" : "bg-primary/90"

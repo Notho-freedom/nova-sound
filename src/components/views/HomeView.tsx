@@ -132,9 +132,7 @@ export const HomeView = ({
   const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-300">
-      {/* Spacing from top */}
-      <div className="pt-4" />
+    <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
       
       {/* Welcome Section */}
       <div>
@@ -173,9 +171,10 @@ export const HomeView = ({
                   key={`recent-${track.id}-${idx}`}
                   onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                   className={cn(
-                    "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-300",
-                    "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10",
-                    isCurrentTrack && isPlaying && "ring-2 ring-primary"
+                    "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-200 ease-out",
+                    "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
+                    isCurrentTrack && isPlaying && "ring-2 ring-primary",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -183,9 +182,9 @@ export const HomeView = ({
                       <img
                         src={getCoverUrl(track.coverUrl)}
                         alt={track.album}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                        className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-110"
                       />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                         <Play className="w-5 h-5 text-white fill-current" />
                       </div>
                     </div>
@@ -226,16 +225,16 @@ export const HomeView = ({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border/30">
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
+                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
                     #
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
                     Titre
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
                     Album
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+                  <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
                     Durée
                   </th>
                 </tr>
@@ -250,13 +249,14 @@ export const HomeView = ({
                       key={`favorite-${track.id}-${idx}`}
                       onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                       className={cn(
-                        "group cursor-pointer transition-all duration-200",
+                        "group cursor-pointer transition-all duration-200 ease-out",
                         isCurrentTrack 
                           ? "bg-primary/10" 
-                          : "hover:bg-muted/30"
+                          : "hover:bg-muted/40 active:bg-muted/50",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                       )}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <div className="w-6 flex items-center justify-center">
                           {isCurrentTrack && isPlaying ? (
                             <div className="flex items-center gap-0.5">
@@ -274,7 +274,7 @@ export const HomeView = ({
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
                             <img
@@ -296,12 +296,12 @@ export const HomeView = ({
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
+                      <td className="px-4 py-2.5 hidden md:table-cell">
                         <p className="text-sm text-muted-foreground truncate">
                           {track.album}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-2.5 text-right">
                         <span className="text-sm text-muted-foreground font-mono">
                           {formatTime(track.duration)}
                         </span>

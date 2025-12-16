@@ -171,9 +171,9 @@ export const SearchView = ({
   const hasResults = query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0);
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in duration-300">
+    <div className="h-full flex flex-col animate-in fade-in duration-200">
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-8">
+        <div className="px-6 py-4 space-y-6">
           {/* Header */}
           <PageHeader
             title="Recherche"
@@ -197,22 +197,22 @@ export const SearchView = ({
                   saveToHistory(query.trim());
                 }
               }}
-              className="pl-10 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all"
+              className="pl-10 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/50"
             />
             {query && (
               <button
                 title="Effacer la recherche"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
               >
-                <X className="w-4 h-4 text-muted-foreground" />
+                <X className="w-4 h-4 text-muted-foreground hover:scale-105 transition-transform duration-200 ease-out" />
               </button>
             )}
           </div>
 
       {query ? (
         /* Search Results */
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Artists Results */}
           {searchResults.artists.length > 0 && (
             <div>
@@ -225,7 +225,7 @@ export const SearchView = ({
                   <button
                     key={artist.name}
                     onClick={() => handleSearch(artist.name)}
-                    className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-colors text-center"
+                    className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-95 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   >
                     <div className="w-24 h-24 rounded-full overflow-hidden mx-auto mb-2 bg-gradient-to-br from-primary/20 to-secondary/20">
                       <img src={getCoverUrl(artist.coverUrl)} alt={artist.name} className="w-full h-full object-cover" />
@@ -250,7 +250,7 @@ export const SearchView = ({
                   <button
                     key={`${album.name}-${album.artist}`}
                     onClick={() => handleSearch(album.name)}
-                    className="p-3 rounded-xl hover:bg-card/50 transition-colors text-left"
+                    className="p-3 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-95 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   >
                     <div className="aspect-square rounded-lg overflow-hidden mb-2 shadow-lg">
                       <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
@@ -291,8 +291,9 @@ export const SearchView = ({
                       key={track.id}
                       onClick={() => onTrackSelect(actualIndex)}
                       className={cn(
-                        "flex items-center gap-4 p-3 cursor-pointer transition-all duration-200 group",
-                        isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
+                        "flex items-center gap-4 px-3 py-2.5 cursor-pointer transition-all duration-200 ease-out group",
+                        isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                       )}
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
@@ -301,7 +302,7 @@ export const SearchView = ({
                           alt={track.album}
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                           <Play className="w-5 h-5 text-white fill-current" />
                         </div>
                       </div>
@@ -328,7 +329,7 @@ export const SearchView = ({
         </div>
       ) : (
         /* Browse View */
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Search History */}
           {searchHistory.length > 0 && (
             <div>
@@ -339,7 +340,7 @@ export const SearchView = ({
                 </div>
                 <button
                   onClick={clearHistory}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                 >
                   Effacer tout
                 </button>
@@ -348,11 +349,11 @@ export const SearchView = ({
                 {searchHistory.map((term) => (
                   <div
                     key={term}
-                    className="group flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 hover:bg-card transition-colors"
+                    className="group flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 hover:bg-card transition-all duration-200 ease-out"
                   >
                     <button
                       onClick={() => setQuery(term)}
-                      className="text-sm text-foreground"
+                      className="text-sm text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                     >
                       {term}
                     </button>
@@ -362,9 +363,9 @@ export const SearchView = ({
                         e.stopPropagation();
                         removeFromHistory(term);
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                     >
-                      <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                      <X className="w-3 h-3 text-muted-foreground hover:text-foreground hover:scale-105 transition-all duration-200 ease-out" />
                     </button>
                   </div>
                 ))}
@@ -389,12 +390,13 @@ export const SearchView = ({
                   key={category.name}
                   onClick={() => handleSearch(category.name)}
                   className={cn(
-                    "relative h-28 rounded-xl overflow-hidden group",
+                    "relative h-28 rounded-xl overflow-hidden group transition-all duration-200 ease-out active:scale-95",
                     "bg-gradient-to-br",
-                    category.color
+                    category.color,
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   )}
                 >
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-200 ease-out" />
                   <div className="absolute inset-0 flex items-end p-4">
                     <h3 className="font-display text-xl font-bold text-white">
                       {category.name}
@@ -419,7 +421,7 @@ export const SearchView = ({
                     <button
                       key={artist}
                       onClick={() => handleSearch(artist)}
-                      className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-colors text-center"
+                      className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-95 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                     >
                       <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-2 shadow-lg">
                         <img 

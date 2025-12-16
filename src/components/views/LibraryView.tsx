@@ -253,7 +253,7 @@ export const LibraryView = ({
   // Render empty state
   if (tracks.length === 0) {
     return (
-      <div className="p-6 h-full flex flex-col items-center justify-center text-center animate-in fade-in duration-300">
+      <div className="px-6 py-4 h-full flex flex-col items-center justify-center text-center animate-in fade-in duration-200">
         <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
           <Music className="w-10 h-10 text-muted-foreground" />
         </div>
@@ -274,8 +274,8 @@ export const LibraryView = ({
     if (!album) return null;
 
     return (
-      <div className="p-6 space-y-6 animate-in fade-in slide-in-from-right duration-300">
-        <button onClick={handleBack} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <div className="px-6 py-4 space-y-6 animate-in fade-in slide-in-from-right duration-200">
+        <button onClick={handleBack} className="text-sm text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded">
           ← Retour aux albums
         </button>
         
@@ -386,7 +386,7 @@ export const LibraryView = ({
   // Albums Grid View
   if (viewMode === "albums" && !selectedAlbum) {
     return (
-      <div className="p-6 space-y-6 animate-in fade-in duration-300">
+      <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold mb-1">{title}</h1>
@@ -427,11 +427,11 @@ export const LibraryView = ({
               <div className="group relative">
                 <button
                   onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                  className="w-full p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50"
+                  className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 >
                   <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
                     <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                       <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
                         <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
                       </div>
@@ -458,7 +458,7 @@ export const LibraryView = ({
   // Artists Grid View
   if (viewMode === "artists") {
     return (
-      <div className="p-6 space-y-6 animate-in fade-in duration-300">
+      <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold mb-1">{title}</h1>
@@ -504,7 +504,7 @@ export const LibraryView = ({
                       const idx = tracks.findIndex(t => t.id === firstTrack.id);
                       if (idx !== -1) onTrackSelect(idx);
                     }}
-                    className="w-full p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50"
+                    className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   >
                     <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
                       {coverUrl ? (
@@ -543,7 +543,7 @@ export const LibraryView = ({
   // Folders View
   if (viewMode === "folders") {
     return (
-      <div className="p-6 space-y-6 animate-in fade-in duration-300">
+      <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold mb-1">{title}</h1>
@@ -588,9 +588,9 @@ export const LibraryView = ({
 
   // Default Tracks View
   return (
-    <div className="h-full flex flex-col animate-in fade-in duration-300">
+    <div className="h-full flex flex-col animate-in fade-in duration-200">
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6 space-y-6">
+        <div className="px-6 py-4 space-y-6">
           {/* Header */}
           <PageHeader
             title={title}
@@ -617,8 +617,9 @@ export const LibraryView = ({
                     <button
                       onClick={() => setDisplayMode("list")}
                       className={cn(
-                        "p-2 rounded transition-colors",
-                        displayMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                        "p-2 rounded transition-all duration-200 ease-out active:scale-95",
+                        displayMode === "list" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                       )}
                     >
                       <List className="w-4 h-4" />
@@ -626,8 +627,9 @@ export const LibraryView = ({
                     <button
                       onClick={() => setDisplayMode("grid")}
                       className={cn(
-                        "p-2 rounded transition-colors",
-                        displayMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"
+                        "p-2 rounded transition-all duration-200 ease-out active:scale-95",
+                        displayMode === "grid" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                       )}
                     >
                       <Grid className="w-4 h-4" />
@@ -889,7 +891,7 @@ export const LibraryView = ({
                     )}
                     {/* Play button overlay */}
                     {!getTrackProgress(track.id) && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                         <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
                           <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
                         </div>

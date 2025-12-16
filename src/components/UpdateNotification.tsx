@@ -57,14 +57,14 @@ export function UpdateNotification() {
         className={cn(
           'relative w-full max-w-2xl mx-4 bg-gradient-to-br from-background via-background/95 to-primary/10',
           'border border-primary/20 rounded-2xl shadow-2xl backdrop-blur-xl',
-          'p-6 md:p-8 pointer-events-auto',
-          'animate-in fade-in-0 zoom-in-95 duration-300'
+          'px-6 py-4 md:px-8 md:py-6 pointer-events-auto',
+          'animate-in fade-in-0 zoom-in-95 duration-200'
         )}
       >
         {/* Close button */}
         <button
           onClick={() => setIsVisible(false)}
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-background/50 transition-colors"
+          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-background/50 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
           aria-label="Fermer"
         >
           <X className="w-5 h-5 text-muted-foreground" />

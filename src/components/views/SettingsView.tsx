@@ -584,10 +584,10 @@ export const SettingsView = () => {
   }
 
   return (
-    <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-300">
+    <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-200">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
-        <div className="px-6 pt-6 pb-4">
+        <div className="px-6 py-4">
           <h1 className="font-display text-2xl font-bold text-foreground">Paramètres</h1>
           <p className="text-sm text-muted-foreground mt-1">Personnalisez votre expérience NEXUS</p>
         </div>
@@ -755,7 +755,7 @@ export const SettingsView = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out"
                             onClick={() => handleRemoveMusicFolder(folder)}
                           >
                             <X className="w-4 h-4" />
@@ -840,7 +840,7 @@ export const SettingsView = () => {
                       key={t.id}
                       onClick={() => handleThemeChange(t.id)}
                       className={cn(
-                        "p-4 rounded-xl border-2 transition-all duration-200",
+                        "p-4 rounded-xl border-2 transition-all duration-200 ease-out active:scale-95",
                         theme === t.id
                           ? `${t.border} bg-primary/10`
                           : "border-transparent bg-muted/30 hover:bg-muted/50"

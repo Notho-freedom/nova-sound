@@ -14,11 +14,11 @@ import { initLyricsProvider } from './services/lyrics-provider.js';
 import { initScrobbler } from './services/scrobbler.js';
 import { initUpdater } from './updater/updater.js';
 // Import CLI parser
-import { parseArgs, showHelp, showVersion, applyCLIOptions } from './cli.js';
+import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions } from './cli.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Parse CLI arguments
-const cliOptions = parseArgs();
+// Parse CLI arguments and normalize (remove duplicates, validate)
+const cliOptions = normalizeOptions(parseArgs());
 // Handle CLI commands that exit immediately
 if (cliOptions.help) {
     showHelp();
@@ -401,6 +401,7 @@ if (!gotTheLock) {
 else {
     // Handle second instance (when user opens file with "Open with..." while app is running)
     app.on('second-instance', (event, commandLine, workingDirectory) => {
+        console.log('Second instance detected (Open with...):', commandLine);
         // Focus the main window if it exists
         if (mainWindow) {
             if (mainWindow.isMinimized()) {
@@ -408,29 +409,73 @@ else {
             }
             mainWindow.focus();
         }
-        // Extract file paths from command line
+        else {
+            // Window doesn't exist yet, create it
+            createWindow();
+        }
+        // Extract file paths from command line (robust parsing for Windows "Open with")
         const files = [];
-        for (const arg of commandLine) {
-            // Skip executable path and flags
-            if (arg === commandLine[0] || arg.startsWith('--') || arg.startsWith('-')) {
+        // On Windows, commandLine includes the executable path as first element
+        // File paths can be:
+        // 1. Absolute paths: C:\Users\...\file.mp3
+        // 2. Relative paths: .\file.mp3 or file.mp3
+        // 3. Quoted paths: "C:\Users\...\file with spaces.mp3"
+        for (let i = 1; i < commandLine.length; i++) {
+            const arg = commandLine[i];
+            // Skip CLI flags and options
+            if (arg.startsWith('--') || arg.startsWith('-')) {
+                // Skip value for flags that take arguments
+                if (arg === '--port' || arg === '-p' || arg === '--music-dir' || arg === '-m') {
+                    i++; // Skip the next argument (the value)
+                }
                 continue;
             }
-            // Check if it's a file path
-            if (arg.includes(path.sep) || arg.match(/^[A-Za-z]:/)) {
+            // Handle quoted paths (Windows often quotes paths with spaces)
+            let filePath = arg;
+            if (filePath.startsWith('"') && filePath.endsWith('"')) {
+                filePath = filePath.slice(1, -1);
+            }
+            // Check if it looks like a file path
+            // Windows: C:\ or UNC \\server\share or relative .\ or ..\
+            // Unix: /path or ./path
+            const isPathLike = filePath.includes(path.sep) ||
+                filePath.match(/^[A-Za-z]:/) || // Windows drive letter
+                filePath.match(/^\\\\/) || // UNC path
+                filePath.startsWith('.\\') || // Relative Windows
+                filePath.startsWith('./') || // Relative Unix
+                path.isAbsolute(filePath);
+            if (isPathLike) {
                 try {
-                    const resolvedPath = path.isAbsolute(arg) ? arg : path.resolve(workingDirectory, arg);
-                    if (fs.existsSync(resolvedPath) && isMediaFile(resolvedPath)) {
-                        files.push(resolvedPath);
+                    // Resolve path (handle both absolute and relative)
+                    const resolvedPath = path.isAbsolute(filePath)
+                        ? path.normalize(filePath)
+                        : path.resolve(workingDirectory || process.cwd(), filePath);
+                    // Verify file exists and is a media file
+                    if (fs.existsSync(resolvedPath)) {
+                        const stats = fs.statSync(resolvedPath);
+                        if (stats.isFile() && isMediaFile(resolvedPath)) {
+                            files.push(resolvedPath);
+                            console.log('Found media file:', resolvedPath);
+                        }
                     }
                 }
                 catch (error) {
-                    // Ignore errors
+                    // Log error but continue processing other files
+                    console.warn(`Error processing file path "${filePath}":`, error);
                 }
             }
         }
-        // Open files in existing window
-        if (files.length > 0 && mainWindow) {
-            files.forEach(file => openMediaFile(file));
+        // Open files in existing window (or wait for window to be ready)
+        if (files.length > 0) {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                // Window is ready, open files immediately
+                files.forEach(file => openMediaFile(file));
+            }
+            else {
+                // Window not ready yet, store files to open when ready
+                app.pendingFiles = (app.pendingFiles || []).concat(files);
+                console.log(`Stored ${files.length} file(s) to open when window is ready`);
+            }
         }
     });
 }
@@ -470,17 +515,26 @@ app.whenReady().then(async () => {
             console.log(`Added music directories: ${newDirs.join(', ')}`);
         }
     }
-    // Auto-scan on startup if enabled (unless --no-scan is specified)
-    if (!cliOptions.noScan) {
-        const settings = await storage.getSettings();
-        const shouldAutoScan = cliOptions.autoScan ||
-            (settings.autoScanOnStartup && settings.musicDirectories.length > 0);
-        if (shouldAutoScan) {
-            // Trigger a scan after window is ready
-            setTimeout(() => {
-                mainWindow?.webContents.send('library:auto-scan-start');
-            }, 2000);
-        }
+    // Auto-scan on startup (respect CLI scanMode)
+    const settings = await storage.getSettings();
+    let shouldAutoScan = false;
+    if (cliOptions.scanMode === 'auto') {
+        // Explicitly enabled via --auto-scan
+        shouldAutoScan = true;
+    }
+    else if (cliOptions.scanMode === 'disabled') {
+        // Explicitly disabled via --no-scan
+        shouldAutoScan = false;
+    }
+    else {
+        // Default behavior: use settings
+        shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
+    }
+    if (shouldAutoScan) {
+        // Trigger a scan after window is ready
+        setTimeout(() => {
+            mainWindow?.webContents.send('library:auto-scan-start');
+        }, 2000);
     }
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
