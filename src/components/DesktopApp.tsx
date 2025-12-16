@@ -191,7 +191,7 @@ export const DesktopApp = () => {
     // Sync to Firebase (debounced)
     const timeoutId = setTimeout(async () => {
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('volume', volume);
       } catch (error) {
         // Silently fail if Firebase sync is not available

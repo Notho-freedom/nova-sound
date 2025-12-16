@@ -49,7 +49,7 @@ export function useTheme(): UseThemeReturn {
       
       // Load from Firebase if authenticated (Firebase takes priority)
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         const firestoreData = await firebaseSyncService.loadFromFirestore();
         if (firestoreData?.theme && themes.some(t => t.id === firestoreData.theme)) {
           setThemeState(firestoreData.theme);
@@ -107,7 +107,7 @@ export function useTheme(): UseThemeReturn {
     // Sync to Firebase
     (async () => {
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('theme', theme);
       } catch (error) {
         // Silently fail if Firebase sync is not available

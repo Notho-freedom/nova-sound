@@ -88,7 +88,7 @@ export function usePlaylists(): UsePlaylistsReturn {
         // Sync to Firebase
         if (playlist) {
           try {
-            const { firebaseSyncService } = await import('../services/firebase-sync');
+            const { firebaseSyncService } = await import('@/services/firebase-sync');
             const updatedPlaylists = [...playlists, playlist];
             firebaseSyncService.queueSync('playlists', updatedPlaylists);
           } catch (error) {
@@ -131,7 +131,7 @@ export function usePlaylists(): UsePlaylistsReturn {
         // Sync to Firebase
         if (updated) {
           try {
-            const { firebaseSyncService } = await import('../services/firebase-sync');
+            const { firebaseSyncService } = await import('@/services/firebase-sync');
             const updatedPlaylists = playlists.map((p) => (p.id === id ? updated! : p));
             firebaseSyncService.queueSync('playlists', updatedPlaylists);
           } catch (error) {

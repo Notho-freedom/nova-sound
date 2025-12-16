@@ -230,7 +230,7 @@ export const SettingsView = () => {
       // Load from Firebase sync (if authenticated)
       if (nexusAuthenticated) {
         try {
-          const { firebaseSyncService } = await import('../services/firebase-sync');
+          const { firebaseSyncService } = await import('@/services/firebase-sync');
           const firestoreData = await firebaseSyncService.loadFromFirestore();
           if (firestoreData?.settings) {
             loadedSettings = { ...loadedSettings, ...firestoreData.settings };
@@ -329,7 +329,7 @@ export const SettingsView = () => {
     // Sync to Firebase if authenticated
     if (nexusAuthenticated) {
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         // Update settings object and sync
         const currentSettings = { ...settings, [key]: value };
         await firebaseSyncService.queueSync('settings', currentSettings);

@@ -52,7 +52,7 @@ export const SearchView = ({
     // Sync to Firebase
     (async () => {
       try {
-        const { firebaseSyncService } = await import('../../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('searchHistory', newHistory);
       } catch (error) {
         // Silently fail if Firebase sync is not available
@@ -67,7 +67,7 @@ export const SearchView = ({
     // Sync to Firebase
     (async () => {
       try {
-        const { firebaseSyncService } = await import('../../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('searchHistory', []);
       } catch (error) {
         // Silently fail if Firebase sync is not available
@@ -83,7 +83,7 @@ export const SearchView = ({
     // Sync to Firebase
     (async () => {
       try {
-        const { firebaseSyncService } = await import('../../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('searchHistory', newHistory);
       } catch (error) {
         // Silently fail if Firebase sync is not available

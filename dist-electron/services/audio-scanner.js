@@ -144,6 +144,11 @@ async function scanLibrary(directories) {
             const track = await processAudioFile(filePath);
             if (track) {
                 newTracks.push(track);
+                // Notify renderer in real-time as each track is processed
+                const windows = BrowserWindow.getAllWindows();
+                windows.forEach(window => {
+                    window.webContents.send('library:track-added', track);
+                });
             }
         }
         // Phase 3: Merge with existing tracks and save to storage (duplicates removed in saveLibrary)

@@ -10,13 +10,9 @@
   "scripts": {
     "dev": "next dev",
     "dev:electron": "concurrently -k \"next dev\" \"npm run electron:dev\"",
-    "dev:backend": "cd server && npm run dev",
-    "dev:all": "concurrently -k \"next dev\" \"npm run dev:backend\" \"npm run electron:dev\"",
     "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && electron .",
     "build": "next build",
-    "build:electron": "npm run build && node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js && tsc -p electron/tsconfig.json",
-    "postbuild": "node scripts/copy-build-to-local-ui.js && node scripts/generate-version.js",
-    "build:backend": "cd server && npm run build",
+    "build:electron": "npm run build && tsc -p electron/tsconfig.json",
     "start": "next start",
     "electron": "electron .",
     "package": "npm run build:electron && electron-builder",
@@ -27,7 +23,8 @@
     "preview": "next start",
     "test:api": "node scripts/test-api-routes.mjs",
     "validate:env": "node scripts/validate-env.js",
-    "validate:env:all": "node scripts/validate-env.js --check-all"
+    "validate:env:all": "node scripts/validate-env.js --check-all",
+    "clean": "powershell -Command \"if (Test-Path '.next') { Remove-Item -Path '.next' -Recurse -Force }; if (Test-Path 'dist-electron') { Remove-Item -Path 'dist-electron' -Recurse -Force }; if (Test-Path 'dist') { Remove-Item -Path 'dist' -Recurse -Force }\""
   },
   "dependencies": {
     "@fontsource/orbitron": "^5.2.8",

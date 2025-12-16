@@ -43,7 +43,7 @@ export function useNotifications(): UseNotificationsReturn {
       
       // Load from Firebase if authenticated
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         const firestoreData = await firebaseSyncService.loadFromFirestore();
         if (firestoreData?.notificationsEnabled !== undefined) {
           setEnabledState(firestoreData.notificationsEnabled);
@@ -64,7 +64,7 @@ export function useNotifications(): UseNotificationsReturn {
     // Sync to Firebase
     (async () => {
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('notifications', value);
       } catch (error) {
         // Silently fail if Firebase sync is not available

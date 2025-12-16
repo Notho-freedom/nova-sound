@@ -68,7 +68,7 @@ export function useFavorites(): UseFavoritesReturn {
       
       // Sync to Firebase
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('favorites', newFavorites);
       } catch (error) {
         console.error('Error syncing favorites to Firebase:', error);
@@ -90,7 +90,7 @@ export function useFavorites(): UseFavoritesReturn {
       
       // Sync to Firebase
       try {
-        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
         firebaseSyncService.queueSync('favorites', newFavorites);
       } catch (error) {
         console.error('Error syncing favorites to Firebase:', error);

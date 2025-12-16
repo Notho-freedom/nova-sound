@@ -51,7 +51,7 @@ export function usePlayHistory(): UsePlayHistoryReturn {
     const timeoutId = setTimeout(() => {
       (async () => {
         try {
-          const { firebaseSyncService } = await import('../services/firebase-sync');
+          const { firebaseSyncService } = await import('@/services/firebase-sync');
           firebaseSyncService.queueSync('history', history);
         } catch (error) {
           // Silently fail if Firebase sync is not available

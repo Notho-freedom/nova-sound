@@ -380,7 +380,7 @@ export function useCloudSync(): UseCloudSyncReturn {
               // Only initialize if it's a different user or sync hasn't been initialized
               if (lastUserIdRef.current !== currentUserId || !syncInitializedRef.current) {
                 try {
-                  const { firebaseSyncService } = await import('../services/firebase-sync');
+                  const { firebaseSyncService } = await import('@/services/firebase-sync');
                   await firebaseSyncService.initializeSync(currentUserId);
                   syncInitializedRef.current = true;
                   lastUserIdRef.current = currentUserId;
@@ -412,7 +412,7 @@ export function useCloudSync(): UseCloudSyncReturn {
         } else {
           // Firebase user signed out - cleanup sync listeners
           try {
-            const { firebaseSyncService } = await import('../services/firebase-sync');
+            const { firebaseSyncService } = await import('@/services/firebase-sync');
             firebaseSyncService.cleanup();
           } catch (error) {
             // Silently fail
@@ -518,7 +518,7 @@ export function useCloudSync(): UseCloudSyncReturn {
       unsubscribeProgress();
       
       // Cleanup Firestore sync listeners
-      import('../services/firebase-sync').then(({ firebaseSyncService }) => {
+      import('@/services/firebase-sync').then(({ firebaseSyncService }) => {
         firebaseSyncService.cleanup();
       }).catch((error) => {
         console.error('Error cleaning up sync on unmount:', error);

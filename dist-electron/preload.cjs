@@ -22,6 +22,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('library:scan-progress', listener);
     return () => ipcRenderer.removeListener('library:scan-progress', listener);
   },
+  onTrackAdded: (callback) => {
+    const listener = (_event, track) => callback(track);
+    ipcRenderer.on('library:track-added', listener);
+    return () => ipcRenderer.removeListener('library:track-added', listener);
+  },
+  onTrackRemoved: (callback) => {
+    const listener = (_event, filePath) => callback(filePath);
+    ipcRenderer.on('library:track-removed', listener);
+    return () => ipcRenderer.removeListener('library:track-removed', listener);
+  },
+  onTrackUpdated: (callback) => {
+    const listener = (_event, track) => callback(track);
+    ipcRenderer.on('library:track-updated', listener);
+    return () => ipcRenderer.removeListener('library:track-updated', listener);
+  },
 
   // Video library
   scanVideos: (directories) => ipcRenderer.invoke('videos:scan', directories),
