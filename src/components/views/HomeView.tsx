@@ -3,7 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
-import { HeroBreadcrumbs } from "@/components/HeroBreadcrumbs";
+import { AppHero } from "@/components/AppHero";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -31,8 +31,6 @@ interface HomeViewProps {
   hasNotifications?: boolean;
   onToggleNotifications?: () => void;
   isFullscreen?: boolean;
-  heroRef?: React.RefObject<HTMLDivElement>;
-  isScrolled?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -86,8 +84,6 @@ export const HomeView = ({
   hasNotifications = false,
   onToggleNotifications,
   isFullscreen = false,
-  heroRef,
-  isScrolled = false,
 }: HomeViewProps) => {
   // Remove duplicates by ID before slicing - memoized
   const getUniqueTracks = useCallback((trackList: Track[]) => {
@@ -254,11 +250,13 @@ export const HomeView = ({
   return (
     <div className="animate-in fade-in duration-200">
       
-      {/* Hero Breadcrumbs Section - Full width, no padding - TitleBar2 fused inside */}
-      <div ref={heroRef} className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
-        <HeroBreadcrumbs 
+      {/* AppHero - Unified hero with TitleBar2 controls integrated */}
+      <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+        <AppHero 
+          variant="home"
+          title="NEXUS"
+          subtitle={`${tracks.length} titres dans votre bibliothèque`}
           userName={userName}
-          trackCount={tracks.length}
           featuredTracks={featuredTracks}
           onTrackSelect={(track) => {
             const index = tracks.findIndex(t => t.id === track.id);
@@ -268,7 +266,7 @@ export const HomeView = ({
           uploadProgress={uploadProgress}
           hasNotifications={hasNotifications}
           onToggleNotifications={onToggleNotifications}
-          showTitleBar2={!isScrolled}
+          enableParticles={true}
         />
       </div>
       

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { AppHero } from "@/components/AppHero";
 import {
   Play, 
   Video as VideoIcon,
@@ -135,53 +136,59 @@ export const VideosView = () => {
 
   return (
     <div className="absolute inset-0 flex flex-col animate-in fade-in duration-300">
-      <div className="flex-1 overflow-y-auto">
+      {/* Hero Section */}
+      <div className="relative -mx-0 -mt-0 mb-0">
+        <AppHero
+          variant="media"
+          title="Vidéos"
+          subtitle={`${displayVideos.length} vidéos dans votre bibliothèque`}
+          icon={VideoIcon}
+        />
+      </div>
+      
+      <div className="flex-1 overflow-y-auto -mt-20 relative z-10">
         <div className="p-6 space-y-6">
-          {/* Header */}
-          <PageHeader
-            title="Vidéos"
-            subtitle={`${displayVideos.length} vidéos dans votre bibliothèque`}
-            rightContent={
-              <div className="flex rounded-lg bg-muted/30 p-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setViewMode("grid")}
-                      className={cn(
-                        "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
-                        viewMode === "grid"
-                          ? "bg-primary/20 text-primary"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <Grid className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-sm">Vue grille</div>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setViewMode("list")}
-                      className={cn(
-                        "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
-                        viewMode === "list"
-                          ? "bg-primary/20 text-primary"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <List className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-sm">Vue liste</div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            }
-          />
+          {/* View Mode Controls */}
+          <div className="flex items-center justify-end">
+            <div className="flex rounded-lg bg-muted/30 p-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={cn(
+                      "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                      viewMode === "grid"
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Grid className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Vue grille</div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={cn(
+                      "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                      viewMode === "list"
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Vue liste</div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
 
           {/* Search Bar */}
           <div className="relative">

@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { firebaseService } from "@/services/firebase";
 import { getUserStorageKey, getCurrentUserId } from "@/lib/storage-utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppHero } from "@/components/AppHero";
 
 // Download configuration
 const MAX_RETRY_ATTEMPTS = 3;
@@ -566,12 +567,20 @@ export const DownloadsView = () => {
   }
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            Téléchargements
-          </h1>
+    <div className="h-full flex flex-col">
+      {/* Hero Section */}
+      <div className="relative -mx-0 -mt-0 mb-0">
+        <AppHero
+          variant="media"
+          title="Téléchargements"
+          subtitle="Gérez vos téléchargements et fichiers uploadés"
+          icon={Download}
+        />
+      </div>
+      
+      <div className="p-6 flex-1 flex flex-col -mt-20 relative z-10">
+        {/* Actions Header */}
+        <div className="mb-6 flex items-center justify-end">
           {activeTab === "uploaded" && (
             <Button
               variant="outline"
@@ -584,12 +593,8 @@ export const DownloadsView = () => {
             </Button>
           )}
         </div>
-        <p className="text-muted-foreground">
-          Gérez vos téléchargements et fichiers uploadés.
-        </p>
-      </div>
 
-      {/* Tabs */}
+        {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-border">
         <button
           onClick={() => setActiveTab("downloads")}
@@ -1002,6 +1007,7 @@ export const DownloadsView = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

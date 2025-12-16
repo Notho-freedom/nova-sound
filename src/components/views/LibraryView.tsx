@@ -38,7 +38,7 @@ import { TrackGridView } from "@/components/TrackGridView";
 import { AlbumContextMenu } from "@/components/AlbumContextMenu";
 import { ArtistContextMenu } from "@/components/ArtistContextMenu";
 import { PageHeader } from "@/components/PageHeader";
-import { PageHero } from "@/components/PageHero";
+import { AppHero } from "@/components/AppHero";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -655,7 +655,8 @@ export const LibraryView = ({
       {/* Hero Section */}
       {tracks.length > 0 && (
         <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
-          <PageHero
+          <AppHero
+            variant="library"
             title={title}
             subtitle={`${albums.length} albums • ${tracks.length} titres • ${formatDuration(totalDuration)}`}
             icon={Library}
@@ -664,7 +665,12 @@ export const LibraryView = ({
               const index = tracks.findIndex(t => t.id === track.id);
               if (index !== -1) onTrackSelect(index);
             }}
-            variant={viewMode === "tracks" ? "default" : "minimal"}
+            stats={{
+              albums: albums.length,
+              tracks: tracks.length,
+              duration: totalDuration,
+              artists: artists.length,
+            }}
           />
         </div>
       )}

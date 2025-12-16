@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/PageHeader";
-import { PageHero } from "@/components/PageHero";
+import { AppHero } from "@/components/AppHero";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackCardSkeleton, AlbumCardSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
@@ -183,72 +183,73 @@ export const SearchView = ({
 
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-200">
-      {/* Hero Section */}
-      {tracks.length > 0 && (
-        <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
-          <PageHero
-            title="Recherche"
-            subtitle={query ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
-            icon={Search}
-            featuredTracks={featuredTracksForHero}
-            onTrackSelect={(track) => {
-              const index = tracks.findIndex(t => t.id === track.id);
-              if (index !== -1) onTrackSelect(index);
-            }}
-            variant={query && searchResults.tracks.length > 0 ? "default" : "minimal"}
-          />
-        </div>
-      )}
+      {/* Hero Section with integrated search */}
+      <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+        <AppHero
+          variant="search"
+          title="Recherche"
+          subtitle={query ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
+          featuredTracks={featuredTracksForHero}
+          onTrackSelect={(track) => {
+            const index = tracks.findIndex(t => t.id === track.id);
+            if (index !== -1) onTrackSelect(index);
+          }}
+          searchValue={query}
+          onSearchChange={setQuery}
+          onSearchSubmit={handleSearch}
+        />
+      </div>
       
       <div className="flex-1 overflow-y-auto">
-        <div className={cn("px-6 py-4 space-y-6", tracks.length > 0 && "-mt-24 md:-mt-32 relative z-10 pt-16 md:pt-20")}>
-          {/* Header - Only show if no hero */}
+        <div className="px-6 py-4 space-y-6 -mt-24 md:-mt-32 relative z-10 pt-16 md:pt-20">
+          {/* Search Bar is now integrated into AppHero for search variant */}
+          {/* Only show standalone search bar if no tracks loaded yet */}
           {tracks.length === 0 && (
-            <PageHeader
-              title="Recherche"
-              subtitle={searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0 ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
-            />
+            <>
+              <PageHeader
+                title="Recherche"
+                subtitle="Recherchez dans votre bibliothèque"
+              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Rechercher des titres, artistes ou albums..."
+                  value={query}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setQuery(value);
+                    if (value.trim()) saveToHistory(value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && query.trim()) {
+                      saveToHistory(query.trim());
+                    }
+                  }}
+                  className="pl-10 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/50"
+                />
+                {query && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setQuery("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                      >
+                        <X className="w-4 h-4 text-muted-foreground hover:scale-105 transition-transform duration-200 ease-out" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-sm">Effacer la recherche</div>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </>
           )}
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Rechercher des titres, artistes ou albums..."
-              value={query}
-              onChange={(e) => {
-                const value = e.target.value;
-                setQuery(value);
-                if (value.trim()) saveToHistory(value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && query.trim()) {
-                  saveToHistory(query.trim());
-                }
-              }}
-              className="pl-10 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/50"
-            />
-            {query && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setQuery("")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                  >
-                    <X className="w-4 h-4 text-muted-foreground hover:scale-105 transition-transform duration-200 ease-out" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm">Effacer la recherche</div>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-
-      {query ? (
-        /* Search Results */
-        <div className="space-y-6">
+          {query ? (
+            // Search Results
+            <div className="space-y-6">
           {/* Artists Results */}
           {searchResults.artists.length > 0 && (
             <div>
@@ -387,7 +388,7 @@ export const SearchView = ({
           </div>
         </div>
       ) : (
-        /* Browse View */
+        // Browse View
         <div className="space-y-6">
           {/* Search History */}
           {searchHistory.length > 0 && (

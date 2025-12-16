@@ -12,6 +12,7 @@ import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
+import { PlaylistView } from "./views/PlaylistView";
 import { SettingsView } from "./views/SettingsView";
 import { NotificationsView } from "./views/NotificationsView";
 
@@ -38,14 +39,23 @@ import { toast } from "sonner";
 import type { Track } from "@/types/music";
 import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 import { useAudioVibes } from "@/hooks/useAudioVibes";
+import { HeroProvider, useHero } from "@/contexts/HeroContext";
 
-export const DesktopApp = () => {
+// Inner component that uses HeroContext
+const DesktopAppContent = () => {
   // Initialize theme hook to ensure theme is loaded and applied on mount
   useTheme();
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory, recordPlayback } = usePlayHistory();
-  const { playlists, addTracksToPlaylist } = usePlaylists();
+  const { 
+    playlists, 
+    createPlaylist, 
+    updatePlaylist, 
+    deletePlaylist, 
+    addTracksToPlaylist, 
+    removeTracksFromPlaylist 
+  } = usePlaylists();
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
   const { notifications, notifySuccess, notifyError } = useNotifications();
@@ -118,9 +128,9 @@ export const DesktopApp = () => {
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // Initialize isScrolled based on current view - true for non-home views, false for home (hero visible by default)
-  const [isScrolled, setIsScrolled] = useState(currentView !== "home");
-  const heroRef = useRef<HTMLDivElement>(null); // Ref to hero element for intersection observer
+  
+  // Use HeroContext for TitleBar v1/v2 switching
+  const { isHeroVisible } = useHero();
 
   // Detect app fullscreen mode
   useEffect(() => {
@@ -158,47 +168,6 @@ export const DesktopApp = () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
-
-  // Track hero visibility for TitleBar switching using Intersection Observer with better precision
-  useEffect(() => {
-    // Immediately set state for non-home views
-    if (currentView !== "home") {
-      setIsScrolled(true); // Show v1 on other views
-      return;
-    }
-
-    // For home view, wait for heroRef to be available
-    if (!heroRef.current) {
-      // If heroRef is not available yet, assume hero is visible (show v2)
-      setIsScrolled(false);
-      return;
-    }
-
-    // Use a more precise threshold - show v2 when hero is at least 20% visible
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry) return;
-        
-        // Show v2 (TitleBar2) when hero is at least 20% visible
-        // Show v1 (TitleBar) when hero is less than 20% visible or not intersecting
-        const isHeroVisible = entry.isIntersecting && entry.intersectionRatio >= 0.2;
-        setIsScrolled(!isHeroVisible);
-      },
-      {
-        // Use multiple thresholds for smoother transitions
-        threshold: [0, 0.1, 0.2, 0.3, 0.5, 1.0],
-        // Add root margin to trigger slightly before hero fully exits
-        rootMargin: '-10% 0px -10% 0px',
-      }
-    );
-
-    observer.observe(heroRef.current);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [currentView]); // Re-run when view changes
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
@@ -846,7 +815,52 @@ export const DesktopApp = () => {
     const message = `Lecture aléatoire de "${playlist.name}"`;
     toast.success(message);
     notifySuccess(message);
-  }, [playlists, libraryTracks, setQueue, setCurrentIndex, notifySuccess, notifyError]);
+  }, [playlists, libraryTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError]);
+
+  // Handlers for PlaylistView - play/shuffle tracks by IDs
+  const handlePlayTracks = useCallback((trackIds: string[]) => {
+    const tracksToPlay = trackIds
+      .map(id => libraryTracks.find(t => t.id === id))
+      .filter((t): t is Track => t !== undefined);
+
+    if (tracksToPlay.length === 0) {
+      const errorMsg = 'Aucun titre trouvé';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
+      return;
+    }
+
+    setQueue(tracksToPlay);
+    setCurrentIndex(0);
+    setIsPlaying(true);
+    const message = `Lecture de ${tracksToPlay.length} titre${tracksToPlay.length > 1 ? 's' : ''}`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
+
+  const handleShuffleTracks = useCallback((trackIds: string[]) => {
+    const tracksToPlay = trackIds
+      .map(id => libraryTracks.find(t => t.id === id))
+      .filter((t): t is Track => t !== undefined);
+
+    if (tracksToPlay.length === 0) {
+      const errorMsg = 'Aucun titre trouvé';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
+      return;
+    }
+
+    // Shuffle tracks
+    const shuffled = [...tracksToPlay].sort(() => Math.random() - 0.5);
+
+    setQueue(shuffled);
+    setCurrentIndex(0);
+    setIsPlaying(true);
+    setIsShuffle(true);
+    const message = `Lecture aléatoire de ${shuffled.length} titre${shuffled.length > 1 ? 's' : ''}`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError]);
 
   const handleToggleFavorite = useCallback(() => {
     if (!currentTrack) return;
@@ -1032,8 +1046,6 @@ export const DesktopApp = () => {
             }
           }}
           isFullscreen={isAppFullscreen}
-          heroRef={heroRef}
-          isScrolled={isScrolled}
         />
         );
       case "search":
@@ -1080,15 +1092,19 @@ export const DesktopApp = () => {
         );
       case "playlists":
         return (
-          <LibraryView
+          <PlaylistView
             tracks={tracks}
+            playlists={playlists}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
-            title="Playlists"
-            onPlayNext={handlePlayNext}
-            onAddToQueue={handleAddToQueue}
-            onAddToPlaylist={handleAddToPlaylist}
+            onPlayTracks={handlePlayTracks}
+            onShuffleTracks={handleShuffleTracks}
+            onCreatePlaylist={createPlaylist}
+            onUpdatePlaylist={updatePlaylist}
+            onDeletePlaylist={deletePlaylist}
+            onAddTracksToPlaylist={addTracksToPlaylist}
+            onRemoveTracksFromPlaylist={removeTracksFromPlaylist}
             loading={libraryLoading}
           />
         );
@@ -1310,9 +1326,9 @@ export const DesktopApp = () => {
           />
         )}
 
-        {/* Title Bar - v1 when scrolled on home or on other views, v2 in hero when at top of home */}
-        {/* Show TitleBar v1 when: not on home view OR on home view but scrolled past hero */}
-        {(currentView !== "home" || (currentView === "home" && isScrolled)) && (
+        {/* Title Bar - Show TitleBar v1 when hero is not visible (scrolled or different page) */}
+        {/* Hero controls (TitleBar2 functionality) are integrated into AppHero component */}
+        {!isHeroVisible && (
           <TitleBar 
             onOpenSettings={handleOpenSettings} 
             uploadProgress={isUploading ? overallProgress : undefined}
@@ -1326,7 +1342,6 @@ export const DesktopApp = () => {
             }}
           />
         )}
-        {/* TitleBar2 is rendered inside HeroBreadcrumbs component on home view when hero is visible */}
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden relative">
@@ -1475,5 +1490,14 @@ export const DesktopApp = () => {
         )}
       </div>
     </TooltipProvider>
+  );
+};
+
+// Main export with HeroProvider wrapper
+export const DesktopApp = () => {
+  return (
+    <HeroProvider>
+      <DesktopAppContent />
+    </HeroProvider>
   );
 };

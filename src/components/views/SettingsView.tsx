@@ -52,6 +52,8 @@ import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductShowcase } from "@/components/ProductShowcase";
+import { AppHero } from "@/components/AppHero";
+import { Settings as SettingsIcon } from "lucide-react";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -845,16 +847,18 @@ export const SettingsView = () => {
 
   return (
     <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-200">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
-        <div className="px-6 py-4">
-          <h1 className="font-display text-2xl font-bold text-foreground">Paramètres</h1>
-          <p className="text-sm text-muted-foreground mt-1">Personnalisez votre expérience NEXUS</p>
-        </div>
+      {/* Hero Section */}
+      <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+        <AppHero
+          variant="settings"
+          title="Paramètres"
+          subtitle="Personnalisez votre expérience NEXUS"
+          icon={SettingsIcon}
+        />
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="audio" className="flex-1 flex flex-col overflow-hidden">
+      {/* Tabs - overlapping hero */}
+      <Tabs defaultValue="audio" className="flex-1 flex flex-col overflow-hidden -mt-20 relative z-10">
         <div className="px-6">
           <TabsList className="bg-muted/30 p-1 h-auto">
             <TabsTrigger value="audio" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">

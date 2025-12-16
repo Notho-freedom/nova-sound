@@ -742,3 +742,151 @@
   --sidebar-accent: 190 50% 15%;
   --sidebar-border: 190 50% 20%;
 }
+
+/* ========================================
+   AppHero Component Styles
+   Steam/Spotify/Apple Music inspired
+   ======================================== */
+
+@layer components {
+  /* Hero parallax effect */
+  .hero-parallax {
+    will-change: transform;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  .hero-parallax > * {
+    transform: translateZ(0);
+  }
+
+  /* Hero particle effect */
+  .hero-particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: particle-float 20s infinite linear;
+  }
+
+  /* Steam-style gradient overlay */
+  .hero-gradient-steam {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.8) 0%,
+      rgba(0, 0, 0, 0.6) 20%,
+      rgba(0, 0, 0, 0.4) 40%,
+      rgba(0, 0, 0, 0.2) 60%,
+      transparent 80%
+    );
+  }
+
+  /* Spotify-style bold title */
+  .hero-title-spotify {
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.8),
+      0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Apple Music-style blur transition */
+  .hero-blur-transition {
+    backdrop-filter: blur(0px);
+    transition: backdrop-filter 0.5s ease-out;
+  }
+
+  .hero-blur-transition.scrolled {
+    backdrop-filter: blur(20px);
+  }
+
+  /* Animated stat counter */
+  .hero-stat-counter {
+    font-variant-numeric: tabular-nums;
+    animation: stat-count 2s ease-out;
+  }
+
+  /* Hero card hover effect */
+  .hero-card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hero-card-hover:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 
+      0 20px 40px -20px rgba(0, 0, 0, 0.5),
+      0 0 30px -10px rgba(255, 255, 255, 0.1);
+  }
+
+  /* Hero glow effect */
+  .hero-glow {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-glow::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--primary) / 0.3),
+      transparent
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  .hero-glow:hover::before {
+    opacity: 1;
+  }
+
+  /* Hero featured track highlight */
+  .hero-featured-highlight {
+    position: relative;
+  }
+
+  .hero-featured-highlight::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--primary)),
+      hsl(var(--secondary)),
+      hsl(var(--primary))
+    );
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.3s ease;
+  }
+
+  .hero-featured-highlight:hover::after,
+  .hero-featured-highlight.active::after {
+    transform: scaleX(1);
+  }
+}
+
+/* Hero particles keyframe (fallback if Tailwind not processed) */
+@keyframes particle-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 0.2;
+  }
+  25% {
+    transform: translateY(-30px) translateX(20px) rotate(90deg);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-50px) translateX(-10px) rotate(180deg);
+    opacity: 0.3;
+  }
+  75% {
+    transform: translateY(-30px) translateX(-30px) rotate(270deg);
+    opacity: 0.4;
+  }
+}
