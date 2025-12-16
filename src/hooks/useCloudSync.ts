@@ -72,6 +72,7 @@ export function useCloudSync(): UseCloudSyncReturn {
   const syncInitializedRef = useRef<boolean>(false);
   const lastUserIdRef = useRef<string | null>(null);
   const anonymousUserInitRef = useRef<boolean>(false); // Prevent multiple anonymous user creations
+  const syncStatusDebounceTimerRef = useRef<NodeJS.Timeout | null>(null); // Debounce sync status calls
 
   // Initialize on mount
   useEffect(() => {
