@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AudioSensesViewProps {
   audioElement: HTMLAudioElement | null;
@@ -264,13 +265,22 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
 
   if (!sensesData) {
     return (
-      <div className="flex items-center justify-center h-full w-full min-h-screen">
-        <div className="text-center max-w-md mx-auto px-4">
-          <Music className="w-16 h-16 mx-auto mb-4 text-muted-foreground animate-pulse" />
-          <p className="text-lg text-muted-foreground mb-2">Aucun audio en cours de lecture</p>
-          <p className="text-sm text-muted-foreground/70">
-            Lancez une piste pour voir les sens audio en action
-          </p>
+      <div className="p-6 space-y-6 overflow-y-auto h-full">
+        <div className="mb-6">
+          <Skeleton className="h-9 w-96 mb-2" />
+          <Skeleton className="h-5 w-80" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );

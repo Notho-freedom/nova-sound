@@ -935,6 +935,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            loading={libraryLoading}
           />
         );
       case "library":

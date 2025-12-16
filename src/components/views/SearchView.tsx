@@ -6,12 +6,15 @@ import { getCoverUrl } from "@/lib/audio";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/PageHeader";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrackCardSkeleton, AlbumCardSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
 
 interface SearchViewProps {
   tracks: Track[];
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  loading?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -27,6 +30,7 @@ export const SearchView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  loading = false,
 }: SearchViewProps) => {
   const [query, setQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);

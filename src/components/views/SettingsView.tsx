@@ -50,6 +50,7 @@ import { toast } from "sonner";
 import type { Settings, RecognitionResult, DetectedGroup, Track } from "@/types/music";
 import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -803,8 +804,38 @@ export const SettingsView = () => {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-200">
+        <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
+          <div className="px-6 py-4">
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Skeleton className="w-9 h-9 rounded-lg" />
+                    <Skeleton className="h-5 w-32" />
+                  </div>
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, j) => (
+                      <div key={j} className="flex items-center justify-between py-3 border-b border-border/30">
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-48" />
+                        </div>
+                        <Skeleton className="h-6 w-12" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

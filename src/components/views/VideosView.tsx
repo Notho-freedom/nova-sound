@@ -22,6 +22,8 @@ import { useVideos } from "@/hooks/useVideos";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import type { Video } from "@/types/music";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlbumCardSkeleton, TrackTableSkeleton, PageHeaderSkeleton } from "@/components/ui/skeletons";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
