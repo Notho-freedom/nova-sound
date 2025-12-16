@@ -447,11 +447,11 @@ export const PlaylistView = ({
 
             {/* Table */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[calc(100vh-450px)]">
                 <table className="w-full">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
                     <tr>
-                      <th className="px-4 py-3 text-left w-12">
+                      <th className="px-4 py-3 text-left w-12 bg-muted/50">
                         <Checkbox
                           checked={allSelected}
                           onCheckedChange={toggleSelectAll}
@@ -459,7 +459,7 @@ export const PlaylistView = ({
                         />
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
                         onClick={() => toggleSort("title")}
                       >
                         <div className="flex items-center gap-2">
@@ -470,7 +470,7 @@ export const PlaylistView = ({
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
                         onClick={() => toggleSort("artist")}
                       >
                         <div className="flex items-center gap-2">
@@ -481,7 +481,7 @@ export const PlaylistView = ({
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors hidden md:table-cell"
+                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors hidden md:table-cell bg-muted/50"
                         onClick={() => toggleSort("album")}
                       >
                         <div className="flex items-center gap-2">
@@ -492,7 +492,7 @@ export const PlaylistView = ({
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors"
+                        className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
                         onClick={() => toggleSort("duration")}
                       >
                         <div className="flex items-center justify-end gap-2">
@@ -730,11 +730,11 @@ export const PlaylistView = ({
 
             {/* Table */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[calc(100vh-450px)]">
                 <table className="w-full">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
                     <tr>
-                      <th className="px-4 py-3 text-left w-12">
+                      <th className="px-4 py-3 text-left w-12 bg-muted/50">
                         <Checkbox
                           checked={allSelected}
                           onCheckedChange={toggleSelectAllEdit}
@@ -742,7 +742,7 @@ export const PlaylistView = ({
                         />
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
                         onClick={() => toggleSort("title")}
                       >
                         <div className="flex items-center gap-2">
@@ -753,7 +753,7 @@ export const PlaylistView = ({
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors"
+                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
                         onClick={() => toggleSort("artist")}
                       >
                         <div className="flex items-center gap-2">
@@ -764,7 +764,7 @@ export const PlaylistView = ({
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors hidden md:table-cell"
+                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors hidden md:table-cell bg-muted/50"
                         onClick={() => toggleSort("album")}
                       >
                         <div className="flex items-center gap-2">
@@ -775,7 +775,7 @@ export const PlaylistView = ({
                         </div>
                       </th>
                       <th 
-                        className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors"
+                        className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
                         onClick={() => toggleSort("duration")}
                       >
                         <div className="flex items-center justify-end gap-2">
