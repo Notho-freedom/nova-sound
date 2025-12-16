@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Track } from "@/types/music";
 import { toast } from "sonner";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface NowPlayingBarProps {
   currentTrack: Track;
@@ -103,6 +104,8 @@ export const NowPlayingBar = ({
   const progress = currentTrack.duration > 0 
     ? (currentTime / currentTrack.duration) * 100 
     : 0;
+
+  const { notifySuccess, notify } = useNotifications();
 
   return (
     <div className="bg-card/80 backdrop-blur-md border-t border-border/50 flex flex-col">
@@ -323,7 +326,9 @@ export const NowPlayingBar = ({
                     }).catch(() => {});
                   } else {
                     navigator.clipboard.writeText(`${currentTrack.title} - ${currentTrack.artist}`);
-                    toast.success("Copié dans le presse-papier");
+                    const message = "Copié dans le presse-papier";
+                    toast.success(message);
+                    notifySuccess(message);
                   }
                 }}>
                   <Share2 className="w-4 h-4 mr-2" />
@@ -332,6 +337,7 @@ export const NowPlayingBar = ({
                 <DropdownMenuItem onClick={() => {
                   const info = `Titre: ${currentTrack.title}\nArtiste: ${currentTrack.artist}\nAlbum: ${currentTrack.album}\nDurée: ${formatTime(currentTrack.duration)}${currentTrack.genre ? `\nGenre: ${currentTrack.genre}` : ''}${currentTrack.year ? `\nAnnée: ${currentTrack.year}` : ''}`;
                   toast.info(info, { duration: 5000 });
+                  notify({ title: "Infos de la piste", description: info, type: "info" });
                 }}>
                   <Info className="w-4 h-4 mr-2" />
                   Infos de la piste
@@ -341,9 +347,11 @@ export const NowPlayingBar = ({
                   onClick={() => {
                     // Radio functionality: play similar tracks based on current track
                     // This would require implementing a recommendation algorithm
-                    toast.info("Fonctionnalité radio - En développement", {
+                    const message = "Fonctionnalité radio - En développement";
+                    toast.info(message, {
                       description: "Cette fonctionnalité sera disponible dans une prochaine mise à jour"
                     });
+                    notify({ title: message, description: "Cette fonctionnalité sera disponible dans une prochaine mise à jour", type: "info" });
                   }}
                   disabled
                 >
@@ -354,7 +362,9 @@ export const NowPlayingBar = ({
                   if (onNavigateToAlbum) {
                     onNavigateToAlbum();
                   } else {
-                    toast.info(`Aller à l'album "${currentTrack.album}"`);
+                    const message = `Aller à l'album "${currentTrack.album}"`;
+                    toast.info(message);
+                    notify({ title: message, type: "info" });
                   }
                 }}>
                   <Disc3 className="w-4 h-4 mr-2" />
@@ -364,7 +374,9 @@ export const NowPlayingBar = ({
                   if (onNavigateToArtist) {
                     onNavigateToArtist();
                   } else {
-                    toast.info(`Aller à l'artiste "${currentTrack.artist}"`);
+                    const message = `Aller à l'artiste "${currentTrack.artist}"`;
+                    toast.info(message);
+                    notify({ title: message, type: "info" });
                   }
                 }}>
                   <Users className="w-4 h-4 mr-2" />

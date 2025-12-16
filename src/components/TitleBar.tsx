@@ -18,13 +18,15 @@ interface TitleBarProps {
   onOpenSettings?: () => void;
   uploadProgress?: number; // 0-100 or undefined if not uploading
   hasNotifications?: boolean;
+  onToggleNotifications?: () => void;
 }
 
 export const TitleBar = ({ 
   title = "NEXUS", 
   onOpenSettings,
   uploadProgress,
-  hasNotifications = false
+  hasNotifications = false,
+  onToggleNotifications
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
@@ -105,11 +107,12 @@ export const TitleBar = ({
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <button
+                onClick={onToggleNotifications}
                 className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted transition-colors group relative"
               >
                 <Bell className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
                 {hasNotifications && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                 )}
               </button>
             </TooltipTrigger>

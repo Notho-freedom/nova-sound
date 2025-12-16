@@ -35,6 +35,7 @@ import { usePlaylists } from "@/hooks/usePlaylists";
 import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export type ViewType = 
   | "home" 
@@ -172,6 +173,7 @@ export const Sidebar = ({
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? internalCollapsed;
   const { playlists, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
+  const { notifySuccess } = useNotifications();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
 
@@ -336,7 +338,9 @@ export const Sidebar = ({
                     onDelete={async () => {
                       if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
                         await deletePlaylist(playlist.id);
-                        toast.success("Playlist supprimée");
+                        const message = "Playlist supprimée";
+                        toast.success(message);
+                        notifySuccess(message);
                       }
                     }}
                     onView={() => onViewChange("playlists")}
@@ -379,7 +383,9 @@ export const Sidebar = ({
                               e.stopPropagation();
                               if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
                                 await deletePlaylist(playlist.id);
-                                toast.success("Playlist supprimée");
+                                const message = "Playlist supprimée";
+                        toast.success(message);
+                        notifySuccess(message);
                               }
                             }}
                             className="text-destructive"
@@ -440,7 +446,9 @@ export const Sidebar = ({
         onCreatePlaylist={async (name, trackIds) => {
           const playlist = await createPlaylist(name, trackIds);
           if (playlist) {
-            toast.success("Playlist créée");
+            const message = "Playlist créée";
+            toast.success(message);
+            notifySuccess(message);
             setCreateModalOpen(false);
           }
         }}
@@ -460,7 +468,9 @@ export const Sidebar = ({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && editingPlaylist.name.trim()) {
                   updatePlaylist(editingPlaylist.id, { name: editingPlaylist.name.trim() });
-                  toast.success("Playlist renommée");
+                  const message = "Playlist renommée";
+                  toast.success(message);
+                  notifySuccess(message);
                   setEditingPlaylist(null);
                 } else if (e.key === "Escape") {
                   setEditingPlaylist(null);
@@ -478,7 +488,9 @@ export const Sidebar = ({
                 onClick={async () => {
                   if (editingPlaylist.name.trim()) {
                     await updatePlaylist(editingPlaylist.id, { name: editingPlaylist.name.trim() });
-                    toast.success("Playlist renommée");
+                    const message = "Playlist renommée";
+                  toast.success(message);
+                  notifySuccess(message);
                     setEditingPlaylist(null);
                   }
                 }}

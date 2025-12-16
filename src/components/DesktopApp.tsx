@@ -6,6 +6,7 @@ import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
+import { NotificationsPanel } from "./NotificationsPanel";
 import { UpdateNotification } from "./UpdateNotification";
 import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
@@ -44,7 +45,7 @@ export const DesktopApp = () => {
   const { playlists, addTracksToPlaylist } = usePlaylists();
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
-  const { notifications } = useNotifications();
+  const { notifications, notifySuccess, notifyError } = useNotifications();
   
   // Combined upload progress (Cloudinary or Nexus)
   const overallProgress = cloudinaryUploading ? cloudinaryProgress : (cloudSyncUploading ? cloudSyncProgress : undefined);
@@ -92,6 +93,7 @@ export const DesktopApp = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -425,26 +427,34 @@ export const DesktopApp = () => {
   const handlePlayNext = useCallback((track: Track | Track[]) => {
     const tracksToAdd = Array.isArray(track) ? track : [track];
     addToQueueNext(tracksToAdd);
-    toast.success(`Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la suite`);
-  }, [addToQueueNext]);
+    const message = `Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la suite`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [addToQueueNext, notifySuccess]);
 
   const handleAddToQueue = useCallback((track: Track | Track[]) => {
     const tracksToAdd = Array.isArray(track) ? track : [track];
     addToQueue(tracksToAdd);
-    toast.success(`Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la file`);
-  }, [addToQueue]);
+    const message = `Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la file`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [addToQueue, notifySuccess]);
 
   const handleAddToPlaylist = useCallback(async (playlistId: string, track: Track | Track[]) => {
     const tracksToAdd = Array.isArray(track) ? track : [track];
     const trackIds = tracksToAdd.map(t => t.id);
     try {
       await addTracksToPlaylist(playlistId, trackIds);
-      toast.success(`Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la playlist`);
+      const message = `Ajouté${tracksToAdd.length > 1 ? 's' : ''} à la playlist`;
+      toast.success(message);
+      notifySuccess(message);
     } catch (error) {
       console.error('Failed to add tracks to playlist:', error);
-      toast.error('Erreur lors de l\'ajout à la playlist');
+      const errorMsg = 'Erreur lors de l\'ajout à la playlist';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
     }
-  }, [addTracksToPlaylist]);
+  }, [addTracksToPlaylist, notifySuccess, notifyError]);
 
   const handleShuffle = useCallback(() => {
     if (isShuffle) {
@@ -465,7 +475,9 @@ export const DesktopApp = () => {
   const handlePlayPlaylist = useCallback((playlistId: string) => {
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) {
-      toast.error('Playlist introuvable');
+      const errorMsg = 'Playlist introuvable';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
       return;
     }
 
@@ -475,7 +487,9 @@ export const DesktopApp = () => {
       .filter((t): t is Track => t !== undefined);
 
     if (playlistTracks.length === 0) {
-      toast.error('La playlist est vide');
+      const errorMsg = 'La playlist est vide';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
       return;
     }
 
@@ -483,13 +497,17 @@ export const DesktopApp = () => {
     setQueue(playlistTracks);
     setCurrentIndex(0);
     setIsPlaying(true);
-    toast.success(`Lecture de "${playlist.name}"`);
-  }, [playlists, libraryTracks, setQueue, setCurrentIndex]);
+    const message = `Lecture de "${playlist.name}"`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [playlists, libraryTracks, setQueue, setCurrentIndex, notifySuccess, notifyError]);
 
   const handleShufflePlaylist = useCallback((playlistId: string) => {
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) {
-      toast.error('Playlist introuvable');
+      const errorMsg = 'Playlist introuvable';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
       return;
     }
 
@@ -499,7 +517,9 @@ export const DesktopApp = () => {
       .filter((t): t is Track => t !== undefined);
 
     if (playlistTracks.length === 0) {
-      toast.error('La playlist est vide');
+      const errorMsg = 'La playlist est vide';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
       return;
     }
 
@@ -511,8 +531,10 @@ export const DesktopApp = () => {
     setCurrentIndex(0);
     setIsPlaying(true);
     setIsShuffle(true);
-    toast.success(`Lecture aléatoire de "${playlist.name}"`);
-  }, [playlists, libraryTracks, setQueue, setCurrentIndex]);
+    const message = `Lecture aléatoire de "${playlist.name}"`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [playlists, libraryTracks, setQueue, setCurrentIndex, notifySuccess, notifyError]);
 
   const handleToggleFavorite = useCallback(() => {
     if (!currentTrack) return;
@@ -556,7 +578,9 @@ export const DesktopApp = () => {
     setShowInlinePlayer(false);
     setCurrentView("artists");
     // Note: LibraryView will handle artist filtering internally when in artists view mode
-    toast.success(`Affichage de l'artiste "${currentTrack.artist}"`);
+    const message = `Affichage de l'artiste "${currentTrack.artist}"`;
+    toast.success(message);
+    notifySuccess(message);
   }, [currentTrack]);
 
   // Utility function to remove duplicates from track lists
@@ -956,6 +980,14 @@ export const DesktopApp = () => {
         <TitleBar 
           onOpenSettings={handleOpenSettings} 
           uploadProgress={isUploading ? overallProgress : undefined}
+          hasNotifications={notifications.length > 0}
+          onToggleNotifications={() => {
+            setIsNotificationsOpen(!isNotificationsOpen);
+            if (!isNotificationsOpen) {
+              setIsLyricsOpen(false);
+              setIsQueueOpen(false);
+            }
+          }}
         />
 
         {/* Main Content */}
@@ -1029,6 +1061,16 @@ export const DesktopApp = () => {
                 />
               </div>
             )}
+
+            {/* Notifications Panel */}
+            {isNotificationsOpen && (
+              <div className="absolute right-0 top-0 bottom-0 z-20 w-80 animate-in slide-in-from-right duration-300">
+                <NotificationsPanel
+                  className="h-full"
+                  onClose={() => setIsNotificationsOpen(false)}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -1053,14 +1095,20 @@ export const DesktopApp = () => {
             onMuteToggle={() => setIsMuted(!isMuted)}
             onToggleQueue={() => {
               setIsQueueOpen(!isQueueOpen);
-              if (!isQueueOpen) setIsLyricsOpen(false);
+              if (!isQueueOpen) {
+                setIsLyricsOpen(false);
+                setIsNotificationsOpen(false);
+              }
             }}
             onFullscreen={() => setIsFullscreen(true)}
             onToggleFavorite={handleToggleFavorite}
             onShowPlayer={handleShowPlayer}
             onShowLyrics={() => {
               setIsLyricsOpen(!isLyricsOpen);
-              if (!isLyricsOpen) setIsQueueOpen(false);
+              if (!isLyricsOpen) {
+                setIsQueueOpen(false);
+                setIsNotificationsOpen(false);
+              }
             }}
             onNavigateToAlbum={handleNavigateToAlbum}
             onNavigateToArtist={handleNavigateToArtist}

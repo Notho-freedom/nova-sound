@@ -140,7 +140,7 @@ export const SettingsView = () => {
     notificationsEnabled: true,
     scrobblingEnabled: false,
     equalizerEnabled: false,
-    theme: "dark",
+    theme: theme,
     showLyrics: true,
     autoScanOnStartup: true,
   });
