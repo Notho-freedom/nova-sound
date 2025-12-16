@@ -249,16 +249,31 @@ class NexusServerService {
     });
   }
 
-  // Get sync status
-  async getSyncStatus(): Promise<SyncStatus> {
+  // Cache for sync status to avoid repeated calls
+  private syncStatusCache: { data: SyncStatus | null; timestamp: number } = {
+    data: null,
+    timestamp: 0,
+  };
+  private readonly SYNC_STATUS_CACHE_DURATION = 5000; // 5 seconds cache
+
+  // Get sync status (with caching to prevent excessive API calls)
+  async getSyncStatus(forceRefresh = false): Promise<SyncStatus> {
+    // Return cached data if still valid and not forcing refresh
+    const now = Date.now();
+    if (!forceRefresh && this.syncStatusCache.data && (now - this.syncStatusCache.timestamp) < this.SYNC_STATUS_CACHE_DURATION) {
+      return this.syncStatusCache.data;
+    }
+
     const accessToken = await authService.getAccessToken();
     if (!accessToken) {
-      return {
+      const fallbackStatus = {
         lastSyncAt: "",
         tracksUploaded: 0,
         tracksDownloaded: 0,
         totalStorage: 0,
       };
+      this.syncStatusCache = { data: fallbackStatus, timestamp: now };
+      return fallbackStatus;
     }
 
     try {
@@ -285,16 +300,22 @@ class NexusServerService {
         };
       }
 
-      return response.json();
+      const status = await response.json();
+      // Cache the result
+      this.syncStatusCache = { data: status, timestamp: now };
+      return status;
     } catch (error) {
       console.warn("Error getting sync status (backend may not be configured):", error);
       // Return data from localStorage as fallback
-      return {
+      const fallbackStatus = {
         lastSyncAt: localStorage.getItem("nexus-last-sync") || "",
         tracksUploaded: parseInt(localStorage.getItem("nexus-tracks-uploaded") || "0"),
         tracksDownloaded: parseInt(localStorage.getItem("nexus-tracks-downloaded") || "0"),
         totalStorage: authService.getUserProfile()?.storageUsed || 0,
       };
+      // Cache the fallback result
+      this.syncStatusCache = { data: fallbackStatus, timestamp: now };
+      return fallbackStatus;
     }
   }
 

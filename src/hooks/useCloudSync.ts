@@ -475,21 +475,27 @@ export function useCloudSync(): UseCloudSyncReturn {
               });
           }
 
-          // Load sync status
-          nexusServerService.getSyncStatus().then((status) => {
-            setSyncStatus({
-              lastSyncAt: status.lastSyncAt || null,
-              tracksUploaded: status.tracksUploaded,
-              tracksDownloaded: status.tracksDownloaded,
-            });
-          }).catch((error) => {
-            console.error("Error loading sync status:", error);
-            setSyncStatus({
-              lastSyncAt: null,
-              tracksUploaded: 0,
-              tracksDownloaded: 0,
-            });
-          });
+          // Load sync status (debounced to avoid excessive calls)
+          if (syncStatusDebounceTimerRef.current) {
+            clearTimeout(syncStatusDebounceTimerRef.current);
+          }
+          syncStatusDebounceTimerRef.current = setTimeout(async () => {
+            try {
+              const status = await nexusServerService.getSyncStatus();
+              setSyncStatus({
+                lastSyncAt: status.lastSyncAt || null,
+                tracksUploaded: status.tracksUploaded,
+                tracksDownloaded: status.tracksDownloaded,
+              });
+            } catch (error) {
+              console.error("Error loading sync status:", error);
+              setSyncStatus({
+                lastSyncAt: null,
+                tracksUploaded: 0,
+                tracksDownloaded: 0,
+              });
+            }
+          }, 1000); // 1 second debounce
         }
       } else if (!user && (!firebaseService.isInitialized() || !firebaseService.getCurrentUser())) {
         // Only clear if no Firebase user exists
@@ -516,6 +522,12 @@ export function useCloudSync(): UseCloudSyncReturn {
       }
       unsubscribeAuth();
       unsubscribeProgress();
+      
+      // Clear debounce timer
+      if (syncStatusDebounceTimerRef.current) {
+        clearTimeout(syncStatusDebounceTimerRef.current);
+        syncStatusDebounceTimerRef.current = null;
+      }
       
       // Cleanup Firestore sync listeners
       import('@/services/firebase-sync').then(({ firebaseSyncService }) => {
