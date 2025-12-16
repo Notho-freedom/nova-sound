@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { getCoverUrl } from "@/lib/audio";
+import { getCoverUrl, getHeroBackgroundUrl, getDefaultHeroImage, getFallbackHeroImage } from "@/lib/audio";
 import type { Track } from "@/types/music";
 
 interface HeroBackgroundProps {
@@ -51,10 +51,10 @@ export const HeroBackground = ({
     return () => window.removeEventListener("scroll", handleScroll);
   }, [enableParallax]);
 
-  // Preload images
+  // Preload images with error handling
   useEffect(() => {
     const images = featuredTracks
-      .map(t => t.coverUrl ? getCoverUrl(t.coverUrl) : null)
+      .map(t => t.coverUrl ? getHeroBackgroundUrl(t.coverUrl) : getFallbackHeroImage())
       .filter(Boolean) as string[];
     
     if (images.length === 0 && !backgroundImage) {
@@ -72,15 +72,22 @@ export const HeroBackground = ({
       }
     };
 
+    const onError = () => {
+      // If image fails to load, still count it as "loaded" to show fallback
+      onLoad();
+    };
+
     if (backgroundImage) {
       const img = new Image();
       img.onload = onLoad;
+      img.onerror = onError;
       img.src = backgroundImage;
     }
 
     images.forEach(src => {
       const img = new Image();
       img.onload = onLoad;
+      img.onerror = onError;
       img.src = src;
     });
 
@@ -97,7 +104,7 @@ export const HeroBackground = ({
   }[blur];
 
   const currentTrack = featuredTracks[currentIndex];
-  const bgImage = backgroundImage || (currentTrack?.coverUrl ? getCoverUrl(currentTrack.coverUrl) : undefined);
+  const bgImage = backgroundImage || (currentTrack?.coverUrl ? getHeroBackgroundUrl(currentTrack.coverUrl) : getFallbackHeroImage());
 
   return (
     <div className={cn("absolute inset-0 overflow-hidden", className)}>
@@ -105,8 +112,7 @@ export const HeroBackground = ({
       {featuredTracks.length > 0 ? (
         <div className="absolute inset-0 w-full h-full">
           {featuredTracks.map((track, index) => {
-            const coverUrl = track.coverUrl ? getCoverUrl(track.coverUrl) : undefined;
-            if (!coverUrl) return null;
+            const coverUrl = track.coverUrl ? getHeroBackgroundUrl(track.coverUrl) : getFallbackHeroImage();
             
             return (
               <div
@@ -148,12 +154,15 @@ export const HeroBackground = ({
         />
       )}
 
-      {/* Fallback gradient background */}
+      {/* Fallback background - only if no images at all */}
       {!bgImage && featuredTracks.length === 0 && (
         <div 
           className="absolute inset-0 w-full h-full"
           style={{
-            background: 'linear-gradient(135deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--background)) 50%, hsl(var(--secondary) / 0.1) 100%)'
+            backgroundImage: `url(${getFallbackHeroImage()})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
           }}
         />
       )}

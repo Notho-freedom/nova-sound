@@ -1,5 +1,27 @@
 import { DEFAULT_COVER } from "@/data/tracks";
 
+// Default hero background images (fallback si album-cover-1.jpg ne charge pas)
+const DEFAULT_HERO_IMAGES_FALLBACK = [
+  "https://res.cloudinary.com/dsslbg3v3/image/upload/v1763928310/Triple_Curved_1920x1080-4_hixg8h.jpg",
+  "https://res.cloudinary.com/dsslbg3v3/image/upload/v1763928311/QD-OLED-5120x1440_MEG_cl2vjd.jpg",
+  "https://res.cloudinary.com/dsslbg3v3/image/upload/v1764459419/backgrounds/gk7ksbvokze4dky5peep.jpg",
+];
+
+/**
+ * Get default hero image - uses album-cover-1.jpg as primary default for home
+ */
+export function getDefaultHeroImage(): string {
+  // Use album-cover-1.jpg as the primary default image for home
+  return DEFAULT_COVER;
+}
+
+/**
+ * Get fallback hero image if default fails to load
+ */
+export function getFallbackHeroImage(): string {
+  return DEFAULT_HERO_IMAGES_FALLBACK[Math.floor(Math.random() * DEFAULT_HERO_IMAGES_FALLBACK.length)];
+}
+
 /**
  * Get album cover URL with fallback to default
  */
@@ -7,6 +29,40 @@ export function getCoverUrl(coverUrl?: string): string {
   if (!coverUrl || coverUrl === '') {
     return DEFAULT_COVER;
   }
+  return coverUrl;
+}
+
+/**
+ * Check if a cover URL is the default cover
+ */
+function isDefaultCover(coverUrl: string): boolean {
+  if (!coverUrl) return false;
+  
+  // Check exact match
+  if (coverUrl === DEFAULT_COVER) return true;
+  
+  // Check if it contains the default cover filename (for different paths)
+  if (coverUrl.includes('album-cover-1.jpg') || coverUrl.includes('album-cover-1')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Get hero background image with fallback to default hero images
+ * If cover is the default cover (album-cover-1.jpg), use Cloudinary images instead
+ */
+export function getHeroBackgroundUrl(coverUrl?: string): string {
+  if (!coverUrl || coverUrl === '') {
+    return getFallbackHeroImage();
+  }
+  
+  // If cover is the default cover, use Cloudinary images for hero background
+  if (isDefaultCover(coverUrl)) {
+    return getFallbackHeroImage();
+  }
+  
   return coverUrl;
 }
 

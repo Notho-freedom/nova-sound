@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCoverUrl } from "@/lib/audio";
+import { getCoverUrl, getDefaultHeroImage, getFallbackHeroImage } from "@/lib/audio";
 import type { Track } from "@/types/music";
 
 interface HeroCarouselProps {
@@ -42,6 +42,7 @@ export const HeroCarousel = ({
   const [internalIndex, setInternalIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(autoPlayInterval > 0);
   const [isHovered, setIsHovered] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   const currentIndex = controlledIndex ?? internalIndex;
 
@@ -77,8 +78,11 @@ export const HeroCarousel = ({
       {/* Track Cards */}
       <div className="flex gap-3 overflow-hidden">
         {tracks.slice(0, 5).map((track, index) => {
-          const coverUrl = track.coverUrl ? getCoverUrl(track.coverUrl) : undefined;
+          const coverUrl = track.coverUrl ? getCoverUrl(track.coverUrl) : getDefaultHeroImage();
+          const fallbackImage = getFallbackHeroImage();
           const isActive = index === currentIndex;
+          const hasError = imageErrors.has(track.id);
+          const displayImage = hasError ? fallbackImage : coverUrl;
           
           return (
             <button
@@ -97,17 +101,25 @@ export const HeroCarousel = ({
             >
               {/* Cover Image */}
               <div className="aspect-square relative overflow-hidden">
-                {coverUrl ? (
-                  <img
-                    src={coverUrl}
-                    alt={track.album || track.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center">
-                    <Play className="w-8 h-8 text-white/50" />
-                  </div>
-                )}
+                <img
+                  src={displayImage}
+                  alt={track.album || track.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  onError={() => {
+                    if (!hasError) {
+                      setImageErrors(prev => new Set(prev).add(track.id));
+                    }
+                  }}
+                  onLoad={() => {
+                    if (hasError) {
+                      setImageErrors(prev => {
+                        const next = new Set(prev);
+                        next.delete(track.id);
+                        return next;
+                      });
+                    }
+                  }}
+                />
                 
                 {/* Hover overlay */}
                 <div className={cn(
