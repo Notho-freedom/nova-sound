@@ -9,12 +9,9 @@ import {
   Volume1,
   Maximize,
   Minimize,
-  Settings,
-  PictureInPicture,
   X,
-  ChevronLeft,
-  Monitor,
   Film,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -22,18 +19,14 @@ import { cn } from "@/lib/utils";
 import type { Video } from "@/types/music";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
 
-interface VideoPlayerProps {
+interface CinemaModeProps {
   video: Video;
   videos?: Video[];
   onClose?: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
   className?: string;
-  showControls?: boolean;
   autoPlay?: boolean;
-  onFullApp?: () => void;
-  onCinemaMode?: () => void;
-  isFullApp?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -46,22 +39,19 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-export const VideoPlayer = ({
+export const CinemaMode = ({
   video,
   videos = [],
   onClose,
   onNext,
   onPrevious,
   className,
-  showControls = true,
   autoPlay = false,
-  onFullApp,
-  onCinemaMode,
-  isFullApp = false,
-}: VideoPlayerProps) => {
-  const [showControlsOverlay, setShowControlsOverlay] = useState(true);
+}: CinemaModeProps) => {
+  const [showControls, setShowControls] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const {
     isPlaying,
@@ -69,7 +59,6 @@ export const VideoPlayer = ({
     duration,
     volume,
     isMuted,
-    isFullscreen,
     isLoading,
     playbackRate,
     playVideo,
@@ -77,10 +66,7 @@ export const VideoPlayer = ({
     seek,
     setVolume,
     toggleMute,
-    toggleFullscreen,
     setPlaybackRate,
-    nextVideo,
-    previousVideo,
     videoRef,
   } = useVideoPlayer(videos);
 
@@ -93,23 +79,21 @@ export const VideoPlayer = ({
 
   // Show/hide controls on mouse movement
   useEffect(() => {
-    if (!showControls) return;
-
     const handleMouseMove = () => {
-      setShowControlsOverlay(true);
+      setShowControls(true);
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
       controlsTimeoutRef.current = setTimeout(() => {
         if (isPlaying) {
-          setShowControlsOverlay(false);
+          setShowControls(false);
         }
-      }, 3000);
+      }, 4000);
     };
 
     const handleMouseLeave = () => {
       if (isPlaying) {
-        setShowControlsOverlay(false);
+        setShowControls(false);
       }
     };
 
@@ -123,7 +107,7 @@ export const VideoPlayer = ({
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [showControls, isPlaying]);
+  }, [isPlaying]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -153,19 +137,14 @@ export const VideoPlayer = ({
           e.preventDefault();
           setVolume(Math.max(0, volume - 5));
           break;
-        case "f":
-        case "F":
-          e.preventDefault();
-          toggleFullscreen();
-          break;
         case "m":
         case "M":
           e.preventDefault();
           toggleMute();
           break;
         case "Escape":
-          if (isFullscreen) {
-            toggleFullscreen();
+          if (onClose) {
+            onClose();
           }
           break;
       }
@@ -173,7 +152,7 @@ export const VideoPlayer = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlayPause, seek, currentTime, duration, setVolume, volume, toggleMute, toggleFullscreen, isFullscreen]);
+  }, [togglePlayPause, seek, currentTime, duration, setVolume, volume, toggleMute, onClose]);
 
   const handleSeek = (value: number[]) => {
     seek(value[0]);
@@ -181,20 +160,6 @@ export const VideoPlayer = ({
 
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0]);
-  };
-
-  const handlePictureInPicture = async () => {
-    if (videoRef.current && document.pictureInPictureEnabled) {
-      try {
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        } else {
-          await videoRef.current.requestPictureInPicture();
-        }
-      } catch (error) {
-        console.error("Picture-in-Picture error:", error);
-      }
-    }
   };
 
   const getVideoSource = (video: Video): string => {
@@ -210,90 +175,79 @@ export const VideoPlayer = ({
 
   return (
     <div
+      ref={containerRef}
       className={cn(
-        "relative bg-black group",
-        isFullApp ? "fixed inset-0 z-[9998]" : "",
+        "fixed inset-0 z-[9999] bg-black",
+        "animate-in fade-in duration-500",
         className
       )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        className={cn(
-          "w-full h-full object-contain",
-          isFullApp && "object-cover"
-        )}
-        playsInline
-        preload="metadata"
-        onClick={togglePlayPause}
-      />
+      {/* Ambient Background Effect */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black opacity-80" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50" />
+        <div className="absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,_transparent_0deg,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-30 animate-spin-slow" />
+      </div>
+
+      {/* Video Element - Centered and scaled */}
+      <div className="absolute inset-0 flex items-center justify-center p-8">
+        <div className="relative w-full h-full max-w-[95vw] max-h-[95vh] flex items-center justify-center">
+          <video
+            ref={videoRef}
+            className="w-full h-full object-contain rounded-lg shadow-2xl"
+            style={{
+              filter: "brightness(1.05) contrast(1.1) saturate(1.1)",
+            }}
+            playsInline
+            preload="metadata"
+            onClick={togglePlayPause}
+          />
+          
+          {/* Film grain overlay */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay">
+            <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSBiYXNlRnJlcXVlbmN5PSIwLjkiIG51bU9jdGF2ZXM9IjQiLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbHRlcj0idXJsKCNub2lzZSkiIG9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==')] bg-repeat" />
+          </div>
+        </div>
+      </div>
 
       {/* Loading Indicator */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-white/80 text-sm">Chargement...</p>
+          </div>
         </div>
       )}
 
       {/* Controls Overlay */}
-      {showControls && (showControlsOverlay || isHovering || !isPlaying) && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-between p-4 transition-opacity">
+      {(showControls || isHovering || !isPlaying) && (
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-between p-6 transition-opacity duration-300 z-40">
           {/* Top Controls */}
           <div className="flex items-center justify-between">
-            {onClose && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="text-white hover:bg-white/20"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              {onClose && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              )}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-md border border-white/10">
+                <Film className="w-4 h-4 text-primary" />
+                <span className="text-sm text-white font-medium">Mode Ciné</span>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
-              {onCinemaMode && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onCinemaMode}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
-                  title="Mode Ciné"
-                >
-                  <Film className="w-5 h-5" />
-                </Button>
-              )}
-              {onFullApp && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onFullApp}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
-                  title="Plein écran dans l'app"
-                >
-                  <Monitor className="w-5 h-5" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handlePictureInPicture}
-                className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
-                disabled={!document.pictureInPictureEnabled}
-                title="Image dans l'image"
-              >
-                <PictureInPicture className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleFullscreen}
-                className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
-                title="Plein écran"
-              >
-                {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-              </Button>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-md border border-white/10">
+                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                <span className="text-xs text-white/80">Immersif</span>
+              </div>
             </div>
           </div>
 
@@ -306,21 +260,21 @@ export const VideoPlayer = ({
                 e.stopPropagation();
                 togglePlayPause();
               }}
-              className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto backdrop-blur-sm"
+              className="w-24 h-24 rounded-full bg-white/10 hover:bg-white/20 text-white pointer-events-auto backdrop-blur-md border border-white/20 transition-all duration-200 ease-out hover:scale-110 active:scale-95"
             >
               {isPlaying ? (
-                <Pause className="w-10 h-10 fill-current" />
+                <Pause className="w-12 h-12 fill-current" />
               ) : (
-                <Play className="w-10 h-10 fill-current ml-1" />
+                <Play className="w-12 h-12 fill-current ml-1" />
               )}
             </Button>
           </div>
 
           {/* Bottom Controls */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Progress Bar */}
-            <div className="flex items-center gap-3">
-              <span className="text-white text-sm font-mono min-w-[60px] text-right">
+            <div className="flex items-center gap-4">
+              <span className="text-white text-sm font-mono min-w-[70px] text-right">
                 {formatTime(currentTime)}
               </span>
               <Slider
@@ -330,35 +284,35 @@ export const VideoPlayer = ({
                 onValueChange={handleSeek}
                 className="flex-1"
               />
-              <span className="text-white text-sm font-mono min-w-[60px]">
+              <span className="text-white text-sm font-mono min-w-[70px]">
                 {formatTime(duration)}
               </span>
             </div>
 
             {/* Control Buttons */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {onPrevious && (
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={onPrevious}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
                     disabled={!videos.length}
                   >
-                    <SkipBack className="w-5 h-5" />
+                    <SkipBack className="w-6 h-6" />
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={togglePlayPause}
-                  className="text-white hover:bg-white/20"
+                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95 w-12 h-12"
                 >
                   {isPlaying ? (
-                    <Pause className="w-5 h-5 fill-current" />
+                    <Pause className="w-6 h-6 fill-current" />
                   ) : (
-                    <Play className="w-5 h-5 fill-current" />
+                    <Play className="w-6 h-6 fill-current" />
                   )}
                 </Button>
                 {onNext && (
@@ -366,22 +320,22 @@ export const VideoPlayer = ({
                     variant="ghost"
                     size="icon"
                     onClick={onNext}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
                     disabled={!videos.length}
                   >
-                    <SkipForward className="w-5 h-5" />
+                    <SkipForward className="w-6 h-6" />
                   </Button>
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {/* Volume Control */}
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={toggleMute}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
                   >
                     <VolumeIcon className="w-5 h-5" />
                   </Button>
@@ -390,34 +344,32 @@ export const VideoPlayer = ({
                     max={100}
                     step={1}
                     onValueChange={handleVolumeChange}
-                    className="w-24"
+                    className="w-32"
                   />
                 </div>
 
                 {/* Playback Rate */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={playbackRate}
-                    onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                    className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  >
-                    <option value="0.25">0.25x</option>
-                    <option value="0.5">0.5x</option>
-                    <option value="0.75">0.75x</option>
-                    <option value="1">1x</option>
-                    <option value="1.25">1.25x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                  </select>
-                </div>
+                <select
+                  value={playbackRate}
+                  onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                  className="bg-white/10 backdrop-blur-md text-white text-sm rounded-lg px-3 py-1.5 border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200"
+                >
+                  <option value="0.25">0.25x</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1">1x</option>
+                  <option value="1.25">1.25x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2x</option>
+                </select>
               </div>
             </div>
 
             {/* Video Info */}
             <div className="text-white">
-              <h3 className="font-medium text-sm truncate">{video.title}</h3>
+              <h3 className="font-semibold text-base truncate">{video.title}</h3>
               {video.width && video.height && (
-                <p className="text-xs text-white/70">
+                <p className="text-xs text-white/70 mt-1">
                   {video.width} × {video.height} • {video.format?.toUpperCase()}
                 </p>
               )}

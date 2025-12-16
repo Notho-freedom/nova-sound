@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useVideos } from "@/hooks/useVideos";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { CinemaMode } from "@/components/CinemaMode";
 import type { Video } from "@/types/music";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,6 +51,8 @@ export const VideosView = () => {
   const [showUrlDialog, setShowUrlDialog] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlTitle, setUrlTitle] = useState("");
+  const [isFullApp, setIsFullApp] = useState(false);
+  const [isCinemaMode, setIsCinemaMode] = useState(false);
 
   // Debug logging removed for production
 
@@ -61,6 +64,35 @@ export const VideosView = () => {
       video.filePath.toLowerCase().includes(query)
     );
   }, [videos, searchQuery]);
+
+  // Cinema Mode View
+  if (selectedVideo && isCinemaMode) {
+    const currentIndex = displayVideos.findIndex(v => v.id === selectedVideo.id);
+    const handleNext = () => {
+      if (currentIndex >= 0 && currentIndex < displayVideos.length - 1) {
+        setSelectedVideo(displayVideos[currentIndex + 1]);
+      }
+    };
+    const handlePrevious = () => {
+      if (currentIndex > 0) {
+        setSelectedVideo(displayVideos[currentIndex - 1]);
+      }
+    };
+
+    return (
+      <CinemaMode
+        video={selectedVideo}
+        videos={displayVideos}
+        onClose={() => {
+          setIsCinemaMode(false);
+          setSelectedVideo(null);
+        }}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        autoPlay={true}
+      />
+    );
+  }
 
   // Video Player View
   if (selectedVideo) {
@@ -75,25 +107,27 @@ export const VideosView = () => {
         setSelectedVideo(displayVideos[currentIndex - 1]);
       }
     };
-    const handleOpenFolder = async () => {
-      if (window.electronAPI && selectedVideo.filePath) {
-        const path = require('path');
-        const folderPath = path.dirname(selectedVideo.filePath);
-        await window.electronAPI.openPath?.(folderPath);
-      }
-    };
 
     return (
-      <div className="h-full flex flex-col animate-in fade-in duration-300 bg-black">
+      <div className={cn(
+        "flex flex-col animate-in fade-in duration-300 bg-black",
+        isFullApp ? "fixed inset-0 z-[9998]" : "h-full"
+      )}>
         <VideoPlayer
           video={selectedVideo}
           videos={displayVideos}
-          onClose={() => setSelectedVideo(null)}
+          onClose={() => {
+            setIsFullApp(false);
+            setSelectedVideo(null);
+          }}
           onNext={handleNext}
           onPrevious={handlePrevious}
           className="flex-1"
           showControls={true}
           autoPlay={true}
+          onFullApp={() => setIsFullApp(!isFullApp)}
+          onCinemaMode={() => setIsCinemaMode(true)}
+          isFullApp={isFullApp}
         />
       </div>
     );

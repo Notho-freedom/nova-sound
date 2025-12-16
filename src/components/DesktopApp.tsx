@@ -118,6 +118,7 @@ export const DesktopApp = () => {
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Audio element ref for real playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -127,6 +128,18 @@ export const DesktopApp = () => {
     setIsLoading(false);
   }, []);
 
+
+  // Listen for video playing state changes
+  useEffect(() => {
+    const handleVideoPlaying = (e: CustomEvent) => {
+      setIsVideoPlaying(e.detail.isPlaying);
+    };
+
+    window.addEventListener("video-playing", handleVideoPlaying as EventListener);
+    return () => {
+      window.removeEventListener("video-playing", handleVideoPlaying as EventListener);
+    };
+  }, []);
 
   // Initialize audio element
   useEffect(() => {
@@ -1301,7 +1314,7 @@ export const DesktopApp = () => {
         </div>
 
         {/* Now Playing Bar */}
-        {currentTrack && (
+        {currentTrack && !isVideoPlaying && (
           <NowPlayingBar
             currentTrack={currentTrack}
             isPlaying={isPlaying}

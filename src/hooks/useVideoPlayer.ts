@@ -119,15 +119,21 @@ export function useVideoPlayer(videos: Video[] = []): UseVideoPlayerReturn {
 
     const handlePlay = () => {
       setIsPlaying(true);
+      // Emit event for video playing state
+      window.dispatchEvent(new CustomEvent("video-playing", { detail: { isPlaying: true } }));
     };
 
     const handlePause = () => {
       setIsPlaying(false);
+      // Emit event for video playing state
+      window.dispatchEvent(new CustomEvent("video-playing", { detail: { isPlaying: false } }));
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
+      // Emit event for video playing state
+      window.dispatchEvent(new CustomEvent("video-playing", { detail: { isPlaying: false } }));
       // Auto-play next video if available
       if (currentVideo && videos.length > 0) {
         const currentIndex = videos.findIndex(v => v.id === currentVideo.id);
