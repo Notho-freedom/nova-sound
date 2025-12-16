@@ -36,6 +36,7 @@ import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/useNotifications";
+import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 
 export type ViewType = 
   | "home" 
@@ -502,6 +503,14 @@ export const Sidebar = ({
           </div>
         </div>
       )}
+
+      {/* Sync Status Indicator */}
+      <div className={cn(
+        "border-t border-border/50 p-2",
+        collapsed && "px-1.5"
+      )}>
+        <SyncStatusIndicator collapsed={collapsed} />
+      </div>
     </div>
   );
 };
