@@ -463,6 +463,11 @@ class FirebaseSyncService {
     }
 
     this.isSyncing = true;
+    
+    // Emit sync start event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('nexus-sync-start'));
+    }
 
     try {
       const userDataRef = doc(db, 'users', userId, 'appData', 'data');
@@ -480,6 +485,11 @@ class FirebaseSyncService {
       this.lastSyncedDataHash = newHash;
       this.pendingChanges.clear();
       
+      // Emit sync complete event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nexus-sync-complete'));
+      }
+      
       // Silent sync - no console logs for normal operations
     } catch (error) {
       console.error('Error saving to Firestore:', error);
@@ -487,6 +497,12 @@ class FirebaseSyncService {
       if (data) {
         Object.keys(data).forEach(key => this.pendingChanges.add(key));
       }
+      
+      // Emit sync error event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nexus-sync-error'));
+      }
+      
       throw error;
     } finally {
       this.isSyncing = false;
@@ -872,6 +888,23 @@ class FirebaseSyncService {
       isSyncing: this.isSyncing,
       queueLength: this.syncQueue.length,
     };
+  }
+
+  // Force an immediate sync to Firestore
+  async forceSyncNow(): Promise<void> {
+    if (!this.currentUserId || !db) {
+      console.warn('Cannot force sync: no user ID or Firestore not initialized');
+      return;
+    }
+
+    try {
+      // Save all local data to Firestore
+      await this.saveToFirestore(this.currentUserId);
+      console.log('Force sync completed successfully');
+    } catch (error) {
+      console.error('Force sync failed:', error);
+      throw error;
+    }
   }
 }
 
