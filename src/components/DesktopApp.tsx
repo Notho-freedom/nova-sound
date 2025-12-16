@@ -12,6 +12,7 @@ import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
+import { PlaylistView } from "./views/PlaylistView";
 import { SettingsView } from "./views/SettingsView";
 import { NotificationsView } from "./views/NotificationsView";
 
@@ -45,7 +46,14 @@ export const DesktopApp = () => {
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory, recordPlayback } = usePlayHistory();
-  const { playlists, addTracksToPlaylist } = usePlaylists();
+  const { 
+    playlists, 
+    createPlaylist, 
+    updatePlaylist, 
+    deletePlaylist, 
+    addTracksToPlaylist, 
+    removeTracksFromPlaylist 
+  } = usePlaylists();
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
   const { notifications, notifySuccess, notifyError } = useNotifications();
@@ -764,7 +772,52 @@ export const DesktopApp = () => {
     const message = `Lecture aléatoire de "${playlist.name}"`;
     toast.success(message);
     notifySuccess(message);
-  }, [playlists, libraryTracks, setQueue, setCurrentIndex, notifySuccess, notifyError]);
+  }, [playlists, libraryTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError]);
+
+  // Handlers for PlaylistView - play/shuffle tracks by IDs
+  const handlePlayTracks = useCallback((trackIds: string[]) => {
+    const tracksToPlay = trackIds
+      .map(id => libraryTracks.find(t => t.id === id))
+      .filter((t): t is Track => t !== undefined);
+
+    if (tracksToPlay.length === 0) {
+      const errorMsg = 'Aucun titre trouvé';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
+      return;
+    }
+
+    setQueue(tracksToPlay);
+    setCurrentIndex(0);
+    setIsPlaying(true);
+    const message = `Lecture de ${tracksToPlay.length} titre${tracksToPlay.length > 1 ? 's' : ''}`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
+
+  const handleShuffleTracks = useCallback((trackIds: string[]) => {
+    const tracksToPlay = trackIds
+      .map(id => libraryTracks.find(t => t.id === id))
+      .filter((t): t is Track => t !== undefined);
+
+    if (tracksToPlay.length === 0) {
+      const errorMsg = 'Aucun titre trouvé';
+      toast.error(errorMsg);
+      notifyError(errorMsg);
+      return;
+    }
+
+    // Shuffle tracks
+    const shuffled = [...tracksToPlay].sort(() => Math.random() - 0.5);
+
+    setQueue(shuffled);
+    setCurrentIndex(0);
+    setIsPlaying(true);
+    setIsShuffle(true);
+    const message = `Lecture aléatoire de ${shuffled.length} titre${shuffled.length > 1 ? 's' : ''}`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError]);
 
   const handleToggleFavorite = useCallback(() => {
     if (!currentTrack) return;
@@ -985,15 +1038,19 @@ export const DesktopApp = () => {
         );
       case "playlists":
         return (
-          <LibraryView
+          <PlaylistView
             tracks={tracks}
+            playlists={playlists}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
-            title="Playlists"
-            onPlayNext={handlePlayNext}
-            onAddToQueue={handleAddToQueue}
-            onAddToPlaylist={handleAddToPlaylist}
+            onPlayTracks={handlePlayTracks}
+            onShuffleTracks={handleShuffleTracks}
+            onCreatePlaylist={createPlaylist}
+            onUpdatePlaylist={updatePlaylist}
+            onDeletePlaylist={deletePlaylist}
+            onAddTracksToPlaylist={addTracksToPlaylist}
+            onRemoveTracksFromPlaylist={removeTracksFromPlaylist}
             loading={libraryLoading}
           />
         );

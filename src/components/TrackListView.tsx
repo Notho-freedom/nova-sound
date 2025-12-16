@@ -31,6 +31,8 @@ interface TrackListViewProps {
   showHistory?: boolean;
   showAlbum?: boolean;
   showTrackNumber?: boolean;
+  showRemoveFromPlaylist?: boolean;
+  onRemoveFromPlaylist?: (track: Track) => void;
 }
 
 export const TrackListView = ({
@@ -54,6 +56,8 @@ export const TrackListView = ({
   showHistory = false,
   showAlbum = true,
   showTrackNumber = false,
+  showRemoveFromPlaylist = false,
+  onRemoveFromPlaylist,
 }: TrackListViewProps) => {
   return (
     <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden relative">
@@ -139,6 +143,7 @@ export const TrackListView = ({
                           onUploadToNexus={() => uploadTrackToNexus?.(track)}
                           canUploadToNexus={canUploadToNexus && !!track.filePath}
                           isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                          onRemoveFromPlaylist={showRemoveFromPlaylist ? () => onRemoveFromPlaylist?.(track) : undefined}
                         >
                           <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
@@ -201,10 +206,14 @@ export const TrackListView = ({
                     onUploadToNexus={() => uploadTrackToNexus?.(track)}
                     canUploadToNexus={canUploadToNexus && !!track.filePath}
                     isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                    onRemoveFromPlaylist={showRemoveFromPlaylist ? () => onRemoveFromPlaylist?.(track) : undefined}
                   >
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                        <button 
+                          className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                          aria-label="Options"
+                        >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
                       </TooltipTrigger>
