@@ -229,8 +229,8 @@ export const HomeView = ({
         />
       </div>
       
-      {/* Main Content with padding */}
-      <div className="px-6 py-4 space-y-6 -mt-12 relative z-10">
+      {/* Main Content with padding - Overlaps with hero fade */}
+      <div className="px-6 py-4 space-y-6 -mt-24 md:-mt-32 relative z-10">
         {/* Subscription Badge */}
         {nexusAuthenticated && nexusUser && (
           <div className="flex justify-end">
