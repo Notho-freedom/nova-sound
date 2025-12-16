@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface UpdateInfo {
   version: string;
@@ -62,13 +63,20 @@ export function UpdateNotification() {
         )}
       >
         {/* Close button */}
-        <button
-          onClick={() => setIsVisible(false)}
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-background/50 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-          aria-label="Fermer"
-        >
-          <X className="w-5 h-5 text-muted-foreground" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setIsVisible(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-background/50 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+              aria-label="Fermer"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="text-sm">Fermer</div>
+          </TooltipContent>
+        </Tooltip>
 
         {/* Header */}
         <div className="flex items-start gap-4 mb-6">
@@ -133,12 +141,19 @@ export function UpdateNotification() {
 
         {/* Actions */}
         <div className="flex justify-end gap-3">
-          <button
-            onClick={() => setIsVisible(false)}
-            className="px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
-          >
-            Parfait !
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setIsVisible(false)}
+                className="px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 font-medium"
+              >
+                Parfait !
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">Fermer cette notification</div>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

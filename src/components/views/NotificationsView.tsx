@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export const NotificationsView = () => {
   const { notifications, clearNotifications, enabled, setEnabled } = useNotifications();
@@ -60,35 +61,52 @@ export const NotificationsView = () => {
               </p>
             </div>
             {notifications.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearNotifications}
-                className="gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Effacer tout
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearNotifications}
+                    className="gap-2 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Effacer tout
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Supprimer toutes les notifications</div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
 
           {/* Filters */}
           <div className="flex items-center gap-2 mt-4">
             {(["all", "success", "error", "warning", "info"] as const).map((filterType) => (
-              <Button
-                key={filterType}
-                variant={filter === filterType ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setFilter(filterType)}
-                className="h-7 text-xs capitalize"
-              >
-                {filterType === "all" ? "Toutes" : filterType}
-                {filterType !== "all" && (
-                  <span className="ml-1 text-xs opacity-70">
-                    ({notifications.filter((n) => n.type === filterType).length})
-                  </span>
-                )}
-              </Button>
+              <Tooltip key={filterType}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={filter === filterType ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilter(filterType)}
+                    className="h-7 text-xs capitalize transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                  >
+                    {filterType === "all" ? "Toutes" : filterType}
+                    {filterType !== "all" && (
+                      <span className="ml-1 text-xs opacity-70">
+                        ({notifications.filter((n) => n.type === filterType).length})
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">
+                    {filterType === "all" 
+                      ? "Afficher toutes les notifications" 
+                      : `Afficher uniquement les notifications ${filterType}`}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             ))}
           </div>
         </div>

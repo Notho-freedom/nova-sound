@@ -918,6 +918,7 @@ export const DesktopApp = () => {
       case "home":
         return (
         <HomeView
+          loading={libraryLoading}
           tracks={tracks}
           currentTrackIndex={currentTrackIndex}
           isPlaying={isPlaying}
@@ -946,6 +947,7 @@ export const DesktopApp = () => {
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
+            loading={libraryLoading}
           />
         );
       case "favorites":
@@ -964,6 +966,7 @@ export const DesktopApp = () => {
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
+            loading={libraryLoading}
           />
         );
       case "playlists":
@@ -977,6 +980,7 @@ export const DesktopApp = () => {
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
+            loading={libraryLoading}
           />
         );
       case "recent":
@@ -1012,6 +1016,7 @@ export const DesktopApp = () => {
                       onPlayNext={handlePlayNext}
                       onAddToQueue={handleAddToQueue}
                       onAddToPlaylist={handleAddToPlaylist}
+                      loading={libraryLoading}
                     />
                   </div>
                 )}
@@ -1043,6 +1048,7 @@ export const DesktopApp = () => {
                       onPlayNext={handlePlayNext}
                       onAddToQueue={handleAddToQueue}
                       onAddToPlaylist={handleAddToPlaylist}
+                      loading={libraryLoading}
                     />
                   </div>
                 )}
@@ -1074,6 +1080,7 @@ export const DesktopApp = () => {
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
+            loading={libraryLoading}
           />
         );
       case "artists":
@@ -1088,6 +1095,7 @@ export const DesktopApp = () => {
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
+            loading={libraryLoading}
           />
         );
       case "videos":

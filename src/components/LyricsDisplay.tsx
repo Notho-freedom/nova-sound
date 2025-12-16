@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Music2, Search, RefreshCw, Clock, AlignLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track, LyricsResult, LyricsLine } from "@/types/music";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface LyricsDisplayProps {
   currentTrack: Track | null;
@@ -241,45 +242,73 @@ export const LyricsDisplay = ({
           {lyrics?.syncedLyrics && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="w-3 h-3" />
-              <button
-                onClick={() => setOffset(o => o - 0.5)}
-                className="px-1 hover:text-primary transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
-              >
-                -
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setOffset(o => o - 0.5)}
+                    className="px-1 hover:text-primary transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
+                  >
+                    -
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Décaler les paroles en arrière (-0.5s)</div>
+                </TooltipContent>
+              </Tooltip>
               <span className="w-8 text-center">{offset > 0 ? "+" : ""}{offset}s</span>
-              <button
-                onClick={() => setOffset(o => o + 0.5)}
-                className="px-1 hover:text-primary transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
-              >
-                +
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setOffset(o => o + 0.5)}
+                    className="px-1 hover:text-primary transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
+                  >
+                    +
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Décaler les paroles en avant (+0.5s)</div>
+                </TooltipContent>
+              </Tooltip>
             </div>
           )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSearch(!showSearch)}
-            className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-          >
-            <Search className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSearch(!showSearch)}
+                className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+              >
+                <Search className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">Rechercher des paroles</div>
+            </TooltipContent>
+          </Tooltip>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (currentTrack) {
-                setLyrics(null);
-                setError(null);
-                // Trigger reload
-              }
-            }}
-            className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-          >
-            <RefreshCw className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (currentTrack) {
+                    setLyrics(null);
+                    setError(null);
+                    // Trigger reload
+                  }
+                }}
+                className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+              >
+                <RefreshCw className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">Recharger les paroles</div>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -294,9 +323,16 @@ export const LyricsDisplay = ({
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="flex-1 transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/50"
             />
-            <Button onClick={handleSearch} disabled={loading} className="transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
-              <Search className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={handleSearch} disabled={loading} className="transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
+                  <Search className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">Rechercher</div>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}

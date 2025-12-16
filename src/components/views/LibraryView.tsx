@@ -42,6 +42,7 @@ import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
+import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton } from "@/components/ui/skeletons";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -57,6 +58,7 @@ interface LibraryViewProps {
   emptyMessage?: string;
   showHistory?: boolean;
   initialSelectedAlbum?: string | null;
+  loading?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -151,6 +153,7 @@ export const LibraryView = ({
   emptyMessage = "Aucun titre trouvé",
   showHistory = false,
   initialSelectedAlbum,
+  loading = false,
 }: LibraryViewProps) => {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("list");
   const [sortMode, setSortMode] = useState<SortMode>("title");
@@ -250,6 +253,22 @@ export const LibraryView = ({
     setSelectedArtist(null);
     setSelectedFolder(null);
   };
+
+  // Render loading state
+  if (loading) {
+    return (
+      <div className="px-6 py-4 h-full flex flex-col animate-in fade-in duration-200">
+        <PageHeaderSkeleton />
+        <div className="mt-6">
+          {viewMode === "albums" && <AlbumGridSkeleton count={12} />}
+          {viewMode === "artists" && <AlbumGridSkeleton count={12} />}
+          {viewMode === "tracks" && displayMode === "grid" && <TrackGridSkeleton count={20} />}
+          {viewMode === "tracks" && displayMode === "list" && <TrackTableSkeleton count={15} />}
+          {viewMode === "folders" && <TrackTableSkeleton count={10} />}
+        </div>
+      </div>
+    );
+  }
 
   // Render empty state
   if (tracks.length === 0) {

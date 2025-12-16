@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useVideos } from "@/hooks/useVideos";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import type { Video } from "@/types/music";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -106,28 +107,42 @@ export const VideosView = () => {
             subtitle={`${displayVideos.length} vidéos dans votre bibliothèque`}
             rightContent={
               <div className="flex rounded-lg bg-muted/30 p-1">
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={cn(
-                    "p-2 rounded transition-colors",
-                    viewMode === "grid"
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={cn(
-                    "p-2 rounded transition-colors",
-                    viewMode === "list"
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <List className="w-4 h-4" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setViewMode("grid")}
+                      className={cn(
+                        "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                        viewMode === "grid"
+                          ? "bg-primary/20 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Grid className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm">Vue grille</div>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setViewMode("list")}
+                      className={cn(
+                        "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                        viewMode === "list"
+                          ? "bg-primary/20 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <List className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm">Vue liste</div>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             }
           />
@@ -143,12 +158,19 @@ export const VideosView = () => {
               className="pl-10 pr-10"
             />
             {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Effacer la recherche</div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
 
@@ -317,11 +339,12 @@ export const VideosView = () => {
       {!loading && !error && displayVideos.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {displayVideos.map((video) => (
-            <button
-              key={video.id}
-              onClick={() => setSelectedVideo(video)}
-              className="group text-left p-3 rounded-xl hover:bg-card/50 transition-colors"
-            >
+            <Tooltip key={video.id}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSelectedVideo(video)}
+                  className="group text-left p-3 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                >
               <div className="aspect-video rounded-lg overflow-hidden mb-3 relative bg-muted">
                 {video.thumbnailUrl ? (
                   <img
@@ -347,7 +370,14 @@ export const VideosView = () => {
               </div>
               <p className="text-sm font-medium truncate">{video.title}</p>
               <p className="text-xs text-muted-foreground">{formatSize(video.fileSize)}</p>
-            </button>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm font-medium">{video.title}</div>
+                <div className="text-xs text-muted-foreground mt-1">{formatTime(video.duration)}</div>
+                <div className="text-xs text-muted-foreground mt-1">{formatSize(video.fileSize)}</div>
+              </TooltipContent>
+            </Tooltip>
           ))}
         </div>
       )}
@@ -377,24 +407,33 @@ export const VideosView = () => {
               {displayVideos.map((video) => (
                 <tr
                   key={video.id}
-                  className="group cursor-pointer hover:bg-muted/30 transition-colors"
+                  className="group cursor-pointer hover:bg-muted/30 transition-all duration-200 ease-out"
                   onClick={() => setSelectedVideo(video)}
                 >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-9 rounded overflow-hidden bg-muted flex items-center justify-center">
-                        {video.thumbnailUrl ? (
-                          <img
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Film className="w-6 h-6 text-muted-foreground" />
-                        )}
-                      </div>
-                      <p className="text-sm font-medium truncate">{video.title}</p>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-9 rounded overflow-hidden bg-muted flex items-center justify-center">
+                            {video.thumbnailUrl ? (
+                              <img
+                                src={video.thumbnailUrl}
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Film className="w-6 h-6 text-muted-foreground" />
+                            )}
+                          </div>
+                          <p className="text-sm font-medium truncate">{video.title}</p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm font-medium">{video.title}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{formatTime(video.duration)}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{formatSize(video.fileSize)}</div>
+                      </TooltipContent>
+                    </Tooltip>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -406,7 +445,7 @@ export const VideosView = () => {
                     <span className="text-sm text-muted-foreground">{formatSize(video.fileSize)}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
                       <Play className="w-4 h-4 mr-2" />
                       Lire
                     </Button>

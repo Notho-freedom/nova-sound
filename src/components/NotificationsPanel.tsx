@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface NotificationsPanelProps {
   className?: string;
@@ -77,14 +78,21 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
             )}
           </div>
           {onClose && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-            >
-              <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="h-8 w-8 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                >
+                  <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">Fermer</div>
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
 
@@ -102,35 +110,52 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
         {/* Filters */}
         <div className="flex items-center gap-1 flex-wrap">
           {(["all", "success", "error", "warning", "info"] as const).map((filterType) => (
-            <Button
-              key={filterType}
-              variant={filter === filterType ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setFilter(filterType)}
-              className="h-7 text-xs capitalize transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-            >
-              {filterType === "all" ? "Toutes" : filterType}
-              {filterType !== "all" && (
-                <span className="ml-1 text-xs opacity-70">
-                  ({notifications.filter((n) => n.type === filterType).length})
-                </span>
-              )}
-            </Button>
+            <Tooltip key={filterType}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={filter === filterType ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setFilter(filterType)}
+                  className="h-7 text-xs capitalize transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                >
+                  {filterType === "all" ? "Toutes" : filterType}
+                  {filterType !== "all" && (
+                    <span className="ml-1 text-xs opacity-70">
+                      ({notifications.filter((n) => n.type === filterType).length})
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">
+                  {filterType === "all" 
+                    ? "Afficher toutes les notifications" 
+                    : `Afficher uniquement les notifications ${filterType}`}
+                </div>
+              </TooltipContent>
+            </Tooltip>
           ))}
         </div>
 
         {/* Actions */}
         {notifications.length > 0 && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/30">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearNotifications}
-              className="h-7 text-xs gap-1.5 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-            >
-              <Trash2 className="w-3 h-3 hover:scale-105 transition-transform duration-200 ease-out" />
-              Effacer tout
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearNotifications}
+                  className="h-7 text-xs gap-1.5 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                >
+                  <Trash2 className="w-3 h-3 hover:scale-105 transition-transform duration-200 ease-out" />
+                  Effacer tout
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">Supprimer toutes les notifications</div>
+              </TooltipContent>
+            </Tooltip>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Notifications:</span>
               <span className={enabled ? "text-green-500" : "text-muted-foreground"}>
