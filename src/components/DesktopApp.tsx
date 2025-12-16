@@ -953,7 +953,7 @@ export const DesktopApp = () => {
       case "settings":
         return <SettingsView />;
       case "statistics":
-        return <StatisticsView />;
+        return <StatisticsView currentTrack={currentTrack} isPlaying={isPlaying} currentTime={currentTime} />;
       case "notifications":
         return <NotificationsView />;
       default:

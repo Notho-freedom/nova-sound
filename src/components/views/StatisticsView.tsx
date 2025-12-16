@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   BarChart3,
   Clock,
@@ -27,6 +27,7 @@ import { Bar, BarChart as RechartsBarChart, XAxis, YAxis, CartesianGrid, PieChar
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Track } from "@/types/music";
 
 const COLORS = [
   "hsl(var(--chart-1))",
@@ -36,12 +37,171 @@ const COLORS = [
   "hsl(var(--chart-5))",
 ];
 
-export const StatisticsView = () => {
+interface StatisticsViewProps {
+  currentTrack?: Track | null;
+  isPlaying?: boolean;
+  currentTime?: number;
+}
+
+export const StatisticsView = ({ currentTrack, isPlaying = false, currentTime = 0 }: StatisticsViewProps = {}) => {
   const { tracks } = useLibrary();
   const { history } = usePlayHistory();
   const [period, setPeriod] = useState<"day" | "week" | "month" | "year" | "all">("all");
+  const [realTimeElapsed, setRealTimeElapsed] = useState(0);
+  const lastUpdateRef = useRef<number>(Date.now());
+  const lastTrackIdRef = useRef<string | null>(null);
+  const accumulatedTimeRef = useRef<number>(0);
 
-  const stats = useStatistics({ tracks, history, period });
+  // Suivi en temps réel du temps d'écoute (mise à jour toutes les 100ms pour précision milliseconde)
+  useEffect(() => {
+    if (!isPlaying || !currentTrack) {
+      // Réinitialiser quand on arrête ou change de piste
+      if (lastTrackIdRef.current !== currentTrack?.id) {
+        accumulatedTimeRef.current = 0;
+        setRealTimeElapsed(0);
+        lastTrackIdRef.current = currentTrack?.id || null;
+      }
+      lastUpdateRef.current = Date.now();
+      return;
+    }
+
+    // Si la piste change, réinitialiser
+    if (lastTrackIdRef.current !== currentTrack.id) {
+      accumulatedTimeRef.current = 0;
+      setRealTimeElapsed(0);
+      lastTrackIdRef.current = currentTrack.id;
+      lastUpdateRef.current = Date.now();
+    }
+
+    // Mise à jour toutes les 100ms pour précision milliseconde
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const delta = (now - lastUpdateRef.current) / 1000; // en secondes avec précision milliseconde
+      lastUpdateRef.current = now;
+      
+      // Accumuler le temps écoulé
+      accumulatedTimeRef.current += delta;
+      setRealTimeElapsed(accumulatedTimeRef.current);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, currentTrack?.id]);
+
+  // Réinitialiser quand la piste change
+  useEffect(() => {
+    if (lastTrackIdRef.current !== currentTrack?.id) {
+      accumulatedTimeRef.current = 0;
+      setRealTimeElapsed(0);
+      lastTrackIdRef.current = currentTrack?.id || null;
+      lastUpdateRef.current = Date.now();
+    }
+  }, [currentTrack?.id]);
+
+  // Calculer les statistiques de base
+  const baseStats = useStatistics({ tracks, history, period });
+  
+  // Enrichir les statistiques avec le temps réel
+  const stats = useMemo(() => {
+    if (!isPlaying || !currentTrack || realTimeElapsed === 0) {
+      return baseStats;
+    }
+
+    // Créer une copie enrichie des stats
+    const enhanced = { ...baseStats };
+    
+    // Ajouter le temps réel au total
+    enhanced.totalListeningTime = baseStats.totalListeningTime + realTimeElapsed;
+    
+    // Mettre à jour l'artiste actuel
+    if (currentTrack.artist) {
+      const artistIndex = enhanced.topArtists.findIndex(a => a.name === currentTrack.artist);
+      if (artistIndex >= 0) {
+        enhanced.topArtists = [...enhanced.topArtists];
+        enhanced.topArtists[artistIndex] = {
+          ...enhanced.topArtists[artistIndex],
+          time: enhanced.topArtists[artistIndex].time + realTimeElapsed,
+        };
+        enhanced.topArtists.sort((a, b) => b.time - a.time);
+      } else {
+        // Ajouter l'artiste s'il n'existe pas encore
+        enhanced.topArtists = [...enhanced.topArtists, {
+          name: currentTrack.artist,
+          plays: 0,
+          time: realTimeElapsed,
+        }];
+        enhanced.topArtists.sort((a, b) => b.time - a.time);
+      }
+    }
+
+    // Mettre à jour l'album actuel
+    if (currentTrack.album && currentTrack.artist) {
+      const albumIndex = enhanced.topAlbums.findIndex(
+        a => a.name === currentTrack.album && a.artist === currentTrack.artist
+      );
+      if (albumIndex >= 0) {
+        enhanced.topAlbums = [...enhanced.topAlbums];
+        enhanced.topAlbums[albumIndex] = {
+          ...enhanced.topAlbums[albumIndex],
+          time: enhanced.topAlbums[albumIndex].time + realTimeElapsed,
+        };
+        enhanced.topAlbums.sort((a, b) => b.time - a.time);
+      }
+    }
+
+    // Mettre à jour le genre actuel
+    if (currentTrack.genre) {
+      const genreIndex = enhanced.topGenres.findIndex(g => g.name === currentTrack.genre);
+      if (genreIndex >= 0) {
+        enhanced.topGenres = [...enhanced.topGenres];
+        enhanced.topGenres[genreIndex] = {
+          ...enhanced.topGenres[genreIndex],
+          time: enhanced.topGenres[genreIndex].time + realTimeElapsed,
+        };
+        enhanced.topGenres.sort((a, b) => b.time - a.time);
+      }
+    }
+
+    // Mettre à jour l'heure actuelle
+    const currentHour = new Date().getHours();
+    enhanced.listeningByHour = [...enhanced.listeningByHour];
+    if (enhanced.listeningByHour[currentHour]) {
+      enhanced.listeningByHour[currentHour] = {
+        ...enhanced.listeningByHour[currentHour],
+        time: enhanced.listeningByHour[currentHour].time + realTimeElapsed,
+      };
+    }
+
+    // Mettre à jour le jour actuel
+    const currentDay = new Date().getDay();
+    const dayNames = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+    enhanced.listeningByDayOfWeek = [...enhanced.listeningByDayOfWeek];
+    if (enhanced.listeningByDayOfWeek[currentDay]) {
+      enhanced.listeningByDayOfWeek[currentDay] = {
+        ...enhanced.listeningByDayOfWeek[currentDay],
+        time: enhanced.listeningByDayOfWeek[currentDay].time + realTimeElapsed,
+      };
+    }
+
+    // Mettre à jour la date actuelle
+    const today = new Date().toISOString().split("T")[0];
+    const dateIndex = enhanced.listeningByDate.findIndex(d => d.date === today);
+    if (dateIndex >= 0) {
+      enhanced.listeningByDate = [...enhanced.listeningByDate];
+      enhanced.listeningByDate[dateIndex] = {
+        ...enhanced.listeningByDate[dateIndex],
+        time: enhanced.listeningByDate[dateIndex].time + realTimeElapsed,
+      };
+    } else {
+      enhanced.listeningByDate = [...enhanced.listeningByDate, {
+        date: today,
+        plays: 0,
+        time: realTimeElapsed,
+      }];
+      enhanced.listeningByDate.sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    return enhanced;
+  }, [baseStats, isPlaying, currentTrack, realTimeElapsed]);
 
   const chartConfig = {
     plays: {
@@ -81,9 +241,17 @@ export const StatisticsView = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Statistiques</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-display font-bold text-foreground">Statistiques</h1>
+              {isPlaying && currentTrack && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/20">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="text-xs font-medium text-primary">En direct</span>
+                </div>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
-              Analyse détaillée de vos habitudes d'écoute
+              Analyse détaillée de vos habitudes d'écoute {isPlaying && currentTrack && "(mise à jour en temps réel)"}
             </p>
           </div>
           <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>

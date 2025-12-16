@@ -314,14 +314,25 @@ export async function recognizeAllUnknownTracks() {
  */
 export async function applyRecognitionResults(results) {
     let updated = 0;
+    const updatedTracks = [];
     for (const result of results) {
         const track = await storage.getTrack(result.trackId);
         if (track) {
             track.artist = result.suggestedArtist;
             track.album = result.suggestedAlbum;
             await storage.updateTrack(result.trackId, track);
+            updatedTracks.push(track);
             updated++;
         }
+    }
+    // Notifier le renderer des mises à jour
+    if (updatedTracks.length > 0) {
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(window => {
+            updatedTracks.forEach(track => {
+                window.webContents.send('library:track-updated', track);
+            });
+        });
     }
     return updated;
 }
@@ -338,14 +349,25 @@ export async function detectAndGroupPatterns() {
  */
 export async function applyDetectedGroup(group) {
     let updated = 0;
+    const updatedTracks = [];
     for (const track of group.tracks) {
         const storedTrack = await storage.getTrack(track.id);
         if (storedTrack) {
             storedTrack.artist = group.artist;
             storedTrack.album = group.album;
             await storage.updateTrack(track.id, storedTrack);
+            updatedTracks.push(storedTrack);
             updated++;
         }
+    }
+    // Notifier le renderer des mises à jour
+    if (updatedTracks.length > 0) {
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(window => {
+            updatedTracks.forEach(track => {
+                window.webContents.send('library:track-updated', track);
+            });
+        });
     }
     return updated;
 }
