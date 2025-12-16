@@ -14,6 +14,7 @@ import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
 import { SettingsView } from "./views/SettingsView";
 import { NotificationsView } from "./views/NotificationsView";
+import { StatisticsView } from "./views/StatisticsView";
 
 // Lazy load heavy components
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
@@ -951,6 +952,8 @@ export const DesktopApp = () => {
         );
       case "settings":
         return <SettingsView />;
+      case "statistics":
+        return <StatisticsView />;
       case "notifications":
         return <NotificationsView />;
       default:

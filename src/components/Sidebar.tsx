@@ -19,7 +19,8 @@ import {
   Edit,
   Trash2,
   Radio,
-  Bell
+  Bell,
+  BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,7 +56,8 @@ export type ViewType =
   | "album-detail"
   | "artist-detail"
   | "player"
-  | "notifications";
+  | "notifications"
+  | "statistics";
 
 interface SidebarProps {
   currentView: ViewType;
@@ -72,6 +74,7 @@ const mainNavItems = [
   { id: "home" as ViewType, icon: Home, label: "Accueil" },
   { id: "search" as ViewType, icon: Search, label: "Rechercher" },
   { id: "library" as ViewType, icon: Library, label: "Bibliothèque" },
+  { id: "statistics" as ViewType, icon: BarChart3, label: "Statistiques" },
   { id: "notifications" as ViewType, icon: Bell, label: "Notifications" },
 ];
 
