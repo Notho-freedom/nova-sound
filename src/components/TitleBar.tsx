@@ -206,31 +206,49 @@ export const TitleBar = ({
           {/* Window Controls - Only show in Electron */}
           {isElectron && (
             <>
-              <button
-                onClick={handleMinimize}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                title="Réduire"
-              >
-                <Minus className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
-              </button>
-              <button
-                onClick={handleMaximize}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                title={isMaximized ? "Restaurer" : "Agrandir"}
-              >
-                {isMaximized ? (
-                  <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 rotate-90 transition-all duration-200 ease-out" />
-                ) : (
-                  <Square className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
-                )}
-              </button>
-              <button
-                onClick={handleClose}
-                className="w-8 h-7 flex items-center justify-center rounded hover:bg-destructive/80 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2"
-                title="Fermer"
-              >
-                <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleMinimize}
+                    className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                  >
+                    <Minus className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Réduire</div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleMaximize}
+                    className="w-8 h-7 flex items-center justify-center rounded hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                  >
+                    {isMaximized ? (
+                      <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 rotate-90 transition-all duration-200 ease-out" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">{isMaximized ? "Restaurer" : "Agrandir"}</div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleClose}
+                    className="w-8 h-7 flex items-center justify-center rounded hover:bg-destructive/80 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200 ease-out" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Fermer</div>
+                </TooltipContent>
+              </Tooltip>
             </>
           )}
 

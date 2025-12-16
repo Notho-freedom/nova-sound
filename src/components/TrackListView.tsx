@@ -93,7 +93,6 @@ export const TrackListView = ({
               <tr
                 key={track.id}
                 onClick={() => onTrackSelect(actualIndex)}
-                title={tooltipText}
                 className={cn(
                   "group cursor-pointer transition-all duration-200 ease-out",
                   isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
@@ -121,24 +120,27 @@ export const TrackListView = ({
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
-                  <TrackContextMenu
-                    track={track}
-                    playlists={playlists}
-                    isFavorite={isFavorite?.(track.id) || false}
-                    onPlay={() => onTrackSelect(actualIndex)}
-                    onPlayNext={() => onPlayNext?.(track)}
-                    onAddToQueue={() => onAddToQueue?.(track)}
-                    onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                    onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
-                    onToggleFavorite={() => toggleFavorite?.(track.id)}
-                    onUploadToCloudinary={() => uploadTrack?.(track)}
-                    canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
-                    isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-                    onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                    canUploadToNexus={canUploadToNexus && !!track.filePath}
-                    isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                  >
-                    <div className="flex items-center gap-3">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <TrackContextMenu
+                          track={track}
+                          playlists={playlists}
+                          isFavorite={isFavorite?.(track.id) || false}
+                          onPlay={() => onTrackSelect(actualIndex)}
+                          onPlayNext={() => onPlayNext?.(track)}
+                          onAddToQueue={() => onAddToQueue?.(track)}
+                          onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                          onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
+                          onToggleFavorite={() => toggleFavorite?.(track.id)}
+                          onUploadToCloudinary={() => uploadTrack?.(track)}
+                          canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                          isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                          onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                          canUploadToNexus={canUploadToNexus && !!track.filePath}
+                          isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                        >
+                          <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 relative">
                         <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover" />
                         {getTrackProgress?.(track.id) && (
@@ -156,7 +158,16 @@ export const TrackListView = ({
                         <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                       </div>
                     </div>
-                  </TrackContextMenu>
+                        </TrackContextMenu>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-sm font-medium">{track.title}</div>
+                      <div className="text-xs text-muted-foreground">{track.artist}</div>
+                      {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                      <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
+                    </TooltipContent>
+                  </Tooltip>
                 </td>
                 {showAlbum && (
                   <td className="px-4 py-3 hidden md:table-cell">

@@ -258,7 +258,6 @@ export const HomeView = ({
                     <tr
                       key={`favorite-${track.id}-${idx}`}
                       onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                      title={tooltipText}
                       className={cn(
                         "group cursor-pointer transition-all duration-200 ease-out",
                         isCurrentTrack 
@@ -286,26 +285,36 @@ export const HomeView = ({
                         </div>
                       </td>
                       <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                            <img
-                              src={getCoverUrl(track.coverUrl)}
-                              alt={track.album}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <p className={cn(
-                              "text-sm font-medium truncate",
-                              isCurrentTrack ? "text-primary" : "text-foreground"
-                            )}>
-                              {track.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {track.artist}
-                            </p>
-                          </div>
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                                <img
+                                  src={getCoverUrl(track.coverUrl)}
+                                  alt={track.album}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className={cn(
+                                  "text-sm font-medium truncate",
+                                  isCurrentTrack ? "text-primary" : "text-foreground"
+                                )}>
+                                  {track.title}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {track.artist}
+                                </p>
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-sm font-medium">{track.title}</div>
+                            <div className="text-xs text-muted-foreground">{track.artist}</div>
+                            {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                            <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
+                          </TooltipContent>
+                        </Tooltip>
                       </td>
                       <td className="px-4 py-2.5 hidden md:table-cell">
                         <p className="text-sm text-muted-foreground truncate">

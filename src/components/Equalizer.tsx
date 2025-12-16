@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { RotateCcw, Save, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 // 10-band equalizer frequencies (Hz)
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -206,13 +207,27 @@ export const Equalizer = ({ audioContext, sourceNode, onConnect, className }: Eq
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="icon" onClick={handleReset} title="Réinitialiser">
-          <RotateCcw className="w-4 h-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon" onClick={handleReset}>
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="text-sm">Réinitialiser</div>
+          </TooltipContent>
+        </Tooltip>
 
-        <Button variant="outline" size="icon" onClick={handleSavePreset} title="Sauvegarder">
-          <Save className="w-4 h-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon" onClick={handleSavePreset}>
+              <Save className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="text-sm">Sauvegarder</div>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Preamp */}
