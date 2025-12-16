@@ -45,76 +45,107 @@ export const HeroBreadcrumbs = ({ className, userName, trackCount, featuredTrack
         />
       )}
       
-      {/* Multiple gradient layers for perfect fade - Style Netflix perfection */}
-      {/* Layer 1: Top dark overlay for text readability */}
+      {/* Netflix-Style Perfect Gradient System - 7 couches pour un fondu invisible */}
+      
+      {/* Couche 1: Assombrissement supérieur pour la lisibilité du texte */}
       <div 
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.8) 20%, rgba(0, 0, 0, 0.6) 40%, rgba(0, 0, 0, 0.3) 60%, transparent 85%)'
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.75) 15%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.2) 60%, transparent 75%)'
         }}
       />
       
-      {/* Layer 2: Middle transition layer */}
+      {/* Couche 2: Transition centrale douce */}
       <div 
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, transparent 0%, transparent 55%, rgba(0, 0, 0, 0.2) 70%, rgba(0, 0, 0, 0.5) 82%, rgba(0, 0, 0, 0.75) 92%, rgba(0, 0, 0, 0.9) 97%, rgba(0, 0, 0, 0.98) 100%)'
+          background: 'linear-gradient(180deg, transparent 0%, transparent 50%, rgba(0,0,0,0.15) 65%, rgba(0,0,0,0.35) 75%, rgba(0,0,0,0.6) 85%, rgba(0,0,0,0.85) 95%, rgba(0,0,0,0.95) 100%)'
         }}
       />
       
-      {/* Layer 3: Perfect fade to page background - Main transition layer */}
+      {/* Couche 3: Transition principale vers le background - Ultra progressive */}
       <div 
-        className="absolute bottom-0 left-0 right-0 h-[65%] pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 h-[70%] pointer-events-none"
         style={{
           background: `linear-gradient(to top, 
             hsl(var(--background)) 0%,
-            hsl(var(--background)) 12%,
-            hsl(var(--background) / 0.99) 18%,
-            hsl(var(--background) / 0.97) 24%,
-            hsl(var(--background) / 0.94) 30%,
-            hsl(var(--background) / 0.90) 36%,
-            hsl(var(--background) / 0.84) 42%,
-            hsl(var(--background) / 0.76) 48%,
-            hsl(var(--background) / 0.66) 54%,
+            hsl(var(--background) / 0.995) 8%,
+            hsl(var(--background) / 0.985) 14%,
+            hsl(var(--background) / 0.97) 20%,
+            hsl(var(--background) / 0.945) 26%,
+            hsl(var(--background) / 0.91) 32%,
+            hsl(var(--background) / 0.865) 38%,
+            hsl(var(--background) / 0.81) 44%,
+            hsl(var(--background) / 0.745) 50%,
+            hsl(var(--background) / 0.67) 56%,
+            hsl(var(--background) / 0.585) 62%,
+            hsl(var(--background) / 0.49) 68%,
+            hsl(var(--background) / 0.39) 74%,
+            hsl(var(--background) / 0.285) 80%,
+            hsl(var(--background) / 0.18) 86%,
+            hsl(var(--background) / 0.09) 92%,
+            hsl(var(--background) / 0.03) 96%,
+            transparent 100%
+          )`
+        }}
+      />
+      
+      {/* Couche 4: Renforcement du bas - Garantit un fondu parfait */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-[45%] pointer-events-none"
+        style={{
+          background: `linear-gradient(to top, 
+            hsl(var(--background)) 0%,
+            hsl(var(--background) / 0.98) 12%,
+            hsl(var(--background) / 0.93) 24%,
+            hsl(var(--background) / 0.84) 36%,
+            hsl(var(--background) / 0.71) 48%,
             hsl(var(--background) / 0.54) 60%,
-            hsl(var(--background) / 0.42) 66%,
-            hsl(var(--background) / 0.30) 72%,
-            hsl(var(--background) / 0.20) 78%,
-            hsl(var(--background) / 0.12) 84%,
-            hsl(var(--background) / 0.06) 90%,
-            hsl(var(--background) / 0.02) 95%,
+            hsl(var(--background) / 0.35) 72%,
+            hsl(var(--background) / 0.18) 84%,
+            hsl(var(--background) / 0.05) 92%,
             transparent 100%
           )`
         }}
       />
       
-      {/* Layer 4: Ultra-smooth bottom edge transition */}
+      {/* Couche 5: Edge polish - Bord ultra lisse */}
       <div 
-        className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
         style={{
           background: `linear-gradient(to top, 
             hsl(var(--background)) 0%,
-            hsl(var(--background) / 0.96) 15%,
-            hsl(var(--background) / 0.88) 30%,
-            hsl(var(--background) / 0.75) 45%,
-            hsl(var(--background) / 0.58) 60%,
-            hsl(var(--background) / 0.40) 75%,
-            hsl(var(--background) / 0.22) 87%,
-            hsl(var(--background) / 0.10) 94%,
+            hsl(var(--background) / 0.95) 20%,
+            hsl(var(--background) / 0.80) 40%,
+            hsl(var(--background) / 0.55) 60%,
+            hsl(var(--background) / 0.25) 80%,
             transparent 100%
           )`
         }}
       />
       
-      {/* Layer 5: Final polish - seamless edge blend */}
+      {/* Couche 6: Final seamless blend - Le secret Netflix */}
       <div 
-        className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
         style={{
           background: `linear-gradient(to top, 
             hsl(var(--background)) 0%,
-            hsl(var(--background) / 0.85) 25%,
-            hsl(var(--background) / 0.50) 50%,
-            hsl(var(--background) / 0.20) 75%,
+            hsl(var(--background) / 0.92) 25%,
+            hsl(var(--background) / 0.65) 50%,
+            hsl(var(--background) / 0.30) 75%,
+            transparent 100%
+          )`
+        }}
+      />
+      
+      {/* Couche 7: Micro-polish imperceptible mais crucial */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-8 pointer-events-none"
+        style={{
+          background: `linear-gradient(to top, 
+            hsl(var(--background)) 0%,
+            hsl(var(--background) / 0.75) 33%,
+            hsl(var(--background) / 0.40) 66%,
             transparent 100%
           )`
         }}
