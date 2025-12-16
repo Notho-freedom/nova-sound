@@ -837,6 +837,7 @@ export const SettingsView = () => {
                     onCheckedChange={(v) => {
                       setNotificationsEnabled(v);
                       if (v) notifySuccess("Notifications activées");
+                      else notifySuccess("Notifications désactivées");
                     }} 
                   />
                 </SettingRow>
@@ -844,6 +845,11 @@ export const SettingsView = () => {
                   <Switch checked={false} disabled />
                   <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
                 </SettingRow>
+                <div className="mt-3 pt-3 border-t border-border/30">
+                  <p className="text-xs text-muted-foreground">
+                    Consultez l'historique des notifications dans le panneau dédié du menu latéral.
+                  </p>
+                </div>
               </SettingsCard>
 
               <SettingsCard title="Raccourcis clavier" icon={Keyboard} className="lg:col-span-2">
@@ -1193,35 +1199,76 @@ export const SettingsView = () => {
                       )}>
                         {subscriptionStatus.isActive && subscriptionStatus.plan === "pro" ? "Plan Pro" : "Plan Gratuit"}
                       </div>
-                      {subscriptionStatus.isActive && subscriptionStatus.currentPeriodEnd && (
-                        <div className="mt-4 space-y-2">
-                          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
-                            <span>
-                              Prochain renouvellement: {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("fr-FR")}
+                      
+                      {/* Détails de l'abonnement */}
+                      <div className="mt-4 space-y-3 text-left">
+                        <div className="p-3 rounded-lg border border-border/50 bg-card/50 space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Statut:</span>
+                            <span className={cn(
+                              "font-medium",
+                              subscriptionStatus.status === "active" ? "text-green-500" :
+                              subscriptionStatus.status === "canceled" ? "text-red-500" :
+                              subscriptionStatus.status === "past_due" ? "text-yellow-500" :
+                              "text-muted-foreground"
+                            )}>
+                              {subscriptionStatus.status === "active" ? "Actif" :
+                               subscriptionStatus.status === "canceled" ? "Annulé" :
+                               subscriptionStatus.status === "past_due" ? "En retard" :
+                               subscriptionStatus.status === "trialing" ? "Essai" :
+                               subscriptionStatus.status}
                             </span>
                           </div>
+                          
+                          {subscriptionStatus.isActive && subscriptionStatus.currentPeriodEnd && (
+                            <>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  Prochain renouvellement:
+                                </span>
+                                <span className="font-medium">
+                                  {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("fr-FR", {
+                                    day: "2-digit",
+                                    month: "long",
+                                    year: "numeric"
+                                  })}
+                                </span>
+                              </div>
+                              
+                              {subscriptionStatus.currentPeriodEnd && (
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">Jours restants:</span>
+                                  <span className="font-medium">
+                                    {Math.ceil((new Date(subscriptionStatus.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} jours
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          
                           {subscriptionStatus.cancelAtPeriodEnd && (
-                            <div className="flex items-center justify-center gap-2 text-sm text-yellow-500">
-                              <AlertCircle className="w-4 h-4" />
+                            <div className="flex items-center gap-2 text-sm text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20">
+                              <AlertCircle className="w-4 h-4 flex-shrink-0" />
                               <span>Annulation programmée à la fin de la période</span>
                             </div>
                           )}
                         </div>
+                      </div>
+                      
+                      {subscriptionStatus.isActive && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleManageBilling}
+                          disabled={subscriptionLoading}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Gérer l'abonnement
+                        </Button>
                       )}
                     </div>
-                    {subscriptionStatus.isActive && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={handleManageBilling}
-                        disabled={subscriptionLoading}
-                      >
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Gérer l'abonnement
-                      </Button>
-                    )}
                   </div>
                 ) : (
                   <div className="text-center py-6">

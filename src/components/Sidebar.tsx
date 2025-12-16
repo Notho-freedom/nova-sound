@@ -18,7 +18,8 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  Radio
+  Radio,
+  Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -51,12 +52,14 @@ export type ViewType =
   | "audio-senses"
   | "album-detail"
   | "artist-detail"
-  | "player";
+  | "player"
+  | "notifications";
 
 interface SidebarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
   favoritesCount?: number;
+  notificationsCount?: number;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
   onPlayPlaylist?: (playlistId: string) => void;
@@ -67,6 +70,7 @@ const mainNavItems = [
   { id: "home" as ViewType, icon: Home, label: "Accueil" },
   { id: "search" as ViewType, icon: Search, label: "Rechercher" },
   { id: "library" as ViewType, icon: Library, label: "Bibliothèque" },
+  { id: "notifications" as ViewType, icon: Bell, label: "Notifications" },
 ];
 
 const libraryItems = [
@@ -159,6 +163,7 @@ export const Sidebar = ({
   currentView, 
   onViewChange, 
   favoritesCount,
+  notificationsCount,
   collapsed: controlledCollapsed,
   onCollapsedChange,
   onPlayPlaylist,
@@ -231,6 +236,7 @@ export const Sidebar = ({
                 label={item.label}
                 isActive={currentView === item.id}
                 onClick={() => onViewChange(item.id)}
+                badge={item.id === "notifications" ? notificationsCount : undefined}
                 collapsed={collapsed}
               />
             ))}

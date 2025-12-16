@@ -12,6 +12,7 @@ import { HomeView } from "./views/HomeView";
 import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
 import { SettingsView } from "./views/SettingsView";
+import { NotificationsView } from "./views/NotificationsView";
 
 // Lazy load heavy components
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
@@ -28,6 +29,7 @@ import { usePlaylists } from "@/hooks/usePlaylists";
 import { useQueue } from "@/hooks/useQueue";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useNotifications } from "@/hooks/useNotifications";
 import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -42,6 +44,7 @@ export const DesktopApp = () => {
   const { playlists, addTracksToPlaylist } = usePlaylists();
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
+  const { notifications } = useNotifications();
   
   // Combined upload progress (Cloudinary or Nexus)
   const overallProgress = cloudinaryUploading ? cloudinaryProgress : (cloudSyncUploading ? cloudSyncProgress : undefined);
@@ -881,6 +884,8 @@ export const DesktopApp = () => {
         );
       case "settings":
         return <SettingsView />;
+      case "notifications":
+        return <NotificationsView />;
       default:
         return (
           <div className="p-6">
@@ -967,6 +972,7 @@ export const DesktopApp = () => {
               if (view !== "albums") setAlbumToOpen(null);
             }}
             favoritesCount={favoriteTracks.length}
+            notificationsCount={notifications.length}
             collapsed={sidebarCollapsed}
             onCollapsedChange={setSidebarCollapsed}
             onPlayPlaylist={handlePlayPlaylist}
