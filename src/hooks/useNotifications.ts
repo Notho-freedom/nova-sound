@@ -32,12 +32,29 @@ export function useNotifications(): UseNotificationsReturn {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [enabled, setEnabledState] = useState(true);
 
-  // Load settings from localStorage
+  // Load settings from localStorage and Firebase
   useEffect(() => {
-    const saved = localStorage.getItem("nexus-notifications-enabled");
-    if (saved !== null) {
-      setEnabledState(saved === "true");
-    }
+    const loadNotificationsEnabled = async () => {
+      // Load from localStorage first
+      const saved = localStorage.getItem("nexus-notifications-enabled");
+      if (saved !== null) {
+        setEnabledState(saved === "true");
+      }
+      
+      // Load from Firebase if authenticated
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const firestoreData = await firebaseSyncService.loadFromFirestore();
+        if (firestoreData?.notificationsEnabled !== undefined) {
+          setEnabledState(firestoreData.notificationsEnabled);
+          localStorage.setItem("nexus-notifications-enabled", String(firestoreData.notificationsEnabled));
+        }
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    };
+    
+    loadNotificationsEnabled();
   }, []);
 
   const setEnabled = useCallback((value: boolean) => {

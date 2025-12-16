@@ -26,12 +26,29 @@ export function useTheme(): UseThemeReturn {
   const [theme, setThemeState] = useState<Theme>("dark");
   const [systemTheme, setSystemTheme] = useState<"dark" | "light">("dark");
 
-  // Load theme from localStorage and listen to Firebase sync updates
+  // Load theme from localStorage and Firebase, and listen to Firebase sync updates
   useEffect(() => {
-    const saved = localStorage.getItem("nexus-theme") as Theme | null;
-    if (saved && themes.some(t => t.id === saved)) {
-      setThemeState(saved);
-    }
+    const loadTheme = async () => {
+      // Load from localStorage first
+      const saved = localStorage.getItem("nexus-theme") as Theme | null;
+      if (saved && themes.some(t => t.id === saved)) {
+        setThemeState(saved);
+      }
+      
+      // Load from Firebase if authenticated
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        const firestoreData = await firebaseSyncService.loadFromFirestore();
+        if (firestoreData?.theme && themes.some(t => t.id === firestoreData.theme)) {
+          setThemeState(firestoreData.theme);
+          localStorage.setItem("nexus-theme", firestoreData.theme);
+        }
+      } catch (error) {
+        // Silently fail if Firebase sync is not available
+      }
+    };
+    
+    loadTheme();
 
     // Listen to Firebase sync updates
     const handleSyncUpdate = (event: CustomEvent) => {

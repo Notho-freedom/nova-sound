@@ -159,24 +159,77 @@ export const SettingsView = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const isElectron = !!window.electronAPI;
 
-  // Load settings from backend
+  // Load settings from backend, localStorage, and Firebase
   useEffect(() => {
     const loadSettings = async () => {
+      let loadedSettings: Partial<Settings> = {
+        musicDirectories: [],
+        crossfadeDuration: 5,
+        gaplessPlayback: true,
+        normalizeVolume: true,
+        audioQuality: "high",
+        notificationsEnabled: true,
+        scrobblingEnabled: false,
+        equalizerEnabled: false,
+        theme: "dark",
+        showLyrics: true,
+        autoScanOnStartup: true,
+      };
+      
       if (isElectron) {
         try {
-          const [loadedSettings, status] = await Promise.all([
+          const [electronSettings, status] = await Promise.all([
             window.electronAPI!.getSettings(),
             window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false, username: undefined }, libreFm: { connected: false, username: undefined } }),
           ]);
-          setSettings(loadedSettings);
+          loadedSettings = { ...loadedSettings, ...electronSettings };
           setScrobblerStatus({
             lastFm: { connected: status.lastFm.connected, username: 'username' in status.lastFm ? status.lastFm.username : undefined },
             libreFm: { connected: status.libreFm.connected, username: 'username' in status.libreFm ? status.libreFm.username : undefined },
           });
         } catch (err) {
-          console.error("Failed to load settings:", err);
+          console.error("Failed to load settings from Electron:", err);
         }
       }
+      
+      // Load from localStorage (for web or as fallback)
+      try {
+        const settingsKeys: (keyof Settings)[] = [
+          'crossfadeEnabled', 'crossfadeDuration', 'gaplessPlayback', 'normalizeVolume',
+          'audioQuality', 'equalizerEnabled', 'showLyrics', 'scrobblingEnabled',
+          'autoScanOnStartup', 'notificationsEnabled'
+        ];
+        
+        settingsKeys.forEach((key) => {
+          const stored = localStorage.getItem(`nexus-setting-${key}`);
+          if (stored !== null) {
+            try {
+              const parsed = JSON.parse(stored);
+              loadedSettings[key] = parsed;
+            } catch (e) {
+              // Invalid JSON, skip
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to load settings from localStorage:", err);
+      }
+      
+      // Load from Firebase sync (if authenticated)
+      if (nexusAuthenticated) {
+        try {
+          const { firebaseSyncService } = await import('../services/firebase-sync');
+          const firestoreData = await firebaseSyncService.loadFromFirestore();
+          if (firestoreData?.settings) {
+            loadedSettings = { ...loadedSettings, ...firestoreData.settings };
+          }
+        } catch (err) {
+          // Silently fail if Firebase sync is not available
+          console.warn("Failed to load settings from Firebase:", err);
+        }
+      }
+      
+      setSettings(loadedSettings);
       
       // Load cloudinary config
       if (cloudinaryConfig) {
@@ -190,7 +243,7 @@ export const SettingsView = () => {
       setLoading(false);
     };
     loadSettings();
-  }, [isElectron, cloudinaryConfig]);
+  }, [isElectron, cloudinaryConfig, nexusAuthenticated]);
 
   // Load subscription status
   useEffect(() => {
@@ -234,10 +287,31 @@ export const SettingsView = () => {
 
   const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
-    if (isElectron) {
-      await window.electronAPI!.updateSettings({ [key]: value });
-    }
+    
+    // Save to localStorage immediately
     localStorage.setItem(`nexus-setting-${key}`, JSON.stringify(value));
+    
+    // Save to Electron storage if in Electron
+    if (isElectron) {
+      try {
+        await window.electronAPI!.updateSettings({ [key]: value });
+      } catch (err) {
+        console.error("Failed to save setting to Electron:", err);
+      }
+    }
+    
+    // Sync to Firebase if authenticated
+    if (nexusAuthenticated) {
+      try {
+        const { firebaseSyncService } = await import('../services/firebase-sync');
+        // Update settings object and sync
+        const currentSettings = { ...settings, [key]: value };
+        await firebaseSyncService.queueSync('settings', currentSettings);
+      } catch (err) {
+        // Silently fail if Firebase sync is not available
+        console.warn("Failed to sync setting to Firebase:", err);
+      }
+    }
   };
 
   const handleAddMusicFolder = async () => {
