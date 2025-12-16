@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/PageHeader";
+import { PageHero } from "@/components/PageHero";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackCardSkeleton, AlbumCardSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
@@ -175,15 +176,39 @@ export const SearchView = ({
 
   const hasResults = query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0);
 
+  // Get featured tracks for hero (top 5 search results)
+  const featuredTracksForHero = useMemo(() => {
+    return searchResults.tracks.slice(0, 5);
+  }, [searchResults.tracks]);
+
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-200">
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-4 space-y-6">
-          {/* Header */}
-          <PageHeader
+      {/* Hero Section */}
+      {tracks.length > 0 && (
+        <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+          <PageHero
             title="Recherche"
-            subtitle={searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0 ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
+            subtitle={query ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
+            icon={Search}
+            featuredTracks={featuredTracksForHero}
+            onTrackSelect={(track) => {
+              const index = tracks.findIndex(t => t.id === track.id);
+              if (index !== -1) onTrackSelect(index);
+            }}
+            variant={query && searchResults.tracks.length > 0 ? "default" : "minimal"}
           />
+        </div>
+      )}
+      
+      <div className="flex-1 overflow-y-auto">
+        <div className={cn("px-6 py-4 space-y-6", tracks.length > 0 && "-mt-24 md:-mt-32 relative z-10 pt-16 md:pt-20")}>
+          {/* Header - Only show if no hero */}
+          {tracks.length === 0 && (
+            <PageHeader
+              title="Recherche"
+              subtitle={searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0 ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
+            />
+          )}
 
           {/* Search Bar */}
           <div className="relative">

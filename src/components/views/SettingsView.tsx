@@ -51,6 +51,7 @@ import type { Settings, RecognitionResult, DetectedGroup, Track } from "@/types/
 import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProductShowcase } from "@/components/ProductShowcase";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -179,8 +180,8 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       // Rafraîchir la bibliothèque
       await refreshLibrary();
       // Recharger les patterns
-      const newPatterns = await window.electronAPI.detectPatterns();
-      setPatterns(newPatterns);
+      const newPatterns = await window.electronAPI?.detectPatterns?.();
+      if (newPatterns) setPatterns(newPatterns);
     } catch (error) {
       console.error('Erreur lors de l\'application:', error);
       toast.error("Erreur lors de l'application du pattern");
@@ -378,6 +379,7 @@ export const SettingsView = () => {
     };
   });
   const [scrobblerStatus, setScrobblerStatus] = useState({
+    configured: false,
     lastFm: { connected: false, username: undefined as string | undefined },
     libreFm: { connected: false, username: undefined as string | undefined },
   });
@@ -413,10 +415,11 @@ export const SettingsView = () => {
         try {
           const [electronSettings, status] = await Promise.all([
             window.electronAPI!.getSettings(),
-            window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false, username: undefined }, libreFm: { connected: false, username: undefined } }),
+            window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ configured: false, lastFm: { connected: false, username: undefined }, libreFm: { connected: false, username: undefined } }),
           ]);
           loadedSettings = { ...loadedSettings, ...electronSettings };
           setScrobblerStatus({
+            configured: 'configured' in status ? status.configured : false,
             lastFm: { connected: status.lastFm.connected, username: 'username' in status.lastFm ? status.lastFm.username : undefined },
             libreFm: { connected: status.libreFm.connected, username: 'username' in status.libreFm ? status.libreFm.username : undefined },
           });
@@ -928,8 +931,33 @@ export const SettingsView = () => {
               </SettingsCard>
 
               <SettingsCard title="Scrobbling" icon={Sparkles} className="lg:col-span-2">
+                {/* Warning if not configured */}
+                {isElectron && !scrobblerStatus.configured && (
+                  <div className="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-500">Configuration requise</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Les clés API Last.fm ne sont pas configurées. Ajoutez LASTFM_API_KEY et LASTFM_API_SECRET dans vos variables d'environnement.
+                      </p>
+                      <a 
+                        href="https://www.last.fm/api/account/create" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
+                      >
+                        Obtenir une clé API <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+                
                 <SettingRow label="Activer le scrobbling" description="Envoie vos écoutes à Last.fm/Libre.fm">
-                  <Switch checked={settings.scrobblingEnabled} onCheckedChange={(v) => updateSetting("scrobblingEnabled", v)} disabled={!isElectron} />
+                  <Switch 
+                    checked={settings.scrobblingEnabled} 
+                    onCheckedChange={(v) => updateSetting("scrobblingEnabled", v)} 
+                    disabled={!isElectron || !scrobblerStatus.configured} 
+                  />
                 </SettingRow>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   {/* Last.fm */}
@@ -953,7 +981,7 @@ export const SettingsView = () => {
                       variant={scrobblerStatus.lastFm.connected ? "outline" : "default"}
                       size="sm"
                       onClick={scrobblerStatus.lastFm.connected ? () => handleDisconnectScrobbler("lastfm") : handleConnectLastFm}
-                      disabled={!isElectron}
+                      disabled={!isElectron || !scrobblerStatus.configured}
                     >
                       {scrobblerStatus.lastFm.connected ? "Déconnecter" : "Connecter"}
                     </Button>
@@ -980,7 +1008,7 @@ export const SettingsView = () => {
                       variant={scrobblerStatus.libreFm.connected ? "outline" : "default"}
                       size="sm"
                       onClick={scrobblerStatus.libreFm.connected ? () => handleDisconnectScrobbler("librefm") : handleConnectLibreFm}
-                      disabled={!isElectron}
+                      disabled={!isElectron || !scrobblerStatus.configured}
                     >
                       {scrobblerStatus.libreFm.connected ? "Déconnecter" : "Connecter"}
                     </Button>
@@ -1781,6 +1809,13 @@ export const SettingsView = () => {
                     </Button>
                   </div>
                 </div>
+              </SettingsCard>
+            </div>
+            
+            {/* Product Showcase Section */}
+            <div className="mt-8">
+              <SettingsCard title="Fonctionnalités" icon={Sparkles} className="lg:col-span-2">
+                <ProductShowcase variant="grid" />
               </SettingsCard>
             </div>
           </TabsContent>

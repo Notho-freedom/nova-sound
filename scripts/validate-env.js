@@ -171,6 +171,16 @@ const envDefinitions = {
         description: 'Storage Directory',
         validate: (val) => !val || val.length > 0,
       },
+      {
+        key: 'LASTFM_API_KEY',
+        description: 'Last.fm API Key (for scrobbling)',
+        validate: (val) => !val || val.length > 10,
+      },
+      {
+        key: 'LASTFM_API_SECRET',
+        description: 'Last.fm API Secret (for scrobbling)',
+        validate: (val) => !val || val.length > 10,
+      },
     ],
   },
 };

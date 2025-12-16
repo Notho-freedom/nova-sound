@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Download, 
   Pause, 
@@ -17,6 +17,7 @@ import {
   Server,
   HardDrive,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,17 +34,23 @@ import { firebaseService } from "@/services/firebase";
 import { getUserStorageKey, getCurrentUserId } from "@/lib/storage-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
+// Download configuration
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_BASE = 1000;
+
 interface DownloadItem {
   id: string;
   filename: string;
   url: string;
   size: number;
-  status: "pending" | "downloading" | "paused" | "completed" | "failed";
+  status: "pending" | "downloading" | "paused" | "completed" | "failed" | "retrying";
   progress: number;
   type: "audio" | "video" | "image" | "other";
   createdAt: Date;
   completedAt?: Date;
   error?: string;
+  retryCount?: number;
+  bytesDownloaded?: number;
 }
 
 interface UploadedFile {
@@ -208,24 +215,20 @@ export const DownloadsView = () => {
     return "À l'instant";
   };
 
-  const startDownload = async (url: string, filename: string) => {
-    const id = crypto.randomUUID();
-    const newDownload: DownloadItem = {
-      id,
-      filename,
-      url,
-      size: 0,
-      status: "pending",
-      progress: 0,
-      type: getFileType(filename),
-      createdAt: new Date(),
-    };
+  // Store abort controllers for active downloads
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
-    setDownloads((prev) => [...prev, newDownload]);
+  const downloadWithRetry = useCallback(async (
+    id: string,
+    url: string,
+    filename: string,
+    retryCount: number = 0
+  ): Promise<void> => {
+    const controller = new AbortController();
+    abortControllersRef.current.set(id, controller);
 
     try {
-      // Simulate download progress (in real implementation, use fetch with progress tracking)
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       const contentLength = response.headers.get("content-length");
       const total = contentLength ? parseInt(contentLength, 10) : 0;
 
@@ -244,7 +247,7 @@ export const DownloadsView = () => {
       setDownloads((prev) =>
         prev.map((d) =>
           d.id === id
-            ? { ...d, status: "downloading", size: total }
+            ? { ...d, status: "downloading", size: total, retryCount }
             : d
         )
       );
@@ -259,7 +262,7 @@ export const DownloadsView = () => {
         const progress = total > 0 ? (received / total) * 100 : 0;
         setDownloads((prev) =>
           prev.map((d) =>
-            d.id === id ? { ...d, progress } : d
+            d.id === id ? { ...d, progress, bytesDownloaded: received } : d
           )
         );
       }
@@ -288,27 +291,95 @@ export const DownloadsView = () => {
         )
       );
 
+      abortControllersRef.current.delete(id);
       toast.success(`Téléchargement terminé: ${filename}`);
-    } catch (error) {
-      console.error("Download failed:", error);
+    } catch (error: any) {
+      // Check if aborted
+      if (error.name === "AbortError") {
+        return;
+      }
+
+      // Retry logic
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount);
+        
+        setDownloads((prev) =>
+          prev.map((d) =>
+            d.id === id
+              ? {
+                  ...d,
+                  status: "retrying",
+                  retryCount: retryCount + 1,
+                  error: `Tentative ${retryCount + 2}/${MAX_RETRY_ATTEMPTS + 1}...`,
+                }
+              : d
+          )
+        );
+
+        toast.warning(`Nouvelle tentative pour ${filename}`, {
+          description: `Nouvel essai dans ${delay / 1000}s`,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Check if still exists and not cancelled
+        if (!abortControllersRef.current.has(id)) {
+          return;
+        }
+        
+        return downloadWithRetry(id, url, filename, retryCount + 1);
+      }
+
+      // Max retries reached
+      console.error("Download failed after retries:", error);
       setDownloads((prev) =>
         prev.map((d) =>
           d.id === id
             ? {
                 ...d,
                 status: "failed",
-                error: error instanceof Error ? error.message : "Erreur inconnue",
+                error: error.message || "Échec après plusieurs tentatives",
               }
             : d
         )
       );
+      abortControllersRef.current.delete(id);
       toast.error(`Échec du téléchargement: ${filename}`);
     }
+  }, []);
+
+  const startDownload = async (url: string, filename: string) => {
+    const id = crypto.randomUUID();
+    const newDownload: DownloadItem = {
+      id,
+      filename,
+      url,
+      size: 0,
+      status: "pending",
+      progress: 0,
+      type: getFileType(filename),
+      createdAt: new Date(),
+      retryCount: 0,
+    };
+
+    setDownloads((prev) => [...prev, newDownload]);
+    
+    // Start download with retry mechanism
+    await downloadWithRetry(id, url, filename, 0);
   };
 
   const pauseDownload = (id: string) => {
+    // Abort the current download
+    const controller = abortControllersRef.current.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(id);
+    }
+    
     setDownloads((prev) =>
-      prev.map((d) => (d.id === id && d.status === "downloading" ? { ...d, status: "paused" } : d))
+      prev.map((d) => (d.id === id && (d.status === "downloading" || d.status === "retrying") 
+        ? { ...d, status: "paused" } 
+        : d))
     );
     toast.info("Téléchargement mis en pause");
   };
@@ -317,16 +388,34 @@ export const DownloadsView = () => {
     const download = downloads.find((d) => d.id === id);
     if (!download || download.status !== "paused") return;
 
-    // In a real implementation, resume from where it left off
-    setDownloads((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: "downloading" } : d))
-    );
+    // Restart the download from the beginning (Range requests would need server support)
     toast.info("Reprise du téléchargement");
+    await downloadWithRetry(id, download.url, download.filename, download.retryCount || 0);
   };
 
   const cancelDownload = (id: string) => {
+    // Abort any active download
+    const controller = abortControllersRef.current.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(id);
+    }
+    
     setDownloads((prev) => prev.filter((d) => d.id !== id));
     toast.info("Téléchargement annulé");
+  };
+
+  const retryDownload = async (id: string) => {
+    const download = downloads.find((d) => d.id === id);
+    if (!download || download.status !== "failed") return;
+
+    // Reset status and retry
+    setDownloads((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, status: "pending", error: undefined, retryCount: 0 } : d))
+    );
+    
+    toast.info("Nouvelle tentative de téléchargement");
+    await downloadWithRetry(id, download.url, download.filename, 0);
   };
 
   const removeDownload = (id: string) => {
@@ -701,12 +790,9 @@ export const DownloadsView = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        removeDownload(download.id);
-                        startDownload(download.url, download.filename);
-                      }}
+                      onClick={() => retryDownload(download.id)}
                     >
-                      <Download className="w-4 h-4 mr-2" />
+                      <RefreshCw className="w-4 h-4 mr-2" />
                       Réessayer
                     </Button>
                     <Button
@@ -717,6 +803,45 @@ export const DownloadsView = () => {
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Retrying Downloads */}
+      {downloads.filter(d => d.status === "retrying").length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+            Nouvelle tentative ({downloads.filter(d => d.status === "retrying").length})
+          </h2>
+          <div className="space-y-2">
+            {downloads.filter(d => d.status === "retrying").map((download) => (
+              <div
+                key={download.id}
+                className="p-4 rounded-lg bg-card border border-yellow-500/30"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                    <RefreshCw className="w-5 h-5 text-yellow-500 animate-spin" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-foreground">
+                      {download.filename}
+                    </p>
+                    <p className="text-xs text-yellow-500 mt-1">
+                      Tentative {(download.retryCount || 0) + 1}/{MAX_RETRY_ATTEMPTS + 1}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => cancelDownload(download.id)}
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             ))}

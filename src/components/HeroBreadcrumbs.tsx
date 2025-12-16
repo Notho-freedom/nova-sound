@@ -26,6 +26,7 @@ interface HeroBreadcrumbsProps {
   uploadProgress?: number;
   hasNotifications?: boolean;
   onToggleNotifications?: () => void;
+  showTitleBar2?: boolean; // Control visibility of TitleBar2 controls
 }
 
 export const HeroBreadcrumbs = ({ 
@@ -37,7 +38,8 @@ export const HeroBreadcrumbs = ({
   onOpenSettings,
   uploadProgress,
   hasNotifications = false,
-  onToggleNotifications
+  onToggleNotifications,
+  showTitleBar2 = true, // Show TitleBar2 controls by default
 }: HeroBreadcrumbsProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -226,8 +228,8 @@ export const HeroBreadcrumbs = ({
         }}
       />
 
-      {/* TitleBar2 Controls - Fused with hero at the top right - Always visible on home */}
-      {(onOpenSettings !== undefined || onToggleNotifications !== undefined) && (
+      {/* TitleBar2 Controls - Fused with hero at the top right - Only visible when hero is visible */}
+      {showTitleBar2 && (onOpenSettings !== undefined || onToggleNotifications !== undefined) && (
         <div 
           className="absolute top-4 right-8 md:top-6 md:right-12 z-30 flex items-center gap-1 select-none"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

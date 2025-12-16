@@ -118,7 +118,8 @@ export const DesktopApp = () => {
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false); // Track scroll position
+  // Initialize isScrolled based on current view - true for non-home views, false for home (hero visible by default)
+  const [isScrolled, setIsScrolled] = useState(currentView !== "home");
   const heroRef = useRef<HTMLDivElement>(null); // Ref to hero element for intersection observer
 
   // Detect app fullscreen mode
@@ -158,22 +159,37 @@ export const DesktopApp = () => {
     };
   }, []);
 
-  // Track hero visibility for TitleBar switching using Intersection Observer
+  // Track hero visibility for TitleBar switching using Intersection Observer with better precision
   useEffect(() => {
-    if (currentView !== "home" || !heroRef.current) {
+    // Immediately set state for non-home views
+    if (currentView !== "home") {
+      setIsScrolled(true); // Show v1 on other views
+      return;
+    }
+
+    // For home view, wait for heroRef to be available
+    if (!heroRef.current) {
+      // If heroRef is not available yet, assume hero is visible (show v2)
       setIsScrolled(false);
       return;
     }
 
+    // Use a more precise threshold - show v2 when hero is at least 20% visible
     const observer = new IntersectionObserver(
       (entries) => {
-        // If hero is not intersecting (not visible), show v1
-        setIsScrolled(!entries[0].isIntersecting);
+        const entry = entries[0];
+        if (!entry) return;
+        
+        // Show v2 (TitleBar2) when hero is at least 20% visible
+        // Show v1 (TitleBar) when hero is less than 20% visible or not intersecting
+        const isHeroVisible = entry.isIntersecting && entry.intersectionRatio >= 0.2;
+        setIsScrolled(!isHeroVisible);
       },
       {
-        // Trigger when hero is completely out of view
-        threshold: 0,
-        rootMargin: '0px',
+        // Use multiple thresholds for smoother transitions
+        threshold: [0, 0.1, 0.2, 0.3, 0.5, 1.0],
+        // Add root margin to trigger slightly before hero fully exits
+        rootMargin: '-10% 0px -10% 0px',
       }
     );
 
@@ -1017,6 +1033,7 @@ export const DesktopApp = () => {
           }}
           isFullscreen={isAppFullscreen}
           heroRef={heroRef}
+          isScrolled={isScrolled}
         />
         );
       case "search":
@@ -1294,6 +1311,7 @@ export const DesktopApp = () => {
         )}
 
         {/* Title Bar - v1 when scrolled on home or on other views, v2 in hero when at top of home */}
+        {/* Show TitleBar v1 when: not on home view OR on home view but scrolled past hero */}
         {(currentView !== "home" || (currentView === "home" && isScrolled)) && (
           <TitleBar 
             onOpenSettings={handleOpenSettings} 
@@ -1308,6 +1326,7 @@ export const DesktopApp = () => {
             }}
           />
         )}
+        {/* TitleBar2 is rendered inside HeroBreadcrumbs component on home view when hero is visible */}
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden relative">

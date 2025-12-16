@@ -4,12 +4,20 @@ import * as crypto from 'crypto';
 import { storage } from './storage.js';
 
 // API Configuration
-// Note: In production, you should use your own API key from Last.fm
-// https://www.last.fm/api/account/create
-const LASTFM_API_KEY = 'YOUR_LASTFM_API_KEY'; // Replace with actual key
-const LASTFM_API_SECRET = 'YOUR_LASTFM_API_SECRET'; // Replace with actual secret
+// Last.fm API credentials from environment variables
+// Get your API key from: https://www.last.fm/api/account/create
+const LASTFM_API_KEY = process.env.LASTFM_API_KEY || '';
+const LASTFM_API_SECRET = process.env.LASTFM_API_SECRET || '';
 const LASTFM_API_URL = 'https://ws.audioscrobbler.com/2.0/';
 const LASTFM_AUTH_URL = 'https://www.last.fm/api/auth/';
+
+/**
+ * Check if Last.fm API is configured
+ */
+export function isScrobblerConfigured(): boolean {
+  return Boolean(LASTFM_API_KEY && LASTFM_API_SECRET && 
+    LASTFM_API_KEY !== '' && LASTFM_API_SECRET !== '');
+}
 
 // Libre.fm uses the same API as Last.fm
 const LIBREFM_API_URL = 'https://libre.fm/2.0/';
@@ -120,6 +128,10 @@ async function makeAPIRequest(
  * Get authentication token (step 1 of auth flow)
  */
 async function getAuthToken(service: 'lastfm' | 'librefm'): Promise<string> {
+  if (!isScrobblerConfigured()) {
+    throw new Error('Last.fm API is not configured. Please set LASTFM_API_KEY and LASTFM_API_SECRET environment variables.');
+  }
+  
   const apiUrl = service === 'lastfm' ? LASTFM_API_URL : LIBREFM_API_URL;
   
   const params = {
@@ -204,6 +216,11 @@ async function authenticate(service: 'lastfm' | 'librefm'): Promise<void> {
  * Update "Now Playing" status
  */
 async function updateNowPlaying(track: ScrobbleTrack): Promise<void> {
+  if (!isScrobblerConfigured()) {
+    console.warn('Scrobbling disabled: Last.fm API not configured');
+    return;
+  }
+  
   const settings = await storage.getSettings();
   
   if (!settings.scrobblingEnabled) return;
@@ -245,6 +262,11 @@ async function updateNowPlaying(track: ScrobbleTrack): Promise<void> {
  * Scrobble a track
  */
 async function scrobbleTrack(track: ScrobbleTrack): Promise<void> {
+  if (!isScrobblerConfigured()) {
+    console.warn('Scrobbling disabled: Last.fm API not configured');
+    return;
+  }
+  
   const settings = await storage.getSettings();
   
   if (!settings.scrobblingEnabled) return;
@@ -318,6 +340,10 @@ async function scrobbleTrack(track: ScrobbleTrack): Promise<void> {
  * Process offline scrobble queue
  */
 async function processScrobbleQueue(): Promise<void> {
+  if (!isScrobblerConfigured()) {
+    return; // Silent return - can't process without API keys
+  }
+  
   const queue = await storage.getScrobbleQueue();
   const settings = await storage.getSettings();
   
@@ -374,10 +400,11 @@ async function disconnect(service: 'lastfm' | 'librefm'): Promise<void> {
 /**
  * Get scrobbler status
  */
-async function getStatus(): Promise<ScrobbleStatus> {
+async function getStatus(): Promise<ScrobbleStatus & { configured: boolean }> {
   const settings = await storage.getSettings();
   
   return {
+    configured: isScrobblerConfigured(),
     lastFm: {
       connected: settings.lastFmConnected,
       username: settings.lastFmUsername,

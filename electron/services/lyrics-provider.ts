@@ -1,7 +1,14 @@
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import { net } from 'electron';
+import { promises as fs } from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 
 const LRCLIB_BASE_URL = 'https://lrclib.net/api';
+
+// Lyrics cache configuration
+const CACHE_DIR = path.join(app.getPath('userData'), 'lyrics-cache');
+const CACHE_MAX_AGE_DAYS = 30; // Cache lyrics for 30 days
 
 export interface LyricsLine {
   time: number; // Time in seconds
@@ -29,6 +36,133 @@ export interface LyricsSearchResult {
   instrumental: boolean;
   syncedLyrics?: string;
   plainLyrics?: string;
+}
+
+/**
+ * Generate a cache key for a track
+ */
+function generateCacheKey(artist: string, title: string): string {
+  const normalized = `${artist.toLowerCase().trim()}-${title.toLowerCase().trim()}`;
+  return crypto.createHash('md5').update(normalized).digest('hex');
+}
+
+/**
+ * Ensure cache directory exists
+ */
+async function ensureCacheDir(): Promise<void> {
+  try {
+    await fs.mkdir(CACHE_DIR, { recursive: true });
+  } catch (error) {
+    // Directory may already exist
+  }
+}
+
+/**
+ * Get cached lyrics
+ */
+async function getCachedLyrics(artist: string, title: string): Promise<LyricsResult | null> {
+  try {
+    const cacheKey = generateCacheKey(artist, title);
+    const cachePath = path.join(CACHE_DIR, `${cacheKey}.json`);
+    
+    const stat = await fs.stat(cachePath);
+    const ageInDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+    
+    // Check if cache is still valid
+    if (ageInDays > CACHE_MAX_AGE_DAYS) {
+      await fs.unlink(cachePath).catch(() => {}); // Delete expired cache
+      return null;
+    }
+    
+    const data = await fs.readFile(cachePath, 'utf-8');
+    const cached = JSON.parse(data);
+    cached.source = 'cache';
+    return cached;
+  } catch (error) {
+    // Cache miss or error reading cache
+    return null;
+  }
+}
+
+/**
+ * Save lyrics to cache
+ */
+async function cacheLyrics(artist: string, title: string, lyrics: LyricsResult): Promise<void> {
+  try {
+    await ensureCacheDir();
+    const cacheKey = generateCacheKey(artist, title);
+    const cachePath = path.join(CACHE_DIR, `${cacheKey}.json`);
+    
+    await fs.writeFile(cachePath, JSON.stringify(lyrics), 'utf-8');
+  } catch (error) {
+    console.error('Failed to cache lyrics:', error);
+  }
+}
+
+/**
+ * Clear expired cache entries
+ */
+async function cleanupCache(): Promise<{ deleted: number; remaining: number }> {
+  let deleted = 0;
+  let remaining = 0;
+  
+  try {
+    await ensureCacheDir();
+    const files = await fs.readdir(CACHE_DIR);
+    
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      
+      const filePath = path.join(CACHE_DIR, file);
+      try {
+        const stat = await fs.stat(filePath);
+        const ageInDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
+        
+        if (ageInDays > CACHE_MAX_AGE_DAYS) {
+          await fs.unlink(filePath);
+          deleted++;
+        } else {
+          remaining++;
+        }
+      } catch (error) {
+        // Skip files that can't be accessed
+      }
+    }
+  } catch (error) {
+    console.error('Failed to cleanup lyrics cache:', error);
+  }
+  
+  return { deleted, remaining };
+}
+
+/**
+ * Get cache statistics
+ */
+async function getCacheStats(): Promise<{ count: number; size: number }> {
+  let count = 0;
+  let size = 0;
+  
+  try {
+    await ensureCacheDir();
+    const files = await fs.readdir(CACHE_DIR);
+    
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue;
+      
+      const filePath = path.join(CACHE_DIR, file);
+      try {
+        const stat = await fs.stat(filePath);
+        count++;
+        size += stat.size;
+      } catch (error) {
+        // Skip files that can't be accessed
+      }
+    }
+  } catch (error) {
+    console.error('Failed to get cache stats:', error);
+  }
+  
+  return { count, size };
 }
 
 /**
@@ -115,7 +249,7 @@ async function fetchJSON<T>(url: string): Promise<T | null> {
 }
 
 /**
- * Get lyrics for a track from LRCLIB
+ * Get lyrics for a track from LRCLIB with caching
  */
 async function getLyrics(
   artist: string,
@@ -124,6 +258,13 @@ async function getLyrics(
   duration?: number
 ): Promise<LyricsResult | null> {
   try {
+    // Check cache first
+    const cached = await getCachedLyrics(artist, title);
+    if (cached) {
+      console.log(`Lyrics cache hit for "${artist} - ${title}"`);
+      return cached;
+    }
+    
     // Build query parameters
     const params = new URLSearchParams({
       artist_name: artist,
@@ -163,6 +304,10 @@ async function getLyrics(
     if (response.plainLyrics) {
       result.plainLyrics = response.plainLyrics;
     }
+    
+    // Cache the result
+    await cacheLyrics(artist, title, result);
+    console.log(`Lyrics cached for "${artist} - ${title}"`);
     
     return result;
   } catch (error) {
@@ -254,6 +399,16 @@ export function findCurrentLyricsLine(
  * Initialize IPC handlers for lyrics
  */
 export function initLyricsProvider() {
+  // Ensure cache directory exists on startup
+  ensureCacheDir();
+  
+  // Cleanup expired cache on startup
+  cleanupCache().then(({ deleted, remaining }) => {
+    if (deleted > 0) {
+      console.log(`Lyrics cache: cleaned ${deleted} expired entries, ${remaining} remaining`);
+    }
+  });
+  
   ipcMain.handle('lyrics:get', async (_event, artist: string, title: string, duration?: number) => {
     return getLyrics(artist, title, undefined, duration);
   });
@@ -274,6 +429,14 @@ export function initLyricsProvider() {
 
   ipcMain.handle('lyrics:getById', async (_event, id: number) => {
     return getLyricsById(id);
+  });
+  
+  ipcMain.handle('lyrics:getCacheStats', async () => {
+    return getCacheStats();
+  });
+  
+  ipcMain.handle('lyrics:clearCache', async () => {
+    return cleanupCache();
   });
 }
 

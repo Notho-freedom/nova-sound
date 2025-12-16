@@ -377,79 +377,130 @@ export function useCloudSync(): UseCloudSyncReturn {
 
     // Subscribe to Firebase auth state changes (priority - uses merged Google data from Firestore)
     let unsubscribeFirebase: (() => void) | null = null;
-    if (firebaseService.isInitialized()) {
-      unsubscribeFirebase = firebaseService.onAuthStateChange(async (firebaseUser) => {
-        if (firebaseUser) {
-          // Always get the latest profile from Firestore (contains merged Google data with priority)
-          const profile = firebaseService.getUserProfile();
-          if (profile) {
-            // Update UI with profile from Firestore (Google data is prioritized during merge)
-            setNexusUser(profile);
-            // Only consider authenticated if user is NOT anonymous (has Google account)
-            setNexusAuthenticated(!firebaseUser.isAnonymous);
-            setNexusIsPro(firebaseService.isPro());
-            
-            // Initialize Firebase sync ONLY ONCE per user session
-            // Check if this is a new user or if sync hasn't been initialized yet
-            if (!firebaseUser.isAnonymous) {
-              const currentUserId = firebaseUser.uid;
+    
+    // Initialize Firebase if not already initialized
+    const initFirebaseAuth = async () => {
+      try {
+        await firebaseService.ensureInitialized();
+        if (firebaseService.isInitialized()) {
+          // Set up auth state listener
+          unsubscribeFirebase = firebaseService.onAuthStateChange(async (firebaseUser) => {
+            if (firebaseUser) {
+              // Wait for profile to be loaded with retries
+              // The profile might not be immediately available after auth state change
+              let profile = firebaseService.getUserProfile();
               
-              // Only initialize if it's a different user or sync hasn't been initialized
-              if (lastUserIdRef.current !== currentUserId || !syncInitializedRef.current) {
-                try {
-                  const { firebaseSyncService } = await import('@/services/firebase-sync');
-                  await firebaseSyncService.initializeSync(currentUserId);
-                  syncInitializedRef.current = true;
-                  lastUserIdRef.current = currentUserId;
-                  
-                  // Load sync status only once during initialization
-                  try {
-                    const status = await nexusServerService.getSyncStatus();
-                    setSyncStatus({
-                      lastSyncAt: status.lastSyncAt || null,
-                      tracksUploaded: status.tracksUploaded,
-                      tracksDownloaded: status.tracksDownloaded,
-                    });
-                  } catch (error) {
-                    // Silently fail
-                    setSyncStatus({
-                      lastSyncAt: null,
-                      tracksUploaded: 0,
-                      tracksDownloaded: 0,
-                    });
-                  }
-                } catch (error) {
-                  console.error('Error initializing Firebase sync:', error);
-                }
+              // Retry up to 5 times with increasing delays
+              const delays = [100, 200, 400, 800, 1000];
+              for (let i = 0; i < delays.length && !profile; i++) {
+                await new Promise(resolve => setTimeout(resolve, delays[i]));
+                profile = firebaseService.getUserProfile();
               }
-              // If sync is already initialized for this user, skip everything
-              // This prevents re-initialization and status loading on every auth state change
+              
+              if (profile) {
+                // Update UI with profile from Firestore (Google data is prioritized during merge)
+                setNexusUser(profile);
+                // Only consider authenticated if user is NOT anonymous (has Google account)
+                setNexusAuthenticated(!firebaseUser.isAnonymous);
+                setNexusIsPro(firebaseService.isPro());
+                
+                // Initialize Firebase sync ONLY ONCE per user session
+                // Check if this is a new user or if sync hasn't been initialized yet
+                if (!firebaseUser.isAnonymous) {
+                  const currentUserId = firebaseUser.uid;
+                  
+                  // Only initialize if it's a different user or sync hasn't been initialized
+                  if (lastUserIdRef.current !== currentUserId || !syncInitializedRef.current) {
+                    try {
+                      const { firebaseSyncService } = await import('@/services/firebase-sync');
+                      
+                      // Ensure sync is properly initialized
+                      await firebaseSyncService.initializeSync(currentUserId);
+                      
+                      syncInitializedRef.current = true;
+                      lastUserIdRef.current = currentUserId;
+                      
+                      // Load sync status only once during initialization
+                      try {
+                        const status = await nexusServerService.getSyncStatus();
+                        setSyncStatus({
+                          lastSyncAt: status.lastSyncAt || null,
+                          tracksUploaded: status.tracksUploaded,
+                          tracksDownloaded: status.tracksDownloaded,
+                        });
+                      } catch {
+                        // Silently fail
+                        setSyncStatus({
+                          lastSyncAt: null,
+                          tracksUploaded: 0,
+                          tracksDownloaded: 0,
+                        });
+                      }
+                    } catch (error) {
+                      console.error('Error initializing Firebase sync:', error);
+                      // Retry once after a delay
+                      setTimeout(async () => {
+                        try {
+                          const { firebaseSyncService } = await import('@/services/firebase-sync');
+                          await firebaseSyncService.initializeSync(currentUserId);
+                          syncInitializedRef.current = true;
+                          lastUserIdRef.current = currentUserId;
+                        } catch (retryError) {
+                          console.error('Retry failed to initialize Firebase sync:', retryError);
+                        }
+                      }, 2000);
+                    }
+                  }
+                  // If sync is already initialized for this user, skip everything
+                  // This prevents re-initialization and status loading on every auth state change
+                }
+              } else if (firebaseUser.isAnonymous) {
+                // For anonymous users without profile, create a basic profile display
+                setNexusUser({
+                  uid: firebaseUser.uid,
+                  email: '',
+                  displayName: 'Utilisateur anonyme',
+                  photoURL: null,
+                  plan: 'free',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                });
+                setNexusAuthenticated(false);
+                setNexusIsPro(false);
+              }
+              // For non-anonymous users without profile after retries, silently skip
+              // The profile will be loaded on next auth state change
+            } else {
+              // Firebase user signed out - cleanup sync listeners
+              try {
+                const { firebaseSyncService } = await import('@/services/firebase-sync');
+                firebaseSyncService.cleanup();
+              } catch (error) {
+                // Silently fail
+              }
+              
+              // Reset flags
+              syncInitializedRef.current = false;
+              lastUserIdRef.current = null;
+              
+              setNexusUser(null);
+              setNexusAuthenticated(false);
+              setNexusIsPro(false);
+              setSyncStatus({
+                lastSyncAt: null,
+                tracksUploaded: 0,
+                tracksDownloaded: 0,
+              });
             }
-          }
-        } else {
-          // Firebase user signed out - cleanup sync listeners
-          try {
-            const { firebaseSyncService } = await import('@/services/firebase-sync');
-            firebaseSyncService.cleanup();
-          } catch (error) {
-            // Silently fail
-          }
-          
-          // Reset flags
-          syncInitializedRef.current = false;
-          lastUserIdRef.current = null;
-          
-          setNexusUser(null);
-          setNexusAuthenticated(false);
-          setNexusIsPro(false);
-          setSyncStatus({
-            lastSyncAt: null,
-            tracksUploaded: 0,
-            tracksDownloaded: 0,
           });
         }
-      });
-    }
+      } catch (error) {
+        console.error('Error initializing Firebase auth:', error);
+      }
+    };
+    
+    // Initialize Firebase auth
+    initFirebaseAuth();
 
     // Subscribe to manual auth state changes (fallback for non-Firebase users)
     // This listener updates UI immediately when a Google user is detected

@@ -140,6 +140,7 @@ export interface ScrobbleTrack {
 }
 
 export interface ScrobblerStatus {
+  configured: boolean;
   lastFm: {
     connected: boolean;
     username?: string;

@@ -32,6 +32,7 @@ interface HomeViewProps {
   onToggleNotifications?: () => void;
   isFullscreen?: boolean;
   heroRef?: React.RefObject<HTMLDivElement>;
+  isScrolled?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -86,6 +87,7 @@ export const HomeView = ({
   onToggleNotifications,
   isFullscreen = false,
   heroRef,
+  isScrolled = false,
 }: HomeViewProps) => {
   // Remove duplicates by ID before slicing - memoized
   const getUniqueTracks = useCallback((trackList: Track[]) => {
@@ -266,6 +268,7 @@ export const HomeView = ({
           uploadProgress={uploadProgress}
           hasNotifications={hasNotifications}
           onToggleNotifications={onToggleNotifications}
+          showTitleBar2={!isScrolled}
         />
       </div>
       

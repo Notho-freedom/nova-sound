@@ -17,6 +17,7 @@ import {
   ListMusic,
   Search,
   X,
+  Library,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ import { TrackGridView } from "@/components/TrackGridView";
 import { AlbumContextMenu } from "@/components/AlbumContextMenu";
 import { ArtistContextMenu } from "@/components/ArtistContextMenu";
 import { PageHeader } from "@/components/PageHeader";
+import { PageHero } from "@/components/PageHero";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -643,12 +645,35 @@ export const LibraryView = ({
   }
 
   // Default Tracks View
+  // Get featured tracks for hero (top 5 tracks)
+  const featuredTracksForHero = useMemo(() => {
+    return getUniqueTracks(tracks).slice(0, 5);
+  }, [tracks, getUniqueTracks]);
+
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-200">
+      {/* Hero Section */}
+      {tracks.length > 0 && (
+        <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+          <PageHero
+            title={title}
+            subtitle={`${albums.length} albums • ${tracks.length} titres • ${formatDuration(totalDuration)}`}
+            icon={Library}
+            featuredTracks={featuredTracksForHero}
+            onTrackSelect={(track) => {
+              const index = tracks.findIndex(t => t.id === track.id);
+              if (index !== -1) onTrackSelect(index);
+            }}
+            variant={viewMode === "tracks" ? "default" : "minimal"}
+          />
+        </div>
+      )}
+      
       <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-4 space-y-6">
-          {/* Header */}
-          <PageHeader
+        <div className={cn("px-6 py-4 space-y-6", tracks.length > 0 && "-mt-24 md:-mt-32 relative z-10 pt-16 md:pt-20")}>
+          {/* Header - Only show if no hero */}
+          {tracks.length === 0 && (
+            <PageHeader
             title={title}
             subtitle={`${filteredAndSortedTracks.length} titres • ${formatDuration(totalDuration)}`}
             rightContent={
@@ -695,6 +720,7 @@ export const LibraryView = ({
               )
             }
           />
+          )}
 
           {/* Actions Bar with Search */}
           <div className="flex items-center gap-3 flex-wrap">

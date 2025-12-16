@@ -336,8 +336,13 @@ class FirebaseService {
   // Subscribe to auth state changes
   onAuthStateChange(callback: (user: User | null) => void): () => void {
     this.authStateListeners.add(callback);
-    // Call immediately with current state
-    callback(this.currentUser);
+    // Call immediately with current state only if profile is loaded or no user
+    // This prevents calling with user but no profile (race condition)
+    if (!this.currentUser || this.userProfile) {
+      callback(this.currentUser);
+    }
+    // If user exists but profile not loaded yet, the callback will be called
+    // by the onAuthStateChanged handler after loadUserProfile completes
     return () => this.authStateListeners.delete(callback);
   }
 
