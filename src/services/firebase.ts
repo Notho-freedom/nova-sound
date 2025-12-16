@@ -15,6 +15,7 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  initializeFirestore,
   doc,
   getDoc,
   setDoc,
@@ -102,9 +103,20 @@ async function loadFirebaseConfig(): Promise<void> {
       try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
-        db = getFirestore(app);
         
-        console.log("Firebase initialized successfully");
+        // Check if running in Electron (for long-polling support)
+        const isElectron = typeof window !== 'undefined' && window.electronAPI;
+        
+        // Use long-polling in Electron to avoid WebSocket issues
+        if (isElectron) {
+          db = initializeFirestore(app, {
+            experimentalForceLongPolling: true,
+          });
+          console.log("Firebase initialized with long-polling (Electron mode)");
+        } else {
+          db = getFirestore(app);
+          console.log("Firebase initialized successfully");
+        }
       } catch (error) {
         console.error("Firebase initialization error:", error);
       }
@@ -433,6 +445,12 @@ class FirebaseService {
       return null;
     }
 
+    // Check if we're offline before attempting Firestore operations
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.warn("⚠️ Device is offline, cannot query Firestore");
+      return null;
+    }
+
     try {
       // Query Firestore for user with this email
       const usersRef = collection(db, 'users');
@@ -444,6 +462,14 @@ class FirebaseService {
         return userDoc.data() as UserProfile;
       }
     } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
+      
+      // Handle offline errors gracefully
+      if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
+        console.warn("⚠️ Firestore unavailable (offline), cannot find user by email");
+        return null;
+      }
+      
       console.error("Error finding user by email:", error);
       throw error;
     }
@@ -524,6 +550,16 @@ class FirebaseService {
   private async loadUserProfile(uid: string): Promise<void> {
     if (!db || !this.currentUser) return;
 
+    // Check if we're offline before attempting Firestore operations
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.warn("⚠️ Device is offline, skipping Firestore load");
+      // Create profile from current user data if no profile exists
+      if (!this.userProfile) {
+        await this.createOrUpdateProfile(this.currentUser);
+      }
+      return;
+    }
+
     try {
       const userRef = doc(db, "users", uid);
       const userSnap = await getDoc(userRef);
@@ -538,6 +574,18 @@ class FirebaseService {
         await this.createOrUpdateProfile(this.currentUser);
       }
     } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
+      
+      // Handle offline errors gracefully
+      if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
+        console.warn("⚠️ Firestore unavailable (offline), using local profile");
+        // Create profile from current user data if no profile exists
+        if (!this.userProfile) {
+          await this.createOrUpdateProfile(this.currentUser);
+        }
+        return;
+      }
+      
       console.error("Error loading user profile:", error);
       throw error;
     }
@@ -548,6 +596,30 @@ class FirebaseService {
   private async createOrUpdateProfile(user: User, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
     if (!db) {
       throw new Error("Firestore not initialized");
+    }
+
+    // Check if we're offline - create profile in memory only
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.warn("⚠️ Device is offline, creating profile in memory only");
+      // Create profile object without saving to Firestore
+      const email = googleUserData?.email || user.email || "";
+      const displayName = googleUserData?.displayName || user.displayName || 
+        (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
+      const photoURL = googleUserData?.photoURL || user.photoURL || null;
+      
+      const offlineProfile: UserProfile = {
+        uid: user.uid,
+        email,
+        displayName,
+        photoURL,
+        plan: "free",
+        storageUsed: 0,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+      
+      this.userProfile = offlineProfile;
+      return offlineProfile;
     }
 
     const userRef = doc(db, "users", user.uid);
@@ -588,12 +660,28 @@ class FirebaseService {
         Object.entries(mergedProfile).filter(([_, v]) => v !== undefined)
       ) as Partial<UserProfile>;
       
-      await updateDoc(userRef, cleanedProfile);
-      
-      this.userProfile = {
-        ...existingProfile,
-        ...cleanedProfile,
-      };
+      try {
+        await updateDoc(userRef, cleanedProfile);
+        
+        this.userProfile = {
+          ...existingProfile,
+          ...cleanedProfile,
+        };
+      } catch (error: unknown) {
+        const firestoreError = error as { code?: string; message?: string };
+        
+        // Handle offline errors gracefully
+        if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
+          console.warn("⚠️ Firestore unavailable (offline), using in-memory profile");
+          this.userProfile = {
+            ...existingProfile,
+            ...cleanedProfile,
+          };
+          return this.userProfile;
+        }
+        
+        throw error;
+      }
     } else {
       // Create new profile with Google data priority
       const newProfile: UserProfile = {
@@ -607,9 +695,22 @@ class FirebaseService {
         lastLoginAt: new Date().toISOString(),
       };
 
-      await setDoc(userRef, newProfile);
-      
-      this.userProfile = newProfile;
+      try {
+        await setDoc(userRef, newProfile);
+        
+        this.userProfile = newProfile;
+      } catch (error: unknown) {
+        const firestoreError = error as { code?: string; message?: string };
+        
+        // Handle offline errors gracefully
+        if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
+          console.warn("⚠️ Firestore unavailable (offline), using in-memory profile");
+          this.userProfile = newProfile;
+          return this.userProfile;
+        }
+        
+        throw error;
+      }
     }
 
     return this.userProfile!;
@@ -642,6 +743,11 @@ class FirebaseService {
       return null;
     }
     
+    // For anonymous users, return null (they don't have valid ID tokens for backend)
+    if (this.currentUser.isAnonymous) {
+      return null;
+    }
+    
     try {
       console.log("getIdToken: Requesting token (forceRefresh:", forceRefresh, ")");
       const token = await this.currentUser.getIdToken(forceRefresh);
@@ -654,6 +760,14 @@ class FirebaseService {
         return null;
       }
     } catch (error) {
+      const authError = error as { code?: string; message?: string };
+      
+      // Handle offline errors gracefully
+      if (authError.code === 'unavailable' || authError.message?.includes('offline')) {
+        console.warn("⚠️ Firebase Auth unavailable (offline), cannot get ID token");
+        return null;
+      }
+      
       console.error("getIdToken: Error getting token:", error);
       // Try to refresh if first attempt failed
       if (!forceRefresh) {

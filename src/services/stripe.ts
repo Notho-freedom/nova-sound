@@ -247,22 +247,43 @@ class StripeService {
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
     // Try Firebase first (if user is connected via Firebase)
     let accessToken: string | null = null;
+    let idToken: string | null = null;
     
     try {
       const { firebaseService } = await import('./firebase');
       if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
-        accessToken = await firebaseService.getIdToken();
+        const firebaseUser = firebaseService.getCurrentUser();
+        // Only use Firebase token if user is not anonymous
+        if (firebaseUser && !firebaseUser.isAnonymous) {
+          idToken = await firebaseService.getIdToken();
+          if (idToken) {
+            accessToken = idToken; // Use ID token for Firebase users
+          }
+        }
       }
     } catch (error) {
-      console.log('Firebase not available, trying authService...');
+      // Silent fail, will try authService
     }
     
-    // Fallback to authService (manual OAuth)
+    // Fallback to authService (manual OAuth) if Firebase token not available
     if (!accessToken) {
-      accessToken = await authService.getAccessToken();
+      try {
+        accessToken = await authService.getAccessToken();
+        // Also try to get ID token for better compatibility
+        if (!idToken) {
+          idToken = await authService.getIdToken();
+          // Prefer ID token if available (better for backend verification)
+          if (idToken) {
+            accessToken = idToken;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to get access token from authService:', error);
+      }
     }
     
     if (!accessToken) {
+      console.warn('No access token available for subscription status check');
       return {
         isActive: false,
         plan: "free",
