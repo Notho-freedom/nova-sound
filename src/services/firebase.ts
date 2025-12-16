@@ -20,8 +20,6 @@ import {
   setDoc,
   updateDoc,
   Firestore,
-  enableIndexedDbPersistence,
-  waitForPendingWrites,
   collection,
   query,
   where,
@@ -105,20 +103,6 @@ async function loadFirebaseConfig(): Promise<void> {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
-        
-        // Enable offline persistence for Firestore
-        if (typeof window !== 'undefined' && db) {
-          enableIndexedDbPersistence(db).catch((err) => {
-            // Persistence can fail if multiple tabs are open
-            if (err.code === 'failed-precondition') {
-              console.warn('Firestore persistence failed: Multiple tabs open');
-            } else if (err.code === 'unimplemented') {
-              console.warn('Firestore persistence not available in this browser');
-            } else {
-              console.warn('Firestore persistence error:', err);
-            }
-          });
-        }
         
         console.log("Firebase initialized successfully");
       } catch (error) {
@@ -338,44 +322,8 @@ class FirebaseService {
       
       console.log("✅ Firebase anonymous user created:", user.uid);
       
-      // Wait a bit for Firestore to be ready (especially in offline mode)
-      if (db) {
-        try {
-          await waitForPendingWrites(db);
-        } catch (waitError) {
-          // Ignore wait errors, continue anyway
-          console.log("Waiting for Firestore pending writes:", waitError);
-        }
-      }
-      
-      // Create or update profile with retry logic for offline mode
-      let profile: UserProfile;
-      try {
-        profile = await this.createOrUpdateProfile(user);
-      } catch (profileError: unknown) {
-        const err = profileError as { code?: string; message?: string };
-        // If offline, create a minimal profile locally
-        if (err.message?.includes('offline') || err.code === 'unavailable') {
-          console.warn("Firestore offline, creating local profile:", err.message);
-          profile = {
-            uid: user.uid,
-            email: '',
-            displayName: 'Utilisateur anonyme',
-            photoURL: null,
-            plan: 'free',
-            storageUsed: 0,
-            createdAt: new Date().toISOString(),
-            lastLoginAt: new Date().toISOString(),
-          };
-          this.userProfile = profile;
-          // Try to save to Firestore when online (will be retried automatically)
-          this.createOrUpdateProfile(user).catch(() => {
-            // Silent fail - will retry when online
-          });
-        } else {
-          throw profileError;
-        }
-      }
+      // Create or update profile
+      const profile = await this.createOrUpdateProfile(user);
       
       return profile;
     } catch (error: unknown) {
@@ -496,13 +444,8 @@ class FirebaseService {
         return userDoc.data() as UserProfile;
       }
     } catch (error: unknown) {
-      const err = error as { code?: string; message?: string };
-      // Handle offline mode gracefully
-      if (err.message?.includes('offline') || err.code === 'unavailable') {
-        console.warn("Firestore offline, cannot check for existing user");
-      } else {
-        console.error("Error finding user by email:", error);
-      }
+      console.error("Error finding user by email:", error);
+      throw error;
     }
 
     return null;
@@ -595,38 +538,8 @@ class FirebaseService {
         await this.createOrUpdateProfile(this.currentUser);
       }
     } catch (error: unknown) {
-      const err = error as { code?: string; message?: string };
-      // Handle offline mode gracefully
-      if (err.message?.includes('offline') || err.code === 'unavailable') {
-        console.warn("Firestore offline, using cached or default profile");
-        // Create a minimal profile from current user data
-        if (this.currentUser) {
-          this.userProfile = {
-            uid: this.currentUser.uid,
-            email: this.currentUser.email || '',
-            displayName: this.currentUser.displayName || 'Utilisateur',
-            photoURL: this.currentUser.photoURL,
-            plan: 'free',
-            storageUsed: 0,
-            createdAt: new Date().toISOString(),
-            lastLoginAt: new Date().toISOString(),
-          };
-          // Try to save when online (will be retried automatically)
-          this.createOrUpdateProfile(this.currentUser).catch(() => {
-            // Silent fail - will retry when online
-          });
-        }
-      } else {
-        console.error("Error loading user profile:", error);
-        // If loading fails, try to create profile from current user
-        if (this.currentUser) {
-          try {
-            await this.createOrUpdateProfile(this.currentUser);
-          } catch (createError) {
-            console.error("Error creating profile:", createError);
-          }
-        }
-      }
+      console.error("Error loading user profile:", error);
+      throw error;
     }
   }
 
@@ -639,34 +552,8 @@ class FirebaseService {
 
     const userRef = doc(db, "users", user.uid);
     
-    // Try to get existing profile, but handle offline mode gracefully
-    let userSnap;
-    try {
-      userSnap = await getDoc(userRef);
-    } catch (error: unknown) {
-      const err = error as { code?: string; message?: string };
-      if (err.message?.includes('offline') || err.code === 'unavailable') {
-        // If offline, create a minimal profile locally
-        console.warn("Firestore offline, creating local profile");
-        const minimalProfile: UserProfile = {
-          uid: user.uid,
-          email: googleUserData?.email || user.email || "",
-          displayName: googleUserData?.displayName || user.displayName || "Utilisateur",
-          photoURL: googleUserData?.photoURL || user.photoURL || null,
-          plan: "free",
-          storageUsed: 0,
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
-        this.userProfile = minimalProfile;
-        // Try to save when online (will be retried automatically)
-        setDoc(userRef, minimalProfile).catch(() => {
-          // Silent fail - will retry when online
-        });
-        return minimalProfile;
-      }
-      throw error;
-    }
+    // Get existing profile
+    const userSnap = await getDoc(userRef);
 
     // Priority: googleUserData > user (Firebase) > existing profile
     const email = googleUserData?.email || user.email || "";
@@ -701,16 +588,7 @@ class FirebaseService {
         Object.entries(mergedProfile).filter(([_, v]) => v !== undefined)
       ) as Partial<UserProfile>;
       
-      try {
-        await updateDoc(userRef, cleanedProfile);
-      } catch (updateError: unknown) {
-        const err = updateError as { code?: string; message?: string };
-        if (err.message?.includes('offline') || err.code === 'unavailable') {
-          console.warn("Firestore offline, update will be retried when online");
-        } else {
-          throw updateError;
-        }
-      }
+      await updateDoc(userRef, cleanedProfile);
       
       this.userProfile = {
         ...existingProfile,
@@ -729,16 +607,7 @@ class FirebaseService {
         lastLoginAt: new Date().toISOString(),
       };
 
-      try {
-        await setDoc(userRef, newProfile);
-      } catch (setError: unknown) {
-        const err = setError as { code?: string; message?: string };
-        if (err.message?.includes('offline') || err.code === 'unavailable') {
-          console.warn("Firestore offline, profile will be saved when online");
-        } else {
-          throw setError;
-        }
-      }
+      await setDoc(userRef, newProfile);
       
       this.userProfile = newProfile;
     }

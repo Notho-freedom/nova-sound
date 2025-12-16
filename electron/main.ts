@@ -171,21 +171,9 @@ function createWindow() {
       mainWindow.webContents.openDevTools();
     }
   } else {
-    // Offline-first: toujours charger depuis local-ui
-    const localUIPath = path.join(__dirname, '../local-ui/index.html');
-    
-    // Si local-ui n'existe pas, fallback vers dist (pour compatibilité)
-    if (fs.existsSync(localUIPath)) {
-      mainWindow.loadFile(localUIPath);
-    } else {
-      // Fallback vers dist si local-ui n'existe pas encore
-      const distPath = path.join(__dirname, '../dist/index.html');
-      if (fs.existsSync(distPath)) {
-        mainWindow.loadFile(distPath);
-      } else {
-        console.error('Aucun build trouvé (ni local-ui ni dist)');
-      }
-    }
+    // Production: Load from Vercel
+    const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
+    mainWindow.loadURL(vercelUrl);
   }
 
   mainWindow.on('closed', () => {
