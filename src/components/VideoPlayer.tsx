@@ -211,7 +211,7 @@ export const VideoPlayer = ({
   return (
     <div
       className={cn(
-        "relative bg-black group",
+        "relative bg-black group w-full h-full",
         isFullApp ? "fixed inset-0 z-[9998]" : "",
         className
       )}
@@ -221,10 +221,7 @@ export const VideoPlayer = ({
       {/* Video Element */}
       <video
         ref={videoRef}
-        className={cn(
-          "w-full h-full object-contain",
-          isFullApp && "object-cover"
-        )}
+        className="w-full h-full object-cover"
         playsInline
         preload="metadata"
         onClick={togglePlayPause}

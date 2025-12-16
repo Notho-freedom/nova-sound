@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Home, 
   Library, 
@@ -189,6 +189,45 @@ export const Sidebar = ({
   const { notifySuccess } = useNotifications();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
+  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 1080);
+
+  // Track window height for dynamic spacing
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate dynamic spacing based on window height
+  const dynamicSpacing = useMemo(() => {
+    // Base spacing values (in rem)
+    const minItemSpacing = 0.125; // 0.125rem (space-y-0.5 equivalent)
+    const maxItemSpacing = 0.5; // 0.5rem (space-y-2 equivalent)
+    const minSectionMargin = 1.5; // 1.5rem (mb-6)
+    const maxSectionMargin = 3; // 3rem (mb-12)
+    
+    // Window height ranges (in pixels)
+    const minHeight = 600;
+    const maxHeight = 1440;
+    
+    // Clamp window height to reasonable bounds
+    const clampedHeight = Math.max(minHeight, Math.min(maxHeight, windowHeight));
+    
+    // Calculate interpolation ratio (0 to 1)
+    const ratio = (clampedHeight - minHeight) / (maxHeight - minHeight);
+    
+    // Interpolate spacing values linearly
+    const itemSpacing = minItemSpacing + (maxItemSpacing - minItemSpacing) * ratio;
+    const sectionMargin = minSectionMargin + (maxSectionMargin - minSectionMargin) * ratio;
+    
+    return {
+      item: itemSpacing,
+      section: sectionMargin,
+    };
+  }, [windowHeight]);
 
   const handleCollapsedChange = (value: boolean) => {
     if (onCollapsedChange) {
@@ -244,24 +283,34 @@ export const Sidebar = ({
           collapsed ? "px-2 py-3" : "px-3 py-4"
         )}>
           {/* Main Navigation */}
-          <div className={cn("space-y-0.5", !collapsed && "mb-6")}>
-            {mainNavItems.map((item) => (
-              <NavItem
-                key={item.id}
-                icon={item.icon}
-                label={item.label}
-                isActive={currentView === item.id}
-                onClick={() => onViewChange(item.id)}
-                badge={item.id === "notifications" ? notificationsCount : undefined}
-                collapsed={collapsed}
-              />
-            ))}
+          <div 
+            style={{
+              marginBottom: !collapsed ? `${dynamicSpacing.section}rem` : `${dynamicSpacing.section * 0.6}rem`,
+            }}
+          >
+            <div style={{ gap: `${dynamicSpacing.item}rem` }} className="flex flex-col">
+              {mainNavItems.map((item) => (
+                <NavItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  isActive={currentView === item.id}
+                  onClick={() => onViewChange(item.id)}
+                  badge={item.id === "notifications" ? notificationsCount : undefined}
+                  collapsed={collapsed}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Library */}
-          <div className={!collapsed ? "mb-6" : "mb-4"}>
+          <div 
+            style={{
+              marginBottom: !collapsed ? `${dynamicSpacing.section}rem` : `${dynamicSpacing.section * 0.6}rem`,
+            }}
+          >
             <SectionTitle collapsed={collapsed}>Ma Musique</SectionTitle>
-            <div className="space-y-0.5">
+            <div style={{ gap: `${dynamicSpacing.item}rem` }} className="flex flex-col">
               {libraryItems.map((item) => (
                 <NavItem
                   key={item.id}
@@ -277,9 +326,13 @@ export const Sidebar = ({
           </div>
 
           {/* Media */}
-          <div className={!collapsed ? "mb-6" : "mb-4"}>
+          <div 
+            style={{
+              marginBottom: !collapsed ? `${dynamicSpacing.section}rem` : `${dynamicSpacing.section * 0.6}rem`,
+            }}
+          >
             <SectionTitle collapsed={collapsed}>Médias</SectionTitle>
-            <div className="space-y-0.5">
+            <div style={{ gap: `${dynamicSpacing.item}rem` }} className="flex flex-col">
               {mediaItems.map((item) => (
                 <NavItem
                   key={item.id}
@@ -294,9 +347,13 @@ export const Sidebar = ({
           </div>
 
           {/* Local Files */}
-          <div className={!collapsed ? "mb-6" : "mb-4"}>
+          <div 
+            style={{
+              marginBottom: !collapsed ? `${dynamicSpacing.section}rem` : `${dynamicSpacing.section * 0.6}rem`,
+            }}
+          >
             <SectionTitle collapsed={collapsed}>Local</SectionTitle>
-            <div className="space-y-0.5">
+            <div style={{ gap: `${dynamicSpacing.item}rem` }} className="flex flex-col">
               {localItems.map((item) => (
                 <NavItem
                   key={item.id}
@@ -312,7 +369,12 @@ export const Sidebar = ({
 
           {/* Playlists - Only show when expanded */}
           {!collapsed && (
-            <div className="mb-6 animate-in fade-in slide-in-from-left-2 duration-300">
+            <div 
+              className="animate-in fade-in slide-in-from-left-2 duration-300"
+              style={{
+                marginBottom: `${dynamicSpacing.section}rem`,
+              }}
+            >
               <div className="flex items-center justify-between px-3 py-2.5 mb-1">
                 <h3 className="text-[10px] font-display uppercase tracking-widest text-muted-foreground/60">
                   Playlists
@@ -329,7 +391,7 @@ export const Sidebar = ({
                   <TooltipContent>Créer une playlist</TooltipContent>
                 </Tooltip>
               </div>
-              <div className="space-y-0.5">
+              <div style={{ gap: `${dynamicSpacing.item}rem` }} className="flex flex-col">
                 {playlists.slice(0, 5).map((playlist) => (
                   <Tooltip key={playlist.id}>
                     <TooltipTrigger asChild>

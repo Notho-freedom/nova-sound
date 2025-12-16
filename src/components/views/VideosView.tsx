@@ -111,7 +111,7 @@ export const VideosView = () => {
     return (
       <div className={cn(
         "flex flex-col animate-in fade-in duration-300 bg-black",
-        isFullApp ? "fixed inset-0 z-[9998]" : "h-full"
+        isFullApp ? "fixed inset-0 z-[9998]" : "absolute inset-0"
       )}>
         <VideoPlayer
           video={selectedVideo}
@@ -122,7 +122,7 @@ export const VideosView = () => {
           }}
           onNext={handleNext}
           onPrevious={handlePrevious}
-          className="flex-1"
+          className="w-full h-full"
           showControls={true}
           autoPlay={true}
           onFullApp={() => setIsFullApp(!isFullApp)}
@@ -134,7 +134,7 @@ export const VideosView = () => {
   }
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in duration-300">
+    <div className="absolute inset-0 flex flex-col animate-in fade-in duration-300">
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 space-y-6">
           {/* Header */}

@@ -1257,10 +1257,15 @@ export const DesktopApp = () => {
             <div className={cn(
               "flex-1 transition-all duration-300 relative",
               isQueueOpen && "mr-80",
-              showInlinePlayer && "flex items-center justify-center"
+              showInlinePlayer && "flex items-center justify-center",
+              currentView === "videos" && "overflow-hidden"
             )}>
               {showInlinePlayer ? (
                 <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
+                  {renderView()}
+                </div>
+              ) : currentView === "videos" ? (
+                <div className="h-full w-full relative">
                   {renderView()}
                 </div>
               ) : (
@@ -1314,7 +1319,7 @@ export const DesktopApp = () => {
         </div>
 
         {/* Now Playing Bar */}
-        {currentTrack && !isVideoPlaying && (
+        {currentTrack && !isVideoPlaying && currentView !== "videos" && (
           <NowPlayingBar
             currentTrack={currentTrack}
             isPlaying={isPlaying}

@@ -191,24 +191,22 @@ export const CinemaMode = ({
         <div className="absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,_transparent_0deg,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-30 animate-spin-slow" />
       </div>
 
-      {/* Video Element - Centered and scaled */}
-      <div className="absolute inset-0 flex items-center justify-center p-8">
-        <div className="relative w-full h-full max-w-[95vw] max-h-[95vh] flex items-center justify-center">
-          <video
-            ref={videoRef}
-            className="w-full h-full object-contain rounded-lg shadow-2xl"
-            style={{
-              filter: "brightness(1.05) contrast(1.1) saturate(1.1)",
-            }}
-            playsInline
-            preload="metadata"
-            onClick={togglePlayPause}
-          />
-          
-          {/* Film grain overlay */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay">
-            <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSBiYXNlRnJlcXVlbmN5PSIwLjkiIG51bU9jdGF2ZXM9IjQiLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbHRlcj0idXJsKCNub2lzZSkiIG9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==')] bg-repeat" />
-          </div>
+      {/* Video Element - Full screen */}
+      <div className="absolute inset-0">
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          style={{
+            filter: "brightness(1.05) contrast(1.1) saturate(1.1)",
+          }}
+          playsInline
+          preload="metadata"
+          onClick={togglePlayPause}
+        />
+        
+        {/* Film grain overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay">
+          <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSBiYXNlRnJlcXVlbmN5PSIwLjkiIG51bU9jdGF2ZXM9IjQiLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbHRlcj0idXJsKCNub2lzZSkiIG9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==')] bg-repeat" />
         </div>
       </div>
 
