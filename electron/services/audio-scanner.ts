@@ -190,6 +190,11 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
       const track = await processAudioFile(filePath);
       if (track) {
         newTracks.push(track);
+        // Notify renderer in real-time as each track is processed
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(window => {
+          window.webContents.send('library:track-added', track);
+        });
       }
     }
 

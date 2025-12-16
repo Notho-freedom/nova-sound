@@ -60,7 +60,7 @@ export function useLibrary(): UseLibraryReturn {
       if (progress.phase === "complete") {
         setScanning(false);
         setScanProgress(null);
-        // Reload library after scan (duplicates already removed in storage)
+        // Final reload to ensure everything is synced
         window.electronAPI!.getLibrary().then((library) => {
           // Additional safety check to remove duplicates
           const uniqueTracks = library.filter((track, index, self) => 
@@ -72,6 +72,43 @@ export function useLibrary(): UseLibraryReturn {
     });
 
     return unsubscribe;
+  }, [isElectron]);
+
+  // Listen for real-time track updates during scan
+  useEffect(() => {
+    if (!isElectron || !window.electronAPI!.onTrackAdded) return;
+
+    // Track added - add to library in real-time
+    const unsubscribeAdded = window.electronAPI!.onTrackAdded((track: Track) => {
+      setTracks(prev => {
+        // Check if track already exists (by ID or filePath)
+        const exists = prev.some(t => t.id === track.id || t.filePath === track.filePath);
+        if (exists) {
+          // Update existing track
+          return prev.map(t => (t.id === track.id || t.filePath === track.filePath) ? track : t);
+        }
+        // Add new track
+        return [...prev, track];
+      });
+    });
+
+    // Track removed - remove from library in real-time
+    const unsubscribeRemoved = window.electronAPI!.onTrackRemoved((filePath: string) => {
+      setTracks(prev => prev.filter(t => t.filePath !== filePath));
+    });
+
+    // Track updated - update in library in real-time
+    const unsubscribeUpdated = window.electronAPI!.onTrackUpdated((track: Track) => {
+      setTracks(prev => prev.map(t => 
+        (t.id === track.id || t.filePath === track.filePath) ? track : t
+      ));
+    });
+
+    return () => {
+      unsubscribeAdded();
+      unsubscribeRemoved();
+      unsubscribeUpdated();
+    };
   }, [isElectron]);
 
   // Select music folders

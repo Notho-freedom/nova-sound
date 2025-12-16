@@ -28,6 +28,9 @@ export interface ElectronAPI {
   scanLibrary: (directories: string[]) => Promise<void>;
   getLibrary: () => Promise<Track[]>;
   onScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
+  onTrackAdded?: (callback: (track: Track) => void) => () => void;
+  onTrackRemoved?: (callback: (filePath: string) => void) => () => void;
+  onTrackUpdated?: (callback: (track: Track) => void) => () => void;
 
   // Video library
   scanVideos: (directories: string[]) => Promise<Video[]>;
