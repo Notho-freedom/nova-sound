@@ -3,6 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
+import { HeroBreadcrumbs } from "@/components/HeroBreadcrumbs";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -208,29 +209,39 @@ export const HomeView = ({
     );
   }
 
-  return (
-    <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
-      
-      {/* Welcome Section */}
-      <div>
-        <h1 className="font-display text-3xl font-bold mb-2 text-foreground">
-          {getGreeting()}{userName ? `, ${userName}` : ""}, bienvenue sur <span className="text-primary">NEXUS</span>
-        </h1>
-        <p className="text-muted-foreground">
-          {tracks.length > 0 
-            ? `${tracks.length} pistes disponibles dans votre bibliothèque`
-            : "Votre système audio futuriste personnel"
-          }
-          {nexusAuthenticated && nexusUser && (
-            <span className="ml-2 text-xs">
-              • {nexusUser.subscriptionStatus === "active" ? "Pro" : "Gratuit"}
-            </span>
-          )}
-        </p>
-      </div>
+  // Get featured track for hero background
+  const featuredTrack = useMemo(() => {
+    if (recentTracks.length > 0) return recentTracks[0];
+    if (favoriteTracks.length > 0) return favoriteTracks[0];
+    if (tracks.length > 0) return tracks[0];
+    return undefined;
+  }, [recentTracks, favoriteTracks, tracks]);
 
-      {/* Quick Play Cards - Recently Played */}
-      {displayRecent.length > 0 && (
+  return (
+    <div className="animate-in fade-in duration-200">
+      
+      {/* Hero Breadcrumbs Section - Full width, no padding */}
+      <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+        <HeroBreadcrumbs 
+          userName={userName}
+          trackCount={tracks.length}
+          featuredTrack={featuredTrack}
+        />
+      </div>
+      
+      {/* Main Content with padding */}
+      <div className="px-6 py-4 space-y-6 -mt-12 relative z-10">
+        {/* Subscription Badge */}
+        {nexusAuthenticated && nexusUser && (
+          <div className="flex justify-end">
+            <div className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+              {nexusUser.subscriptionStatus === "active" ? "Pro" : "Gratuit"}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Play Cards - Recently Played */}
+        {displayRecent.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-primary" />
@@ -290,10 +301,10 @@ export const HomeView = ({
             })}
           </div>
         </div>
-      )}
+        )}
 
-      {/* Favorites Section */}
-      {displayFavorites.length > 0 && (
+        {/* Favorites Section */}
+        {displayFavorites.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Heart className="w-5 h-5 text-red-500" />
@@ -409,10 +420,10 @@ export const HomeView = ({
             </table>
           </div>
         </div>
-      )}
+        )}
 
-      {/* For You Section - Dynamic Recommendations */}
-      {(uniqueDiscoveries.length > 0 || uniqueSimilar.length > 0 || uniqueMix.length > 0) && (
+        {/* For You Section - Dynamic Recommendations */}
+        {(uniqueDiscoveries.length > 0 || uniqueSimilar.length > 0 || uniqueMix.length > 0) && (
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-amber-500" />
@@ -666,10 +677,10 @@ export const HomeView = ({
             )}
           </div>
         </div>
-      )}
+        )}
 
-      {/* Empty state */}
-      {tracks.length === 0 && (
+        {/* Empty state */}
+        {tracks.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
             <Music className="w-10 h-10 text-muted-foreground" />
@@ -679,7 +690,8 @@ export const HomeView = ({
             Ajoutez des dossiers de musique dans les paramètres pour commencer à écouter.
           </p>
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
