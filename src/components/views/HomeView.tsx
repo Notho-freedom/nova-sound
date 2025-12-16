@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
 import { HeroBreadcrumbs } from "@/components/HeroBreadcrumbs";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +26,12 @@ interface HomeViewProps {
   favoriteTracks?: Track[];
   history?: HistoryEntry[];
   loading?: boolean;
+  onOpenSettings?: () => void;
+  uploadProgress?: number;
+  hasNotifications?: boolean;
+  onToggleNotifications?: () => void;
+  isFullscreen?: boolean;
+  heroRef?: React.RefObject<HTMLDivElement>;
 }
 
 const formatTime = (seconds: number) => {
@@ -78,6 +84,8 @@ export const HomeView = ({
   uploadProgress,
   hasNotifications = false,
   onToggleNotifications,
+  isFullscreen = false,
+  heroRef,
 }: HomeViewProps) => {
   // Remove duplicates by ID before slicing - memoized
   const getUniqueTracks = useCallback((trackList: Track[]) => {
@@ -245,7 +253,7 @@ export const HomeView = ({
     <div className="animate-in fade-in duration-200">
       
       {/* Hero Breadcrumbs Section - Full width, no padding - TitleBar2 fused inside */}
-      <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
+      <div ref={heroRef} className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
         <HeroBreadcrumbs 
           userName={userName}
           trackCount={tracks.length}

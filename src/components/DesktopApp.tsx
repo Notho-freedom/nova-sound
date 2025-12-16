@@ -115,8 +115,74 @@ export const DesktopApp = () => {
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false); // Track scroll position
+  const heroRef = useRef<HTMLDivElement>(null); // Ref to hero element for intersection observer
+
+  // Detect app fullscreen mode
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsAppFullscreen(!!document.fullscreenElement);
+    };
+
+    // Check browser fullscreen
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    
+    // Check Electron maximized state (as fullscreen approximation)
+    if (window.electronAPI) {
+      const checkElectronFullscreen = async () => {
+        try {
+          const isMaximized = await window.electronAPI?.isMaximized?.();
+          if (isMaximized !== undefined) {
+            setIsAppFullscreen(isMaximized);
+          }
+        } catch (error) {
+          // Ignore errors
+        }
+      };
+      
+      checkElectronFullscreen();
+      
+      // Poll for changes (Electron doesn't emit window state events)
+      const interval = setInterval(checkElectronFullscreen, 500);
+      
+      return () => {
+        clearInterval(interval);
+      };
+    }
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Track hero visibility for TitleBar switching using Intersection Observer
+  useEffect(() => {
+    if (currentView !== "home" || !heroRef.current) {
+      setIsScrolled(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // If hero is not intersecting (not visible), show v1
+        setIsScrolled(!entries[0].isIntersecting);
+      },
+      {
+        // Trigger when hero is completely out of view
+        threshold: 0,
+        rootMargin: '0px',
+      }
+    );
+
+    observer.observe(heroRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [currentView]); // Re-run when view changes
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
@@ -949,6 +1015,8 @@ export const DesktopApp = () => {
               setIsQueueOpen(false);
             }
           }}
+          isFullscreen={isAppFullscreen}
+          heroRef={heroRef}
         />
         );
       case "search":
@@ -1225,19 +1293,21 @@ export const DesktopApp = () => {
           />
         )}
 
-        {/* Title Bar - Hidden for TitleBar2 fusion with hero */}
-        {/* <TitleBar 
-          onOpenSettings={handleOpenSettings} 
-          uploadProgress={isUploading ? overallProgress : undefined}
-          hasNotifications={notifications.length > 0}
-          onToggleNotifications={() => {
-            setIsNotificationsOpen(!isNotificationsOpen);
-            if (!isNotificationsOpen) {
-              setIsLyricsOpen(false);
-              setIsQueueOpen(false);
-            }
-          }}
-        /> */}
+        {/* Title Bar - v1 when scrolled on home or on other views, v2 in hero when at top of home */}
+        {(currentView !== "home" || (currentView === "home" && isScrolled)) && (
+          <TitleBar 
+            onOpenSettings={handleOpenSettings} 
+            uploadProgress={isUploading ? overallProgress : undefined}
+            hasNotifications={notifications.length > 0}
+            onToggleNotifications={() => {
+              setIsNotificationsOpen(!isNotificationsOpen);
+              if (!isNotificationsOpen) {
+                setIsLyricsOpen(false);
+                setIsQueueOpen(false);
+              }
+            }}
+          />
+        )}
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden relative">

@@ -226,11 +226,12 @@ export const HeroBreadcrumbs = ({
         }}
       />
 
-      {/* TitleBar2 Controls - Fused with hero at the top right */}
-      <div 
-        className="absolute top-4 right-8 md:top-6 md:right-12 z-30 flex items-center gap-1 select-none"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      {/* TitleBar2 Controls - Fused with hero at the top right - Always visible on home */}
+      {(onOpenSettings !== undefined || onToggleNotifications !== undefined) && (
+        <div 
+          className="absolute top-4 right-8 md:top-6 md:right-12 z-30 flex items-center gap-1 select-none"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
         {/* Notifications */}
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
@@ -379,7 +380,8 @@ export const HeroBreadcrumbs = ({
             </Tooltip>
           </>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col justify-end p-6 md:p-12 pb-20 md:pb-24">
