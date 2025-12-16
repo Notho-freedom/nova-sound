@@ -11,6 +11,8 @@ import type {
   ScrobblerStatus,
   ScanProgress,
   Video,
+  RecognitionResult,
+  DetectedGroup,
 } from './music';
 
 export interface ElectronAPI {

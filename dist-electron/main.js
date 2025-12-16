@@ -12,6 +12,7 @@ import { initPlaylistManager } from './services/playlist-manager.js';
 import { initEqualizer } from './services/equalizer.js';
 import { initLyricsProvider } from './services/lyrics-provider.js';
 import { initScrobbler } from './services/scrobbler.js';
+import { initMusicRecognizer } from './services/music-recognizer.js';
 import { initUpdater } from './updater/updater.js';
 // Import CLI parser
 import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions } from './cli.js';
@@ -191,6 +192,7 @@ async function initServices() {
     initEqualizer();
     initLyricsProvider();
     initScrobbler();
+    initMusicRecognizer();
 }
 // Window control handlers
 ipcMain.handle('window:minimize', () => {

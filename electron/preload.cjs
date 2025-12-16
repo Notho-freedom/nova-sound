@@ -133,6 +133,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update:available', listener);
     return () => ipcRenderer.removeListener('update:available', listener);
   },
+  
+  // Music recognition
+  recognizeAll: () => ipcRenderer.invoke('recognize:all'),
+  applyRecognition: (results) => ipcRenderer.invoke('recognize:apply', results),
+  detectPatterns: () => ipcRenderer.invoke('recognize:detect-patterns'),
+  applyDetectedGroup: (group) => ipcRenderer.invoke('recognize:apply-group', group),
+  recognizeTrack: (trackId) => ipcRenderer.invoke('recognize:track', trackId),
+  onRecognitionUpdated: (callback) => {
+    const listener = (_event, updated) => callback(updated);
+    ipcRenderer.on('recognize:updated', listener);
+    return () => ipcRenderer.removeListener('recognize:updated', listener);
+  },
 });
 
 console.log('Preload script loaded successfully');

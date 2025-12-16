@@ -261,6 +261,16 @@ class Storage {
     }
   }
 
+  async updateTrack(trackId: string, track: Partial<StoredTrack>): Promise<void> {
+    const library = await this.getLibrary();
+    const index = library.findIndex(t => t.id === trackId);
+    
+    if (index >= 0) {
+      library[index] = { ...library[index], ...track };
+      await this.saveLibrary(library);
+    }
+  }
+
   // Videos
   async getVideos(): Promise<StoredVideo[]> {
     return readJSON<StoredVideo[]>(PATHS.videos, []);

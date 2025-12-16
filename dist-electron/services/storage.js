@@ -156,6 +156,14 @@ class Storage {
             await this.saveLibrary(library);
         }
     }
+    async updateTrack(trackId, track) {
+        const library = await this.getLibrary();
+        const index = library.findIndex(t => t.id === trackId);
+        if (index >= 0) {
+            library[index] = { ...library[index], ...track };
+            await this.saveLibrary(library);
+        }
+    }
     // Videos
     async getVideos() {
         return readJSON(PATHS.videos, []);

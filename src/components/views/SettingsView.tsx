@@ -44,7 +44,7 @@ import { authService } from "@/services/auth";
 import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useNotifications } from "@/hooks/useNotifications";
 import { toast } from "sonner";
-import type { Settings } from "@/types/music";
+import type { Settings, RecognitionResult, DetectedGroup, Track } from "@/types/music";
 import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 
@@ -91,6 +91,223 @@ const SettingsCard = ({ title, icon: Icon, children, className }: SettingsCardPr
 );
 
 // Config status alert
+// Recognition Card Component
+const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshLibrary: () => Promise<void> }) => {
+  const [recognizing, setRecognizing] = useState(false);
+  const [results, setResults] = useState<RecognitionResult[]>([]);
+  const [patterns, setPatterns] = useState<DetectedGroup[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [showPatterns, setShowPatterns] = useState(false);
+  const isElectron = typeof window !== 'undefined' && window.electronAPI;
+
+  const unknownTracks = tracks.filter(t => t.artist === 'Artiste inconnu' || t.album === 'Album inconnu');
+
+  const handleRecognize = async () => {
+    if (!isElectron || !window.electronAPI?.recognizeAll) {
+      toast.error("Fonctionnalité disponible uniquement dans l'application desktop");
+      return;
+    }
+
+    setRecognizing(true);
+    try {
+      const recognitionResults = await window.electronAPI.recognizeAll();
+      setResults(recognitionResults);
+      setShowResults(true);
+      toast.success(`${recognitionResults.length} pistes reconnues`);
+    } catch (error) {
+      console.error('Erreur lors de la reconnaissance:', error);
+      toast.error("Erreur lors de la reconnaissance");
+    } finally {
+      setRecognizing(false);
+    }
+  };
+
+  const handleApplyResults = async () => {
+    if (!isElectron || !window.electronAPI?.applyRecognition) {
+      return;
+    }
+
+    try {
+      const updated = await window.electronAPI.applyRecognition(results);
+      toast.success(`${updated} pistes mises à jour`);
+      setResults([]);
+      setShowResults(false);
+      await refreshLibrary();
+    } catch (error) {
+      console.error('Erreur lors de l\'application:', error);
+      toast.error("Erreur lors de l'application des résultats");
+    }
+  };
+
+  const handleDetectPatterns = async () => {
+    if (!isElectron || !window.electronAPI?.detectPatterns) {
+      toast.error("Fonctionnalité disponible uniquement dans l'application desktop");
+      return;
+    }
+
+    setRecognizing(true);
+    try {
+      const detectedPatterns = await window.electronAPI.detectPatterns();
+      setPatterns(detectedPatterns);
+      setShowPatterns(true);
+      toast.success(`${detectedPatterns.length} patterns détectés`);
+    } catch (error) {
+      console.error('Erreur lors de la détection:', error);
+      toast.error("Erreur lors de la détection des patterns");
+    } finally {
+      setRecognizing(false);
+    }
+  };
+
+  const handleApplyPattern = async (group: DetectedGroup) => {
+    if (!isElectron || !window.electronAPI?.applyDetectedGroup) {
+      return;
+    }
+
+    try {
+      const updated = await window.electronAPI.applyDetectedGroup(group);
+      toast.success(`${updated} pistes mises à jour`);
+      await refreshLibrary();
+      // Recharger les patterns
+      const newPatterns = await window.electronAPI.detectPatterns();
+      setPatterns(newPatterns);
+    } catch (error) {
+      console.error('Erreur lors de l\'application:', error);
+      toast.error("Erreur lors de l'application du pattern");
+    }
+  };
+
+  if (!isElectron) {
+    return null;
+  }
+
+  return (
+    <SettingsCard title="Reconnaissance automatique" icon={Wand2} className="lg:col-span-2">
+      <div className="space-y-4">
+        <div className="p-3 rounded-lg bg-muted/30">
+          <p className="text-sm text-muted-foreground">
+            {unknownTracks.length > 0 
+              ? `${unknownTracks.length} pistes avec métadonnées manquantes`
+              : "Toutes les pistes sont identifiées"}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleRecognize}
+            disabled={recognizing || unknownTracks.length === 0}
+          >
+            {recognizing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyse...
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-4 h-4 mr-2" />
+                Reconnaître toutes les pistes
+              </>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDetectPatterns}
+            disabled={recognizing || unknownTracks.length === 0}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Détecter les patterns
+          </Button>
+        </div>
+
+        {showResults && results.length > 0 && (
+          <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium">Résultats de reconnaissance ({results.length})</h4>
+              <Button variant="ghost" size="sm" onClick={() => setShowResults(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {results.slice(0, 10).map((result) => (
+                <div key={result.trackId} className="p-2 rounded bg-muted/30 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">
+                      {result.originalArtist} - {result.originalAlbum}
+                    </span>
+                    <span className="text-primary">→</span>
+                    <span className="font-medium">
+                      {result.suggestedArtist} - {result.suggestedAlbum}
+                    </span>
+                    <span className="text-muted-foreground ml-auto">
+                      {Math.round(result.confidence * 100)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {results.length > 10 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  ... et {results.length - 10} autres
+                </p>
+              )}
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full mt-3"
+              onClick={handleApplyResults}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Appliquer les résultats ({results.length} pistes)
+            </Button>
+          </div>
+        )}
+
+        {showPatterns && patterns.length > 0 && (
+          <div className="mt-4 p-4 rounded-lg bg-accent/5 border border-accent/20">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium">Patterns détectés ({patterns.length})</h4>
+              <Button variant="ghost" size="sm" onClick={() => setShowPatterns(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {patterns.map((pattern, idx) => (
+                <div key={idx} className="p-3 rounded bg-muted/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-medium">{pattern.artist}</p>
+                      <p className="text-xs text-muted-foreground">{pattern.album}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-mono">{pattern.tracks.length} pistes</p>
+                      <p className="text-xs text-muted-foreground">
+                        {Math.round(pattern.confidence * 100)}% confiance
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleApplyPattern(pattern)}
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Appliquer ce pattern
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </SettingsCard>
+  );
+};
+
 const ConfigAlert = ({ configured, service }: { configured: boolean; service: string }) => {
   if (configured) return null;
   return (
@@ -817,6 +1034,8 @@ export const SettingsView = () => {
                   <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
                 </SettingRow>
               </SettingsCard>
+
+              <RecognitionCard tracks={tracks} refreshLibrary={refreshLibrary} />
             </div>
           </TabsContent>
 
