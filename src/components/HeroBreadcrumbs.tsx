@@ -1,17 +1,20 @@
-import { Home, ChevronRight, Play } from "lucide-react";
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { Play, Minus, Square, X, Copy, Settings, Bell, User, LogOut, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import type { Track } from "@/types/music";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useCloudSync } from "@/hooks/useCloudSync";
 
 interface HeroBreadcrumbsProps {
   className?: string;
@@ -19,6 +22,10 @@ interface HeroBreadcrumbsProps {
   trackCount?: number;
   featuredTracks?: Track[];
   onTrackSelect?: (track: Track) => void;
+  onOpenSettings?: () => void;
+  uploadProgress?: number;
+  hasNotifications?: boolean;
+  onToggleNotifications?: () => void;
 }
 
 export const HeroBreadcrumbs = ({ 
@@ -26,10 +33,38 @@ export const HeroBreadcrumbs = ({
   userName, 
   trackCount, 
   featuredTracks = [],
-  onTrackSelect 
+  onTrackSelect,
+  onOpenSettings,
+  uploadProgress,
+  hasNotifications = false,
+  onToggleNotifications
 }: HeroBreadcrumbsProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isElectron, setIsElectron] = useState(false);
+  const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync();
+
+  useEffect(() => {
+    setIsElectron(!!window.electronAPI);
+  }, []);
+
+  const handleLogout = async () => {
+    await nexusLogout();
+  };
+
+  const handleMinimize = async () => {
+    await window.electronAPI?.minimize();
+  };
+
+  const handleMaximize = async () => {
+    await window.electronAPI?.maximize();
+    setIsMaximized(!isMaximized);
+  };
+
+  const handleClose = async () => {
+    await window.electronAPI?.close();
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -191,29 +226,163 @@ export const HeroBreadcrumbs = ({
         }}
       />
 
+      {/* TitleBar2 Controls - Fused with hero at the top right */}
+      <div 
+        className="absolute top-4 right-8 md:top-6 md:right-12 z-30 flex items-center gap-1 select-none"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
+        {/* Notifications */}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onToggleNotifications}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all duration-200 ease-out active:scale-95 group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            >
+              <Bell className="w-4 h-4 text-white/90 group-hover:text-white group-hover:scale-105 transition-all duration-200 ease-out drop-shadow" />
+              {hasNotifications && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-400 animate-pulse shadow-lg" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Notifications</TooltipContent>
+        </Tooltip>
+
+        {/* User Avatar */}
+        {nexusAuthenticated && nexusUser ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent">
+                <Avatar className="w-7 h-7 border border-white/30 group-hover:scale-105 transition-transform duration-200 ease-out ring-1 ring-white/20">
+                  <AvatarImage src={nexusUser.photoURL || undefined} alt={nexusUser.displayName || ""} />
+                  <AvatarFallback className="bg-white/20 text-white text-xs">
+                    {nexusUser.displayName?.charAt(0).toUpperCase() || <User className="w-3.5 h-3.5" />}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={nexusUser.photoURL || undefined} alt={nexusUser.displayName || ""} />
+                    <AvatarFallback className="bg-primary/20 text-primary">
+                      {nexusUser.displayName?.charAt(0).toUpperCase() || <User className="w-4 h-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{nexusUser.displayName || "Utilisateur"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{nexusUser.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  {nexusIsPro ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/20 text-primary">
+                      <Crown className="w-3 h-3" />
+                      Pro
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
+                      Gratuit
+                    </span>
+                  )}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onOpenSettings} className="cursor-pointer">
+                <Settings className="w-4 h-4 mr-2" />
+                Paramètres
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                <LogOut className="w-4 h-4 mr-2" />
+                Se déconnecter
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onOpenSettings}
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+              >
+                <User className="w-4 h-4 text-white/90 group-hover:text-white group-hover:scale-105 transition-all duration-200 ease-out drop-shadow" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Se connecter</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Settings */}
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onOpenSettings}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            >
+              <Settings className="w-4 h-4 text-white/90 group-hover:text-white group-hover:rotate-45 group-hover:scale-105 transition-all duration-200 ease-out drop-shadow" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Paramètres</TooltipContent>
+        </Tooltip>
+
+        {/* Separator */}
+        {isElectron && (
+          <div className="w-px h-5 bg-white/20 mx-1" />
+        )}
+
+        {/* Window Controls - Only show in Electron */}
+        {isElectron && (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleMinimize}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                >
+                  <Minus className="w-4 h-4 text-white/90 group-hover:text-white group-hover:scale-105 transition-all duration-200 ease-out drop-shadow" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">Réduire</div>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleMaximize}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/20 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                >
+                  {isMaximized ? (
+                    <Copy className="w-3.5 h-3.5 text-white/90 group-hover:text-white group-hover:scale-105 rotate-90 transition-all duration-200 ease-out drop-shadow" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5 text-white/90 group-hover:text-white group-hover:scale-105 transition-all duration-200 ease-out drop-shadow" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">{isMaximized ? "Restaurer" : "Agrandir"}</div>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleClose}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-500/80 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                >
+                  <X className="w-4 h-4 text-white/90 group-hover:text-white group-hover:scale-105 transition-all duration-200 ease-out drop-shadow" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm">Fermer</div>
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
+      </div>
 
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col justify-end p-6 md:p-12 pb-20 md:pb-24">
-        {/* Breadcrumbs */}
-        <div className="absolute top-6 left-6 md:top-12 md:left-12 z-20">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="#" className="flex items-center gap-1.5 text-white/90 hover:text-white transition-colors drop-shadow-lg">
-                  <Home className="w-4 h-4" />
-                  <span>Accueil</span>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator>
-                <ChevronRight className="w-4 h-4 text-white/60" />
-              </BreadcrumbSeparator>
-              <BreadcrumbItem>
-                <BreadcrumbPage className="text-white font-medium drop-shadow-lg">NEXUS</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-
         {/* Hero Content - Bottom aligned like Netflix with perfect positioning */}
         <div className="flex items-end justify-between gap-8 pb-4">
           <div className="space-y-4 max-w-3xl flex-1">

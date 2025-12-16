@@ -74,6 +74,10 @@ export const HomeView = ({
   favoriteTracks = [],
   history = [],
   loading = false,
+  onOpenSettings,
+  uploadProgress,
+  hasNotifications = false,
+  onToggleNotifications,
 }: HomeViewProps) => {
   // Remove duplicates by ID before slicing - memoized
   const getUniqueTracks = useCallback((trackList: Track[]) => {
@@ -240,7 +244,7 @@ export const HomeView = ({
   return (
     <div className="animate-in fade-in duration-200">
       
-      {/* Hero Breadcrumbs Section - Full width, no padding */}
+      {/* Hero Breadcrumbs Section - Full width, no padding - TitleBar2 fused inside */}
       <div className="relative -mx-6 md:-mx-8 -mt-4 mb-0">
         <HeroBreadcrumbs 
           userName={userName}
@@ -250,6 +254,10 @@ export const HomeView = ({
             const index = tracks.findIndex(t => t.id === track.id);
             if (index !== -1) onTrackSelect(index);
           }}
+          onOpenSettings={onOpenSettings}
+          uploadProgress={uploadProgress}
+          hasNotifications={hasNotifications}
+          onToggleNotifications={onToggleNotifications}
         />
       </div>
       

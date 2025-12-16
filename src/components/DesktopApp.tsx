@@ -939,6 +939,16 @@ export const DesktopApp = () => {
           recentTracks={recentTracks}
           favoriteTracks={favoriteTracks}
           history={history}
+          onOpenSettings={handleOpenSettings}
+          uploadProgress={isUploading ? overallProgress : undefined}
+          hasNotifications={notifications.length > 0}
+          onToggleNotifications={() => {
+            setIsNotificationsOpen(!isNotificationsOpen);
+            if (!isNotificationsOpen) {
+              setIsLyricsOpen(false);
+              setIsQueueOpen(false);
+            }
+          }}
         />
         );
       case "search":
@@ -1215,8 +1225,8 @@ export const DesktopApp = () => {
           />
         )}
 
-        {/* Title Bar */}
-        <TitleBar 
+        {/* Title Bar - Hidden for TitleBar2 fusion with hero */}
+        {/* <TitleBar 
           onOpenSettings={handleOpenSettings} 
           uploadProgress={isUploading ? overallProgress : undefined}
           hasNotifications={notifications.length > 0}
@@ -1227,7 +1237,7 @@ export const DesktopApp = () => {
               setIsQueueOpen(false);
             }
           }}
-        />
+        /> */}
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden relative">
