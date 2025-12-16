@@ -110,14 +110,11 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed }: Nav
         "w-full flex items-center gap-3 rounded-lg transition-all duration-300 group",
         collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
         isActive 
-          ? "bg-primary/20 text-primary glow-cyan" 
+          ? "bg-primary/20 text-primary" 
           : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
       )}
     >
-      <Icon className={cn(
-        "w-5 h-5 transition-all duration-300 flex-shrink-0",
-        isActive && "drop-shadow-[0_0_8px_hsl(var(--neon-cyan))]"
-      )} />
+      <Icon className="w-5 h-5 transition-all duration-300 flex-shrink-0" />
       {!collapsed && (
         <>
           <span className="text-sm font-medium flex-1 text-left truncate">{label}</span>
