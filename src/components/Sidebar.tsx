@@ -107,19 +107,34 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed }: Nav
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 rounded-lg transition-all duration-300 group",
-        collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
+        "relative w-full flex items-center rounded-lg transition-all duration-200 ease-out group",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+        collapsed 
+          ? "px-2.5 py-2.5 justify-center" 
+          : "px-3 py-2.5 gap-3",
         isActive 
           ? "bg-primary/20 text-primary" 
-          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted/60"
       )}
     >
-      <Icon className="w-5 h-5 transition-all duration-300 flex-shrink-0" />
+      {/* Active indicator bar */}
+      {isActive && !collapsed && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+      )}
+      
+      <Icon className={cn(
+        "flex-shrink-0 transition-all duration-200",
+        collapsed ? "w-5 h-5" : "w-[18px] h-[18px]",
+        isActive ? "scale-105" : "group-hover:scale-105"
+      )} />
+      
       {!collapsed && (
         <>
-          <span className="text-sm font-medium flex-1 text-left truncate">{label}</span>
+          <span className="text-sm font-medium flex-1 text-left truncate transition-colors duration-200">
+            {label}
+          </span>
           {badge !== undefined && badge > 0 && (
-            <span className="px-2 py-0.5 text-xs rounded-full bg-secondary/20 text-secondary">
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-secondary/20 text-secondary transition-all duration-200 group-hover:bg-secondary/30">
               {badge}
             </span>
           )}
@@ -152,7 +167,7 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed }: Nav
 const SectionTitle = ({ children, collapsed }: { children: React.ReactNode; collapsed?: boolean }) => {
   if (collapsed) return null;
   return (
-    <h3 className="px-3 py-2 text-[10px] font-display uppercase tracking-widest text-muted-foreground/50 transition-opacity duration-300">
+    <h3 className="px-3 py-2.5 mb-1 text-[10px] font-display uppercase tracking-widest text-muted-foreground/60 transition-opacity duration-200">
       {children}
     </h3>
   );
@@ -208,11 +223,12 @@ export const Sidebar = ({
         onClick={() => handleCollapsedChange(!collapsed)}
         className={cn(
           "absolute -right-3 top-1/2 -translate-y-1/2 z-50",
-          "w-6 h-6 rounded-full bg-card border border-border",
+          "w-6 h-6 rounded-full bg-card border border-border/80",
           "flex items-center justify-center",
-          "text-muted-foreground hover:text-primary hover:border-primary/50",
-          "transition-all duration-300 hover:scale-110",
-          "shadow-lg"
+          "text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-card/90",
+          "transition-all duration-200 ease-out active:scale-95",
+          "shadow-md hover:shadow-lg",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
         )}
       >
         {collapsed ? (
@@ -223,12 +239,12 @@ export const Sidebar = ({
       </button>
 
       <ScrollArea className="flex-1">
-        <div className={cn("p-2 space-y-4", collapsed && "px-1.5")}>
-          {/* Spacing from top */}
-          <div className="pt-4" />
-          
+        <div className={cn(
+          "transition-all duration-300",
+          collapsed ? "px-2 py-3" : "px-3 py-4"
+        )}>
           {/* Main Navigation */}
-          <div className="space-y-1">
+          <div className={cn("space-y-0.5", !collapsed && "mb-6")}>
             {mainNavItems.map((item) => (
               <NavItem
                 key={item.id}
@@ -243,9 +259,9 @@ export const Sidebar = ({
           </div>
 
           {/* Library */}
-          <div>
+          <div className={!collapsed ? "mb-6" : "mb-4"}>
             <SectionTitle collapsed={collapsed}>Ma Musique</SectionTitle>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {libraryItems.map((item) => (
                 <NavItem
                   key={item.id}
@@ -261,9 +277,9 @@ export const Sidebar = ({
           </div>
 
           {/* Media */}
-          <div>
+          <div className={!collapsed ? "mb-6" : "mb-4"}>
             <SectionTitle collapsed={collapsed}>Médias</SectionTitle>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {mediaItems.map((item) => (
                 <NavItem
                   key={item.id}
@@ -278,9 +294,9 @@ export const Sidebar = ({
           </div>
 
           {/* Local Files */}
-          <div>
+          <div className={!collapsed ? "mb-6" : "mb-4"}>
             <SectionTitle collapsed={collapsed}>Local</SectionTitle>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {localItems.map((item) => (
                 <NavItem
                   key={item.id}
@@ -296,16 +312,16 @@ export const Sidebar = ({
 
           {/* Playlists - Only show when expanded */}
           {!collapsed && (
-            <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-              <div className="flex items-center justify-between px-3 py-2">
-                <h3 className="text-[10px] font-display uppercase tracking-widest text-muted-foreground/50">
+            <div className="mb-6 animate-in fade-in slide-in-from-left-2 duration-300">
+              <div className="flex items-center justify-between px-3 py-2.5 mb-1">
+                <h3 className="text-[10px] font-display uppercase tracking-widest text-muted-foreground/60">
                   Playlists
                 </h3>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <button 
                       onClick={() => setCreateModalOpen(true)}
-                      className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-primary transition-colors"
+                      className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-primary transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -313,7 +329,7 @@ export const Sidebar = ({
                   <TooltipContent>Créer une playlist</TooltipContent>
                 </Tooltip>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {playlists.slice(0, 5).map((playlist) => (
                   <PlaylistContextMenu
                     key={playlist.id}
@@ -346,21 +362,21 @@ export const Sidebar = ({
                     <div className="w-full flex items-center gap-2 group">
                       <button
                         onClick={() => onViewChange("playlists")}
-                        className="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
+                        className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                       >
-                        <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all">
+                        <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all duration-200 group-hover:scale-105">
                           <Music className="w-4 h-4 text-primary" />
                         </div>
                         <div className="flex-1 text-left min-w-0">
-                          <p className="text-sm truncate">{playlist.name}</p>
-                          <p className="text-xs text-muted-foreground">{playlist.trackIds.length} titres</p>
+                          <p className="text-sm font-medium truncate transition-colors duration-200">{playlist.name}</p>
+                          <p className="text-xs text-muted-foreground/80 mt-0.5">{playlist.trackIds.length} titres</p>
                         </div>
                       </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
                             onClick={(e) => e.stopPropagation()}
-                            className="p-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
+                            className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
@@ -397,14 +413,14 @@ export const Sidebar = ({
                   </PlaylistContextMenu>
                 ))}
                 {playlists.length === 0 && (
-                  <p className="px-3 py-2 text-xs text-muted-foreground italic">
+                  <p className="px-3 py-3 text-xs text-muted-foreground/70 italic text-center">
                     Aucune playlist
                   </p>
                 )}
                 {playlists.length > 5 && (
                   <button
                     onClick={() => onViewChange("playlists")}
-                    className="w-full px-3 py-2 text-xs text-primary hover:underline text-left"
+                    className="w-full px-3 py-2.5 text-xs font-medium text-primary hover:text-primary/80 hover:bg-primary/10 rounded-lg transition-all duration-200 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   >
                     Voir tout ({playlists.length})
                   </button>
@@ -419,11 +435,11 @@ export const Sidebar = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={() => onViewChange("playlists")}
-                  className="w-full flex items-center justify-center px-2 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
+                  className="w-full flex items-center justify-center px-2.5 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 >
                   <div className="relative">
-                    <ListMusic className="w-5 h-5" />
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-[10px] flex items-center justify-center text-primary-foreground">
+                    <ListMusic className="w-5 h-5 transition-transform duration-200 hover:scale-110" />
+                    <span className="absolute -top-1 -right-1 w-[18px] h-[18px] rounded-full bg-primary text-[10px] font-medium flex items-center justify-center text-primary-foreground shadow-sm">
                       {playlists.length}
                     </span>
                   </div>
@@ -503,8 +519,8 @@ export const Sidebar = ({
 
       {/* Sync Status Indicator */}
       <div className={cn(
-        "border-t border-border/50 p-2",
-        collapsed && "px-1.5"
+        "border-t border-border/50 transition-all duration-300",
+        collapsed ? "px-2 py-2.5" : "px-3 py-3"
       )}>
         <SyncStatusIndicator collapsed={collapsed} />
       </div>
