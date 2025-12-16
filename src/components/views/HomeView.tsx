@@ -5,6 +5,7 @@ import { getCoverUrl } from "@/lib/audio";
 import { PageHeader } from "@/components/PageHeader";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface HistoryEntry {
   trackId: string;
@@ -167,40 +168,48 @@ export const HomeView = ({
               const isCurrentTrack = currentTrackIndex === actualIndex;
               
               return (
-                <button
-                  key={`recent-${track.id}-${idx}`}
-                  onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                  className={cn(
-                    "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-200 ease-out",
-                    "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
-                    isCurrentTrack && isPlaying && "ring-2 ring-primary",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
-                      <img
-                        src={getCoverUrl(track.coverUrl)}
-                        alt={track.album}
-                        className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                        <Play className="w-5 h-5 text-white fill-current" />
+                <Tooltip key={`recent-${track.id}-${idx}`}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                      className={cn(
+                        "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-200 ease-out",
+                        "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
+                        isCurrentTrack && isPlaying && "ring-2 ring-primary",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
+                          <img
+                            src={getCoverUrl(track.coverUrl)}
+                            alt={track.album}
+                            className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                            <Play className="w-5 h-5 text-white fill-current" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "text-sm font-medium truncate",
+                            isCurrentTrack ? "text-primary" : "text-foreground"
+                          )}>
+                            {track.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {track.artist}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "text-sm font-medium truncate",
-                        isCurrentTrack ? "text-primary" : "text-foreground"
-                      )}>
-                        {track.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {track.artist}
-                      </p>
-                    </div>
-                  </div>
-                </button>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm font-medium">{track.title}</div>
+                    <div className="text-xs text-muted-foreground">{track.artist}</div>
+                    {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
@@ -243,11 +252,13 @@ export const HomeView = ({
                 {displayFavorites.map((track, idx) => {
                   const actualIndex = tracks.findIndex(t => t.id === track.id);
                   const isCurrentTrack = currentTrackIndex === actualIndex;
+                  const tooltipText = `${track.title} - ${track.artist}${track.album ? ` (${track.album})` : ''} - ${formatTime(track.duration)}`;
                   
                   return (
                     <tr
                       key={`favorite-${track.id}-${idx}`}
                       onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                      title={tooltipText}
                       className={cn(
                         "group cursor-pointer transition-all duration-200 ease-out",
                         isCurrentTrack 
@@ -325,16 +336,18 @@ export const HomeView = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Discoveries Playlist - Style explorateur */}
             {uniqueDiscoveries.length > 0 && (
-              <div 
-                className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                onClick={() => {
-                  if (uniqueDiscoveries.length > 0) {
-                    const firstTrack = uniqueDiscoveries[0];
-                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }
-                }}
-              >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                    onClick={() => {
+                      if (uniqueDiscoveries.length > 0) {
+                        const firstTrack = uniqueDiscoveries[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }
+                    }}
+                  >
                 {/* Background avec image de la première piste */}
                 <img
                   src={getCoverUrl(uniqueDiscoveries[0]?.coverUrl)}
@@ -388,20 +401,29 @@ export const HomeView = ({
                   </div>
                 </div>
               </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm font-medium">Découvertes</div>
+                  <div className="text-xs text-muted-foreground">{uniqueDiscoveries.length} pistes recommandées</div>
+                  <div className="text-xs text-muted-foreground mt-1">Cliquez pour lire</div>
+                </TooltipContent>
+              </Tooltip>
             )}
 
             {/* Similar to Favorites - Style chaleureux */}
             {uniqueSimilar.length > 0 && (
-              <div 
-                className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                onClick={() => {
-                  if (uniqueSimilar.length > 0) {
-                    const firstTrack = uniqueSimilar[0];
-                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }
-                }}
-              >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                    onClick={() => {
+                      if (uniqueSimilar.length > 0) {
+                        const firstTrack = uniqueSimilar[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }
+                    }}
+                  >
                 {/* Background avec image de la première piste */}
                 <img
                   src={getCoverUrl(uniqueSimilar[0]?.coverUrl)}
@@ -455,20 +477,29 @@ export const HomeView = ({
                   </div>
                 </div>
               </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm font-medium">Similaires</div>
+                  <div className="text-xs text-muted-foreground">{uniqueSimilar.length} pistes similaires</div>
+                  <div className="text-xs text-muted-foreground mt-1">Basé sur vos goûts</div>
+                </TooltipContent>
+              </Tooltip>
             )}
 
             {/* Mix based on time - Style dynamique */}
             {uniqueMix.length > 0 && (
-              <div 
-                className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                onClick={() => {
-                  if (uniqueMix.length > 0) {
-                    const firstTrack = uniqueMix[0];
-                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }
-                }}
-              >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+                    onClick={() => {
+                      if (uniqueMix.length > 0) {
+                        const firstTrack = uniqueMix[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }
+                    }}
+                  >
                 {/* Background avec image de la première piste */}
                 <img
                   src={getCoverUrl(uniqueMix[0]?.coverUrl)}
@@ -536,6 +567,17 @@ export const HomeView = ({
                   </div>
                 </div>
               </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm font-medium">
+                    {new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{uniqueMix.length} pistes</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {new Date().getHours() < 18 ? "⚡ Énergisant" : "🌙 Apaisant"}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>
