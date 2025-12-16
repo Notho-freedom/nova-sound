@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Plus, Music, ListMusic, Trash2, Edit, Play, Shuffle, X, Search, ArrowLeft, Check, ArrowUpDown, Filter, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Music, ListMusic, Trash2, Edit, Play, Shuffle, X, Search, ArrowLeft, Check, ArrowUpDown, Filter, ChevronUp, ChevronDown, Grid, List } from "lucide-react";
 import { Track, Playlist } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl, formatDuration } from "@/lib/audio";
@@ -14,6 +14,7 @@ import { TrackListView } from "@/components/TrackListView";
 import { PageHeader } from "@/components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 interface PlaylistViewProps {
@@ -1097,10 +1098,53 @@ export const PlaylistView = ({
               {playlists.length} playlist{playlists.length > 1 ? "s" : ""}
             </p>
           </div>
-          <Button onClick={() => setPageMode("create")}>
-            <Plus className="w-4 h-4 mr-2" />
-            Créer une playlist
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex rounded-lg bg-muted/30 p-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={cn(
+                      "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                      viewMode === "grid"
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    aria-label="Vue grille"
+                  >
+                    <Grid className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Vue grille</div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={cn(
+                      "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                      viewMode === "list"
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    aria-label="Vue liste"
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">Vue liste</div>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Button onClick={() => setPageMode("create")}>
+              <Plus className="w-4 h-4 mr-2" />
+              Créer une playlist
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
@@ -1119,14 +1163,25 @@ export const PlaylistView = ({
       <ScrollArea className="flex-1">
         <div className="p-6">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {[...Array(8)].map((_, i) => (
-                <div
-                  key={i}
-                  className="aspect-square rounded-lg bg-muted animate-pulse"
-                />
-              ))}
-            </div>
+            viewMode === "grid" ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                {[...Array(12)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="aspect-[3/4] rounded-lg bg-muted animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {[...Array(8)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-16 rounded-lg bg-muted animate-pulse"
+                  />
+                ))}
+              </div>
+            )
           ) : filteredPlaylists.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[400px] text-center">
               <Music className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
@@ -1145,8 +1200,8 @@ export const PlaylistView = ({
                 </Button>
               )}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          ) : viewMode === "grid" ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
               {filteredPlaylists.map((playlist) => {
                 const playlistTracks = playlist.trackIds
                   .map((id) => tracks.find((t) => t.id === id))
@@ -1168,7 +1223,7 @@ export const PlaylistView = ({
                   >
                     <div
                       onClick={() => setSelectedPlaylistId(playlist.id)}
-                      className="group relative aspect-square rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 cursor-pointer transition-all hover:scale-105 hover:shadow-lg"
+                      className="group relative aspect-[3/4] rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 cursor-pointer transition-all hover:scale-105 hover:shadow-lg"
                     >
                       {coverUrl ? (
                         <img
@@ -1178,15 +1233,76 @@ export const PlaylistView = ({
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Music className="w-16 h-16 text-primary/50" />
+                          <Music className="w-10 h-10 text-primary/50" />
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                        <h3 className="font-semibold truncate mb-1">{playlist.name}</h3>
-                        <p className="text-sm text-white/80">
+                      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                        <h3 className="font-semibold truncate mb-0.5 text-sm">{playlist.name}</h3>
+                        <p className="text-xs text-white/80">
                           {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
                         </p>
+                      </div>
+                    </div>
+                  </PlaylistContextMenu>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredPlaylists.map((playlist) => {
+                const playlistTracks = playlist.trackIds
+                  .map((id) => tracks.find((t) => t.id === id))
+                  .filter((t): t is Track => !!t);
+                const coverUrl =
+                  playlistTracks.length > 0
+                    ? getCoverUrl(playlistTracks[0].coverUrl)
+                    : undefined;
+
+                return (
+                  <PlaylistContextMenu
+                    key={playlist.id}
+                    playlist={playlist}
+                    onPlay={() => handlePlayPlaylist(playlist.id)}
+                    onShuffle={() => handleShufflePlaylist(playlist.id)}
+                    onEdit={() => handleEditPlaylist(playlist)}
+                    onDelete={() => handleDeletePlaylist(playlist.id)}
+                    onView={() => setSelectedPlaylistId(playlist.id)}
+                  >
+                    <div
+                      onClick={() => setSelectedPlaylistId(playlist.id)}
+                      className="group flex items-center gap-4 p-3 rounded-lg bg-card/30 hover:bg-card/50 border border-border/30 cursor-pointer transition-all"
+                    >
+                      <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary/20 to-secondary/20">
+                        {coverUrl ? (
+                          <img
+                            src={coverUrl}
+                            alt={playlist.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Music className="w-6 h-6 text-primary/50" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate mb-0.5">{playlist.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayPlaylist(playlist.id);
+                          }}
+                        >
+                          <Play className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   </PlaylistContextMenu>
