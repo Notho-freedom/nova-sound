@@ -41,7 +41,7 @@ import { useLibrary } from "@/hooks/useLibrary";
 import { useVideos } from "@/hooks/useVideos";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { authService } from "@/services/auth";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useNotifications } from "@/hooks/useNotifications";
 import { toast } from "sonner";
 import type { Settings } from "@/types/music";
@@ -131,18 +131,24 @@ export const SettingsView = () => {
 
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
-  const [settings, setSettings] = useState<Partial<Settings>>({
-    musicDirectories: [],
-    crossfadeDuration: 5,
-    gaplessPlayback: true,
-    normalizeVolume: true,
-    audioQuality: "high",
-    notificationsEnabled: true,
-    scrobblingEnabled: false,
-    equalizerEnabled: false,
-    theme: theme,
-    showLyrics: true,
-    autoScanOnStartup: true,
+  // Initialize settings with current theme from useTheme hook
+  const [settings, setSettings] = useState<Partial<Settings>>(() => {
+    const savedTheme = typeof window !== 'undefined' 
+      ? (localStorage.getItem("nexus-theme") as any) || theme 
+      : theme;
+    return {
+      musicDirectories: [],
+      crossfadeDuration: 5,
+      gaplessPlayback: true,
+      normalizeVolume: true,
+      audioQuality: "high",
+      notificationsEnabled: true,
+      scrobblingEnabled: false,
+      equalizerEnabled: false,
+      theme: savedTheme,
+      showLyrics: true,
+      autoScanOnStartup: true,
+    };
   });
   const [scrobblerStatus, setScrobblerStatus] = useState({
     lastFm: { connected: false, username: undefined as string | undefined },
@@ -192,6 +198,12 @@ export const SettingsView = () => {
         }
       }
       
+      // Load theme from localStorage (don't override the current theme from useTheme)
+      const savedTheme = localStorage.getItem("nexus-theme") as Theme | null;
+      if (savedTheme) {
+        loadedSettings.theme = savedTheme;
+      }
+
       // Load from localStorage (for web or as fallback)
       try {
         const settingsKeys: (keyof Settings)[] = [
@@ -223,13 +235,27 @@ export const SettingsView = () => {
           if (firestoreData?.settings) {
             loadedSettings = { ...loadedSettings, ...firestoreData.settings };
           }
+          // Also check for theme directly in firestoreData (Firebase takes priority)
+          if (firestoreData?.theme) {
+            loadedSettings.theme = firestoreData.theme;
+          }
         } catch (err) {
           // Silently fail if Firebase sync is not available
           console.warn("Failed to load settings from Firebase:", err);
         }
       }
       
-      setSettings(loadedSettings);
+      // Always use the current theme from useTheme hook as the source of truth
+      // This prevents the theme from being reset when opening settings
+      if (theme) {
+        loadedSettings.theme = theme;
+      }
+      
+      setSettings(prevSettings => ({
+        ...loadedSettings,
+        // Preserve theme from useTheme hook to prevent reset
+        theme: theme || prevSettings.theme || loadedSettings.theme
+      }));
       
       // Load cloudinary config
       if (cloudinaryConfig) {
@@ -243,7 +269,7 @@ export const SettingsView = () => {
       setLoading(false);
     };
     loadSettings();
-  }, [isElectron, cloudinaryConfig, nexusAuthenticated]);
+  }, [isElectron, cloudinaryConfig, nexusAuthenticated, theme]);
 
   // Load subscription status
   useEffect(() => {

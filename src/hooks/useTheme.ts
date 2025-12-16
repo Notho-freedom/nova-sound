@@ -22,20 +22,32 @@ const themes: { id: Theme; name: string }[] = [
   { id: "system", name: "Système" },
 ];
 
+// Helper function to get initial theme synchronously
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return "dark";
+  const saved = localStorage.getItem("nexus-theme") as Theme | null;
+  if (saved && themes.some(t => t.id === saved)) {
+    return saved;
+  }
+  return "dark";
+}
+
 export function useTheme(): UseThemeReturn {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  // Initialize theme synchronously from localStorage to avoid flash
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
   const [systemTheme, setSystemTheme] = useState<"dark" | "light">("dark");
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load theme from localStorage and Firebase, and listen to Firebase sync updates
   useEffect(() => {
     const loadTheme = async () => {
-      // Load from localStorage first
+      // Load from localStorage first (already done in initial state, but ensure it's applied)
       const saved = localStorage.getItem("nexus-theme") as Theme | null;
       if (saved && themes.some(t => t.id === saved)) {
         setThemeState(saved);
       }
       
-      // Load from Firebase if authenticated
+      // Load from Firebase if authenticated (Firebase takes priority)
       try {
         const { firebaseSyncService } = await import('../services/firebase-sync');
         const firestoreData = await firebaseSyncService.loadFromFirestore();
@@ -45,6 +57,8 @@ export function useTheme(): UseThemeReturn {
         }
       } catch (error) {
         // Silently fail if Firebase sync is not available
+      } finally {
+        setIsLoaded(true);
       }
     };
     
@@ -74,8 +88,10 @@ export function useTheme(): UseThemeReturn {
     return () => mediaQuery.removeEventListener("change", handler);
   }, []);
 
-  // Apply theme to document
+  // Apply theme to document (only after initial load to avoid reset)
   useEffect(() => {
+    if (!isLoaded) return; // Don't apply theme until we've loaded from storage
+    
     const root = document.documentElement;
     const resolvedTheme = theme === "system" ? systemTheme : theme;
 
@@ -97,7 +113,21 @@ export function useTheme(): UseThemeReturn {
         // Silently fail if Firebase sync is not available
       }
     })();
-  }, [theme, systemTheme]);
+  }, [theme, systemTheme, isLoaded]);
+
+  // Apply initial theme immediately on mount (before async load)
+  useEffect(() => {
+    const root = document.documentElement;
+    const initialTheme = getInitialTheme();
+    // For system theme, default to dark until we detect the actual system theme
+    const resolvedTheme = initialTheme === "system" ? "dark" : initialTheme;
+
+    // Remove all theme classes
+    root.classList.remove("dark", "light", "cyberpunk", "minimal", "spotify", "apple-music", "youtube-music", "tidal", "deezer");
+
+    // Add initial theme class
+    root.classList.add(resolvedTheme);
+  }, []); // Only run once on mount
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
