@@ -108,6 +108,14 @@ export interface ElectronAPI {
       date: string;
     }>;
   }) => void) => () => void;
+  
+  // Music recognition
+  recognizeAll?: () => Promise<RecognitionResult[]>;
+  applyRecognition?: (results: RecognitionResult[]) => Promise<number>;
+  detectPatterns?: () => Promise<DetectedGroup[]>;
+  applyDetectedGroup?: (group: DetectedGroup) => Promise<number>;
+  recognizeTrack?: (trackId: string) => Promise<RecognitionResult | null>;
+  onRecognitionUpdated?: (callback: (updated: number) => void) => () => void;
 }
 
 declare global {

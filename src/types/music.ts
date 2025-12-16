@@ -208,3 +208,22 @@ export interface Video {
   lastPlayedAt?: string;
   playCount?: number;
 }
+
+// Music recognition types
+export interface RecognitionResult {
+  trackId: string;
+  originalArtist: string;
+  originalAlbum: string;
+  suggestedArtist: string;
+  suggestedAlbum: string;
+  confidence: number;
+  method: 'filename' | 'folder' | 'similarity' | 'pattern';
+}
+
+export interface DetectedGroup {
+  artist: string;
+  album: string;
+  tracks: Track[];
+  confidence: number;
+  pattern: string;
+}

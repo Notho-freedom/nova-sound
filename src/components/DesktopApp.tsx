@@ -204,6 +204,71 @@ export const DesktopApp = () => {
     return () => clearTimeout(timeoutId);
   }, [volume, isMuted]);
 
+  // Define handlers before useEffects that use them
+  const handlePlayPause = useCallback(() => setIsPlaying(prev => !prev), []);
+
+  const handlePrevious = useCallback(() => {
+    if (tracks.length === 0) return;
+    
+    if (currentTime > 3) {
+      setCurrentTime(0);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+      }
+    } else {
+      const newIndex = currentTrackIndex === 0 ? tracks.length - 1 : currentTrackIndex - 1;
+      setCurrentIndex(newIndex);
+      setCurrentTime(0);
+    }
+  }, [currentTime, tracks.length, currentTrackIndex, setCurrentIndex]);
+
+  const handleNext = useCallback(() => {
+    if (tracks.length === 0) return;
+
+    // Repeat one: restart current track
+    if (repeatMode === "one") {
+      setCurrentTime(0);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(console.error);
+      }
+      return;
+    }
+
+    // Handle shuffle mode
+    if (isShuffle) {
+      let randomIndex;
+      do {
+        randomIndex = Math.floor(Math.random() * tracks.length);
+      } while (randomIndex === currentTrackIndex && tracks.length > 1);
+      setCurrentIndex(randomIndex);
+      setCurrentTime(0);
+      return;
+    }
+
+    // Normal progression with repeat mode handling
+    const isLastTrack = currentTrackIndex === tracks.length - 1;
+    
+    if (isLastTrack) {
+      // At the end of the queue
+      if (repeatMode === "all") {
+        // Loop back to beginning
+        setCurrentIndex(0);
+        setCurrentTime(0);
+      } else {
+        // Repeat off: stay at last track, stop playback
+        setIsPlaying(false);
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+      }
+    } else {
+      // Move to next track
+      setCurrentIndex(currentTrackIndex + 1);
+      setCurrentTime(0);
+    }
+  }, [repeatMode, isShuffle, currentTrackIndex, tracks.length, setCurrentIndex]);
+
   // Update current time from audio element with higher precision
   useEffect(() => {
     if (!audioRef.current) return;
@@ -233,7 +298,21 @@ export const DesktopApp = () => {
     };
 
     const handleEnded = () => {
-      handleNext();
+      // Handle repeat mode when track ends
+      if (repeatMode === "one") {
+        // Repeat current track
+        setCurrentTime(0);
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(console.error);
+        }
+      } else if (repeatMode === "all") {
+        // Move to next track (will loop if at end)
+        handleNext();
+      } else {
+        // Repeat off: move to next or stop if at end
+        handleNext();
+      }
     };
 
     // Start animation frame loop for smooth updates when playing
@@ -254,7 +333,7 @@ export const DesktopApp = () => {
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, repeatMode, handleNext]);
 
   // Fallback: Simulate playback progress when no real audio file
   useEffect(() => {
@@ -263,15 +342,20 @@ export const DesktopApp = () => {
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
         if (prev >= currentTrack.duration) {
-          handleNext();
-          return 0;
+          // Handle repeat mode when simulated track ends
+          if (repeatMode === "one") {
+            return 0; // Restart current track
+          } else {
+            handleNext();
+            return 0;
+          }
         }
         return prev + 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath]);
+  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath, repeatMode, handleNext]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -331,7 +415,7 @@ export const DesktopApp = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreen, showInlinePlayer]);
+  }, [isFullscreen, showInlinePlayer, handleNext, handlePrevious]);
 
   const handlePlayPause = useCallback(() => setIsPlaying(prev => !prev), []);
 
@@ -353,6 +437,7 @@ export const DesktopApp = () => {
   const handleNext = useCallback(() => {
     if (tracks.length === 0) return;
 
+    // Repeat one: restart current track
     if (repeatMode === "one") {
       setCurrentTime(0);
       if (audioRef.current) {
@@ -362,19 +447,38 @@ export const DesktopApp = () => {
       return;
     }
 
+    // Handle shuffle mode
     if (isShuffle) {
       let randomIndex;
       do {
         randomIndex = Math.floor(Math.random() * tracks.length);
       } while (randomIndex === currentTrackIndex && tracks.length > 1);
       setCurrentIndex(randomIndex);
-    } else {
-      const newIndex = currentTrackIndex === tracks.length - 1
-        ? (repeatMode === "all" ? 0 : currentTrackIndex)
-        : currentTrackIndex + 1;
-      setCurrentIndex(newIndex);
+      setCurrentTime(0);
+      return;
     }
-    setCurrentTime(0);
+
+    // Normal progression with repeat mode handling
+    const isLastTrack = currentTrackIndex === tracks.length - 1;
+    
+    if (isLastTrack) {
+      // At the end of the queue
+      if (repeatMode === "all") {
+        // Loop back to beginning
+        setCurrentIndex(0);
+        setCurrentTime(0);
+      } else {
+        // Repeat off: stay at last track, stop playback
+        setIsPlaying(false);
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+      }
+    } else {
+      // Move to next track
+      setCurrentIndex(currentTrackIndex + 1);
+      setCurrentTime(0);
+    }
   }, [repeatMode, isShuffle, currentTrackIndex, tracks.length, setCurrentIndex]);
 
   const handleSeek = useCallback((value: number[]) => {
