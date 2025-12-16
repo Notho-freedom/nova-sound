@@ -1,17 +1,17 @@
 import { useState, useMemo, useCallback } from "react";
-import { Plus, Music, ListMusic, Trash2, Edit, Play, Shuffle, X, Search } from "lucide-react";
+import { Plus, Music, ListMusic, Trash2, Edit, Play, Shuffle, X, Search, ArrowLeft, Check } from "lucide-react";
 import { Track, Playlist } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { TrackGridView } from "@/components/TrackGridView";
 import { TrackListView } from "@/components/TrackListView";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 
 interface PlaylistViewProps {
@@ -49,9 +49,7 @@ export const PlaylistView = ({
 }: PlaylistViewProps) => {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showAddTracksModal, setShowAddTracksModal] = useState(false);
-  const [showRemoveTracksModal, setShowRemoveTracksModal] = useState(false);
+  const [pageMode, setPageMode] = useState<PageMode>("list");
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [selectedTracksForPlaylist, setSelectedTracksForPlaylist] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,7 +114,7 @@ export const PlaylistView = ({
     const playlist = await onCreatePlaylist(newPlaylistName.trim(), selectedTracksForPlaylist);
     if (playlist) {
       toast.success("Playlist créée");
-      setShowCreateModal(false);
+      setPageMode("list");
       setNewPlaylistName("");
       setSelectedTracksForPlaylist([]);
       setSelectedPlaylistId(playlist.id);
@@ -175,6 +173,241 @@ export const PlaylistView = ({
     setEditingPlaylistId(null);
     setEditingPlaylistName("");
   };
+
+  // Show create playlist page
+  if (pageMode === "create") {
+    return (
+      <div className="h-full flex flex-col animate-in fade-in duration-300">
+        <div className="p-6 border-b border-border/50">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPageMode("list");
+                setNewPlaylistName("");
+                setSelectedTracksForPlaylist([]);
+              }}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour
+            </Button>
+          </div>
+          <PageHeader
+            title="Créer une nouvelle playlist"
+            subtitle="Donnez un nom à votre playlist et ajoutez des titres"
+          />
+        </div>
+        <div className="flex-1 overflow-auto">
+          <div className="p-6 space-y-6 max-w-4xl mx-auto">
+            <div className="space-y-2">
+              <Label htmlFor="playlist-name">Nom de la playlist</Label>
+              <Input
+                id="playlist-name"
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                placeholder="Ma nouvelle playlist"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newPlaylistName.trim()) {
+                    handleCreatePlaylist();
+                  }
+                }}
+                className="text-lg"
+              />
+            </div>
+
+            {uniqueTracks.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    Ajouter des titres ({selectedTracksForPlaylist.length} sélectionné
+                    {selectedTracksForPlaylist.length > 1 ? "s" : ""})
+                  </Label>
+                </div>
+                <div className="border rounded-lg">
+                  <ScrollArea className="h-[500px]">
+                    <div className="p-4 space-y-2">
+                      {uniqueTracks.map((track) => (
+                        <div
+                          key={track.id}
+                          onClick={() => {
+                            setSelectedTracksForPlaylist((prev) =>
+                              prev.includes(track.id)
+                                ? prev.filter((id) => id !== track.id)
+                                : [...prev, track.id]
+                            );
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
+                            selectedTracksForPlaylist.includes(track.id)
+                              ? "bg-primary/10 border border-primary/30"
+                              : "hover:bg-muted/30"
+                          )}
+                        >
+                          <Checkbox
+                            checked={selectedTracksForPlaylist.includes(track.id)}
+                            onCheckedChange={() => {
+                              setSelectedTracksForPlaylist((prev) =>
+                                prev.includes(track.id)
+                                  ? prev.filter((id) => id !== track.id)
+                                  : [...prev, track.id]
+                              );
+                            }}
+                          />
+                          <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                            <img
+                              src={getCoverUrl(track.coverUrl)}
+                              alt={track.album}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{track.title}</p>
+                            <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPageMode("list");
+                  setNewPlaylistName("");
+                  setSelectedTracksForPlaylist([]);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleCreatePlaylist}
+                disabled={!newPlaylistName.trim()}
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Créer la playlist
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show edit tracks page (add/remove)
+  if (pageMode === "edit" && selectedPlaylist) {
+    const isRemoving = selectedTracksForPlaylist.length > 0 && 
+      selectedTracksForPlaylist.every(id => playlistTracks.some(t => t.id === id));
+    const tracksToShow = isRemoving ? playlistTracks : uniqueAvailableTracks;
+
+    return (
+      <div className="h-full flex flex-col animate-in fade-in duration-300">
+        <div className="p-6 border-b border-border/50">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPageMode("list");
+                setSelectedTracksForPlaylist([]);
+              }}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour
+            </Button>
+          </div>
+          <PageHeader
+            title={isRemoving ? "Retirer des titres" : "Ajouter des titres"}
+            subtitle={`${isRemoving ? "Retirer" : "Ajouter"} des titres à "${selectedPlaylist.name}"`}
+          />
+        </div>
+        <div className="flex-1 overflow-auto">
+          <div className="p-6 space-y-6 max-w-4xl mx-auto">
+            <div className="border rounded-lg">
+              <ScrollArea className="h-[500px]">
+                <div className="p-4 space-y-2">
+                  {tracksToShow.map((track) => (
+                    <div
+                      key={track.id}
+                      onClick={() => {
+                        setSelectedTracksForPlaylist((prev) =>
+                          prev.includes(track.id)
+                            ? prev.filter((id) => id !== track.id)
+                            : [...prev, track.id]
+                        );
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors",
+                        selectedTracksForPlaylist.includes(track.id)
+                          ? isRemoving
+                            ? "bg-destructive/10 border border-destructive/30"
+                            : "bg-primary/10 border border-primary/30"
+                          : "hover:bg-muted/30"
+                      )}
+                    >
+                      <Checkbox
+                        checked={selectedTracksForPlaylist.includes(track.id)}
+                        onCheckedChange={() => {
+                          setSelectedTracksForPlaylist((prev) =>
+                            prev.includes(track.id)
+                              ? prev.filter((id) => id !== track.id)
+                              : [...prev, track.id]
+                          );
+                        }}
+                      />
+                      <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                        <img
+                          src={getCoverUrl(track.coverUrl)}
+                          alt={track.album}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{track.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPageMode("list");
+                  setSelectedTracksForPlaylist([]);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant={isRemoving ? "destructive" : "default"}
+                onClick={isRemoving ? handleRemoveTracks : handleAddTracks}
+                disabled={selectedTracksForPlaylist.length === 0}
+              >
+                {isRemoving ? (
+                  <>
+                    <X className="w-4 h-4 mr-2" />
+                    Retirer {selectedTracksForPlaylist.length > 0 && `(${selectedTracksForPlaylist.length})`}
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Ajouter {selectedTracksForPlaylist.length > 0 && `(${selectedTracksForPlaylist.length})`}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // If a playlist is selected, show its tracks
   if (selectedPlaylist) {
@@ -265,7 +498,7 @@ export const PlaylistView = ({
               variant="outline"
               onClick={() => {
                 setSelectedTracksForPlaylist([]);
-                setShowAddTracksModal(true);
+                setPageMode("edit");
               }}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -276,7 +509,7 @@ export const PlaylistView = ({
                 variant="outline"
                 onClick={() => {
                   setSelectedTracksForPlaylist(playlistTracks.map((t) => t.id));
-                  setShowRemoveTracksModal(true);
+                  setPageMode("edit");
                 }}
               >
                 <X className="w-4 h-4 mr-2" />
@@ -376,141 +609,6 @@ export const PlaylistView = ({
             </div>
           )}
         </div>
-
-        {/* Add Tracks Modal */}
-        <Dialog open={showAddTracksModal} onOpenChange={setShowAddTracksModal}>
-          <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Ajouter des titres à la playlist</DialogTitle>
-              <DialogDescription>
-                Sélectionnez les titres à ajouter à "{selectedPlaylist?.name}".
-              </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
-              <div className="space-y-2 p-2">
-                {uniqueAvailableTracks.map((track) => (
-                  <div
-                    key={track.id}
-                    onClick={() => {
-                      setSelectedTracksForPlaylist((prev) =>
-                        prev.includes(track.id)
-                          ? prev.filter((id) => id !== track.id)
-                          : [...prev, track.id]
-                      );
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                      selectedTracksForPlaylist.includes(track.id)
-                        ? "bg-primary/10 border border-primary/30"
-                        : "hover:bg-muted/30"
-                    )}
-                  >
-                    <Checkbox
-                      checked={selectedTracksForPlaylist.includes(track.id)}
-                      onCheckedChange={() => {
-                        setSelectedTracksForPlaylist((prev) =>
-                          prev.includes(track.id)
-                            ? prev.filter((id) => id !== track.id)
-                            : [...prev, track.id]
-                        );
-                      }}
-                    />
-                    <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                      <img
-                        src={getCoverUrl(track.coverUrl)}
-                        alt={track.album}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{track.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            <DialogFooter className="flex-shrink-0">
-              <Button variant="outline" onClick={() => setShowAddTracksModal(false)}>
-                Annuler
-              </Button>
-              <Button
-                onClick={handleAddTracks}
-                disabled={selectedTracksForPlaylist.length === 0}
-              >
-                Ajouter {selectedTracksForPlaylist.length > 0 && `(${selectedTracksForPlaylist.length})`}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Remove Tracks Modal */}
-        <Dialog open={showRemoveTracksModal} onOpenChange={setShowRemoveTracksModal}>
-          <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Retirer des titres de la playlist</DialogTitle>
-              <DialogDescription>
-                Sélectionnez les titres à retirer de "{selectedPlaylist?.name}".
-              </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
-              <div className="space-y-2 p-2">
-                {playlistTracks.map((track) => (
-                  <div
-                    key={track.id}
-                    onClick={() => {
-                      setSelectedTracksForPlaylist((prev) =>
-                        prev.includes(track.id)
-                          ? prev.filter((id) => id !== track.id)
-                          : [...prev, track.id]
-                      );
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                      selectedTracksForPlaylist.includes(track.id)
-                        ? "bg-destructive/10 border border-destructive/30"
-                        : "hover:bg-muted/30"
-                    )}
-                  >
-                    <Checkbox
-                      checked={selectedTracksForPlaylist.includes(track.id)}
-                      onCheckedChange={() => {
-                        setSelectedTracksForPlaylist((prev) =>
-                          prev.includes(track.id)
-                            ? prev.filter((id) => id !== track.id)
-                            : [...prev, track.id]
-                        );
-                      }}
-                    />
-                    <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                      <img
-                        src={getCoverUrl(track.coverUrl)}
-                        alt={track.album}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{track.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-            <DialogFooter className="flex-shrink-0">
-              <Button variant="outline" onClick={() => setShowRemoveTracksModal(false)}>
-                Annuler
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleRemoveTracks}
-                disabled={selectedTracksForPlaylist.length === 0}
-              >
-                Retirer {selectedTracksForPlaylist.length > 0 && `(${selectedTracksForPlaylist.length})`}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     );
   }
@@ -527,7 +625,7 @@ export const PlaylistView = ({
               {playlists.length} playlist{playlists.length > 1 ? "s" : ""}
             </p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button onClick={() => setPageMode("create")}>
             <Plus className="w-4 h-4 mr-2" />
             Créer une playlist
           </Button>
@@ -569,7 +667,7 @@ export const PlaylistView = ({
                   : "Créez votre première playlist pour commencer"}
               </p>
               {!searchQuery && (
-                <Button onClick={() => setShowCreateModal(true)}>
+                <Button onClick={() => setPageMode("create")}>
                   <Plus className="w-4 h-4 mr-2" />
                   Créer une playlist
                 </Button>
@@ -626,126 +724,6 @@ export const PlaylistView = ({
           )}
         </div>
       </ScrollArea>
-
-      {/* Create Playlist Modal */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Créer une nouvelle playlist</DialogTitle>
-            <DialogDescription>
-              Donnez un nom à votre playlist et ajoutez des titres.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4 flex-1 min-h-0 flex flex-col">
-            <div className="space-y-2 flex-shrink-0">
-              <Label htmlFor="playlist-name">Nom de la playlist</Label>
-              <Input
-                id="playlist-name"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                placeholder="Ma nouvelle playlist"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newPlaylistName.trim()) {
-                    handleCreatePlaylist();
-                  }
-                }}
-              />
-            </div>
-            {uniqueTracks.length > 0 && (
-              <div className="space-y-2 flex-1 min-h-0 flex flex-col">
-                <Label className="flex-shrink-0">
-                  Ajouter des titres ({selectedTracksForPlaylist.length} sélectionné
-                  {selectedTracksForPlaylist.length > 1 ? "s" : ""})
-                </Label>
-                <ScrollArea className="flex-1 min-h-0 rounded-lg border border-border/50">
-                  <div className="p-2 space-y-1">
-                    {uniqueTracks.map((track) => (
-                      <div
-                        key={track.id}
-                        onClick={() => {
-                          setSelectedTracksForPlaylist((prev) =>
-                            prev.includes(track.id)
-                              ? prev.filter((id) => id !== track.id)
-                              : [...prev, track.id]
-                          );
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                          selectedTracksForPlaylist.includes(track.id)
-                            ? "bg-primary/10 border border-primary/30"
-                            : "hover:bg-muted/30"
-                        )}
-                      >
-                        <Checkbox
-                          checked={selectedTracksForPlaylist.includes(track.id)}
-                          onCheckedChange={() => {
-                            setSelectedTracksForPlaylist((prev) =>
-                              prev.includes(track.id)
-                                ? prev.filter((id) => id !== track.id)
-                                : [...prev, track.id]
-                            );
-                          }}
-                        />
-                        <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                          <img
-                            src={getCoverUrl(track.coverUrl)}
-                            alt={track.album}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{track.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="flex-shrink-0">
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleCreatePlaylist} disabled={!newPlaylistName.trim()}>
-              Créer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Playlist Name Dialog */}
-      {editingPlaylistId && (
-        <Dialog open={!!editingPlaylistId} onOpenChange={() => setEditingPlaylistId(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Renommer la playlist</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <Input
-                value={editingPlaylistName}
-                onChange={(e) => setEditingPlaylistName(e.target.value)}
-                placeholder="Nom de la playlist"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveEdit();
-                  if (e.key === "Escape") setEditingPlaylistId(null);
-                }}
-              />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingPlaylistId(null)}>
-                Annuler
-              </Button>
-              <Button onClick={handleSaveEdit} disabled={!editingPlaylistName.trim()}>
-                Enregistrer
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };
