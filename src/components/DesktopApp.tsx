@@ -14,7 +14,6 @@ import { SearchView } from "./views/SearchView";
 import { LibraryView } from "./views/LibraryView";
 import { SettingsView } from "./views/SettingsView";
 import { NotificationsView } from "./views/NotificationsView";
-import { StatisticsView } from "./views/StatisticsView";
 
 // Lazy load heavy components
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
@@ -45,7 +44,7 @@ export const DesktopApp = () => {
   useTheme();
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
-  const { history, addToHistory } = usePlayHistory();
+  const { history, addToHistory, recordPlayback } = usePlayHistory();
   const { playlists, addTracksToPlaylist } = usePlaylists();
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
@@ -78,6 +77,23 @@ export const DesktopApp = () => {
   const tracks = queue.tracks.length > 0 ? queue.tracks : libraryTracks;
   const currentTrackIndex = queue.currentIndex;
   const currentTrack = queueCurrentTrack || (tracks.length > 0 ? tracks[currentTrackIndex] || tracks[0] : null);
+  
+  // Refs pour suivre le temps d'écoute de chaque piste
+  const playbackStartTimeRef = useRef<number | null>(null);
+  const playbackStartTrackIdRef = useRef<string | null>(null);
+  const accumulatedPlaybackTimeRef = useRef<number>(0);
+  const lastTimeUpdateRef = useRef<number>(Date.now());
+  
+  // Refs pour stocker les fonctions de manière stable
+  const recordPlaybackRef = useRef(recordPlayback);
+  const addToHistoryRef = useRef(addToHistory);
+  const handleNextRef = useRef<(() => void) | null>(null);
+  
+  // Mettre à jour les refs quand les fonctions changent
+  useEffect(() => {
+    recordPlaybackRef.current = recordPlayback;
+    addToHistoryRef.current = addToHistory;
+  }, [recordPlayback, addToHistory]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>("home");
@@ -166,22 +182,98 @@ export const DesktopApp = () => {
       }
     }
 
-    // Add to play history
-    if (currentTrack) {
-      addToHistory(currentTrack.id);
+    // Enregistrer le temps d'écoute de la piste précédente si elle existe et est différente
+    const previousTrackId = playbackStartTrackIdRef.current;
+    if (previousTrackId && previousTrackId !== currentTrack?.id) {
+      // Mettre à jour le temps accumulé une dernière fois avant de changer
+      if (playbackStartTimeRef.current !== null) {
+        const realTimeNow = Date.now();
+        const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+        accumulatedPlaybackTimeRef.current += delta;
+        lastTimeUpdateRef.current = realTimeNow;
+      }
+      
+      const elapsedTime = accumulatedPlaybackTimeRef.current;
+      if (elapsedTime > 0) {
+        const previousTrack = tracks.find(t => t.id === previousTrackId);
+        const previousTrackDuration = previousTrack?.duration || 0;
+        const completedPercentage = previousTrackDuration > 0
+          ? Math.min(100, (elapsedTime / previousTrackDuration) * 100)
+          : 100;
+        
+        // Enregistrer la session d'écoute de la piste précédente
+        recordPlaybackRef.current(previousTrackId, elapsedTime, completedPercentage);
+      }
+      
+      // Réinitialiser pour la nouvelle piste
+      playbackStartTimeRef.current = null;
+      playbackStartTrackIdRef.current = null;
+      accumulatedPlaybackTimeRef.current = 0;
     }
-  }, [currentTrack?.id, isPlaying]);
+
+    // Démarrer le suivi pour la nouvelle piste
+    if (currentTrack) {
+      // Si c'est une nouvelle piste (différente de la précédente)
+      if (playbackStartTrackIdRef.current !== currentTrack.id) {
+        addToHistoryRef.current(currentTrack.id);
+        playbackStartTrackIdRef.current = currentTrack.id;
+        // Réinitialiser le temps accumulé seulement pour une nouvelle piste
+        accumulatedPlaybackTimeRef.current = 0;
+        lastTimeUpdateRef.current = Date.now();
+      }
+      
+      if (isPlaying) {
+        // Si on reprend la lecture, redémarrer le compteur
+        if (playbackStartTimeRef.current === null) {
+          playbackStartTimeRef.current = Date.now();
+          lastTimeUpdateRef.current = Date.now();
+        }
+      } else {
+        // Si on pause, on garde le temps accumulé mais on arrête le compteur
+        // Ne pas mettre à null si on a déjà du temps accumulé
+        if (playbackStartTimeRef.current !== null) {
+          // Mettre à jour le temps accumulé une dernière fois avant de pause
+          const realTimeNow = Date.now();
+          const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+          accumulatedPlaybackTimeRef.current += delta;
+          lastTimeUpdateRef.current = realTimeNow;
+          playbackStartTimeRef.current = null;
+        }
+      }
+    }
+  }, [currentTrack?.id, isPlaying, tracks]);
 
   // Handle play/pause
   useEffect(() => {
     if (!audioRef.current || !currentTrack?.filePath) return;
 
     if (isPlaying) {
+      // Reprendre le suivi du temps si on reprend la lecture
+      if (playbackStartTrackIdRef.current === currentTrack.id && playbackStartTimeRef.current === null) {
+        playbackStartTimeRef.current = Date.now();
+        lastTimeUpdateRef.current = Date.now();
+      }
       audioRef.current.play().catch(console.error);
     } else {
+      // Enregistrer le temps d'écoute accumulé quand on pause
+      if (playbackStartTrackIdRef.current === currentTrack.id && accumulatedPlaybackTimeRef.current > 0) {
+        const elapsedTime = accumulatedPlaybackTimeRef.current;
+        const trackDuration = currentTrack.duration || 0;
+        const completedPercentage = trackDuration > 0
+          ? Math.min(100, (elapsedTime / trackDuration) * 100)
+          : 100;
+        
+        // Enregistrer seulement si on a écouté au moins 5 secondes (éviter les clics accidentels)
+        if (elapsedTime >= 5) {
+          recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage);
+          // Réinitialiser pour la prochaine session
+          accumulatedPlaybackTimeRef.current = 0;
+        }
+        playbackStartTimeRef.current = null;
+      }
       audioRef.current.pause();
     }
-  }, [isPlaying, currentTrack?.filePath]);
+  }, [isPlaying, currentTrack?.filePath, currentTrack?.id]);
 
   // Handle volume changes
   useEffect(() => {
@@ -211,6 +303,31 @@ export const DesktopApp = () => {
   const handlePrevious = useCallback(() => {
     if (tracks.length === 0) return;
     
+    // Enregistrer le temps d'écoute de la piste actuelle avant de changer
+    if (playbackStartTrackIdRef.current && accumulatedPlaybackTimeRef.current > 0) {
+      // Mettre à jour le temps accumulé une dernière fois
+      if (playbackStartTimeRef.current !== null) {
+        const realTimeNow = Date.now();
+        const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+        accumulatedPlaybackTimeRef.current += delta;
+        lastTimeUpdateRef.current = realTimeNow;
+      }
+      
+      const elapsedTime = accumulatedPlaybackTimeRef.current;
+      const currentTrackData = tracks.find(t => t.id === playbackStartTrackIdRef.current);
+      if (currentTrackData && elapsedTime > 0) {
+        const completedPercentage = currentTrackData.duration > 0
+          ? Math.min(100, (elapsedTime / currentTrackData.duration) * 100)
+          : 100;
+        recordPlaybackRef.current(playbackStartTrackIdRef.current, elapsedTime, completedPercentage);
+      }
+      
+      // Réinitialiser les refs après enregistrement pour éviter les conflits
+      playbackStartTimeRef.current = null;
+      playbackStartTrackIdRef.current = null;
+      accumulatedPlaybackTimeRef.current = 0;
+    }
+    
     if (currentTime > 3) {
       setCurrentTime(0);
       if (audioRef.current) {
@@ -221,10 +338,35 @@ export const DesktopApp = () => {
       setCurrentIndex(newIndex);
       setCurrentTime(0);
     }
-  }, [currentTime, tracks.length, currentTrackIndex, setCurrentIndex]);
+  }, [currentTime, tracks, currentTrackIndex, setCurrentIndex]);
 
   const handleNext = useCallback(() => {
     if (tracks.length === 0) return;
+
+    // Enregistrer le temps d'écoute de la piste actuelle avant de changer (sauf pour repeat one)
+    if (repeatMode !== "one" && playbackStartTrackIdRef.current && accumulatedPlaybackTimeRef.current > 0) {
+      // Mettre à jour le temps accumulé une dernière fois
+      if (playbackStartTimeRef.current !== null) {
+        const realTimeNow = Date.now();
+        const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+        accumulatedPlaybackTimeRef.current += delta;
+        lastTimeUpdateRef.current = realTimeNow;
+      }
+      
+      const elapsedTime = accumulatedPlaybackTimeRef.current;
+      const currentTrackData = tracks.find(t => t.id === playbackStartTrackIdRef.current);
+      if (currentTrackData && elapsedTime > 0) {
+        const completedPercentage = currentTrackData.duration > 0
+          ? Math.min(100, (elapsedTime / currentTrackData.duration) * 100)
+          : 100;
+        recordPlaybackRef.current(playbackStartTrackIdRef.current, elapsedTime, completedPercentage);
+      }
+      
+      // Réinitialiser les refs après enregistrement pour éviter les conflits
+      playbackStartTimeRef.current = null;
+      playbackStartTrackIdRef.current = null;
+      accumulatedPlaybackTimeRef.current = 0;
+    }
 
     // Repeat one: restart current track
     if (repeatMode === "one") {
@@ -268,7 +410,7 @@ export const DesktopApp = () => {
       setCurrentIndex(currentTrackIndex + 1);
       setCurrentTime(0);
     }
-  }, [repeatMode, isShuffle, currentTrackIndex, tracks.length, setCurrentIndex]);
+  }, [repeatMode, isShuffle, currentTrackIndex, tracks, setCurrentIndex]);
 
   // Update current time from audio element with higher precision
   useEffect(() => {
@@ -285,6 +427,14 @@ export const DesktopApp = () => {
         if (Math.abs(now - lastUpdateTime) >= 0.05 || !lastUpdateTime) {
           setCurrentTime(now); // Keep decimal precision for lyrics sync
           lastUpdateTime = now;
+          
+          // Mettre à jour le temps d'écoute accumulé en temps réel
+          if (isPlaying && currentTrack && playbackStartTrackIdRef.current === currentTrack.id) {
+            const realTimeNow = Date.now();
+            const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000; // en secondes
+            accumulatedPlaybackTimeRef.current += delta;
+            lastTimeUpdateRef.current = realTimeNow;
+          }
         }
         if (isPlaying) {
           animationFrameId = requestAnimationFrame(updateTime);
@@ -295,10 +445,33 @@ export const DesktopApp = () => {
     const handleTimeUpdate = () => {
       if (audioRef.current) {
         setCurrentTime(audioRef.current.currentTime); // Keep precision
+        
+        // Mettre à jour le temps d'écoute accumulé
+        if (isPlaying && currentTrack && playbackStartTrackIdRef.current === currentTrack.id) {
+          const realTimeNow = Date.now();
+          const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+          accumulatedPlaybackTimeRef.current += delta;
+          lastTimeUpdateRef.current = realTimeNow;
+        }
       }
     };
 
     const handleEnded = () => {
+      // Enregistrer le temps d'écoute complet de la piste
+      if (currentTrack && playbackStartTrackIdRef.current === currentTrack.id) {
+        const elapsedTime = accumulatedPlaybackTimeRef.current;
+        const completedPercentage = currentTrack.duration > 0
+          ? Math.min(100, (elapsedTime / currentTrack.duration) * 100)
+          : 100;
+        
+        recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage);
+        
+        // Réinitialiser pour la prochaine piste
+        playbackStartTimeRef.current = null;
+        playbackStartTrackIdRef.current = null;
+        accumulatedPlaybackTimeRef.current = 0;
+      }
+      
       // Handle repeat mode when track ends
       if (repeatMode === "one") {
         // Repeat current track
@@ -309,10 +482,10 @@ export const DesktopApp = () => {
         }
       } else if (repeatMode === "all") {
         // Move to next track (will loop if at end)
-        handleNext();
+        handleNextRef.current?.();
       } else {
         // Repeat off: move to next or stop if at end
-        handleNext();
+        handleNextRef.current?.();
       }
     };
 
@@ -334,7 +507,7 @@ export const DesktopApp = () => {
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [isPlaying, repeatMode, handleNext]);
+  }, [isPlaying, repeatMode, currentTrack?.id]);
 
   // Fallback: Simulate playback progress when no real audio file
   useEffect(() => {
@@ -347,7 +520,7 @@ export const DesktopApp = () => {
           if (repeatMode === "one") {
             return 0; // Restart current track
           } else {
-            handleNext();
+            handleNextRef.current?.();
             return 0;
           }
         }
@@ -356,7 +529,7 @@ export const DesktopApp = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath, repeatMode, handleNext]);
+  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath, repeatMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -373,7 +546,7 @@ export const DesktopApp = () => {
         case "ArrowRight":
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            handleNext();
+            handleNextRef.current?.();
           }
           break;
         case "ArrowLeft":
@@ -416,7 +589,7 @@ export const DesktopApp = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreen, showInlinePlayer, handleNext, handlePrevious]);
+  }, [isFullscreen, showInlinePlayer]);
 
   const handleSeek = useCallback((value: number[]) => {
     const newTime = value[0];
@@ -952,8 +1125,6 @@ export const DesktopApp = () => {
         );
       case "settings":
         return <SettingsView />;
-      case "statistics":
-        return <StatisticsView currentTrack={currentTrack} isPlaying={isPlaying} currentTime={currentTime} />;
       case "notifications":
         return <NotificationsView />;
       default:
