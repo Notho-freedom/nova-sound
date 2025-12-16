@@ -83,7 +83,7 @@ export const HomeView = ({
 
   const displayRecent = recentTracks.length > 0 
     ? getUniqueTracks(recentTracks).slice(0, 20) 
-    : getUniqueTracks(tracks).slice(0, 20);
+    : getUniqueTracks(tracks).slice(0, 10);
   
   const displayFavorites = favoriteTracks.length > 0 
     ? getUniqueTracks(favoriteTracks).slice(0, 6) 
