@@ -331,47 +331,49 @@ export const Sidebar = ({
               </div>
               <div className="space-y-0.5">
                 {playlists.slice(0, 5).map((playlist) => (
-                  <PlaylistContextMenu
-                    key={playlist.id}
-                    playlist={playlist}
-                    onPlay={() => {
-                      onViewChange("playlists");
-                      if (onPlayPlaylist) {
-                        onPlayPlaylist(playlist.id);
-                      }
-                    }}
-                    onShuffle={() => {
-                      onViewChange("playlists");
-                      if (onShufflePlaylist) {
-                        onShufflePlaylist(playlist.id);
-                      }
-                    }}
-                    onEdit={() => {
-                      setEditingPlaylist({ id: playlist.id, name: playlist.name });
-                    }}
-                    onDelete={async () => {
-                      if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
-                        await deletePlaylist(playlist.id);
-                        const message = "Playlist supprimée";
-                        toast.success(message);
-                        notifySuccess(message);
-                      }
-                    }}
-                    onView={() => onViewChange("playlists")}
-                  >
-                    <div className="w-full flex items-center gap-2 group">
-                      <button
-                        onClick={() => onViewChange("playlists")}
-                        className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                      >
-                        <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all duration-200 group-hover:scale-105">
-                          <Music className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="flex-1 text-left min-w-0">
-                          <p className="text-sm font-medium truncate transition-colors duration-200">{playlist.name}</p>
-                          <p className="text-xs text-muted-foreground/80 mt-0.5">{playlist.trackIds.length} titres</p>
-                        </div>
-                      </button>
+                  <Tooltip key={playlist.id}>
+                    <TooltipTrigger asChild>
+                      <div className="w-full">
+                        <PlaylistContextMenu
+                          playlist={playlist}
+                          onPlay={() => {
+                            onViewChange("playlists");
+                            if (onPlayPlaylist) {
+                              onPlayPlaylist(playlist.id);
+                            }
+                          }}
+                          onShuffle={() => {
+                            onViewChange("playlists");
+                            if (onShufflePlaylist) {
+                              onShufflePlaylist(playlist.id);
+                            }
+                          }}
+                          onEdit={() => {
+                            setEditingPlaylist({ id: playlist.id, name: playlist.name });
+                          }}
+                          onDelete={async () => {
+                            if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
+                              await deletePlaylist(playlist.id);
+                              const message = "Playlist supprimée";
+                              toast.success(message);
+                              notifySuccess(message);
+                            }
+                          }}
+                          onView={() => onViewChange("playlists")}
+                        >
+                          <div className="w-full flex items-center gap-2 group">
+                            <button
+                              onClick={() => onViewChange("playlists")}
+                              className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                            >
+                              <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:from-primary/30 group-hover:to-secondary/30 transition-all duration-200 group-hover:scale-105">
+                                <Music className="w-4 h-4 text-primary" />
+                              </div>
+                              <div className="flex-1 text-left min-w-0">
+                                <p className="text-sm font-medium truncate transition-colors duration-200">{playlist.name}</p>
+                                <p className="text-xs text-muted-foreground/80 mt-0.5">{playlist.trackIds.length} titres</p>
+                              </div>
+                            </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -410,7 +412,14 @@ export const Sidebar = ({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                  </PlaylistContextMenu>
+                        </PlaylistContextMenu>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-sm font-medium">{playlist.name}</div>
+                      <div className="text-xs text-muted-foreground">{playlist.trackIds.length} titre{playlist.trackIds.length > 1 ? 's' : ''}</div>
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
                 {playlists.length === 0 && (
                   <p className="px-3 py-3 text-xs text-muted-foreground/70 italic text-center">

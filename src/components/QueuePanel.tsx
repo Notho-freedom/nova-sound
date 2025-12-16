@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface QueuePanelProps {
   tracks: Track[];
@@ -32,14 +33,16 @@ const TrackItem = ({
   onClick: () => void; 
   showGrip?: boolean;
 }) => (
-  <div
-    onClick={onClick}
-    className={cn(
-      "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer group",
-      "hover:bg-muted/40 transition-all duration-200 ease-out active:scale-[0.98]",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-    )}
-  >
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <div
+        onClick={onClick}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer group",
+          "hover:bg-muted/40 transition-all duration-200 ease-out active:scale-[0.98]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+        )}
+      >
     {showGrip && (
       <GripVertical className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out cursor-grab" />
     )}
@@ -61,7 +64,15 @@ const TrackItem = ({
     <span className="text-xs text-muted-foreground">
       {formatTime(track.duration)}
     </span>
-  </div>
+      </div>
+    </TooltipTrigger>
+    <TooltipContent>
+      <div className="text-sm font-medium">{track.title}</div>
+      <div className="text-xs text-muted-foreground">{track.artist}</div>
+      {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+      <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
+    </TooltipContent>
+  </Tooltip>
 );
 
 export const QueuePanel = ({

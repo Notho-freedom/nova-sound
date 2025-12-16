@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -337,12 +338,14 @@ export const LibraryView = ({
               {album.tracks.map((track, idx) => {
                 const actualIndex = tracks.findIndex(t => t.id === track.id);
                 const isCurrentTrack = currentTrackIndex === actualIndex;
+                const tooltipText = `${track.title} - ${track.artist} - ${formatTime(track.duration)}`;
 
                 return (
                   <tr
                     key={`album-track-${track.id}-${idx}`}
                     ref={isCurrentTrack ? currentTrackRef : null}
                     onClick={() => onTrackSelect(actualIndex)}
+                    title={tooltipText}
                     className={cn(
                       "group cursor-pointer transition-all duration-200",
                       isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
@@ -424,11 +427,13 @@ export const LibraryView = ({
               onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
               onViewArtist={() => setSelectedArtist(album.artist)}
             >
-              <div className="group relative">
-                <button
-                  onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                  className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="group relative">
+                    <button
+                      onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                      className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                    >
                   <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
                     <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
@@ -440,14 +445,21 @@ export const LibraryView = ({
                   <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
                   <p className="text-xs text-muted-foreground/70">{album.tracks.length} titres</p>
-                </button>
-                <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </div>
+                    </button>
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm font-medium">{album.name}</div>
+                  <div className="text-xs text-muted-foreground">{album.artist}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{album.tracks.length} titre{album.tracks.length > 1 ? 's' : ''}</div>
+                </TooltipContent>
+              </Tooltip>
             </AlbumContextMenu>
           ))}
         </div>
@@ -497,15 +509,17 @@ export const LibraryView = ({
                 onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
                 onViewArtist={() => setSelectedArtist(artist.name)}
               >
-                <div className="group relative">
-                  <button
-                    onClick={() => {
-                      const firstTrack = artist.tracks[0];
-                      const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                      if (idx !== -1) onTrackSelect(idx);
-                    }}
-                    className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                  >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="group relative">
+                      <button
+                        onClick={() => {
+                          const firstTrack = artist.tracks[0];
+                          const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                          if (idx !== -1) onTrackSelect(idx);
+                        }}
+                        className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                      >
                     <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
                       {coverUrl ? (
                         <img src={getCoverUrl(coverUrl)} alt={artist.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -524,14 +538,20 @@ export const LibraryView = ({
                     <p className="text-xs text-muted-foreground text-center">
                       {artist.albums.size} albums • {artist.tracks.length} titres
                     </p>
-                  </button>
-                  <button
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </div>
+                      </button>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm font-medium">{artist.name}</div>
+                    <div className="text-xs text-muted-foreground">{artist.albums.size} album{artist.albums.size > 1 ? 's' : ''} • {artist.tracks.length} titre{artist.tracks.length > 1 ? 's' : ''}</div>
+                  </TooltipContent>
+                </Tooltip>
               </ArtistContextMenu>
             );
           })}
@@ -553,10 +573,11 @@ export const LibraryView = ({
 
         <div className="space-y-2">
           {folders.map((folder) => (
-            <div
-              key={folder.path}
-              className="flex items-center gap-4 p-4 rounded-xl bg-card/30 hover:bg-card/50 transition-colors"
-            >
+            <Tooltip key={folder.path}>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex items-center gap-4 p-4 rounded-xl bg-card/30 hover:bg-card/50 transition-colors"
+                >
               <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
                 <FolderOpen className="w-6 h-6 text-primary" />
               </div>
@@ -579,7 +600,14 @@ export const LibraryView = ({
                 <Play className="w-4 h-4 mr-2" />
                 Lire
               </Button>
-            </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm font-medium">{folder.path.split(/[/\\]/).pop()}</div>
+                <div className="text-xs text-muted-foreground">{folder.path}</div>
+                <div className="text-xs text-muted-foreground mt-1">{folder.tracks.length} fichier{folder.tracks.length > 1 ? 's' : ''}</div>
+              </TooltipContent>
+            </Tooltip>
           ))}
         </div>
       </div>
@@ -700,11 +728,13 @@ export const LibraryView = ({
               {filteredAndSortedTracks.map((track, idx) => {
                 const actualIndex = tracks.findIndex(t => t.id === track.id);
                 const isCurrentTrack = currentTrackIndex === actualIndex;
+                const tooltipText = `${track.title} - ${track.artist}${track.album ? ` (${track.album})` : ''} - ${formatTime(track.duration)}`;
 
                 return (
                   <tr
                     key={`track-${track.id}-${idx}`}
                     onClick={() => onTrackSelect(actualIndex)}
+                    title={tooltipText}
                     className={cn(
                       "group cursor-pointer transition-all duration-200",
                       isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
@@ -859,50 +889,64 @@ export const LibraryView = ({
                 onUploadToCloudinary={() => uploadTrack(track)}
                 canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                 isUploading={getTrackProgress(track.id)?.status === 'uploading'}
+                onUploadToNexus={() => uploadTrackToNexus(track)}
+                canUploadToNexus={canUploadToNexus && !!track.filePath}
+                isUploadingToNexus={getNexusTrackProgress(track.id)?.status === 'uploading'}
               >
-                <button
-                  onClick={() => onTrackSelect(actualIndex)}
-                  className={cn(
-                    "group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50 w-full",
-                    isCurrentTrack && "ring-2 ring-primary"
-                  )}
-                >
-                  <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
-                    <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    {/* Upload progress overlay */}
-                    {getTrackProgress(track.id) && (
-                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
-                        <div className="text-center">
-                          <Cloud className="w-6 h-6 text-white mb-2 mx-auto" />
-                          <span className="text-xs text-white font-medium">
-                            {getTrackProgress(track.id)?.progress || 0}%
-                          </span>
-                        </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onTrackSelect(actualIndex)}
+                      className={cn(
+                        "group p-4 rounded-xl text-left transition-all duration-200 hover:bg-card/50 w-full",
+                        isCurrentTrack && "ring-2 ring-primary",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                      )}
+                    >
+                      <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+                        <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                        {/* Upload progress overlay */}
+                        {getTrackProgress(track.id) && (
+                          <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
+                            <div className="text-center">
+                              <Cloud className="w-6 h-6 text-white mb-2 mx-auto" />
+                              <span className="text-xs text-white font-medium">
+                                {getTrackProgress(track.id)?.progress || 0}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Progress bar */}
+                        {getTrackProgress(track.id)?.status === 'uploading' && (
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/30 z-10">
+                            <div 
+                              className="h-full bg-primary transition-all duration-300"
+                              style={{ width: `${getTrackProgress(track.id)?.progress || 0}%` }}
+                            />
+                          </div>
+                        )}
+                        {/* Play button overlay */}
+                        {!getTrackProgress(track.id) && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                            <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                              <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {/* Progress bar */}
-                    {getTrackProgress(track.id)?.status === 'uploading' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/30 z-10">
-                        <div 
-                          className="h-full bg-primary transition-all duration-300"
-                          style={{ width: `${getTrackProgress(track.id)?.progress || 0}%` }}
-                        />
-                      </div>
-                    )}
-                    {/* Play button overlay */}
-                    {!getTrackProgress(track.id) && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                          <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                    {track.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-                </button>
+                      <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                        {track.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm font-medium">{track.title}</div>
+                    <div className="text-xs text-muted-foreground">{track.artist}</div>
+                    {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                    <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
+                  </TooltipContent>
+                </Tooltip>
               </TrackContextMenu>
             );
           })}

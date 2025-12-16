@@ -3,6 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -83,14 +84,16 @@ export const TrackGridView = ({
             canUploadToNexus={canUploadToNexus && !!track.filePath}
             isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
           >
-            <button
-              onClick={() => onTrackSelect(actualIndex)}
-              className={cn(
-                "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full",
-                isCurrentTrack && "ring-2 ring-primary",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-              )}
-            >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onTrackSelect(actualIndex)}
+                  className={cn(
+                    "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full",
+                    isCurrentTrack && "ring-2 ring-primary",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                  )}
+                >
               <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
                 <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105" />
                 {/* Upload progress overlay */}
@@ -135,6 +138,14 @@ export const TrackGridView = ({
               <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
               <p className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</p>
             </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="text-sm font-medium">{track.title}</div>
+                <div className="text-xs text-muted-foreground">{track.artist}</div>
+                {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
+              </TooltipContent>
+            </Tooltip>
           </TrackContextMenu>
         );
       })}

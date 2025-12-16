@@ -3,6 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -86,11 +87,13 @@ export const TrackListView = ({
           {tracks.map((track, idx) => {
             const actualIndex = tracks.findIndex(t => t.id === track.id);
             const isCurrentTrack = currentTrackIndex === actualIndex;
+            const tooltipText = `${track.title} - ${track.artist}${track.album ? ` (${track.album})` : ''} - ${formatTime(track.duration)}`;
 
             return (
               <tr
                 key={track.id}
                 onClick={() => onTrackSelect(actualIndex)}
+                title={tooltipText}
                 className={cn(
                   "group cursor-pointer transition-all duration-200 ease-out",
                   isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
@@ -188,9 +191,16 @@ export const TrackListView = ({
                     canUploadToNexus={canUploadToNexus && !!track.filePath}
                     isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                   >
-                    <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">Options</div>
+                      </TooltipContent>
+                    </Tooltip>
                   </TrackContextMenu>
                 </td>
               </tr>
