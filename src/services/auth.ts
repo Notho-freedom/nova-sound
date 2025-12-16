@@ -32,15 +32,14 @@ const GOOGLE_OAUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";
 
-// Backend proxy endpoint (optional - if not set, will try direct OAuth)
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
+// Backend proxy endpoint (optional - if not set, will use Next.js API route)
+// Next.js: Use  prefix for client-side env vars
 const OAUTH_PROXY_ENDPOINT = 
-  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_OAUTH_PROXY_URL : null) || null;
+  (typeof window !== 'undefined' ? process.env.OAUTH_PROXY_URL : null) || null;
 
-// Client secret (optional - for Desktop/Electron apps only, not recommended for web)
-// Should only be used in Electron/Desktop apps where the secret is bundled
-const GOOGLE_CLIENT_SECRET = 
-  (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET : null) || null;
+// Next.js API route for OAuth token exchange (uses server-side credentials)
+// This is the default and secure method for web applications
+const OAUTH_API_ENDPOINT = '/api/oauth/token';
 
 class AuthService {
   private currentUser: UserProfile | null = null;
@@ -51,6 +50,13 @@ class AuthService {
   constructor() {
     // Load persisted data (only for manual OAuth users, not Firebase anonymous)
     this.loadFromStorage();
+    
+    // Preload Google Client ID from API (non-blocking)
+    if (typeof window !== 'undefined') {
+      this.loadGoogleClientId().catch((error) => {
+        console.warn("Failed to preload Google Client ID:", error);
+      });
+    }
     
     // Check if tokens are expired
     if (this.authTokens && this.authTokens.expiresAt < Date.now()) {
@@ -135,12 +141,69 @@ class AuthService {
     }
   }
 
-  // Get Google OAuth Client ID
-  getGoogleClientId(): string | null {
+  // Load Google OAuth Client ID from API route
+  private async loadGoogleClientId(): Promise<string | null> {
+    // Only load on client side
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    // If already set, return it
+    if (this.googleClientId) {
+      return this.googleClientId;
+    }
+
+    try {
+      // Try to load from API route first (secure method)
+      const response = await fetch('/api/config/auth');
+      
+      if (response.ok) {
+        const config = await response.json();
+        const clientId = config.googleClientId || null;
+        if (clientId) {
+          this.googleClientId = clientId;
+          // Save to localStorage
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
+          }
+          console.log("Google OAuth Client ID loaded from API route");
+          return clientId;
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to load Google Client ID from API, trying fallback:", error);
+    }
+
+    // Fallback to NEXT_PUBLIC_* for backward compatibility
     const envClientId = typeof window !== 'undefined' 
       ? process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID 
       : null;
-    return this.googleClientId || envClientId || null;
+    
+    if (envClientId) {
+      this.googleClientId = envClientId;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, envClientId);
+      }
+      return envClientId;
+    }
+
+    return null;
+  }
+
+  // Get Google OAuth Client ID (async - loads from API if needed)
+  async getGoogleClientId(): Promise<string | null> {
+    // Try localStorage first (fast)
+    if (this.googleClientId) {
+      return this.googleClientId;
+    }
+
+    // Load from API or env
+    return await this.loadGoogleClientId();
+  }
+
+  // Synchronous getter for backward compatibility (may return null if not loaded)
+  getGoogleClientIdSync(): string | null {
+    return this.googleClientId || null;
   }
 
   // Generate code verifier and challenge for PKCE
@@ -179,11 +242,11 @@ class AuthService {
 
   // Build Google OAuth URL with PKCE
   private async buildAuthUrl(): Promise<string> {
-    const clientId = this.getGoogleClientId();
+    const clientId = await this.getGoogleClientId();
     if (!clientId) {
       throw new Error(
         "Google OAuth Client ID not configured. " +
-        "Please set it in settings or add NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID to .env"
+        "Please set it in settings or add GOOGLE_OAUTH_CLIENT_ID to .env"
       );
     }
 
@@ -217,7 +280,7 @@ class AuthService {
 
   // Exchange authorization code for tokens with PKCE
   private async exchangeCodeForTokens(code: string): Promise<AuthTokens> {
-    const clientId = this.getGoogleClientId();
+    const clientId = await this.getGoogleClientId();
     if (!clientId) {
       throw new Error("Google OAuth Client ID not configured");
     }
@@ -230,7 +293,7 @@ class AuthService {
 
     const redirectUri = window.location.origin + window.location.pathname;
 
-    // Try using backend proxy if available (handles client_secret securely)
+    // Try using custom backend proxy if available (handles client_secret securely)
     if (OAUTH_PROXY_ENDPOINT) {
       try {
         const response = await fetch(`${OAUTH_PROXY_ENDPOINT}/oauth/token`, {
@@ -260,57 +323,56 @@ class AuthService {
           };
         }
       } catch (error) {
-        console.warn("OAuth proxy failed, trying direct OAuth:", error);
+        console.warn("OAuth proxy failed, trying Next.js API route:", error);
       }
     }
 
-    // Direct OAuth with PKCE
-    // If client_secret is available (for Electron/Desktop apps), include it
-    // Otherwise, try without it (for Desktop app type OAuth clients)
-    const tokenParams: Record<string, string> = {
-      client_id: clientId,
-      code: code,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-      code_verifier: codeVerifier,
-    };
+    // Use Next.js API route (default and secure method for web applications)
+    // This route handles the client_secret securely on the server side
+    try {
+      const response = await fetch(OAUTH_API_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code,
+          redirect_uri: redirectUri,
+          code_verifier: codeVerifier,
+        }),
+      });
 
-    // Add client_secret if available (for Electron/Desktop apps)
-    if (GOOGLE_CLIENT_SECRET) {
-      tokenParams.client_secret = GOOGLE_CLIENT_SECRET;
-    }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Token exchange failed' }));
+        sessionStorage.removeItem("oauth_code_verifier");
+        
+        throw new Error(
+          errorData.message || 
+          "OAuth configuration error: Please ensure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set in your server environment variables."
+        );
+      }
 
-    const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams(tokenParams),
-    });
+      const data = await response.json();
+      sessionStorage.removeItem("oauth_code_verifier");
+      
+      const expiresIn = data.expires_in || 3600;
+      const expiresAt = Date.now() + expiresIn * 1000;
 
-    if (!response.ok) {
-      const error = await response.text();
+      return {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        idToken: data.id_token,
+        expiresAt: expiresAt,
+      };
+    } catch (error) {
       // Clear stored values on error
       sessionStorage.removeItem("oauth_code_verifier");
       
-      // Provide helpful error message
-      try {
-        const errorObj = JSON.parse(error);
-        if (errorObj.error === "invalid_request" && errorObj.error_description?.includes("client_secret")) {
-          throw new Error(
-            "OAuth configuration error: " +
-            (GOOGLE_CLIENT_SECRET 
-              ? "The provided client_secret is invalid. Please check NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET in your .env file."
-              : "Your Google OAuth client requires a client_secret. " +
-                "For Electron/Desktop apps, add NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_SECRET to your .env file. " +
-                "For web apps, use a backend proxy (NEXT_PUBLIC_OAUTH_PROXY_URL) or configure as 'Desktop app' type in Google Cloud Console.")
-          );
-        }
-      } catch (parseError) {
-        // Error is not JSON, use as-is
+      // Re-throw with more context if it's not already an Error
+      if (error instanceof Error) {
+        throw error;
       }
-      
-      throw new Error(`Token exchange failed: ${error}`);
+      throw new Error(`Token exchange failed: ${String(error)}`);
     }
 
     const data = await response.json();
@@ -336,7 +398,7 @@ class AuthService {
       throw new Error("No refresh token available");
     }
 
-    const clientId = this.getGoogleClientId();
+    const clientId = await this.getGoogleClientId();
     if (!clientId) {
       throw new Error("Google OAuth Client ID not configured");
     }

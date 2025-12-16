@@ -7,7 +7,7 @@ import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
 const PRICE_PRO_YEARLY = process.env.STRIPE_PRICE_PRO_YEARLY || '';
-const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
 
 const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
   ? new Stripe(STRIPE_SECRET_KEY.trim(), {

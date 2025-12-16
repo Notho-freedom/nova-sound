@@ -350,10 +350,10 @@ export const SettingsView = () => {
   // Google Sign In
   const handleGoogleSignIn = async () => {
     // Check if Google OAuth Client ID is configured
-    const clientId = authService.getGoogleClientId();
+    const clientId = await authService.getGoogleClientId();
     if (!clientId) {
       toast.error("Google OAuth non configuré", {
-        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID dans .env",
+        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez GOOGLE_CLIENT_ID dans les variables d'environnement serveur",
       });
       return;
     }
@@ -947,7 +947,7 @@ export const SettingsView = () => {
 
               {/* Nexus Server with Firebase Auth */}
               <SettingsCard title="Serveur NEXUS" icon={Shield}>
-                <ConfigAlert configured={!!authService.getGoogleClientId()} service="Google OAuth" />
+                <ConfigAlert configured={!!authService.getGoogleClientIdSync()} service="Google OAuth" />
                 
                 <div className="space-y-4">
                   <div className="p-3 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
@@ -1016,7 +1016,7 @@ export const SettingsView = () => {
                           size="sm" 
                           className="w-full gap-2"
                           onClick={handleGoogleSignIn}
-                          disabled={authLoading || !authService.getGoogleClientId()}
+                          disabled={authLoading || !authService.getGoogleClientIdSync()}
                         >
                           {authLoading ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1354,8 +1354,8 @@ export const SettingsView = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Firebase</span>
-                    <span className={cn("text-sm", authService.getGoogleClientId() ? "text-green-500" : "text-yellow-500")}>
-                      {authService.getGoogleClientId() ? "Configuré" : "Non configuré"}
+                    <span className={cn("text-sm", authService.getGoogleClientIdSync() ? "text-green-500" : "text-yellow-500")}>
+                      {authService.getGoogleClientIdSync() ? "Configuré" : "Non configuré"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

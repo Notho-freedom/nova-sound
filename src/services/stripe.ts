@@ -1,36 +1,87 @@
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { authService } from "./auth";
 
-// Stripe configuration
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
-const STRIPE_PUBLISHABLE_KEY = typeof window !== 'undefined' 
-  ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
-  : undefined;
+// Stripe configuration - loaded from API route (server-side only)
+// Fallback to NEXT_PUBLIC_* for backward compatibility
+let stripeConfig: {
+  publishableKey: string;
+  priceProMonthly: string;
+  priceProYearly: string;
+} | null = null;
 
 // Next.js: Use same-origin API routes (no base URL needed)
 // With Next.js, API routes are on the same origin, so we don't need a base URL
 const API_BASE_URL = '';
 
-// Validate config
-const isConfigValid = STRIPE_PUBLISHABLE_KEY && STRIPE_PUBLISHABLE_KEY !== "undefined";
-
 let stripePromise: Promise<Stripe | null> | null = null;
+let configLoadPromise: Promise<void> | null = null;
 
-// Initialize Stripe
-if (isConfigValid && typeof window !== 'undefined') {
-  stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
-} else if (typeof window !== 'undefined') {
-  console.warn("Stripe publishable key not configured. Check your .env file.");
+// Load Stripe configuration from API route
+async function loadStripeConfig(): Promise<void> {
+  // Only load on client side
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  // If already loaded, return
+  if (stripeConfig) {
+    return;
+  }
+
+  // If already loading, wait for it
+  if (configLoadPromise) {
+    return configLoadPromise;
+  }
+
+  // Start loading
+  configLoadPromise = (async () => {
+    try {
+      // Try to load from API route first (secure method)
+      const response = await fetch('/api/config/stripe');
+      
+      if (response.ok) {
+        const config = await response.json();
+        stripeConfig = {
+          publishableKey: config.publishableKey || '',
+          priceProMonthly: config.priceProMonthly || 'price_pro_monthly',
+          priceProYearly: config.priceProYearly || 'price_pro_yearly',
+        };
+        console.log("Stripe config loaded from API route");
+      } else {
+        throw new Error(`API route returned ${response.status}`);
+      }
+    } catch (error) {
+      console.warn("Failed to load Stripe config from API, trying fallback:", error);
+      
+      // Fallback to NEXT_PUBLIC_* for backward compatibility
+      stripeConfig = {
+        publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+        priceProMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || 'price_pro_monthly',
+        priceProYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY || 'price_pro_yearly',
+      };
+    }
+
+    // Validate config and initialize Stripe
+    const isConfigValid = stripeConfig && stripeConfig.publishableKey && stripeConfig.publishableKey !== "undefined";
+    
+    if (isConfigValid && stripeConfig) {
+      stripePromise = loadStripe(stripeConfig.publishableKey);
+    } else {
+      console.warn("Stripe publishable key not configured. Check your .env file and ensure /api/config/stripe is configured.");
+    }
+  })();
+
+  return configLoadPromise;
 }
 
-// Price IDs - these should be configured in your Stripe dashboard
+// Price IDs - loaded from config
 export const PRICE_IDS = {
-  PRO_MONTHLY: typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || "price_pro_monthly")
-    : "price_pro_monthly",
-  PRO_YEARLY: typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY || "price_pro_yearly")
-    : "price_pro_yearly",
+  get PRO_MONTHLY() {
+    return stripeConfig?.priceProMonthly || 'price_pro_monthly';
+  },
+  get PRO_YEARLY() {
+    return stripeConfig?.priceProYearly || 'price_pro_yearly';
+  },
 };
 
 export interface CheckoutSessionResponse {
@@ -51,13 +102,19 @@ export interface SubscriptionStatus {
 }
 
 class StripeService {
+  // Ensure Stripe config is loaded
+  async ensureInitialized(): Promise<void> {
+    await loadStripeConfig();
+  }
+
   // Check if Stripe is initialized
   isInitialized(): boolean {
-    return isConfigValid;
+    return stripePromise !== null;
   }
 
   // Get Stripe instance
   async getStripe(): Promise<Stripe | null> {
+    await this.ensureInitialized();
     if (!stripePromise) {
       throw new Error("Stripe not initialized. Check your configuration.");
     }

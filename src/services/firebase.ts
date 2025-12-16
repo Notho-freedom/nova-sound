@@ -20,40 +20,116 @@ import {
   setDoc,
   updateDoc,
   Firestore,
+  enableIndexedDbPersistence,
+  waitForPendingWrites,
+  collection,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
 
-// Firebase configuration - loaded from environment variables
-// Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
-const firebaseConfig = {
-  apiKey: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_API_KEY : '',
-  authDomain: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN : '',
-  projectId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID : '',
-  storageBucket: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET : '',
-  messagingSenderId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID : '',
-  appId: typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_FIREBASE_APP_ID : '',
-};
-
-// Validate config
-const isConfigValid = Object.values(firebaseConfig).every(
-  (value) => value && value !== "undefined"
-);
+// Firebase configuration - loaded from API route (server-side only)
+// Fallback to NEXT_PUBLIC_* for backward compatibility
+let firebaseConfig: {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+} | null = null;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
+let configLoadPromise: Promise<void> | null = null;
 
-// Initialize Firebase only if config is valid
-if (isConfigValid) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    console.log("Firebase initialized successfully");
-  } catch (error) {
-    console.error("Firebase initialization error:", error);
+// Load Firebase configuration from API route
+async function loadFirebaseConfig(): Promise<void> {
+  // Only load on client side
+  if (typeof window === 'undefined') {
+    return;
   }
-} else {
-  console.warn("Firebase config incomplete. Please check your .env file.");
+
+  // If already loaded, return
+  if (firebaseConfig) {
+    return;
+  }
+
+  // If already loading, wait for it
+  if (configLoadPromise) {
+    return configLoadPromise;
+  }
+
+  // Start loading
+  configLoadPromise = (async () => {
+    try {
+      // Try to load from API route first (secure method)
+      const response = await fetch('/api/config/firebase');
+      
+      if (response.ok) {
+        const config = await response.json();
+        firebaseConfig = {
+          apiKey: config.apiKey || '',
+          authDomain: config.authDomain || '',
+          projectId: config.projectId || '',
+          storageBucket: config.storageBucket || '',
+          messagingSenderId: config.messagingSenderId || '',
+          appId: config.appId || '',
+        };
+        console.log("Firebase config loaded from API route");
+      } else {
+        throw new Error(`API route returned ${response.status}`);
+      }
+    } catch (error) {
+      console.warn("Failed to load Firebase config from API, trying fallback:", error);
+      
+      // Fallback to NEXT_PUBLIC_* for backward compatibility
+      firebaseConfig = {
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
+      };
+    }
+
+    // Validate config
+    const isConfigValid = firebaseConfig && Object.values(firebaseConfig).every(
+      (value) => value && value !== "undefined" && value !== ''
+    );
+
+    if (isConfigValid && firebaseConfig) {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        
+        // Enable offline persistence for Firestore
+        if (typeof window !== 'undefined' && db) {
+          enableIndexedDbPersistence(db).catch((err) => {
+            // Persistence can fail if multiple tabs are open
+            if (err.code === 'failed-precondition') {
+              console.warn('Firestore persistence failed: Multiple tabs open');
+            } else if (err.code === 'unimplemented') {
+              console.warn('Firestore persistence not available in this browser');
+            } else {
+              console.warn('Firestore persistence error:', err);
+            }
+          });
+        }
+        
+        console.log("Firebase initialized successfully");
+      } catch (error) {
+        console.error("Firebase initialization error:", error);
+      }
+    } else {
+      console.warn("Firebase config incomplete. Please check your .env file and ensure /api/config/firebase is configured.");
+    }
+  })();
+
+  return configLoadPromise;
 }
 
 // Google Auth Provider
@@ -87,13 +163,29 @@ class FirebaseService {
   private authStateListeners: Set<(user: User | null) => void> = new Set();
 
   constructor() {
+    // Preload Firebase config from API (non-blocking)
+    if (typeof window !== 'undefined') {
+      loadFirebaseConfig().catch((error) => {
+        console.warn("Failed to preload Firebase config:", error);
+      });
+    }
+    
     // Listen for auth state changes
+    // This will automatically handle transitions from anonymous to Google user
     if (auth) {
       onAuthStateChanged(auth, async (user) => {
+        const previousUser = this.currentUser;
         this.currentUser = user;
+        
         if (user) {
           const userType = user.isAnonymous ? "anonymous" : (user.email || "authenticated");
           console.log("Auth state changed: user signed in", userType, user.uid);
+          
+          // If user transitioned from anonymous to Google, log it
+          if (previousUser?.isAnonymous && !user.isAnonymous) {
+            console.log("✅ User transitioned from anonymous to Google account:", user.email);
+            // The anonymous user is automatically replaced by Firebase
+          }
           
           // Verify token is available (only for non-anonymous users)
           if (!user.isAnonymous) {
@@ -117,10 +209,10 @@ class FirebaseService {
           console.log("Auth state changed: user signed out");
           
           // Clean up user-isolated storage when signing out
-          if (this.currentUser) {
+          if (previousUser) {
             try {
               const { cleanupUserStorage } = await import('@/lib/storage-utils');
-              cleanupUserStorage(this.currentUser.uid);
+              cleanupUserStorage(previousUser.uid);
             } catch (error) {
               console.error('Failed to cleanup user storage:', error);
             }
@@ -136,6 +228,7 @@ class FirebaseService {
 
   // Handle redirect result after Google sign-in (call this on app initialization)
   async handleRedirectResult(): Promise<UserProfile | null> {
+    await this.ensureInitialized();
     if (!auth) return null;
 
     try {
@@ -172,6 +265,13 @@ class FirebaseService {
     return app !== null && auth !== null;
   }
 
+  // Ensure Firebase config is loaded
+  async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized()) {
+      await loadFirebaseConfig();
+    }
+  }
+
   // Get current user
   getCurrentUser(): User | null {
     return this.currentUser;
@@ -191,9 +291,45 @@ class FirebaseService {
   }
 
   // Sign in anonymously (Firebase handles persistence automatically)
+  // Only creates anonymous user if no user exists
   async signInAnonymously(): Promise<UserProfile> {
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized. Check your configuration.");
+    }
+
+    // Check if user already exists (Firebase persists auth state)
+    // Get current user from auth (more reliable than this.currentUser)
+    const currentAuthUser = auth.currentUser;
+    if (currentAuthUser) {
+      // User already exists, update internal reference and return existing profile
+      this.currentUser = currentAuthUser;
+      
+      // If user is not anonymous, don't create anonymous user
+      if (!currentAuthUser.isAnonymous) {
+        console.log("✅ Firebase user already exists (not anonymous):", currentAuthUser.email);
+        const existingProfile = this.userProfile;
+        if (existingProfile) {
+          return existingProfile;
+        }
+        // Load profile if it doesn't exist
+        await this.loadUserProfile(currentAuthUser.uid);
+        if (this.userProfile) {
+          return this.userProfile;
+        }
+      } else {
+        // User is anonymous, return existing profile
+        const existingProfile = this.userProfile;
+        if (existingProfile) {
+          console.log("✅ Using existing Firebase anonymous user:", currentAuthUser.uid);
+          return existingProfile;
+        }
+        // Load profile if it doesn't exist
+        await this.loadUserProfile(currentAuthUser.uid);
+        if (this.userProfile) {
+          return this.userProfile;
+        }
+      }
     }
 
     try {
@@ -202,26 +338,82 @@ class FirebaseService {
       
       console.log("✅ Firebase anonymous user created:", user.uid);
       
-      // Create or update profile
-      const profile = await this.createOrUpdateProfile(user);
+      // Wait a bit for Firestore to be ready (especially in offline mode)
+      if (db) {
+        try {
+          await waitForPendingWrites(db);
+        } catch (waitError) {
+          // Ignore wait errors, continue anyway
+          console.log("Waiting for Firestore pending writes:", waitError);
+        }
+      }
+      
+      // Create or update profile with retry logic for offline mode
+      let profile: UserProfile;
+      try {
+        profile = await this.createOrUpdateProfile(user);
+      } catch (profileError: unknown) {
+        const err = profileError as { code?: string; message?: string };
+        // If offline, create a minimal profile locally
+        if (err.message?.includes('offline') || err.code === 'unavailable') {
+          console.warn("Firestore offline, creating local profile:", err.message);
+          profile = {
+            uid: user.uid,
+            email: '',
+            displayName: 'Utilisateur anonyme',
+            photoURL: null,
+            plan: 'free',
+            storageUsed: 0,
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+          };
+          this.userProfile = profile;
+          // Try to save to Firestore when online (will be retried automatically)
+          this.createOrUpdateProfile(user).catch(() => {
+            // Silent fail - will retry when online
+          });
+        } else {
+          throw profileError;
+        }
+      }
+      
       return profile;
     } catch (error: unknown) {
       console.error("Error signing in anonymously:", error);
       const authError = error as { code?: string; message?: string };
+      
+      // If user already exists, try to get existing profile
+      if (authError.code === "auth/operation-not-allowed") {
+        throw new Error("L'authentification anonyme n'est pas activée. Veuillez l'activer dans Firebase Console.");
+      }
+      
       throw new Error(authError.message || "Erreur lors de la connexion anonyme");
     }
   }
 
   // Link Google account to anonymous user (using manual OAuth credential)
   // Google data takes priority over anonymous data
-  // Step 1: Update Firebase profile with Google data BEFORE linking
-  // Step 2: Link the Google credential to the anonymous user
+  // Step 1: Check if Google account already exists
+  // Step 2: If exists, sign in to that account (anonymous user will be replaced)
+  // Step 3: If not, update anonymous profile and link
   async linkWithGoogleCredential(idToken: string, accessToken: string, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
-    if (!auth || !this.currentUser) {
-      throw new Error("Firebase not initialized or no user signed in");
+    // Ensure Firebase is fully initialized
+    await this.ensureInitialized();
+    
+    if (!auth) {
+      throw new Error("Firebase not initialized. Check your configuration.");
     }
+    
+    // Get current user from auth (may have changed since last check)
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error("No user signed in. Please sign in anonymously first.");
+    }
+    
+    // Update internal reference
+    this.currentUser = currentUser;
 
-    if (!this.currentUser.isAnonymous) {
+    if (!currentUser.isAnonymous) {
       throw new Error("Current user is not anonymous. Cannot link account.");
     }
 
@@ -230,18 +422,32 @@ class FirebaseService {
     }
 
     try {
-      // STEP 1: Update Firebase profile with Google data BEFORE linking
-      console.log("📝 Step 1: Updating anonymous profile with Google data before linking...");
+      // STEP 1: Check if a Google account with this email already exists
+      const existingUser = await this.findUserByEmail(googleUserData.email);
+      
+      if (existingUser && existingUser.uid !== this.currentUser.uid) {
+        // Account Google existe déjà avec un autre UID
+        // Firebase va automatiquement remplacer l'utilisateur anonyme lors de la liaison
+        console.log("🔍 Google account exists, will replace anonymous user during link");
+      }
+      
+      // STEP 2: Update Firebase profile with Google data BEFORE linking
+      console.log("📝 Step 2: Updating anonymous profile with Google data before linking...");
       await this.createOrUpdateProfile(this.currentUser, googleUserData);
       console.log("✅ Profile updated with Google data:", this.userProfile);
       
-      // STEP 2: Link the Google credential to the anonymous user
-      console.log("🔗 Step 2: Linking Google credential to anonymous user...");
+      // STEP 3: Link the Google credential to the anonymous user
+      // Firebase will automatically replace the anonymous user with the Google account
+      console.log("🔗 Step 3: Linking Google credential to anonymous user...");
       const credential = GoogleAuthProvider.credential(idToken, accessToken);
       const userCredential = await linkWithCredential(this.currentUser, credential);
       const user = userCredential.user;
       
       console.log("✅ Firebase anonymous user linked with Google account:", user.uid);
+      console.log("✅ Anonymous user automatically replaced by Firebase");
+      
+      // Wait a bit for Firestore to update
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Force reload profile from Firestore to ensure we have the latest merged data
       await this.loadUserProfile(user.uid);
@@ -261,7 +467,10 @@ class FirebaseService {
       const authError = error as { code?: string; message?: string };
       
       if (authError.code === "auth/credential-already-in-use") {
-        throw new Error("Ce compte Google est déjà utilisé par un autre utilisateur.");
+        // This means the Google account is already linked to another Firebase user
+        // We should sign in to that existing account instead
+        console.log("🔍 Google account already in use, attempting to sign in to existing account");
+        throw new Error("Ce compte Google est déjà utilisé. Veuillez vous connecter avec ce compte.");
       } else if (authError.code === "auth/email-already-in-use") {
         throw new Error("Cet email est déjà utilisé par un autre compte.");
       }
@@ -270,8 +479,38 @@ class FirebaseService {
     }
   }
 
+  // Find user by email in Firestore
+  async findUserByEmail(email: string): Promise<UserProfile | null> {
+    if (!db || !email) {
+      return null;
+    }
+
+    try {
+      // Query Firestore for user with this email
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        return userDoc.data() as UserProfile;
+      }
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      // Handle offline mode gracefully
+      if (err.message?.includes('offline') || err.code === 'unavailable') {
+        console.warn("Firestore offline, cannot check for existing user");
+      } else {
+        console.error("Error finding user by email:", error);
+      }
+    }
+
+    return null;
+  }
+
   // Sign in with Google
   async signInWithGoogle(): Promise<void> {
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized. Check your configuration.");
     }
@@ -285,7 +524,13 @@ class FirebaseService {
         try {
           const result = await signInWithPopup(auth, googleProvider);
           const user = result.user;
+          
+          // If there was an anonymous user, it will be automatically replaced
+          // Create or update profile
           await this.createOrUpdateProfile(user);
+          
+          // Force UI update
+          this.authStateListeners.forEach((listener) => listener(user));
           return;
         } catch (popupError: unknown) {
           const error = popupError as { code?: string; message?: string };
@@ -322,6 +567,7 @@ class FirebaseService {
 
   // Sign out
   async signOut(): Promise<void> {
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized");
     }
@@ -348,14 +594,37 @@ class FirebaseService {
         // Profile doesn't exist, create it from current user
         await this.createOrUpdateProfile(this.currentUser);
       }
-    } catch (error) {
-      console.error("Error loading user profile:", error);
-      // If loading fails, try to create profile from current user
-      if (this.currentUser) {
-        try {
-          await this.createOrUpdateProfile(this.currentUser);
-        } catch (createError) {
-          console.error("Error creating profile:", createError);
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      // Handle offline mode gracefully
+      if (err.message?.includes('offline') || err.code === 'unavailable') {
+        console.warn("Firestore offline, using cached or default profile");
+        // Create a minimal profile from current user data
+        if (this.currentUser) {
+          this.userProfile = {
+            uid: this.currentUser.uid,
+            email: this.currentUser.email || '',
+            displayName: this.currentUser.displayName || 'Utilisateur',
+            photoURL: this.currentUser.photoURL,
+            plan: 'free',
+            storageUsed: 0,
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+          };
+          // Try to save when online (will be retried automatically)
+          this.createOrUpdateProfile(this.currentUser).catch(() => {
+            // Silent fail - will retry when online
+          });
+        }
+      } else {
+        console.error("Error loading user profile:", error);
+        // If loading fails, try to create profile from current user
+        if (this.currentUser) {
+          try {
+            await this.createOrUpdateProfile(this.currentUser);
+          } catch (createError) {
+            console.error("Error creating profile:", createError);
+          }
         }
       }
     }
@@ -369,7 +638,35 @@ class FirebaseService {
     }
 
     const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
+    
+    // Try to get existing profile, but handle offline mode gracefully
+    let userSnap;
+    try {
+      userSnap = await getDoc(userRef);
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      if (err.message?.includes('offline') || err.code === 'unavailable') {
+        // If offline, create a minimal profile locally
+        console.warn("Firestore offline, creating local profile");
+        const minimalProfile: UserProfile = {
+          uid: user.uid,
+          email: googleUserData?.email || user.email || "",
+          displayName: googleUserData?.displayName || user.displayName || "Utilisateur",
+          photoURL: googleUserData?.photoURL || user.photoURL || null,
+          plan: "free",
+          storageUsed: 0,
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
+        this.userProfile = minimalProfile;
+        // Try to save when online (will be retried automatically)
+        setDoc(userRef, minimalProfile).catch(() => {
+          // Silent fail - will retry when online
+        });
+        return minimalProfile;
+      }
+      throw error;
+    }
 
     // Priority: googleUserData > user (Firebase) > existing profile
     const email = googleUserData?.email || user.email || "";
@@ -404,7 +701,16 @@ class FirebaseService {
         Object.entries(mergedProfile).filter(([_, v]) => v !== undefined)
       ) as Partial<UserProfile>;
       
-      await updateDoc(userRef, cleanedProfile);
+      try {
+        await updateDoc(userRef, cleanedProfile);
+      } catch (updateError: unknown) {
+        const err = updateError as { code?: string; message?: string };
+        if (err.message?.includes('offline') || err.code === 'unavailable') {
+          console.warn("Firestore offline, update will be retried when online");
+        } else {
+          throw updateError;
+        }
+      }
       
       this.userProfile = {
         ...existingProfile,
@@ -423,7 +729,17 @@ class FirebaseService {
         lastLoginAt: new Date().toISOString(),
       };
 
-      await setDoc(userRef, newProfile);
+      try {
+        await setDoc(userRef, newProfile);
+      } catch (setError: unknown) {
+        const err = setError as { code?: string; message?: string };
+        if (err.message?.includes('offline') || err.code === 'unavailable') {
+          console.warn("Firestore offline, profile will be saved when online");
+        } else {
+          throw setError;
+        }
+      }
+      
       this.userProfile = newProfile;
     }
 

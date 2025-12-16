@@ -4,7 +4,7 @@ import { verifyAuth } from '../../auth/middleware';
 import { validateRequest, createErrorResponse, ErrorCodes, stripePortalSchema, isValidationError } from '~/lib/validation';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
 
 const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
   ? new Stripe(STRIPE_SECRET_KEY.trim(), {

@@ -9,8 +9,14 @@
  * et valide leur format si possible.
  */
 
-const fs = require('fs');
-const path = require('path');
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Colors for terminal output
 const colors = {
@@ -23,8 +29,8 @@ const colors = {
 };
 
 // Load environment variables
-require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: join(__dirname, '..', '.env.local') });
+dotenv.config({ path: join(__dirname, '..', '.env') });
 
 // Environment variable definitions
 const envDefinitions = {
@@ -89,6 +95,11 @@ const envDefinitions = {
         key: 'GOOGLE_CLIENT_ID',
         description: 'Google OAuth Client ID (server)',
         validate: (val) => !val || val.includes('.apps.googleusercontent.com'),
+      },
+      {
+        key: 'GOOGLE_CLIENT_SECRET',
+        description: 'Google OAuth Client Secret (server) - REQUIRED for OAuth token exchange',
+        validate: (val) => !val || val.length > 10,
       },
       {
         key: 'STRIPE_SECRET_KEY',
