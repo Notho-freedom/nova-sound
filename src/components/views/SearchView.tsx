@@ -201,6 +201,7 @@ export const SearchView = ({
             />
             {query && (
               <button
+                title="Effacer la recherche"
                 onClick={() => setQuery("")}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
               >
@@ -356,6 +357,7 @@ export const SearchView = ({
                       {term}
                     </button>
                     <button
+                      title="Effacer la recherche"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeFromHistory(term);

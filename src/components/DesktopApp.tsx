@@ -31,6 +31,7 @@ import { useQueue } from "@/hooks/useQueue";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useTheme } from "@/hooks/useTheme";
 import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -39,6 +40,8 @@ import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 import { useAudioVibes } from "@/hooks/useAudioVibes";
 
 export const DesktopApp = () => {
+  // Initialize theme hook to ensure theme is loaded and applied on mount
+  useTheme();
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory } = usePlayHistory();

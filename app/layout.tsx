@@ -27,6 +27,33 @@ export default function RootLayout({
       <head>
         <title>NEXUS Audio System | Futuristic Music Player</title>
         <meta name="description" content="Experience music like never before with NEXUS - a futuristic audio player designed for those who seek something extraordinary and unique." />
+        {/* Apply theme immediately before React mounts to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const saved = localStorage.getItem("nexus-theme");
+                  const themes = ["dark", "light", "cyberpunk", "minimal", "spotify", "apple-music", "youtube-music", "tidal", "deezer", "system"];
+                  if (saved && themes.includes(saved)) {
+                    const root = document.documentElement;
+                    root.classList.remove(...themes);
+                    if (saved === "system") {
+                      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                      root.classList.add(prefersDark ? "dark" : "light");
+                    } else {
+                      root.classList.add(saved);
+                    }
+                  } else {
+                    document.documentElement.classList.add("dark");
+                  }
+                } catch (e) {
+                  document.documentElement.classList.add("dark");
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
         {mounted ? (
