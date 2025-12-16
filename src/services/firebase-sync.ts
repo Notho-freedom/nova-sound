@@ -188,11 +188,13 @@ class FirebaseSyncService {
   }
 
   // Load all user data from Firestore (silent mode - minimal logs)
-  private async loadFromFirestore(userId: string): Promise<void> {
-    if (!db) return;
+  // Made public for external access (settings, theme, notifications hooks)
+  async loadFromFirestore(userId?: string): Promise<UserAppData | null> {
+    const targetUserId = userId || this.currentUserId;
+    if (!db || !targetUserId) return null;
     
     try {
-      const userDataRef = doc(db, 'users', userId, 'appData', 'data');
+      const userDataRef = doc(db, 'users', targetUserId, 'appData', 'data');
       const userDataSnap = await getDoc(userDataRef);
 
       if (userDataSnap.exists()) {
@@ -201,16 +203,18 @@ class FirebaseSyncService {
         // Merge with local data (Firestore takes priority for first load)
         await this.mergeWithLocal(data);
         
-        // Only log on first load, not on every sync
+        return data;
       } else {
         // No Firestore data, save local data to Firestore
-        await this.saveToFirestore(userId);
+        await this.saveToFirestore(targetUserId);
+        return null;
       }
-    } catch (error) {
+    } catch (error: any) {
       // Only log actual errors
       if (error.code !== 'unavailable' && error.code !== 'cancelled') {
         console.error('Error loading from Firestore:', error);
       }
+      return null;
     }
   }
 

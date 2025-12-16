@@ -374,22 +374,6 @@ class AuthService {
       }
       throw new Error(`Token exchange failed: ${String(error)}`);
     }
-
-    const data = await response.json();
-    
-    // Clear code verifier after successful exchange
-    sessionStorage.removeItem("oauth_code_verifier");
-    
-    // Calculate expiration time (default to 1 hour if not provided)
-    const expiresIn = data.expires_in || 3600;
-    const expiresAt = Date.now() + expiresIn * 1000;
-
-    return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      idToken: data.id_token,
-      expiresAt: expiresAt,
-    };
   }
 
   // Refresh access token

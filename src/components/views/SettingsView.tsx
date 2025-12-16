@@ -217,7 +217,7 @@ export const SettingsView = () => {
           if (stored !== null) {
             try {
               const parsed = JSON.parse(stored);
-              loadedSettings[key] = parsed;
+              (loadedSettings as Record<string, unknown>)[key] = parsed;
             } catch (e) {
               // Invalid JSON, skip
             }
