@@ -209,13 +209,33 @@ export const HomeView = ({
     );
   }
 
-  // Get featured track for hero background
-  const featuredTrack = useMemo(() => {
-    if (recentTracks.length > 0) return recentTracks[0];
-    if (favoriteTracks.length > 0) return favoriteTracks[0];
-    if (tracks.length > 0) return tracks[0];
-    return undefined;
-  }, [recentTracks, favoriteTracks, tracks]);
+  // Get featured tracks for hero slider (up to 5 tracks)
+  const featuredTracks = useMemo(() => {
+    const tracksList: Track[] = [];
+    
+    // Add recent tracks first
+    if (recentTracks.length > 0) {
+      tracksList.push(...getUniqueTracks(recentTracks).slice(0, 3));
+    }
+    
+    // Add favorite tracks if we need more
+    if (tracksList.length < 5 && favoriteTracks.length > 0) {
+      const favorites = getUniqueTracks(favoriteTracks).filter(
+        t => !tracksList.some(existing => existing.id === t.id)
+      );
+      tracksList.push(...favorites.slice(0, 5 - tracksList.length));
+    }
+    
+    // Add any tracks if we still need more
+    if (tracksList.length < 5 && tracks.length > 0) {
+      const additional = getUniqueTracks(tracks).filter(
+        t => !tracksList.some(existing => existing.id === t.id)
+      );
+      tracksList.push(...additional.slice(0, 5 - tracksList.length));
+    }
+    
+    return tracksList;
+  }, [recentTracks, favoriteTracks, tracks, getUniqueTracks]);
 
   return (
     <div className="animate-in fade-in duration-200">
@@ -225,12 +245,16 @@ export const HomeView = ({
         <HeroBreadcrumbs 
           userName={userName}
           trackCount={tracks.length}
-          featuredTrack={featuredTrack}
+          featuredTracks={featuredTracks}
+          onTrackSelect={(track) => {
+            const index = tracks.findIndex(t => t.id === track.id);
+            if (index !== -1) onTrackSelect(index);
+          }}
         />
       </div>
       
       {/* Main Content with padding - Overlaps with hero fade */}
-      <div className="px-6 py-4 space-y-6 -mt-24 md:-mt-32 relative z-10">
+      <div className="px-6 py-4 space-y-6 -mt-24 md:-mt-32 relative z-10 pt-16 md:pt-20">
         {/* Subscription Badge */}
         {nexusAuthenticated && nexusUser && (
           <div className="flex justify-end">
