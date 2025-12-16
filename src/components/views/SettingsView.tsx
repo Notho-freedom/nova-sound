@@ -28,6 +28,9 @@ import {
   LogOut,
   AlertCircle,
   Zap,
+  Wand2,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -321,7 +324,7 @@ const ConfigAlert = ({ configured, service }: { configured: boolean; service: st
 };
 
 export const SettingsView = () => {
-  const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders } = useLibrary();
+  const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders, refreshLibrary } = useLibrary();
   const { videos, scanning: scanningVideos, scanProgress: videoScanProgress, scanVideos, selectVideoFolders } = useVideos();
   const { theme, setTheme } = useTheme();
   const { enabled: notificationsEnabled, setEnabled: setNotificationsEnabled, notifySuccess, notifyError } = useNotifications();
