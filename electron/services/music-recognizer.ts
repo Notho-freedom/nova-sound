@@ -396,6 +396,7 @@ export async function recognizeAllUnknownTracks(): Promise<RecognitionResult[]> 
  */
 export async function applyRecognitionResults(results: RecognitionResult[]): Promise<number> {
   let updated = 0;
+  const updatedTracks: StoredTrack[] = [];
   
   for (const result of results) {
     const track = await storage.getTrack(result.trackId);
@@ -403,8 +404,19 @@ export async function applyRecognitionResults(results: RecognitionResult[]): Pro
       track.artist = result.suggestedArtist;
       track.album = result.suggestedAlbum;
       await storage.updateTrack(result.trackId, track);
+      updatedTracks.push(track);
       updated++;
     }
+  }
+  
+  // Notifier le renderer des mises à jour
+  if (updatedTracks.length > 0) {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(window => {
+      updatedTracks.forEach(track => {
+        window.webContents.send('library:track-updated', track);
+      });
+    });
   }
   
   return updated;
@@ -427,6 +439,7 @@ export async function detectAndGroupPatterns(): Promise<DetectedGroup[]> {
  */
 export async function applyDetectedGroup(group: DetectedGroup): Promise<number> {
   let updated = 0;
+  const updatedTracks: StoredTrack[] = [];
   
   for (const track of group.tracks) {
     const storedTrack = await storage.getTrack(track.id);
@@ -434,8 +447,19 @@ export async function applyDetectedGroup(group: DetectedGroup): Promise<number> 
       storedTrack.artist = group.artist;
       storedTrack.album = group.album;
       await storage.updateTrack(track.id, storedTrack);
+      updatedTracks.push(storedTrack);
       updated++;
     }
+  }
+  
+  // Notifier le renderer des mises à jour
+  if (updatedTracks.length > 0) {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(window => {
+      updatedTracks.forEach(track => {
+        window.webContents.send('library:track-updated', track);
+      });
+    });
   }
   
   return updated;

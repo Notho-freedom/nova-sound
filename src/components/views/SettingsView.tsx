@@ -135,6 +135,9 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       toast.success(`${updated} pistes mises à jour`);
       setResults([]);
       setShowResults(false);
+      // Attendre un peu pour que les événements soient traités
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Rafraîchir la bibliothèque
       await refreshLibrary();
     } catch (error) {
       console.error('Erreur lors de l\'application:', error);
@@ -170,6 +173,9 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
     try {
       const updated = await window.electronAPI.applyDetectedGroup(group);
       toast.success(`${updated} pistes mises à jour`);
+      // Attendre un peu pour que les événements soient traités
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Rafraîchir la bibliothèque
       await refreshLibrary();
       // Recharger les patterns
       const newPatterns = await window.electronAPI.detectPatterns();
