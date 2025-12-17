@@ -136,3 +136,66 @@ export const PageHeaderSkeleton = () => (
   </div>
 );
 
+/**
+ * Skeleton pour une ligne de tableau d'album
+ */
+export const AlbumTableRowSkeleton = () => (
+  <tr className="border-b border-border/30">
+    <td className="px-4 py-3">
+      <div className="flex items-center gap-3">
+        <Skeleton className="w-12 h-12 rounded flex-shrink-0" />
+        <div className="min-w-0 space-y-2 flex-1">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-32" />
+        </div>
+      </div>
+    </td>
+    <td className="px-4 py-3 hidden md:table-cell">
+      <Skeleton className="h-4 w-28" />
+    </td>
+    <td className="px-4 py-3 hidden lg:table-cell">
+      <Skeleton className="h-4 w-16" />
+    </td>
+    <td className="px-4 py-3 text-right">
+      <Skeleton className="h-4 w-20 ml-auto" />
+    </td>
+    <td className="px-4 py-3 w-12">
+      <Skeleton className="w-6 h-6 mx-auto" />
+    </td>
+  </tr>
+);
+
+/**
+ * Skeleton pour un tableau d'albums
+ */
+export const AlbumTableSkeleton = ({ count = 10 }: { count?: number }) => (
+  <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30">
+    <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+      <table className="w-full">
+        <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+          <tr className="border-b border-border/30">
+            <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+              Album
+            </th>
+            <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+              Artiste
+            </th>
+            <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
+              Année
+            </th>
+            <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+              Titres
+            </th>
+            <th className="px-4 py-2.5 w-12"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: count }).map((_, i) => (
+            <AlbumTableRowSkeleton key={`album-table-skeleton-${i}`} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+

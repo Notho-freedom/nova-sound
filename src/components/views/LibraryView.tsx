@@ -47,7 +47,7 @@ import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
-import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton } from "@/components/ui/skeletons";
+import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton, AlbumTableSkeleton } from "@/components/ui/skeletons";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -632,7 +632,11 @@ export const LibraryView = ({
         {/* Albums Content */}
         <div className="flex-1 overflow-auto px-6 py-4">
           {loading ? (
-            <AlbumGridSkeleton />
+            albumsViewMode === "grid" ? (
+              <AlbumGridSkeleton />
+            ) : (
+              <AlbumTableSkeleton />
+            )
           ) : filteredAndSortedAlbums.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <Disc3 className="h-16 w-16 text-muted-foreground mb-4" />
@@ -708,80 +712,145 @@ export const LibraryView = ({
               ))}
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredAndSortedAlbums.map((album) => (
-                <AlbumContextMenu
-                  key={`${album.name}-${album.artist}`}
-                  album={album}
-                  playlists={playlists}
-                  onPlay={() => {
-                    const firstTrack = album.tracks[0];
-                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }}
-                  onShuffle={() => {
-                    const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
-                    const idx = tracks.findIndex(t => t.id === shuffled[0].id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }}
-                  onAddToQueue={() => {
-                    if (onAddToQueue) {
-                      album.tracks.forEach(track => onAddToQueue(track));
-                    }
-                  }}
-                  onAddToPlaylist={(playlistId) => {
-                    if (onAddToPlaylist) {
-                      album.tracks.forEach(track => onAddToPlaylist(playlistId, track));
-                    }
-                  }}
-                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
-                  onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                  onViewArtist={() => setSelectedArtist(album.artist)}
-                >
-                  <div
-                    onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                    className="group relative flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-all"
-                  >
-                    <div className="relative w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-                      {album.coverUrl ? (
-                        <img
-                          src={getCoverUrl(album.coverUrl)}
-                          alt={album.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Disc3 className="w-6 h-6 text-primary/50" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play className="w-5 h-5 text-white fill-current ml-0.5" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate text-sm">{album.name}</h3>
-                      <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
-                      <p className="text-xs text-muted-foreground/70 mt-0.5">
-                        {album.tracks.length} titre{album.tracks.length > 1 ? "s" : ""}
-                        {album.year && ` • ${album.year}`}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
+            <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
+              <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 bg-muted/50 backdrop-blur-sm">
+                    <tr className="border-b border-border/30">
+                      <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+                        Album
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                        Artiste
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
+                        Année
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+                        Titres
+                      </th>
+                      <th className="px-4 py-2.5 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAndSortedAlbums.map((album) => {
+                      const handlePlay = () => {
                         const firstTrack = album.tracks[0];
                         const idx = tracks.findIndex(t => t.id === firstTrack.id);
                         if (idx !== -1) onTrackSelect(idx);
-                      }}
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </AlbumContextMenu>
-              ))}
+                      };
+
+                      return (
+                        <AlbumContextMenu
+                          key={`${album.name}-${album.artist}`}
+                          album={album}
+                          playlists={playlists}
+                          onPlay={handlePlay}
+                          onShuffle={() => {
+                            const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
+                            const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                            if (idx !== -1) onTrackSelect(idx);
+                          }}
+                          onAddToQueue={() => {
+                            if (onAddToQueue) {
+                              album.tracks.forEach(track => onAddToQueue(track));
+                            }
+                          }}
+                          onAddToPlaylist={(playlistId) => {
+                            if (onAddToPlaylist) {
+                              album.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                            }
+                          }}
+                          onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
+                          onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                          onViewArtist={() => setSelectedArtist(album.artist)}
+                        >
+                          <tr
+                            onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                            className="group cursor-pointer transition-all duration-200 ease-out hover:bg-muted/40 active:bg-muted/50"
+                          >
+                            <td className="px-4 py-3">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-3">
+                                    <div className="relative w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary/20 to-secondary/20">
+                                      {album.coverUrl ? (
+                                        <img
+                                          src={getCoverUrl(album.coverUrl)}
+                                          alt={album.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <Disc3 className="w-6 h-6 text-primary/50" />
+                                        </div>
+                                      )}
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Play className="w-4 h-4 text-white fill-current ml-0.5" />
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate text-foreground">
+                                        {album.name}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm font-medium">{album.name}</div>
+                                  <div className="text-xs text-muted-foreground">{album.artist}</div>
+                                  {album.year && <div className="text-xs text-muted-foreground mt-1">Année: {album.year}</div>}
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {album.tracks.length} titre{album.tracks.length > 1 ? "s" : ""}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-sm text-muted-foreground truncate">{album.artist}</p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm font-medium">{album.artist}</div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </td>
+                            <td className="px-4 py-3 hidden lg:table-cell">
+                              <p className="text-sm text-muted-foreground">
+                                {album.year || "-"}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="text-sm text-muted-foreground font-mono">
+                                {album.tracks.length}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
+                                    className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                    aria-label="Options"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm">Clic droit pour plus d'options</div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </td>
+                          </tr>
+                        </AlbumContextMenu>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
