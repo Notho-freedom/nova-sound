@@ -382,8 +382,11 @@ function registerLocalAudioProtocol() {
 function registerLocalVideoProtocol() {
     protocol.handle('local-video', async (request) => {
         let filePath = request.url.replace('local-video://', '');
-        // Decode URI component
+        // Decode URI component - handle both encoded and unencoded paths
         try {
+            // Remove any leading slashes
+            filePath = filePath.replace(/^\/+/, '');
+            // Decode URI component
             filePath = decodeURIComponent(filePath);
         }
         catch (e) {
@@ -391,12 +394,33 @@ function registerLocalVideoProtocol() {
         }
         console.log('Loading video file:', filePath);
         try {
+            // Normalize path for Windows
+            if (process.platform === 'win32') {
+                // Handle Windows paths that might have forward slashes
+                filePath = filePath.replace(/\//g, '\\');
+            }
             // Check if file exists
             if (!fs.existsSync(filePath)) {
                 console.error('Video file not found:', filePath);
-                return new Response('File not found', { status: 404 });
+                // Try alternative path formats
+                const altPath = filePath.replace(/\\/g, '/');
+                if (fs.existsSync(altPath)) {
+                    filePath = altPath;
+                }
+                else {
+                    return new Response('File not found', {
+                        status: 404,
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        }
+                    });
+                }
             }
             const stats = fs.statSync(filePath);
+            if (!stats.isFile()) {
+                console.error('Path is not a file:', filePath);
+                return new Response('Path is not a file', { status: 400 });
+            }
             const ext = path.extname(filePath).toLowerCase();
             const mimeTypes = {
                 '.mp4': 'video/mp4',
@@ -410,6 +434,7 @@ function registerLocalVideoProtocol() {
                 '.3gp': 'video/3gpp',
                 '.ogv': 'video/ogg',
             };
+            const contentType = mimeTypes[ext] || 'video/mp4';
             // Handle Range requests for video seeking
             const rangeHeader = request.headers.get('range');
             if (rangeHeader) {
@@ -419,15 +444,27 @@ function registerLocalVideoProtocol() {
                     const start = parseInt(matches[1], 10);
                     const end = matches[2] ? parseInt(matches[2], 10) : stats.size - 1;
                     const chunkSize = end - start + 1;
+                    if (start >= stats.size || start < 0) {
+                        return new Response('Range Not Satisfiable', {
+                            status: 416,
+                            headers: {
+                                'Content-Range': `bytes */${stats.size}`,
+                            }
+                        });
+                    }
                     // Read only the requested range
                     const buffer = Buffer.alloc(chunkSize);
                     const fd = fs.openSync(filePath, 'r');
-                    fs.readSync(fd, buffer, 0, chunkSize, start);
-                    fs.closeSync(fd);
+                    try {
+                        fs.readSync(fd, buffer, 0, chunkSize, start);
+                    }
+                    finally {
+                        fs.closeSync(fd);
+                    }
                     return new Response(buffer, {
                         status: 206, // Partial Content
                         headers: {
-                            'Content-Type': mimeTypes[ext] || 'video/mp4',
+                            'Content-Type': contentType,
                             'Content-Length': chunkSize.toString(),
                             'Content-Range': `bytes ${start}-${end}/${stats.size}`,
                             'Accept-Ranges': 'bytes',
@@ -448,6 +485,7 @@ function registerLocalVideoProtocol() {
                         controller.close();
                     });
                     nodeStream.on('error', (err) => {
+                        console.error('Stream error:', err);
                         controller.error(err);
                     });
                 },
@@ -457,7 +495,7 @@ function registerLocalVideoProtocol() {
             });
             return new Response(webStream, {
                 headers: {
-                    'Content-Type': mimeTypes[ext] || 'video/mp4',
+                    'Content-Type': contentType,
                     'Content-Length': stats.size.toString(),
                     'Accept-Ranges': 'bytes',
                     'Cache-Control': 'no-cache',
@@ -466,7 +504,12 @@ function registerLocalVideoProtocol() {
         }
         catch (error) {
             console.error('Failed to load video file:', filePath, error);
-            return new Response(`Error loading video: ${error instanceof Error ? error.message : String(error)}`, { status: 500 });
+            return new Response(`Error loading video: ${error instanceof Error ? error.message : String(error)}`, {
+                status: 500,
+                headers: {
+                    'Content-Type': 'text/plain',
+                }
+            });
         }
     });
 }

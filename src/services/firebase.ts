@@ -26,6 +26,10 @@ import {
   query,
   where,
   getDocs,
+  enableIndexedDbPersistence,
+  CACHE_SIZE_UNLIMITED,
+  persistentLocalCache,
+  persistentMultipleTabManager,
 } from "firebase/firestore";
 
 // Firebase configuration - loaded from API route (server-side only)
@@ -109,17 +113,42 @@ async function loadFirebaseConfig(): Promise<void> {
         const isElectron = typeof window !== 'undefined' && window.electronAPI;
         
         // Use long-polling in Electron to avoid WebSocket issues
+        // Also enable offline persistence for better experience
         if (isElectron) {
           db = initializeFirestore(app, {
             experimentalForceLongPolling: true,
+            // Enable local cache for offline support
+            localCache: persistentLocalCache({
+              tabManager: persistentMultipleTabManager(),
+              cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+            }),
           });
-          console.log("Firebase initialized with long-polling (Electron mode)");
+          console.log("Firebase initialized with long-polling and persistent cache (Electron mode)");
         } else {
-          db = getFirestore(app);
-          console.log("Firebase initialized successfully");
+          // For web browsers, use default settings with persistence
+          db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+              tabManager: persistentMultipleTabManager(),
+              cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+            }),
+          });
+          console.log("Firebase initialized with persistent cache");
         }
       } catch (error) {
         console.error("Firebase initialization error:", error);
+        // Fallback to simpler initialization if advanced features fail
+        try {
+          if (!app) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+          }
+          if (!db) {
+            db = getFirestore(app);
+            console.log("Firebase initialized with fallback settings");
+          }
+        } catch (fallbackError) {
+          console.error("Firebase fallback initialization failed:", fallbackError);
+        }
       }
     } else {
       console.warn("Firebase config incomplete. Please check your .env file and ensure /api/config/firebase is configured.");
@@ -500,11 +529,8 @@ class FirebaseService {
       return null;
     }
 
-    // Check if we're offline before attempting Firestore operations
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      console.warn("⚠️ Device is offline, cannot query Firestore");
-      return null;
-    }
+    // Note: Don't check navigator.onLine - it's unreliable in Electron
+    // Let Firebase SDK handle offline scenarios naturally
 
     try {
       // Query Firestore for user with this email
@@ -520,13 +546,17 @@ class FirebaseService {
       const firestoreError = error as { code?: string; message?: string };
       
       // Handle offline errors gracefully
-      if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
-        console.warn("⚠️ Firestore unavailable (offline), cannot find user by email");
+      if (firestoreError.code === 'unavailable' || 
+          firestoreError.code === 'failed-precondition' ||
+          firestoreError.message?.includes('offline') ||
+          firestoreError.message?.includes('network')) {
+        console.warn("⚠️ Firestore query failed (likely network issue), returning null");
         return null;
       }
       
       console.error("Error finding user by email:", error);
-      throw error;
+      // Don't throw - return null to allow graceful fallback
+      return null;
     }
 
     return null;
@@ -615,15 +645,8 @@ class FirebaseService {
   private async loadUserProfile(uid: string): Promise<void> {
     if (!db || !this.currentUser) return;
 
-    // Check if we're offline before attempting Firestore operations
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      console.warn("⚠️ Device is offline, skipping Firestore load");
-      // Create profile from current user data if no profile exists
-      if (!this.userProfile) {
-        await this.createOrUpdateProfile(this.currentUser);
-      }
-      return;
-    }
+    // Note: Don't check navigator.onLine - it's unreliable in Electron
+    // Let Firebase SDK handle offline scenarios naturally
 
     try {
       const userRef = doc(db, "users", uid);
@@ -641,19 +664,52 @@ class FirebaseService {
     } catch (error: unknown) {
       const firestoreError = error as { code?: string; message?: string };
       
-      // Handle offline errors gracefully
-      if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
-        console.warn("⚠️ Firestore unavailable (offline), using local profile");
+      // Handle offline/network errors gracefully
+      if (firestoreError.code === 'unavailable' || 
+          firestoreError.code === 'failed-precondition' ||
+          firestoreError.message?.includes('offline') ||
+          firestoreError.message?.includes('network')) {
+        console.warn("⚠️ Firestore load failed (network issue), creating local profile");
         // Create profile from current user data if no profile exists
         if (!this.userProfile) {
-          await this.createOrUpdateProfile(this.currentUser);
+          await this.createOrUpdateProfileOffline(this.currentUser);
         }
         return;
       }
       
       console.error("Error loading user profile:", error);
-      throw error;
+      // Don't throw - create local profile as fallback
+      if (!this.userProfile) {
+        await this.createOrUpdateProfileOffline(this.currentUser);
+      }
     }
+  }
+
+  // Create profile in memory only (for offline scenarios)
+  private createOrUpdateProfileOffline(user: User, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): UserProfile {
+    const email = googleUserData?.email || user.email || "";
+    const displayName = googleUserData?.displayName || user.displayName || 
+      (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
+    const photoURL = googleUserData?.photoURL || user.photoURL || null;
+    
+    const offlineProfile: UserProfile = {
+      uid: user.uid,
+      email,
+      displayName,
+      photoURL,
+      plan: this.userProfile?.plan || "free",
+      storageUsed: this.userProfile?.storageUsed || 0,
+      stripeCustomerId: this.userProfile?.stripeCustomerId,
+      subscriptionId: this.userProfile?.subscriptionId,
+      subscriptionStatus: this.userProfile?.subscriptionStatus,
+      subscriptionEndDate: this.userProfile?.subscriptionEndDate,
+      createdAt: this.userProfile?.createdAt || new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    
+    this.userProfile = offlineProfile;
+    console.log("📝 Created offline profile:", offlineProfile.email || offlineProfile.uid);
+    return offlineProfile;
   }
 
   // Create or update user profile
@@ -663,40 +719,37 @@ class FirebaseService {
       throw new Error("Firestore not initialized");
     }
 
-    // Check if we're offline - create profile in memory only
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      console.warn("⚠️ Device is offline, creating profile in memory only");
-      // Create profile object without saving to Firestore
-      const email = googleUserData?.email || user.email || "";
-      const displayName = googleUserData?.displayName || user.displayName || 
-        (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
-      const photoURL = googleUserData?.photoURL || user.photoURL || null;
-      
-      const offlineProfile: UserProfile = {
-        uid: user.uid,
-        email,
-        displayName,
-        photoURL,
-        plan: "free",
-        storageUsed: 0,
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-      };
-      
-      this.userProfile = offlineProfile;
-      return offlineProfile;
-    }
+    // Note: Don't check navigator.onLine - it's unreliable in Electron
+    // Let Firebase SDK handle offline scenarios naturally
 
     const userRef = doc(db, "users", user.uid);
     
-    // Get existing profile
-    const userSnap = await getDoc(userRef);
-
     // Priority: googleUserData > user (Firebase) > existing profile
     const email = googleUserData?.email || user.email || "";
     const displayName = googleUserData?.displayName || user.displayName || 
       (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
     const photoURL = googleUserData?.photoURL || user.photoURL || null;
+
+    // Try to get existing profile from Firestore
+    let userSnap;
+    try {
+      userSnap = await getDoc(userRef);
+    } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
+      
+      // Handle network errors gracefully - create profile in memory
+      if (firestoreError.code === 'unavailable' || 
+          firestoreError.code === 'failed-precondition' ||
+          firestoreError.message?.includes('offline') ||
+          firestoreError.message?.includes('network')) {
+        console.warn("⚠️ Firestore getDoc failed (network issue), creating local profile");
+        return this.createOrUpdateProfileOffline(user, googleUserData);
+      }
+      
+      // For other errors, log and create local profile
+      console.error("Error getting profile from Firestore:", error);
+      return this.createOrUpdateProfileOffline(user, googleUserData);
+    }
 
     if (userSnap.exists()) {
       // Update last login and merge data (Google data takes priority)
@@ -732,12 +785,16 @@ class FirebaseService {
           ...existingProfile,
           ...cleanedProfile,
         };
+        console.log("📥 Profile updated in Firestore");
       } catch (error: unknown) {
         const firestoreError = error as { code?: string; message?: string };
         
-        // Handle offline errors gracefully
-        if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
-          console.warn("⚠️ Firestore unavailable (offline), using in-memory profile");
+        // Handle offline/network errors gracefully
+        if (firestoreError.code === 'unavailable' || 
+            firestoreError.code === 'failed-precondition' ||
+            firestoreError.message?.includes('offline') ||
+            firestoreError.message?.includes('network')) {
+          console.warn("⚠️ Firestore update failed (network issue), using in-memory profile");
           this.userProfile = {
             ...existingProfile,
             ...cleanedProfile,
@@ -745,7 +802,13 @@ class FirebaseService {
           return this.userProfile;
         }
         
-        throw error;
+        // For other errors, log and use in-memory profile as fallback
+        console.error("Error updating profile in Firestore:", error);
+        this.userProfile = {
+          ...existingProfile,
+          ...cleanedProfile,
+        };
+        return this.userProfile;
       }
     } else {
       // Create new profile with Google data priority
@@ -764,17 +827,24 @@ class FirebaseService {
         await setDoc(userRef, newProfile);
         
         this.userProfile = newProfile;
+        console.log("📥 Profile created in Firestore");
       } catch (error: unknown) {
         const firestoreError = error as { code?: string; message?: string };
         
-        // Handle offline errors gracefully
-        if (firestoreError.code === 'unavailable' || firestoreError.message?.includes('offline')) {
-          console.warn("⚠️ Firestore unavailable (offline), using in-memory profile");
+        // Handle offline/network errors gracefully
+        if (firestoreError.code === 'unavailable' || 
+            firestoreError.code === 'failed-precondition' ||
+            firestoreError.message?.includes('offline') ||
+            firestoreError.message?.includes('network')) {
+          console.warn("⚠️ Firestore create failed (network issue), using in-memory profile");
           this.userProfile = newProfile;
           return this.userProfile;
         }
         
-        throw error;
+        // For other errors, log and use in-memory profile as fallback
+        console.error("Error creating profile in Firestore:", error);
+        this.userProfile = newProfile;
+        return this.userProfile;
       }
     }
 

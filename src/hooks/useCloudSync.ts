@@ -169,15 +169,9 @@ export function useCloudSync(): UseCloudSyncReturn {
         }
         
         // PRIORITY 3: If no Firebase user exists and no Google user, create anonymous user
-        // Only if we're online (Firestore operations require network)
+        // Note: Don't check navigator.onLine - it's unreliable in Electron
+        // Let Firebase SDK handle offline scenarios naturally
         if (!firebaseUser && !localGoogleUser) {
-          // Check if we're online before attempting to create anonymous user
-          if (typeof navigator !== 'undefined' && !navigator.onLine) {
-            console.warn("⚠️ Device is offline, skipping anonymous user creation");
-            anonymousUserInitRef.current = true; // Prevent retry while offline
-            return;
-          }
-          
           // Mark as initializing to prevent multiple creations
           anonymousUserInitRef.current = true;
           
@@ -199,10 +193,13 @@ export function useCloudSync(): UseCloudSyncReturn {
               return;
             }
             
-            // Handle offline errors gracefully
-            if (anonError.code === "unavailable" || anonError.message?.includes("offline")) {
-              console.warn("⚠️ Firebase unavailable (offline), skipping anonymous user creation");
-              anonymousUserInitRef.current = false; // Allow retry when back online
+            // Handle offline/network errors gracefully
+            if (anonError.code === "unavailable" || 
+                anonError.code === "network-request-failed" ||
+                anonError.message?.includes("offline") ||
+                anonError.message?.includes("network")) {
+              console.warn("⚠️ Firebase network issue, anonymous user creation deferred");
+              anonymousUserInitRef.current = false; // Allow retry when connection improves
               return;
             }
             

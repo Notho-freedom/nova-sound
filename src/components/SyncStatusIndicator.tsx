@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { firebaseSyncService } from "@/services/firebase-sync";
 import { firebaseService } from "@/services/firebase";
+import { isOnline, onConnectivityChange, isElectron } from "@/lib/connectivity";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
@@ -46,7 +47,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
       setTimeout(() => setSyncStatus("idle"), 5000);
     };
 
-    // Check online status
+    // Check online status using robust connectivity utility
     const handleOnline = () => {
       if (syncStatus === "offline") {
         setSyncStatus("idle");
@@ -57,12 +58,26 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
       setSyncStatus("offline");
     };
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    // Use robust connectivity listener (handles Electron quirks)
+    const cleanupConnectivity = onConnectivityChange((online) => {
+      if (online) {
+        handleOnline();
+      } else {
+        handleOffline();
+      }
+    });
 
-    // Check initial online status
-    if (!navigator.onLine) {
-      setSyncStatus("offline");
+    // Check initial online status using robust check
+    // In Electron, assume online initially - let Firebase handle actual connectivity
+    if (isElectron()) {
+      // Don't check initial status - Electron's navigator.onLine is unreliable
+      // Let the connectivity change listener handle it
+    } else {
+      isOnline().then((online) => {
+        if (!online) {
+          setSyncStatus("offline");
+        }
+      });
     }
 
     // Listen for auth state changes
@@ -77,8 +92,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     window.addEventListener("nexus-sync-error", handleSyncError);
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      cleanupConnectivity();
       window.removeEventListener("nexus-sync-start", handleSyncStart);
       window.removeEventListener("nexus-sync-complete", handleSyncComplete);
       window.removeEventListener("nexus-sync-error", handleSyncError);

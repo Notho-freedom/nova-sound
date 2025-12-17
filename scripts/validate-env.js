@@ -34,72 +34,114 @@ dotenv.config({ path: join(__dirname, '..', '.env') });
 
 // Environment variable definitions
 const envDefinitions = {
-  // Client-side (NEXT_PUBLIC_*)
-  client: {
+  // Firebase Client Configuration (exposed via /api/config/firebase)
+  firebaseClient: {
     required: [
       {
-        key: 'NEXT_PUBLIC_FIREBASE_API_KEY',
-        description: 'Firebase API Key',
+        key: 'FIREBASE_API_KEY',
+        description: 'Firebase API Key (public)',
         validate: (val) => val && val.length > 20,
       },
       {
-        key: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+        key: 'FIREBASE_AUTH_DOMAIN',
         description: 'Firebase Auth Domain',
         validate: (val) => val && val.includes('.firebaseapp.com'),
       },
       {
-        key: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+        key: 'FIREBASE_PROJECT_ID',
         description: 'Firebase Project ID',
         validate: (val) => val && val.length > 0,
       },
-    ],
-    optional: [
       {
-        key: 'NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID',
-        description: 'Google OAuth Client ID',
-        validate: (val) => !val || val.includes('.apps.googleusercontent.com'),
+        key: 'FIREBASE_STORAGE_BUCKET',
+        description: 'Firebase Storage Bucket',
+        validate: (val) => val && (val.includes('.appspot.com') || val.includes('.firebasestorage.app')),
       },
       {
-        key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
-        description: 'Stripe Publishable Key',
-        validate: (val) => !val || val.startsWith('pk_'),
+        key: 'FIREBASE_MESSAGING_SENDER_ID',
+        description: 'Firebase Messaging Sender ID',
+        validate: (val) => val && /^\d+$/.test(val),
       },
       {
-        key: 'NEXT_PUBLIC_FRONTEND_URL',
-        description: 'Frontend URL',
-        validate: (val) => !val || val.startsWith('http'),
+        key: 'FIREBASE_APP_ID',
+        description: 'Firebase App ID',
+        validate: (val) => val && val.includes(':'),
       },
     ],
+    optional: [],
   },
-  // Server-side (no NEXT_PUBLIC_ prefix)
-  server: {
+  // Firebase Admin SDK (server-side only)
+  firebaseAdmin: {
     required: [
       {
-        key: 'FIREBASE_PROJECT_ID',
-        description: 'Firebase Project ID (server)',
-        validate: (val) => val && val.length > 0,
-      },
-      {
         key: 'FIREBASE_CLIENT_EMAIL',
-        description: 'Firebase Client Email',
+        description: 'Firebase Admin Client Email',
         validate: (val) => val && val.includes('@') && val.includes('.iam.gserviceaccount.com'),
       },
       {
         key: 'FIREBASE_PRIVATE_KEY',
-        description: 'Firebase Private Key',
+        description: 'Firebase Admin Private Key',
         validate: (val) => val && val.includes('BEGIN PRIVATE KEY'),
       },
     ],
     optional: [
       {
+        key: 'FIREBASE_PRIVATE_KEY_ID',
+        description: 'Firebase Private Key ID',
+        validate: (val) => !val || val.length > 20,
+      },
+      {
+        key: 'FIREBASE_CLIENT_ID',
+        description: 'Firebase Client ID',
+        validate: (val) => !val || /^\d+$/.test(val),
+      },
+      {
+        key: 'FIREBASE_TOKEN_URI',
+        description: 'Firebase Token URI',
+        validate: (val) => !val || val.startsWith('https://'),
+      },
+      {
+        key: 'FIREBASE_AUTH_URI',
+        description: 'Firebase Auth URI',
+        validate: (val) => !val || val.startsWith('https://'),
+      },
+    ],
+  },
+  // Google OAuth
+  googleOAuth: {
+    required: [
+      {
         key: 'GOOGLE_CLIENT_ID',
-        description: 'Google OAuth Client ID (server)',
+        description: 'Google OAuth Client ID',
+        validate: (val) => val && val.includes('.apps.googleusercontent.com'),
+      },
+    ],
+    optional: [
+      {
+        key: 'GOOGLE_CLIENT_SECRET',
+        description: 'Google OAuth Client Secret',
+        validate: (val) => !val || val.length > 10,
+      },
+      {
+        key: 'GOOGLE_OAUTH_CLIENT_ID',
+        description: 'Google OAuth Client ID (alias)',
         validate: (val) => !val || val.includes('.apps.googleusercontent.com'),
       },
       {
-        key: 'GOOGLE_CLIENT_SECRET',
-        description: 'Google OAuth Client Secret (server) - REQUIRED for OAuth token exchange',
+        key: 'GOOGLE_OAUTH_CLIENT_SECRET',
+        description: 'Google OAuth Client Secret (alias)',
         validate: (val) => !val || val.length > 10,
+      },
+    ],
+  },
+  // Stripe
+  stripe: {
+    required: [],
+    optional: [
+      {
+        key: 'STRIPE_PUBLISHABLE_KEY',
+        description: 'Stripe Publishable Key',
+        validate: (val) => !val || val.startsWith('pk_'),
       },
       {
         key: 'STRIPE_SECRET_KEY',
@@ -116,6 +158,12 @@ const envDefinitions = {
         description: 'Stripe Pro Yearly Price ID',
         validate: (val) => !val || val.startsWith('price_'),
       },
+    ],
+  },
+  // Storage providers
+  storage: {
+    required: [],
+    optional: [
       {
         key: 'BUNNY_STORAGE_NAME',
         description: 'Bunny Storage Zone Name',
@@ -132,18 +180,13 @@ const envDefinitions = {
         validate: (val) => !val || val.startsWith('https://'),
       },
       {
-        key: 'BUNNY_TOKEN_KEY',
-        description: 'Bunny Token Key (for signed URLs)',
-        validate: (val) => !val || val.length > 10,
-      },
-      {
         key: 'PLANETHOSTER_SFTP_HOST',
         description: 'PlanetHoster SFTP Host',
         validate: (val) => !val || val.length > 0,
       },
       {
         key: 'PLANETHOSTER_SFTP_PORT',
-        description: 'PlanetHoster SFTP Port (default: 22)',
+        description: 'PlanetHoster SFTP Port',
         validate: (val) => !val || (parseInt(val, 10) >= 1 && parseInt(val, 10) <= 65535),
       },
       {
@@ -152,24 +195,40 @@ const envDefinitions = {
         validate: (val) => !val || val.length > 0,
       },
       {
-        key: 'PLANETHOSTER_SFTP_PASSWORD',
-        description: 'PlanetHoster SFTP Password',
-        validate: (val) => !val || val.length > 0,
-      },
-      {
-        key: 'PLANETHOSTER_SFTP_PRIVATE_KEY',
-        description: 'PlanetHoster SFTP Private Key (SSH key - more secure)',
-        validate: (val) => !val || val.includes('BEGIN'),
-      },
-      {
         key: 'PLANETHOSTER_CDN_URL',
-        description: 'PlanetHoster CDN/Public URL',
+        description: 'PlanetHoster CDN URL',
         validate: (val) => !val || val.startsWith('https://'),
       },
       {
         key: 'STORAGE_DIR',
-        description: 'Storage Directory',
+        description: 'Local Storage Directory',
         validate: (val) => !val || val.length > 0,
+      },
+    ],
+  },
+  // URLs and other
+  urls: {
+    required: [],
+    optional: [
+      {
+        key: 'VERCEL_URL',
+        description: 'Vercel Deployment URL',
+        validate: (val) => !val || val.startsWith('https://'),
+      },
+      {
+        key: 'UPDATE_BASE_URL',
+        description: 'Update Server Base URL',
+        validate: (val) => !val || val.startsWith('http'),
+      },
+      {
+        key: 'API_URL',
+        description: 'API URL',
+        validate: (val) => !val || val.startsWith('http'),
+      },
+      {
+        key: 'NEXT_PUBLIC_API_URL',
+        description: 'Next.js Public API URL',
+        validate: (val) => !val || val.startsWith('http'),
       },
     ],
   },
@@ -209,7 +268,7 @@ function checkEnvSection(section, sectionName, checkAll = false) {
 function printResults(checkResult) {
   const { results, requiredIssues, optionalIssues, sectionName } = checkResult;
 
-  console.log(`\n${colors.cyan}=== ${sectionName} Variables ===${colors.reset}\n`);
+  console.log(`\n${colors.cyan}=== ${sectionName} ===${colors.reset}\n`);
 
   // Required variables
   if (results.required.length > 0) {
@@ -227,7 +286,7 @@ function printResults(checkResult) {
 
   // Optional variables
   if (results.optional.length > 0) {
-    console.log(`\n${colors.blue}Optional:${colors.reset}`);
+    console.log(`${colors.blue}Optional:${colors.reset}`);
     results.optional.forEach((result) => {
       if (!result.isSet) {
         console.log(`  ${colors.yellow}○${colors.reset} ${result.key} - ${result.description} (non défini)`);
@@ -251,16 +310,27 @@ function main() {
   console.log(`${colors.cyan}🔍 Validation des variables d'environnement${colors.reset}`);
   console.log(`${colors.blue}Fichiers vérifiés: .env.local, .env${colors.reset}`);
 
-  const clientCheck = checkEnvSection(envDefinitions.client, 'Client-side (NEXT_PUBLIC_*)', checkAll);
-  const serverCheck = checkEnvSection(envDefinitions.server, 'Server-side', checkAll);
+  // Check all sections
+  const sections = [
+    { def: envDefinitions.firebaseClient, name: '🔥 Firebase Client (via /api/config/firebase)' },
+    { def: envDefinitions.firebaseAdmin, name: '🔐 Firebase Admin SDK' },
+    { def: envDefinitions.googleOAuth, name: '🔑 Google OAuth' },
+    { def: envDefinitions.stripe, name: '💳 Stripe' },
+    { def: envDefinitions.storage, name: '📦 Storage Providers' },
+    { def: envDefinitions.urls, name: '🌐 URLs' },
+  ];
 
-  const clientIssues = printResults(clientCheck);
-  const serverIssues = printResults(serverCheck);
+  let totalRequiredIssues = 0;
+  let totalOptionalIssues = 0;
+
+  sections.forEach(({ def, name }) => {
+    const checkResult = checkEnvSection(def, name, checkAll);
+    const issues = printResults(checkResult);
+    totalRequiredIssues += issues.requiredIssues.length;
+    totalOptionalIssues += issues.optionalIssues.length;
+  });
 
   // Summary
-  const totalRequiredIssues = clientIssues.requiredIssues.length + serverIssues.requiredIssues.length;
-  const totalOptionalIssues = clientIssues.optionalIssues.length + serverIssues.optionalIssues.length;
-
   console.log(`\n${colors.cyan}=== Résumé ===${colors.reset}\n`);
 
   if (totalRequiredIssues === 0 && totalOptionalIssues === 0) {
@@ -279,4 +349,3 @@ function main() {
 }
 
 main();
-

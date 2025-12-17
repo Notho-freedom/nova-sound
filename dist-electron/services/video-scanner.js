@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { watch } from 'chokidar';
@@ -7,7 +7,57 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { storage } from './storage.js';
 import ffmpegStatic from 'ffmpeg-static';
+import { fileURLToPath } from 'url';
 const execAsync = promisify(exec);
+// Get default thumbnail path (album-cover-1.jpg)
+function getDefaultThumbnailPath() {
+    try {
+        // Try to find the image in various possible locations
+        const possiblePaths = [
+            // In development: relative to electron folder
+            path.join(__dirname, '../src/assets/album-cover-1.jpg'),
+            path.join(__dirname, '../../src/assets/album-cover-1.jpg'),
+            // In production: might be in resources
+            path.join(process.resourcesPath || app.getAppPath(), 'assets/album-cover-1.jpg'),
+            path.join(app.getAppPath(), 'src/assets/album-cover-1.jpg'),
+            // Try public folder
+            path.join(__dirname, '../public/album-cover-1.jpg'),
+            path.join(app.getAppPath(), 'public/album-cover-1.jpg'),
+            // Try copying from src/assets to public if needed
+            path.join(__dirname, '../src/assets/album-cover-1.jpg'),
+        ];
+        const fsSync = require('fs');
+        for (const possiblePath of possiblePaths) {
+            try {
+                if (fsSync.existsSync(possiblePath)) {
+                    console.log('Found default thumbnail at:', possiblePath);
+                    return possiblePath;
+                }
+            }
+            catch (e) {
+                // Continue to next path
+            }
+        }
+        console.log('Default thumbnail image (album-cover-1.jpg) not found in any expected location');
+        return null;
+    }
+    catch (error) {
+        console.error('Error finding default thumbnail:', error);
+        return null;
+    }
+}
+// Get default thumbnail URL
+function getDefaultThumbnailUrl() {
+    const defaultPath = getDefaultThumbnailPath();
+    if (!defaultPath) {
+        // Fallback to web URL if file not found (Next.js will serve it from public or assets)
+        return '/album-cover-1.jpg';
+    }
+    // Use local-image:// protocol for Electron
+    return `local-image://${encodeURIComponent(defaultPath)}`;
+}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 // Supported video formats
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ogv'];
 let watcher = null;
@@ -201,12 +251,14 @@ async function extractVideoMetadata(filePath) {
     // In the future, this could use ffprobe or similar tools
     const basename = path.basename(filePath, path.extname(filePath));
     const ext = path.extname(filePath).toLowerCase();
-    // Generate thumbnail
+    // Generate thumbnail (will use default if generation fails)
     const thumbnailUrl = await generateThumbnail(filePath);
+    // If no thumbnail generated, use default
+    const finalThumbnailUrl = thumbnailUrl || getDefaultThumbnailUrl() || undefined;
     return {
         title: basename,
         format: ext.substring(1), // Remove the dot
-        thumbnailUrl: thumbnailUrl || undefined,
+        thumbnailUrl: finalThumbnailUrl,
     };
 }
 /**
@@ -235,6 +287,14 @@ async function processVideoFile(filePath) {
             const firstFrameThumbnail = await generateThumbnail(filePath, false, true);
             if (firstFrameThumbnail) {
                 video.thumbnailUrl = firstFrameThumbnail;
+            }
+            else {
+                // Ultimate fallback: use default thumbnail
+                const defaultThumbnail = getDefaultThumbnailUrl();
+                if (defaultThumbnail) {
+                    video.thumbnailUrl = defaultThumbnail;
+                    console.log(`Using default thumbnail for ${path.basename(filePath)}`);
+                }
             }
         }
         return video;
@@ -367,6 +427,14 @@ function startWatching(directories) {
                         await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
                         video.thumbnailUrl = thumbnail;
                     }
+                    else {
+                        // Ultimate fallback: use default thumbnail
+                        const defaultThumbnail = getDefaultThumbnailUrl();
+                        if (defaultThumbnail) {
+                            await storage.updateVideo(video.id, { thumbnailUrl: defaultThumbnail });
+                            video.thumbnailUrl = defaultThumbnail;
+                        }
+                    }
                 }
                 // Notify renderer
                 const windows = BrowserWindow.getAllWindows();
@@ -438,6 +506,18 @@ async function generateMissingThumbnailsBackground() {
                             windows.forEach(window => {
                                 window.webContents.send('videos:updated', { ...video, thumbnailUrl: firstFrameThumbnail });
                             });
+                        }
+                        else {
+                            // Ultimate fallback: use default thumbnail
+                            const defaultThumbnail = getDefaultThumbnailUrl();
+                            if (defaultThumbnail) {
+                                await storage.updateVideo(video.id, { thumbnailUrl: defaultThumbnail });
+                                // Notify renderer of update
+                                const windows = BrowserWindow.getAllWindows();
+                                windows.forEach(window => {
+                                    window.webContents.send('videos:updated', { ...video, thumbnailUrl: defaultThumbnail });
+                                });
+                            }
                         }
                     }
                 }
@@ -586,8 +666,21 @@ export function initVideoScanner() {
                         });
                     }
                     else {
-                        failed++;
-                        console.log(`Failed to generate thumbnail for: ${path.basename(video.filePath)}`);
+                        // Ultimate fallback: use default thumbnail
+                        const defaultThumbnail = getDefaultThumbnailUrl();
+                        if (defaultThumbnail) {
+                            await storage.updateVideo(video.id, { thumbnailUrl: defaultThumbnail });
+                            generated++;
+                            // Notify renderer of update
+                            const windows = BrowserWindow.getAllWindows();
+                            windows.forEach(window => {
+                                window.webContents.send('videos:updated', { ...video, thumbnailUrl: defaultThumbnail });
+                            });
+                        }
+                        else {
+                            failed++;
+                            console.log(`Failed to generate thumbnail for: ${path.basename(video.filePath)}`);
+                        }
                     }
                 }
             }
