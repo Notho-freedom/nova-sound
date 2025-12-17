@@ -1,4 +1,4 @@
-import { Play, Clock, TrendingUp, Sparkles, Heart, Music } from "lucide-react";
+import { Play, Clock, TrendingUp, Sparkles, Heart, Music, MoreHorizontal } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -8,6 +8,11 @@ import { useCloudSync } from "@/hooks/useCloudSync";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackCardSkeleton, PlaylistCardSkeleton, TableRowSkeleton } from "@/components/ui/skeletons";
+import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { usePlaylists } from "@/hooks/usePlaylists";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useNexusUpload } from "@/hooks/useNexusUpload";
 
 interface HistoryEntry {
   trackId: string;
@@ -69,11 +74,25 @@ export const HomeView = ({
   isPlaying,
   onTrackSelect,
   onPlayTracks,
+  onPlayNext,
+  onAddToQueue,
+  onAddToPlaylist,
   recentTracks = [],
   favoriteTracks = [],
   history = [],
   loading = false,
 }: HomeViewProps) => {
+  // Hooks for context menu
+  const playlistsResult = usePlaylists();
+  const playlists = playlistsResult?.playlists ?? [];
+  const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
+  const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
+  const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated, nexusUser } = useCloudSync();
+  const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated;
+  
   // Remove duplicates by ID before slicing - memoized
   const getUniqueTracks = useCallback((trackList: Track[]) => {
     const seen = new Set<string>();
@@ -133,7 +152,6 @@ export const HomeView = ({
     return "Bonsoir";
   };
 
-  const { nexusUser, nexusAuthenticated } = useCloudSync();
   const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
 
 
@@ -244,48 +262,67 @@ export const HomeView = ({
               const isCurrentTrack = currentTrackIndex === actualIndex;
               
               return (
-                <Tooltip key={`recent-${track.id}-${idx}`}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                      className={cn(
-                        "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-200 ease-out",
-                        "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
-                        isCurrentTrack && isPlaying && "ring-2 ring-primary",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
-                          <img
-                            src={getCoverUrl(track.coverUrl)}
-                            alt={track.album}
-                            className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-110"
-                          />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                            <Play className="w-5 h-5 text-white fill-current" />
+                <TrackContextMenu
+                  key={`recent-${track.id}-${idx}`}
+                  track={track}
+                  playlists={playlists}
+                  isFavorite={isFavorite(track.id)}
+                  onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                  onPlayNext={() => onPlayNext?.(track)}
+                  onAddToQueue={() => onAddToQueue?.(track)}
+                  onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                  onToggleFavorite={() => toggleFavorite(track.id)}
+                  onUploadToCloudinary={() => uploadTrack?.(track)}
+                  canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                  isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                  onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                  canUploadToNexus={canUploadToNexus && !!track.filePath}
+                  isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                        className={cn(
+                          "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-200 ease-out",
+                          "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
+                          isCurrentTrack && isPlaying && "ring-2 ring-primary",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
+                            <img
+                              src={getCoverUrl(track.coverUrl)}
+                              alt={track.album}
+                              className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                              <Play className="w-5 h-5 text-white fill-current" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              "text-sm font-medium truncate",
+                              isCurrentTrack ? "text-primary" : "text-foreground"
+                            )}>
+                              {track.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {track.artist}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-sm font-medium truncate",
-                            isCurrentTrack ? "text-primary" : "text-foreground"
-                          )}>
-                            {track.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {track.artist}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-sm font-medium">{track.title}</div>
-                    <div className="text-xs text-muted-foreground">{track.artist}</div>
-                    {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
-                  </TooltipContent>
-                </Tooltip>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-sm font-medium">{track.title}</div>
+                      <div className="text-xs text-muted-foreground">{track.artist}</div>
+                      {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                    </TooltipContent>
+                  </Tooltip>
+                </TrackContextMenu>
               );
             })}
           </div>
@@ -363,25 +400,45 @@ export const HomeView = ({
                       <td className="px-4 py-2.5">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                                <img
-                                  src={getCoverUrl(track.coverUrl)}
-                                  alt={track.album}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <p className={cn(
-                                  "text-sm font-medium truncate",
-                                  isCurrentTrack ? "text-primary" : "text-foreground"
-                                )}>
-                                  {track.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {track.artist}
-                                </p>
-                              </div>
+                            <div>
+                              <TrackContextMenu
+                                track={track}
+                                playlists={playlists}
+                                isFavorite={isFavorite(track.id)}
+                                onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                                onPlayNext={() => onPlayNext?.(track)}
+                                onAddToQueue={() => onAddToQueue?.(track)}
+                                onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                                onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                                onToggleFavorite={() => toggleFavorite(track.id)}
+                                onUploadToCloudinary={() => uploadTrack?.(track)}
+                                canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                                isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                                onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                                canUploadToNexus={canUploadToNexus && !!track.filePath}
+                                isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                                    <img
+                                      src={getCoverUrl(track.coverUrl)}
+                                      alt={track.album}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className={cn(
+                                      "text-sm font-medium truncate",
+                                      isCurrentTrack ? "text-primary" : "text-foreground"
+                                    )}>
+                                      {track.title}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {track.artist}
+                                    </p>
+                                  </div>
+                                </div>
+                              </TrackContextMenu>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -401,6 +458,42 @@ export const HomeView = ({
                         <span className="text-sm text-muted-foreground font-mono">
                           {formatTime(track.duration)}
                         </span>
+                      </td>
+                      <td className="px-4 py-2.5 w-12">
+                        <TrackContextMenu
+                          track={track}
+                          playlists={playlists}
+                          isFavorite={isFavorite(track.id)}
+                          onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                          onPlayNext={() => onPlayNext?.(track)}
+                          onAddToQueue={() => onAddToQueue?.(track)}
+                          onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                          onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                          onToggleFavorite={() => toggleFavorite(track.id)}
+                          onUploadToCloudinary={() => uploadTrack?.(track)}
+                          canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                          isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                          onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                          canUploadToNexus={canUploadToNexus && !!track.filePath}
+                          isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                        >
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                aria-label="Options"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-sm">Options</div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TrackContextMenu>
                       </td>
                     </tr>
                   );

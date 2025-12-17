@@ -451,6 +451,7 @@ export const LibraryView = ({
                   <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
                   <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
                   <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
+                  <th className="px-4 py-3 w-12"></th>
                 </tr>
               </thead>
               <tbody>
@@ -488,9 +489,29 @@ export const LibraryView = ({
                     <td className="px-4 py-3">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                            {track.title}
-                          </p>
+                          <div>
+                            <TrackContextMenu
+                              track={track}
+                              playlists={playlists}
+                              isFavorite={isFavorite(track.id)}
+                              onPlay={() => onTrackSelect(actualIndex)}
+                              onPlayNext={() => onPlayNext?.(track)}
+                              onAddToQueue={() => onAddToQueue?.(track)}
+                              onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                              onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                              onToggleFavorite={() => toggleFavorite(track.id)}
+                              onUploadToCloudinary={() => uploadTrack?.(track)}
+                              canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                              isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                              onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                              canUploadToNexus={canUploadToNexus && !!track.filePath}
+                              isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                            >
+                              <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                {track.title}
+                              </p>
+                            </TrackContextMenu>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-sm font-medium">{track.title}</div>
@@ -502,6 +523,42 @@ export const LibraryView = ({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <TrackContextMenu
+                        track={track}
+                        playlists={playlists}
+                        isFavorite={isFavorite(track.id)}
+                        onPlay={() => onTrackSelect(actualIndex)}
+                        onPlayNext={() => onPlayNext?.(track)}
+                        onAddToQueue={() => onAddToQueue?.(track)}
+                        onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                        onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                        onToggleFavorite={() => toggleFavorite(track.id)}
+                        onUploadToCloudinary={() => uploadTrack?.(track)}
+                        canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                        isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                        onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                        canUploadToNexus={canUploadToNexus && !!track.filePath}
+                        isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                      >
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                              aria-label="Options"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-sm">Options</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TrackContextMenu>
                     </td>
                   </tr>
                 );
@@ -698,6 +755,7 @@ export const LibraryView = ({
                     <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
                     <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Album</th>
                     <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
+                    <th className="px-4 py-3 w-12"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -734,9 +792,29 @@ export const LibraryView = ({
                         <td className="px-4 py-3">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                                {track.title}
-                              </p>
+                              <div>
+                                <TrackContextMenu
+                                  track={track}
+                                  playlists={playlists}
+                                  isFavorite={isFavorite(track.id)}
+                                  onPlay={() => onTrackSelect(actualIndex)}
+                                  onPlayNext={() => onPlayNext?.(track)}
+                                  onAddToQueue={() => onAddToQueue?.(track)}
+                                  onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                                  onToggleFavorite={() => toggleFavorite(track.id)}
+                                  onUploadToCloudinary={() => uploadTrack?.(track)}
+                                  canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                                  isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                                  onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                                  canUploadToNexus={canUploadToNexus && !!track.filePath}
+                                  isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                                >
+                                  <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                    {track.title}
+                                  </p>
+                                </TrackContextMenu>
+                              </div>
                             </TooltipTrigger>
                             <TooltipContent>
                               <div className="text-sm font-medium">{track.title}</div>
@@ -751,6 +829,42 @@ export const LibraryView = ({
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <TrackContextMenu
+                            track={track}
+                            playlists={playlists}
+                            isFavorite={isFavorite(track.id)}
+                            onPlay={() => onTrackSelect(actualIndex)}
+                            onPlayNext={() => onPlayNext?.(track)}
+                            onAddToQueue={() => onAddToQueue?.(track)}
+                            onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                            onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                            onToggleFavorite={() => toggleFavorite(track.id)}
+                            onUploadToCloudinary={() => uploadTrack?.(track)}
+                            canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                            isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                            onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                            canUploadToNexus={canUploadToNexus && !!track.filePath}
+                            isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                          >
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                  aria-label="Options"
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-sm">Options</div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TrackContextMenu>
                         </td>
                       </tr>
                     );

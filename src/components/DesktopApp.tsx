@@ -989,6 +989,9 @@ export const DesktopApp = () => {
           currentTrackIndex={currentTrackIndex}
           isPlaying={isPlaying}
           onTrackSelect={handleTrackSelect}
+          onPlayNext={handlePlayNext}
+          onAddToQueue={handleAddToQueue}
+          onAddToPlaylist={handleAddToPlaylist}
           recentTracks={recentTracks}
           favoriteTracks={favoriteTracks}
           history={history}
@@ -1001,6 +1004,9 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
             loading={libraryLoading}
           />
         );
