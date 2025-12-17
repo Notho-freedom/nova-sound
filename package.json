@@ -76,6 +76,7 @@
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",
     "form-data": "^4.0.5",
+    "framer-motion": "^12.23.26",
     "google-auth-library": "^10.5.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
