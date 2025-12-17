@@ -179,7 +179,7 @@ async function generateThumbnail(filePath: string, forceRegenerate = false): Pro
 /**
  * Regenerate thumbnail for a specific video
  */
-export async function regenerateThumbnail(videoId: string): Promise<string | null> {
+async function regenerateThumbnail(videoId: string): Promise<string | null> {
   const videos = await storage.getVideos();
   const video = videos.find(v => v.id === videoId);
   
@@ -509,7 +509,11 @@ export function initVideoScanner() {
     let regenerated = 0;
     
     for (const video of videos) {
-      if (!video.thumbnailUrl || !video.thumbnailUrl.startsWith('file://')) {
+      // Check for both old file:// and new local-image:// formats
+      const hasThumbnail = video.thumbnailUrl && 
+        (video.thumbnailUrl.startsWith('file://') || video.thumbnailUrl.startsWith('local-image://'));
+      
+      if (!hasThumbnail) {
         const thumbnail = await generateThumbnail(video.filePath, true);
         if (thumbnail) {
           await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });

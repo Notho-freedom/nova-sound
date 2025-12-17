@@ -314,6 +314,16 @@ class Storage {
     }
   }
 
+  async updateVideo(videoId: string, updates: Partial<StoredVideo>): Promise<void> {
+    const videos = await this.getVideos();
+    const index = videos.findIndex(v => v.id === videoId);
+    
+    if (index >= 0) {
+      videos[index] = { ...videos[index], ...updates };
+      await this.saveVideos(videos);
+    }
+  }
+
   // Artwork
   async saveArtwork(artwork: ArtworkData, sourceFilePath: string): Promise<string> {
     await ensureDir(ARTWORK_DIR);
@@ -341,8 +351,8 @@ class Storage {
     
     await fs.writeFile(thumbnailPath, thumbnailData);
     
-    // Return file:// URL for Electron
-    return `file://${thumbnailPath.replace(/\\/g, '/')}`;
+    // Return local-image:// URL for custom protocol (works better with CSP)
+    return `local-image://${encodeURIComponent(thumbnailPath)}`;
   }
 
   async getThumbnailPath(sourceFilePath: string): Promise<string | null> {
@@ -352,7 +362,8 @@ class Storage {
     
     try {
       await fs.access(thumbnailPath);
-      return `file://${thumbnailPath.replace(/\\/g, '/')}`;
+      // Return local-image:// URL for custom protocol (works better with CSP)
+      return `local-image://${encodeURIComponent(thumbnailPath)}`;
     } catch {
       return null;
     }
