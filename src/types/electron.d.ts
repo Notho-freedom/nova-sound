@@ -43,9 +43,11 @@ export interface ElectronAPI {
   addVideoFromUrl?: (url: string, title?: string) => Promise<Video>;
   regenerateVideoThumbnail?: (videoId: string) => Promise<string | null>;
   regenerateAllVideoThumbnails?: () => Promise<number>;
+  generateMissingVideoThumbnails?: () => Promise<{ generated: number; failed: number; total: number }>;
   onVideoScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
   onVideoAdded: (callback: (video: Video) => void) => () => void;
   onVideoRemoved: (callback: (filePath: string) => void) => () => void;
+  onVideoUpdated?: (callback: (video: Video) => void) => () => void;
 
   // Track metadata
   getTrackMetadata: (filePath: string) => Promise<TrackMetadata>;

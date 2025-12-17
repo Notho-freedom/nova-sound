@@ -36,6 +36,13 @@ export function useVideos(): UseVideosReturn {
       try {
         const videoLibrary = await window.electronAPI!.getVideos();
         console.log("Loaded videos from Electron:", videoLibrary);
+        // Log thumbnail status for debugging
+        const videosWithThumbs = videoLibrary?.filter(v => v.thumbnailUrl) || [];
+        const videosWithoutThumbs = videoLibrary?.filter(v => !v.thumbnailUrl) || [];
+        console.log(`Videos with thumbnails: ${videosWithThumbs.length}, without: ${videosWithoutThumbs.length}`);
+        if (videosWithoutThumbs.length > 0) {
+          console.log("Sample videos without thumbnails:", videosWithoutThumbs.slice(0, 3).map(v => ({ id: v.id, title: v.title, filePath: v.filePath })));
+        }
         setVideos(videoLibrary || []);
       } catch (err) {
         console.error("Failed to load videos:", err);
@@ -78,10 +85,24 @@ export function useVideos(): UseVideosReturn {
       setVideos((prev) => prev.filter((v) => v.filePath !== filePath));
     });
 
+    // Listen for video updates (e.g., when thumbnail is generated)
+    const unsubscribeUpdated = window.electronAPI!.onVideoUpdated?.((updatedVideo) => {
+      setVideos((prev) => {
+        const index = prev.findIndex(v => v.id === updatedVideo.id || v.filePath === updatedVideo.filePath);
+        if (index >= 0) {
+          const newVideos = [...prev];
+          newVideos[index] = { ...newVideos[index], ...updatedVideo };
+          return newVideos;
+        }
+        return prev;
+      });
+    });
+
     return () => {
       unsubscribeProgress();
       unsubscribeAdded();
       unsubscribeRemoved();
+      unsubscribeUpdated?.();
     };
   }, [isElectron]);
 

@@ -776,12 +776,26 @@ export const VideosView = () => {
                             src={video.thumbnailUrl || video.posterUrl}
                             alt={video.title}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Hide image and show fallback icon if thumbnail fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const fallback = target.nextElementSibling as HTMLElement;
+                              if (fallback) {
+                                fallback.style.display = 'flex';
+                              }
+                            }}
                           />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Film className="w-12 h-12 text-muted-foreground" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div 
+                          className={cn(
+                            "w-full h-full flex items-center justify-center",
+                            (video.thumbnailUrl || video.posterUrl) ? "hidden" : ""
+                          )}
+                          style={{ display: (video.thumbnailUrl || video.posterUrl) ? 'none' : 'flex' }}
+                        >
+                          <Film className="w-12 h-12 text-muted-foreground" />
+                        </div>
 
                         {/* Cloud indicator */}
                         {video.cloudStatus?.isUploaded && (

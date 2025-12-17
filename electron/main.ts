@@ -542,7 +542,15 @@ function registerLocalImageProtocol() {
       console.error('Failed to decode image path:', filePath, e);
     }
     
+    console.log('Loading thumbnail image:', filePath);
+    
     try {
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        console.error('Thumbnail file not found:', filePath);
+        return new Response('Image not found', { status: 404 });
+      }
+      
       const data = fs.readFileSync(filePath);
       const ext = path.extname(filePath).toLowerCase();
       

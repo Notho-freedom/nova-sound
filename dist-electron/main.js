@@ -239,9 +239,14 @@ ipcMain.handle('dialog:openVideoFile', async (_event, multiSelect = false) => {
     });
     return result.filePaths;
 });
-// Read file as base64 for blob creation
+// Read file as base64 for blob creation (for small files < 100MB)
 ipcMain.handle('file:readAsBase64', async (_event, filePath) => {
     try {
+        const stats = fs.statSync(filePath);
+        // Limit to 100MB for base64 (larger files should use streaming)
+        if (stats.size > 100 * 1024 * 1024) {
+            throw new Error('File too large for base64 encoding. Use streaming upload instead.');
+        }
         const data = fs.readFileSync(filePath);
         return data.toString('base64');
     }
@@ -249,6 +254,79 @@ ipcMain.handle('file:readAsBase64', async (_event, filePath) => {
         console.error('Failed to read file:', filePath, error);
         throw error;
     }
+});
+// Get file info without reading content
+ipcMain.handle('file:getInfo', async (_event, filePath) => {
+    try {
+        const stats = fs.statSync(filePath);
+        return {
+            size: stats.size,
+            exists: true,
+            isFile: stats.isFile(),
+            path: filePath,
+        };
+    }
+    catch (error) {
+        return { exists: false, size: 0, isFile: false, path: filePath };
+    }
+});
+// Upload file directly to cloud (streaming for large files)
+ipcMain.handle('file:uploadToCloud', async (_event, options) => {
+    const { filePath, cloudName, uploadPreset, resourceType, publicId } = options;
+    const FormData = (await import('form-data')).default;
+    const https = await import('https');
+    return new Promise((resolve, reject) => {
+        try {
+            const stats = fs.statSync(filePath);
+            const fileName = path.basename(filePath);
+            const form = new FormData();
+            form.append('file', fs.createReadStream(filePath), fileName);
+            form.append('upload_preset', uploadPreset);
+            form.append('resource_type', resourceType);
+            if (publicId) {
+                form.append('public_id', publicId);
+            }
+            const req = https.request({
+                hostname: 'api.cloudinary.com',
+                port: 443,
+                path: `/v1_1/${cloudName}/upload`,
+                method: 'POST',
+                headers: form.getHeaders(),
+            }, (res) => {
+                let data = '';
+                res.on('data', (chunk) => { data += chunk; });
+                res.on('end', () => {
+                    try {
+                        const json = JSON.parse(data);
+                        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                            resolve({
+                                success: true,
+                                url: json.secure_url,
+                                publicId: json.public_id,
+                                bytes: json.bytes,
+                            });
+                        }
+                        else {
+                            resolve({
+                                success: false,
+                                error: json.error?.message || `HTTP ${res.statusCode}`,
+                            });
+                        }
+                    }
+                    catch (e) {
+                        resolve({ success: false, error: 'Failed to parse response' });
+                    }
+                });
+            });
+            req.on('error', (e) => {
+                resolve({ success: false, error: e.message });
+            });
+            form.pipe(req);
+        }
+        catch (error) {
+            resolve({ success: false, error: error.message });
+        }
+    });
 });
 ipcMain.handle('dialog:openPlaylist', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -392,6 +470,48 @@ function registerLocalVideoProtocol() {
         }
     });
 }
+// Register custom protocol for local image files (thumbnails, etc.)
+function registerLocalImageProtocol() {
+    protocol.handle('local-image', async (request) => {
+        let filePath = request.url.replace('local-image://', '');
+        // Decode URI component
+        try {
+            filePath = decodeURIComponent(filePath);
+        }
+        catch (e) {
+            console.error('Failed to decode image path:', filePath, e);
+        }
+        console.log('Loading thumbnail image:', filePath);
+        try {
+            // Check if file exists
+            if (!fs.existsSync(filePath)) {
+                console.error('Thumbnail file not found:', filePath);
+                return new Response('Image not found', { status: 404 });
+            }
+            const data = fs.readFileSync(filePath);
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp',
+                '.bmp': 'image/bmp',
+                '.svg': 'image/svg+xml',
+            };
+            return new Response(data, {
+                headers: {
+                    'Content-Type': mimeTypes[ext] || 'image/jpeg',
+                    'Cache-Control': 'max-age=3600', // Cache images for 1 hour
+                },
+            });
+        }
+        catch (error) {
+            console.error('Failed to load image file:', filePath, error);
+            return new Response('Image not found', { status: 404 });
+        }
+    });
+}
 // Make the app a single instance (handle "Open with..." on Windows)
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -486,6 +606,7 @@ app.whenReady().then(async () => {
     // Register custom protocols
     registerLocalAudioProtocol();
     registerLocalVideoProtocol();
+    registerLocalImageProtocol();
     // Initialize storage and services
     await storage.init();
     await initServices();

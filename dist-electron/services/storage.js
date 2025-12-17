@@ -198,6 +198,14 @@ class Storage {
             await this.saveVideos(videos);
         }
     }
+    async updateVideo(videoId, updates) {
+        const videos = await this.getVideos();
+        const index = videos.findIndex(v => v.id === videoId);
+        if (index >= 0) {
+            videos[index] = { ...videos[index], ...updates };
+            await this.saveVideos(videos);
+        }
+    }
     // Artwork
     async saveArtwork(artwork, sourceFilePath) {
         await ensureDir(ARTWORK_DIR);
@@ -218,8 +226,8 @@ class Storage {
         const filename = `${hash}.jpg`;
         const thumbnailPath = path.join(THUMBNAILS_DIR, filename);
         await fs.writeFile(thumbnailPath, thumbnailData);
-        // Return file:// URL for Electron
-        return `file://${thumbnailPath.replace(/\\/g, '/')}`;
+        // Return local-image:// URL for custom protocol (works better with CSP)
+        return `local-image://${encodeURIComponent(thumbnailPath)}`;
     }
     async getThumbnailPath(sourceFilePath) {
         const hash = crypto.createHash('md5').update(sourceFilePath).digest('hex');
@@ -227,7 +235,8 @@ class Storage {
         const thumbnailPath = path.join(THUMBNAILS_DIR, filename);
         try {
             await fs.access(thumbnailPath);
-            return `file://${thumbnailPath.replace(/\\/g, '/')}`;
+            // Return local-image:// URL for custom protocol (works better with CSP)
+            return `local-image://${encodeURIComponent(thumbnailPath)}`;
         }
         catch {
             return null;

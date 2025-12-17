@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addVideoFromUrl: (url, title) => ipcRenderer.invoke('videos:addFromUrl', url, title),
   regenerateVideoThumbnail: (videoId) => ipcRenderer.invoke('videos:regenerateThumbnail', videoId),
   regenerateAllVideoThumbnails: () => ipcRenderer.invoke('videos:regenerateAllThumbnails'),
+  generateMissingVideoThumbnails: () => ipcRenderer.invoke('videos:generateMissingThumbnails'),
   onVideoScanProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('videos:scan-progress', listener);
@@ -61,6 +62,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event, filePath) => callback(filePath);
     ipcRenderer.on('videos:removed', listener);
     return () => ipcRenderer.removeListener('videos:removed', listener);
+  },
+  onVideoUpdated: (callback) => {
+    const listener = (_event, video) => callback(video);
+    ipcRenderer.on('videos:updated', listener);
+    return () => ipcRenderer.removeListener('videos:updated', listener);
   },
 
   // Track metadata
