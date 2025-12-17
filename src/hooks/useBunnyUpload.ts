@@ -172,7 +172,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
               // Track uploaded media for sync
               (async () => {
                 try {
-                  const { firebaseSyncService } = await import('./firebase-sync');
+                  const { firebaseSyncService } = await import('@/services/firebase-sync');
                   const { getUserStorageKey } = await import('@/lib/storage-utils');
                   
                   const storageKey = await getUserStorageKey('nexus-uploaded-media');
@@ -199,6 +199,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
                   }
                 } catch (error) {
                   // Silently fail if Firebase sync is not available
+                  console.warn('Failed to track uploaded media:', error);
                 }
               })();
               

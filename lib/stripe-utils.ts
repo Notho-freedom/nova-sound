@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { verifyAuth } from '../app/api/auth/middleware';
 import { NextRequest } from 'next/server';
+import { getFirebaseAdmin, isFirebaseAdminInitialized } from './firebaseAdmin';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
@@ -13,9 +14,9 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
   : null;
 
 /**
- * Check if a user has an active Pro subscription
+ * Check if a user has an active Pro subscription via Stripe
  */
-export async function isUserPro(userId: string): Promise<boolean> {
+async function isUserProViaStripe(userId: string): Promise<boolean> {
   if (!stripe) {
     return false;
   }
@@ -50,9 +51,50 @@ export async function isUserPro(userId: string): Promise<boolean> {
 
     return isPro && subscription.status === 'active';
   } catch (error) {
-    console.error('Error checking Pro status:', error);
+    console.error('Error checking Pro status via Stripe:', error);
     return false;
   }
+}
+
+/**
+ * Check if a user has an active Pro subscription via Firestore profile
+ */
+async function isUserProViaFirestore(userId: string): Promise<boolean> {
+  try {
+    if (!isFirebaseAdminInitialized()) {
+      return false;
+    }
+
+    const admin = getFirebaseAdmin();
+    const db = admin.firestore();
+    
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return false;
+    }
+
+    const userData = userDoc.data();
+    return userData?.plan === 'pro' && userData?.subscriptionStatus === 'active';
+  } catch (error) {
+    console.error('Error checking Pro status via Firestore:', error);
+    return false;
+  }
+}
+
+/**
+ * Check if a user has an active Pro subscription
+ * Checks both Stripe and Firestore (Firestore takes precedence for manual activations)
+ */
+export async function isUserPro(userId: string): Promise<boolean> {
+  // First check Firestore (for manual activations)
+  const isProViaFirestore = await isUserProViaFirestore(userId);
+  if (isProViaFirestore) {
+    return true;
+  }
+
+  // Then check Stripe (for paid subscriptions)
+  return await isUserProViaStripe(userId);
 }
 
 /**
