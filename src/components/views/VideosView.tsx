@@ -134,10 +134,13 @@ export const VideosView = () => {
 
   const {
     uploadVideoToCloudinary,
+    uploadVideoToBunny,
     uploadVideoToNexus,
     getCloudinaryProgress,
+    getBunnyProgress,
     getNexusProgress,
     isUploadingToCloudinary,
+    isUploadingToBunny,
     isUploadingToNexus,
   } = useVideoUpload();
 
@@ -806,8 +809,10 @@ export const VideosView = () => {
                     onMarkAsWatched={() => markAsWatched(video.id)}
                     onMarkAsUnwatched={() => markAsUnwatched(video.id)}
                     onUploadToCloudinary={() => uploadVideoToCloudinary(video)}
+                    onUploadToBunny={() => uploadVideoToBunny(video)}
                     onUploadToNexus={() => uploadVideoToNexus(video)}
                     canUploadToCloudinary={cloudinaryConfigured || nexusIsPro}
+                    canUploadToBunny={nexusIsPro && nexusAuthenticated}
                     canUploadToNexus={nexusIsPro && nexusAuthenticated}
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
@@ -1141,8 +1146,10 @@ export const VideosView = () => {
                     onMarkAsWatched={() => markAsWatched(video.id)}
                     onMarkAsUnwatched={() => markAsUnwatched(video.id)}
                     onUploadToCloudinary={() => uploadVideoToCloudinary(video)}
+                    onUploadToBunny={() => uploadVideoToBunny(video)}
                     onUploadToNexus={() => uploadVideoToNexus(video)}
                     canUploadToCloudinary={cloudinaryConfigured || nexusIsPro}
+                    canUploadToBunny={nexusIsPro && nexusAuthenticated}
                     canUploadToNexus={nexusIsPro && nexusAuthenticated}
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >

@@ -43,6 +43,7 @@ import { AlbumContextMenu } from "@/components/AlbumContextMenu";
 import { ArtistContextMenu } from "@/components/ArtistContextMenu";
 import { PageHeader } from "@/components/PageHeader";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -184,7 +185,9 @@ export const LibraryView = ({
   
   // Cloudinary upload
   const { uploadTrack, uploadAlbum, uploadPlaylist, getTrackProgress } = useCloudinaryUpload();
-  // Nexus/Bunny upload (Pro only)
+  // Bunny upload (Pro only)
+  const { uploadTrack: uploadTrackToBunny, uploadAlbum: uploadAlbumToBunny, uploadPlaylist: uploadPlaylistToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
+  // Nexus upload (Pro only - local storage)
   const { uploadTrack: uploadTrackToNexus, uploadAlbum: uploadAlbumToNexus, uploadPlaylist: uploadPlaylistToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const playlistsResult = usePlaylists();
@@ -196,6 +199,7 @@ export const LibraryView = ({
   const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
   
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -506,6 +510,9 @@ export const LibraryView = ({
                               onUploadToCloudinary={() => uploadTrack?.(track)}
                               canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                               isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                              onUploadToBunny={() => uploadTrackToBunny?.(track)}
+                              canUploadToBunny={canUploadToBunny && !!track.filePath}
+                              isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
                               onUploadToNexus={() => uploadTrackToNexus?.(track)}
                               canUploadToNexus={canUploadToNexus && !!track.filePath}
                               isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
@@ -546,6 +553,9 @@ export const LibraryView = ({
                         onUploadToCloudinary={() => uploadTrack?.(track)}
                         canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                         isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                        onUploadToBunny={() => uploadTrackToBunny?.(track)}
+                        canUploadToBunny={canUploadToBunny && !!track.filePath}
+                        isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
                         onUploadToNexus={() => uploadTrackToNexus?.(track)}
                         canUploadToNexus={canUploadToNexus && !!track.filePath}
                         isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
@@ -2007,6 +2017,9 @@ export const LibraryView = ({
                 onUploadToCloudinary={() => uploadTrack(track)}
                 canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                 isUploading={getTrackProgress(track.id)?.status === 'uploading'}
+                onUploadToBunny={() => uploadTrackToBunny(track)}
+                canUploadToBunny={canUploadToBunny && !!track.filePath}
+                isUploadingToBunny={getBunnyTrackProgress(track.id)?.status === 'uploading'}
                 onUploadToNexus={() => uploadTrackToNexus(track)}
                 canUploadToNexus={canUploadToNexus && !!track.filePath}
                 isUploadingToNexus={getNexusTrackProgress(track.id)?.status === 'uploading'}

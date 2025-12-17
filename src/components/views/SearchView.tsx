@@ -13,6 +13,7 @@ import { UploadIndicator } from "@/components/UploadIndicator";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -55,10 +56,12 @@ export const SearchView = ({
   const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
   const { isFavorite, toggleFavorite } = useFavorites();
   const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
+  const { uploadTrack: uploadTrackToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
   const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
 
   // Load search history from localStorage
@@ -353,6 +356,9 @@ export const SearchView = ({
                       onUploadToCloudinary={() => uploadTrack?.(track)}
                       canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                       isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                      onUploadToBunny={() => uploadTrackToBunny?.(track)}
+                      canUploadToBunny={canUploadToBunny && !!track.filePath}
+                      isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
                       onUploadToNexus={() => uploadTrackToNexus?.(track)}
                       canUploadToNexus={canUploadToNexus && !!track.filePath}
                       isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}

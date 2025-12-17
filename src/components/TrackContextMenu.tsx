@@ -46,6 +46,9 @@ interface TrackContextMenuProps {
   onUploadToCloudinary?: () => void;
   canUploadToCloudinary?: boolean;
   isUploading?: boolean;
+  onUploadToBunny?: () => void;
+  canUploadToBunny?: boolean;
+  isUploadingToBunny?: boolean;
   onUploadToNexus?: () => void;
   canUploadToNexus?: boolean;
   isUploadingToNexus?: boolean;
@@ -70,6 +73,9 @@ export const TrackContextMenu = ({
   onUploadToCloudinary,
   canUploadToCloudinary = false,
   isUploading = false,
+  onUploadToBunny,
+  canUploadToBunny = false,
+  isUploadingToBunny = false,
   onUploadToNexus,
   canUploadToNexus = false,
   isUploadingToNexus = false,
@@ -153,7 +159,7 @@ export const TrackContextMenu = ({
           </ContextMenuItem>
         )}
 
-        {(onUploadToCloudinary && canUploadToCloudinary) || (onUploadToNexus && canUploadToNexus) ? (
+        {(onUploadToCloudinary && canUploadToCloudinary) || (onUploadToBunny && canUploadToBunny) || (onUploadToNexus && canUploadToNexus) ? (
           <>
             <ContextMenuSeparator />
             {onUploadToCloudinary && canUploadToCloudinary && (
@@ -169,7 +175,25 @@ export const TrackContextMenu = ({
                 ) : (
                   <>
                     <Cloud className="w-4 h-4 mr-2" />
-                    Uploader vers Cloudinary
+                    Uploader vers Cloudinary (Free)
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
+            {onUploadToBunny && canUploadToBunny && (
+              <ContextMenuItem 
+                onClick={onUploadToBunny}
+                disabled={isUploadingToBunny}
+              >
+                {isUploadingToBunny ? (
+                  <>
+                    <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload vers Bunny...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Uploader vers Bunny (Pro)
                   </>
                 )}
               </ContextMenuItem>
@@ -181,13 +205,13 @@ export const TrackContextMenu = ({
               >
                 {isUploadingToNexus ? (
                   <>
-                    <Zap className="w-4 h-4 mr-2 animate-pulse" />
-                    Upload vers Bunny...
+                    <Server className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload vers Nexus...
                   </>
                 ) : (
                   <>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Uploader vers Nexus/Bunny (Pro)
+                    <Server className="w-4 h-4 mr-2" />
+                    Uploader vers Nexus (Pro)
                   </>
                 )}
               </ContextMenuItem>

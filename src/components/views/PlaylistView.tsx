@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -66,11 +67,13 @@ export const PlaylistView = ({
   
   // Upload hooks
   const { uploadPlaylist, uploadTrack, getTrackProgress } = useCloudinaryUpload();
+  const { uploadPlaylist: uploadPlaylistToBunny, uploadTrack: uploadTrackToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
   const { uploadPlaylist: uploadPlaylistToNexus, uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
   // Table state for create/edit pages

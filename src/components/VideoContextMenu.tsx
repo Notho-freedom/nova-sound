@@ -62,6 +62,9 @@ interface VideoContextMenuProps {
   onUploadToCloudinary?: () => void;
   canUploadToCloudinary?: boolean;
   isUploadingToCloudinary?: boolean;
+  onUploadToBunny?: () => void;
+  canUploadToBunny?: boolean;
+  isUploadingToBunny?: boolean;
   onUploadToNexus?: () => void;
   canUploadToNexus?: boolean;
   isUploadingToNexus?: boolean;
@@ -94,6 +97,9 @@ export const VideoContextMenu = ({
   onUploadToCloudinary,
   canUploadToCloudinary = false,
   isUploadingToCloudinary = false,
+  onUploadToBunny,
+  canUploadToBunny = false,
+  isUploadingToBunny = false,
   onUploadToNexus,
   canUploadToNexus = false,
   isUploadingToNexus = false,
@@ -233,35 +239,63 @@ export const VideoContextMenu = ({
         <ContextMenuSeparator />
 
         {/* Cloud Upload */}
-        {(canUploadToCloudinary || canUploadToNexus) && (
+        {(canUploadToCloudinary || canUploadToBunny || canUploadToNexus) && (
           <>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>
-                <Cloud className="w-4 h-4 mr-2" />
-                Uploader vers le cloud
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent>
-                {canUploadToCloudinary && (
-                  <ContextMenuItem
-                    onClick={onUploadToCloudinary}
-                    disabled={isUploadingToCloudinary}
-                  >
-                    <Cloud className="w-4 h-4 mr-2 text-blue-500" />
-                    {isUploadingToCloudinary ? "Upload en cours..." : "Cloudinary"}
-                  </ContextMenuItem>
-                )}
-                {canUploadToNexus && (
-                  <ContextMenuItem
-                    onClick={onUploadToNexus}
-                    disabled={isUploadingToNexus}
-                  >
-                    <Server className="w-4 h-4 mr-2 text-purple-500" />
-                    {isUploadingToNexus ? "Upload en cours..." : "Nexus / Bunny (Pro)"}
-                  </ContextMenuItem>
-                )}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
             <ContextMenuSeparator />
+            {canUploadToCloudinary && (
+              <ContextMenuItem
+                onClick={onUploadToCloudinary}
+                disabled={isUploadingToCloudinary}
+              >
+                {isUploadingToCloudinary ? (
+                  <>
+                    <Cloud className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload en cours...
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="w-4 h-4 mr-2 text-purple-500" />
+                    Uploader vers Cloudinary (Free)
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
+            {canUploadToBunny && (
+              <ContextMenuItem
+                onClick={onUploadToBunny}
+                disabled={isUploadingToBunny}
+              >
+                {isUploadingToBunny ? (
+                  <>
+                    <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload vers Bunny...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 mr-2 text-blue-500" />
+                    Uploader vers Bunny (Pro)
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
+            {canUploadToNexus && (
+              <ContextMenuItem
+                onClick={onUploadToNexus}
+                disabled={isUploadingToNexus}
+              >
+                {isUploadingToNexus ? (
+                  <>
+                    <Server className="w-4 h-4 mr-2 animate-pulse" />
+                    Upload vers Nexus...
+                  </>
+                ) : (
+                  <>
+                    <Server className="w-4 h-4 mr-2 text-green-500" />
+                    Uploader vers Nexus (Pro)
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
           </>
         )}
 

@@ -519,7 +519,7 @@ export const DownloadsView = () => {
     count: filesByProvider[key].length
   })));
 
-  const providerOrder = ["bunny", "planethoster", "cloudinary", "nexus", "local"];
+  const providerOrder = ["bunny", "cloudinary", "nexus", "planethoster", "local"];
 
   const activeDownloads = downloads.filter(
     (d) => d.status === "downloading" || d.status === "paused"

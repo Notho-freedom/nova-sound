@@ -39,6 +39,13 @@ interface UseVideoUploadReturn {
   isUploadingToCloudinary: boolean;
   getCloudinaryProgress: (videoId: string) => VideoUploadProgress | null;
   
+  // Bunny
+  uploadVideoToBunny: (video: Video) => Promise<void>;
+  uploadMultipleToBunny: (videos: Video[]) => Promise<void>;
+  bunnyProgress: Map<string, VideoUploadProgress>;
+  isUploadingToBunny: boolean;
+  getBunnyProgress: (videoId: string) => VideoUploadProgress | null;
+  
   // Nexus
   uploadVideoToNexus: (video: Video) => Promise<void>;
   uploadMultipleToNexus: (videos: Video[]) => Promise<void>;
@@ -54,8 +61,10 @@ interface UseVideoUploadReturn {
 export function useVideoUpload(): UseVideoUploadReturn {
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const [cloudinaryProgress, setCloudinaryProgress] = useState<Map<string, VideoUploadProgress>>(new Map());
+  const [bunnyProgress, setBunnyProgress] = useState<Map<string, VideoUploadProgress>>(new Map());
   const [nexusProgress, setNexusProgress] = useState<Map<string, VideoUploadProgress>>(new Map());
   const [isUploadingToCloudinary, setIsUploadingToCloudinary] = useState(false);
+  const [isUploadingToBunny, setIsUploadingToBunny] = useState(false);
   const [isUploadingToNexus, setIsUploadingToNexus] = useState(false);
 
   // Get MIME type from file path
@@ -67,6 +76,15 @@ export function useVideoUpload(): UseVideoUploadReturn {
   // Update progress helper
   const updateCloudinaryProgress = useCallback((videoId: string, update: Partial<VideoUploadProgress>) => {
     setCloudinaryProgress((prev) => {
+      const current = prev.get(videoId) || { videoId, status: 'pending', progress: 0 };
+      const updated = new Map(prev);
+      updated.set(videoId, { ...current, ...update });
+      return updated;
+    });
+  }, []);
+
+  const updateBunnyProgress = useCallback((videoId: string, update: Partial<VideoUploadProgress>) => {
+    setBunnyProgress((prev) => {
       const current = prev.get(videoId) || { videoId, status: 'pending', progress: 0 };
       const updated = new Map(prev);
       updated.set(videoId, { ...current, ...update });
@@ -240,6 +258,152 @@ export function useVideoUpload(): UseVideoUploadReturn {
     }
   }, [cloudinaryConfigured, nexusIsPro, cloudinaryProgress, getMimeType, updateCloudinaryProgress]);
 
+  // Upload video to Bunny
+  const uploadVideoToBunny = useCallback(async (video: Video) => {
+    if (!nexusIsPro || !nexusAuthenticated) {
+      toast.error('Plan Pro requis', {
+        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+      });
+      return;
+    }
+
+    if (!video.filePath) {
+      toast.error('Fichier introuvable', {
+        description: 'Le fichier vidéo n\'est pas disponible localement.',
+      });
+      return;
+    }
+
+    const existing = bunnyProgress.get(video.id);
+    if (existing?.status === 'uploading') {
+      toast.info('Upload déjà en cours', {
+        description: `L'upload de "${video.title}" est déjà en cours.`,
+      });
+      return;
+    }
+
+    if (!window.electronAPI) {
+      toast.error('Mode Electron requis', {
+        description: 'L\'upload nécessite le mode Electron.',
+      });
+      return;
+    }
+
+    setIsUploadingToBunny(true);
+    updateBunnyProgress(video.id, {
+      status: 'uploading',
+      progress: 0,
+      startedAt: new Date().toISOString(),
+    });
+
+    try {
+      toast.info('Upload démarré', {
+        description: `Upload de "${video.title}" vers Bunny...`,
+      });
+
+      // Get access token
+      let accessToken: string | null = null;
+      try {
+        const { firebaseService } = await import('@/services/firebase');
+        if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+          accessToken = await firebaseService.getIdToken();
+        }
+      } catch (error) {
+        console.error('Failed to get Firebase token:', error);
+      }
+
+      if (!accessToken) {
+        throw new Error('Not authenticated - no token available');
+      }
+
+      // Read file as base64
+      const base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+      const mimeType = getMimeType(video.filePath);
+      const fileName = video.filePath.split(/[\\/]/).pop() || `video_${video.id}`;
+
+      // Convert base64 to blob
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', blob, fileName);
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
+      // Upload with progress tracking
+      const result = await new Promise<{ success: boolean; url?: string; id?: string; error?: string }>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            updateBunnyProgress(video.id, { progress });
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve({ success: true, url: response.url, id: response.id });
+            } catch {
+              resolve({ success: false, error: 'Invalid response from server' });
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              resolve({ success: false, error: error.message || `HTTP ${xhr.status}` });
+            } catch {
+              resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
+            }
+          }
+        };
+
+        xhr.onerror = () => resolve({ success: false, error: 'Network error' });
+        xhr.onabort = () => resolve({ success: false, error: 'Upload aborted' });
+
+        xhr.open('POST', `${API_BASE_URL}/api/storage/upload-bunny`);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.send(formData);
+      });
+
+      if (result.success) {
+        updateBunnyProgress(video.id, {
+          status: 'completed',
+          progress: 100,
+          cloudUrl: result.url,
+          cloudId: result.id,
+          completedAt: new Date().toISOString(),
+        });
+
+        saveUploadedVideo(video, 'bunny', result.url!, result.id);
+
+        toast.success('Upload terminé', {
+          description: `"${video.title}" a été uploadé sur Bunny.`,
+        });
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error: any) {
+      console.error('Bunny video upload error:', error);
+      updateBunnyProgress(video.id, {
+        status: 'error',
+        error: error.message,
+      });
+      toast.error('Erreur d\'upload', {
+        description: error.message || 'Une erreur est survenue lors de l\'upload vers Bunny.',
+      });
+    } finally {
+      setIsUploadingToBunny(false);
+    }
+  }, [nexusIsPro, nexusAuthenticated, bunnyProgress, getMimeType, updateBunnyProgress]);
+
   // Upload video to Nexus
   const uploadVideoToNexus = useCallback(async (video: Video) => {
     if (!nexusIsPro || !nexusAuthenticated) {
@@ -378,6 +542,18 @@ export function useVideoUpload(): UseVideoUploadReturn {
     toast.success(`Upload de ${uniqueVideos.length} vidéo(s) terminé`);
   }, [uploadVideoToCloudinary]);
 
+  const uploadMultipleToBunny = useCallback(async (videos: Video[]) => {
+    const uniqueVideos = videos.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+    
+    toast.info(`Démarrage de l'upload de ${uniqueVideos.length} vidéo(s)...`);
+    
+    for (const video of uniqueVideos) {
+      await uploadVideoToBunny(video);
+    }
+    
+    toast.success(`Upload de ${uniqueVideos.length} vidéo(s) terminé`);
+  }, [uploadVideoToBunny]);
+
   const uploadMultipleToNexus = useCallback(async (videos: Video[]) => {
     const uniqueVideos = videos.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
     
@@ -407,6 +583,11 @@ export function useVideoUpload(): UseVideoUploadReturn {
       updated.delete(videoId);
       return updated;
     });
+    setBunnyProgress((prev) => {
+      const updated = new Map(prev);
+      updated.delete(videoId);
+      return updated;
+    });
     setNexusProgress((prev) => {
       const updated = new Map(prev);
       updated.delete(videoId);
@@ -417,6 +598,11 @@ export function useVideoUpload(): UseVideoUploadReturn {
   // Clear progress
   const clearProgress = useCallback((videoId: string) => {
     setCloudinaryProgress((prev) => {
+      const updated = new Map(prev);
+      updated.delete(videoId);
+      return updated;
+    });
+    setBunnyProgress((prev) => {
       const updated = new Map(prev);
       updated.delete(videoId);
       return updated;
@@ -434,6 +620,11 @@ export function useVideoUpload(): UseVideoUploadReturn {
     cloudinaryProgress,
     isUploadingToCloudinary,
     getCloudinaryProgress,
+    uploadVideoToBunny,
+    uploadMultipleToBunny,
+    bunnyProgress,
+    isUploadingToBunny,
+    getBunnyProgress,
     uploadVideoToNexus,
     uploadMultipleToNexus,
     nexusProgress,
