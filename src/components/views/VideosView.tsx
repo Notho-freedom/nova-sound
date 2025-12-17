@@ -25,6 +25,7 @@ import {
   Sparkles,
   History,
   ChevronRight,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -810,16 +811,14 @@ export const VideosView = () => {
                     canUploadToNexus={nexusIsPro && nexusAuthenticated}
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="group cursor-pointer p-2 rounded-xl hover:bg-card/50 transition-all"
-                          onClick={() => {
-                            if (!selectionMode) {
-                              handleViewDetails(video);
-                            }
-                          }}
-                        >
+                    <div
+                      className="group cursor-pointer p-2 rounded-xl hover:bg-card/50 transition-all"
+                      onClick={() => {
+                        if (!selectionMode) {
+                          handleViewDetails(video);
+                        }
+                      }}
+                    >
                       <div className="aspect-video rounded-lg overflow-hidden relative bg-muted">
                         {video.thumbnailUrl || video.posterUrl ? (
                           <img
@@ -881,7 +880,11 @@ export const VideosView = () => {
                         {/* Selection checkbox */}
                         {selectionMode && (
                           <div className="absolute top-2 right-2 z-10">
+                            <label className="sr-only" htmlFor={`video-checkbox-${video.id}`}>
+                              Sélectionner {video.title}
+                            </label>
                             <input
+                              id={`video-checkbox-${video.id}`}
                               type="checkbox"
                               checked={selectedVideoIds.has(video.id)}
                               onChange={(e) => {
@@ -898,6 +901,7 @@ export const VideosView = () => {
                               }}
                               onClick={(e) => e.stopPropagation()}
                               className="w-5 h-5 rounded border-2 border-white bg-black/50 checked:bg-primary checked:border-primary"
+                              aria-label={`Sélectionner ${video.title}`}
                             />
                           </div>
                         )}
@@ -948,7 +952,12 @@ export const VideosView = () => {
                       </div>
 
                       <div className="mt-2 px-1">
-                        <h3 className="text-sm font-medium truncate">{video.title}</h3>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <h3 className="text-sm font-medium truncate">{video.title}</h3>
+                          </TooltipTrigger>
+                          <TooltipContent>{video.title}</TooltipContent>
+                        </Tooltip>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           {video.year && <span>{video.year}</span>}
                           <span>{formatSize(video.fileSize)}</span>
