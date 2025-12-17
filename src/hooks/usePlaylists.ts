@@ -80,7 +80,7 @@ export function usePlaylists(): UsePlaylistsReturn {
         if (isElectron && window.electronAPI) {
           playlist = await window.electronAPI.createPlaylist(name, trackIds);
           if (playlist) {
-            setPlaylists((prev) => [...prev, playlist]);
+            setPlaylists((prev) => [...prev, playlist!]);
           }
         } else {
           // Web mode
@@ -122,8 +122,8 @@ export function usePlaylists(): UsePlaylistsReturn {
       try {
         let updated: Playlist | null = null;
         
-        if (isElectron) {
-          updated = await window.electronAPI!.updatePlaylist(id, data);
+        if (isElectron && window.electronAPI) {
+          updated = await window.electronAPI.updatePlaylist(id, data);
           setPlaylists((prev) =>
             prev.map((p) => (p.id === id ? { ...p, ...updated! } : p))
           );
@@ -216,16 +216,19 @@ export function usePlaylists(): UsePlaylistsReturn {
   const importPlaylist = useCallback(async (): Promise<Playlist | null> => {
     if (!isElectron) return null;
 
+    if (!window.electronAPI) return null;
+
     try {
-      const files = await window.electronAPI!.openFile([
+      const files = await window.electronAPI.openFile([
         { name: "Playlist Files", extensions: ["m3u", "m3u8", "pls"] },
       ]);
       
       if (files.length === 0) return null;
 
-      const playlist = await window.electronAPI!.importPlaylist(files[0]);
+      const playlist = await window.electronAPI.importPlaylist(files[0]);
       if (playlist) {
-        setPlaylists((prev) => [...prev, playlist]);
+        const newPlaylist = playlist; // Capture for closure
+        setPlaylists((prev) => [...prev, newPlaylist]);
       }
       return playlist;
     } catch (err) {
