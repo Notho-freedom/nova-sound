@@ -371,6 +371,20 @@ class FirebaseService {
     return this.userProfile;
   }
 
+  // Force refresh profile from Firestore (useful when profile is updated externally)
+  async refreshProfile(): Promise<void> {
+    if (!this.currentUser) {
+      console.warn("Cannot refresh profile: no current user");
+      return;
+    }
+    console.log("🔄 Forcing profile refresh from Firestore...");
+    await this.loadUserProfile(this.currentUser.uid);
+    // Notify listeners to update UI
+    if (this.currentUser) {
+      this.authStateListeners.forEach((listener) => listener(this.currentUser));
+    }
+  }
+
   // Subscribe to auth state changes
   onAuthStateChange(callback: (user: User | null) => void): () => void {
     this.authStateListeners.add(callback);
@@ -692,25 +706,79 @@ class FirebaseService {
     this.userProfile = null;
   }
 
-  // Load user profile from Firestore
+  // Load user profile from Firestore and set up real-time listener
   private async loadUserProfile(uid: string): Promise<void> {
     if (!db || !this.currentUser) return;
+
+    // Clean up existing snapshot listener if any
+    if (this.profileSnapshotUnsubscribe) {
+      this.profileSnapshotUnsubscribe();
+      this.profileSnapshotUnsubscribe = null;
+    }
 
     // Note: Don't check navigator.onLine - it's unreliable in Electron
     // Let Firebase SDK handle offline scenarios naturally
 
     try {
       const userRef = doc(db, "users", uid);
+      
+      // First, load initial data
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
         const profileData = userSnap.data() as UserProfile;
         // Ensure we have the latest data from Firestore
         this.userProfile = profileData;
-        console.log("📥 Profile loaded from Firestore:", this.userProfile);
+        console.log("📥 Profile loaded from Firestore:", {
+          plan: profileData.plan,
+          subscriptionStatus: profileData.subscriptionStatus,
+          email: profileData.email,
+          displayName: profileData.displayName,
+        });
       } else {
         // Profile doesn't exist, create it from current user
         await this.createOrUpdateProfile(this.currentUser);
+      }
+
+      // Set up real-time listener for profile changes (only for non-anonymous users)
+      if (!this.currentUser.isAnonymous) {
+        console.log("👂 Setting up real-time profile listener for user:", uid);
+        this.profileSnapshotUnsubscribe = onSnapshot(
+          userRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              const updatedProfile = snapshot.data() as UserProfile;
+              const previousPlan = this.userProfile?.plan;
+              const previousStatus = this.userProfile?.subscriptionStatus;
+              
+              this.userProfile = updatedProfile;
+              console.log("🔄 Profile updated in real-time:", {
+                plan: updatedProfile.plan,
+                subscriptionStatus: updatedProfile.subscriptionStatus,
+                email: updatedProfile.email,
+              });
+              
+              // Always notify listeners when profile changes (not just on plan change)
+              // This ensures UI updates even if other fields change
+              const planChanged = previousPlan !== updatedProfile.plan;
+              const statusChanged = previousStatus !== updatedProfile.subscriptionStatus;
+              
+              if (planChanged || statusChanged) {
+                console.log(`✨ Plan/Status changed: ${previousPlan}/${previousStatus} → ${updatedProfile.plan}/${updatedProfile.subscriptionStatus}`);
+              }
+              
+              // Always notify listeners to ensure UI is updated with latest profile
+              if (this.currentUser) {
+                this.authStateListeners.forEach((listener) => listener(this.currentUser));
+              }
+            }
+          },
+          (error) => {
+            console.warn("⚠️ Profile snapshot listener error:", error);
+            // Don't break the app if listener fails
+          }
+        );
+        console.log("✅ Real-time profile listener active");
       }
     } catch (error: unknown) {
       const firestoreError = error as { code?: string; message?: string };

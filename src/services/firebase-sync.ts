@@ -919,14 +919,35 @@ class FirebaseSyncService {
   // Force an immediate sync to Firestore
   async forceSyncNow(): Promise<void> {
     const db = getFirestoreInstance();
-    if (!this.currentUserId || !db) {
-      console.warn('Cannot force sync: no user ID or Firestore not initialized');
+    if (!db) {
+      console.warn('Cannot force sync: Firestore not initialized');
+      return;
+    }
+
+    // Get user ID from Firebase if not set
+    let userId = this.currentUserId;
+    if (!userId) {
+      const { firebaseService } = await import('./firebase');
+      const currentUser = firebaseService.getCurrentUser();
+      if (!currentUser || currentUser.isAnonymous) {
+        console.warn('Cannot force sync: no authenticated user');
+        return;
+      }
+      userId = currentUser.uid;
+      // Initialize sync if not already done
+      if (!this.isInitialized) {
+        await this.initializeSync(userId);
+      }
+    }
+
+    if (!userId) {
+      console.warn('Cannot force sync: no user ID available');
       return;
     }
 
     try {
       // Save all local data to Firestore
-      await this.saveToFirestore(this.currentUserId);
+      await this.saveToFirestore(userId);
       console.log('Force sync completed successfully');
     } catch (error) {
       console.error('Force sync failed:', error);

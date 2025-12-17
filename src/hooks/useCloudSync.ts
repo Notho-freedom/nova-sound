@@ -677,10 +677,10 @@ export function useCloudSync(): UseCloudSyncReturn {
     // Force reload profile from Firestore
     const currentUser = authService.getCurrentUser();
     if (currentUser && !currentUser.isAnonymous) {
-      // Reload profile will trigger the snapshot listener
-      await authService.ensureInitialized();
-      // The snapshot listener will automatically update the profile
-      // But we also update state immediately from current profile
+      // Use the new refreshProfile method which will reload from Firestore
+      // and trigger the snapshot listener
+      await authService.refreshProfile();
+      // Update state from current profile
       const profile = authService.getUserProfile();
       if (profile) {
         setNexusUser(profile);
