@@ -455,7 +455,7 @@ export const VideoPlayer = ({
             <div className="text-white">
               <h3 className="font-medium text-sm truncate">{video.title}</h3>
               <div className="flex items-center gap-2 text-xs text-white/70">
-                {video.width && video.height && (
+              {video.width && video.height && (
                   <span>{video.width} × {video.height}</span>
                 )}
                 {video.format && (
@@ -466,7 +466,7 @@ export const VideoPlayer = ({
                 )}
                 {video.duration > 0 && (
                   <span>• {formatTime(video.duration)}</span>
-                )}
+              )}
               </div>
             </div>
           </div>

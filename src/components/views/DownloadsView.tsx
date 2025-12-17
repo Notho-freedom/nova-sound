@@ -95,11 +95,11 @@ export const DownloadsView = () => {
 
   // Load uploaded files from localStorage and API
   const loadUploadedFiles = useCallback(async () => {
-    setLoadingUploaded(true);
-    try {
-      // Get user-isolated storage key
-      const userId = await getCurrentUserId();
-      const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+      setLoadingUploaded(true);
+      try {
+        // Get user-isolated storage key
+        const userId = await getCurrentUserId();
+        const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
       
       console.log("[DownloadsView] Loading uploaded files with key:", storageKey, "userId:", userId);
       
@@ -114,9 +114,9 @@ export const DownloadsView = () => {
           console.error("[DownloadsView] Error parsing old key:", e);
         }
       }
-      
-      // Load from localStorage (user-isolated)
-      const saved = localStorage.getItem(storageKey);
+        
+        // Load from localStorage (user-isolated)
+        const saved = localStorage.getItem(storageKey);
       let uploadedMedia: UploadedFile[] = [];
       
       if (saved) {
@@ -171,40 +171,40 @@ export const DownloadsView = () => {
         }
       });
 
-      // Fetch files from Nexus API for local storage files
-      try {
-        const token = await firebaseService.getIdToken();
-        if (token) {
-          const response = await fetch("/api/storage/files", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (response.ok) {
-            const nexusFiles = await response.json();
+        // Fetch files from Nexus API for local storage files
+        try {
+          const token = await firebaseService.getIdToken();
+          if (token) {
+            const response = await fetch("/api/storage/files", {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            if (response.ok) {
+              const nexusFiles = await response.json();
             console.log("[DownloadsView] Fetched from Nexus API:", nexusFiles.length, "files");
             if (nexusFiles.length > 0) {
               console.log("[DownloadsView] Sample Nexus file:", nexusFiles[0]);
             }
-            // Merge with uploadedMedia, avoiding duplicates
-            const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
+              // Merge with uploadedMedia, avoiding duplicates
+              const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
             console.log("[DownloadsView] Looking for matches between localStorage files and Nexus API files");
             console.log("[DownloadsView] localStorage file IDs:", Array.from(nexusFileIds));
             console.log("[DownloadsView] Nexus API file IDs:", nexusFiles.map((f: any) => f.id));
             
-            nexusFiles.forEach((file: any) => {
-              if (!nexusFileIds.has(file.id)) {
-                uploadedMedia.push({
-                  id: file.id,
-                  name: file.name,
-                  uploadedAt: file.uploadedAt,
-                  cloudProvider: "nexus",
-                  url: `/api/storage/download/${file.id}`,
-                  size: file.size,
-                });
-              } else {
-                // Update existing entry with URL if missing
-                const existing = uploadedMedia.find(f => f.id === file.id);
+              nexusFiles.forEach((file: any) => {
+                if (!nexusFileIds.has(file.id)) {
+                  uploadedMedia.push({
+                    id: file.id,
+                    name: file.name,
+                    uploadedAt: file.uploadedAt,
+                    cloudProvider: "nexus",
+                    url: `/api/storage/download/${file.id}`,
+                    size: file.size,
+                  });
+                } else {
+                  // Update existing entry with URL if missing
+                  const existing = uploadedMedia.find(f => f.id === file.id);
                 if (existing) {
                   console.log("[DownloadsView] Found match for file ID:", file.id);
                   if (!existing.url) {
@@ -214,34 +214,34 @@ export const DownloadsView = () => {
                   if (!existing.size && file.size) {
                     existing.size = file.size;
                   }
+                  }
                 }
-              }
-            });
+              });
           } else {
             console.warn("[DownloadsView] Nexus API returned status:", response.status);
-          }
+            }
         } else {
           console.log("[DownloadsView] No Firebase token available, skipping Nexus API fetch");
-        }
-      } catch (error) {
+          }
+        } catch (error) {
         console.error("[DownloadsView] Failed to fetch Nexus files:", error);
-      }
+        }
 
-      // Sort by upload date (newest first)
-      uploadedMedia.sort((a, b) => 
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
+        // Sort by upload date (newest first)
+        uploadedMedia.sort((a, b) => 
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
 
       console.log("[DownloadsView] Final uploaded files count:", uploadedMedia.length);
       if (uploadedMedia.length > 0) {
         console.log("[DownloadsView] Sample file:", uploadedMedia[0]);
       }
-      setUploadedFiles(uploadedMedia);
-    } catch (error) {
+        setUploadedFiles(uploadedMedia);
+      } catch (error) {
       console.error("[DownloadsView] Failed to load uploaded files:", error);
-    } finally {
-      setLoadingUploaded(false);
-    }
+      } finally {
+        setLoadingUploaded(false);
+      }
   }, []);
 
   // Load on mount
@@ -491,7 +491,7 @@ export const DownloadsView = () => {
 
   const refreshUploadedFiles = async () => {
     await loadUploadedFiles();
-    toast.success("Fichiers uploadés actualisés");
+      toast.success("Fichiers uploadés actualisés");
   };
 
   // Group uploaded files by provider
@@ -536,29 +536,29 @@ export const DownloadsView = () => {
         <TabsList className="mb-6 bg-muted/30">
           <TabsTrigger value="downloads" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
             <Download className="w-4 h-4" />
-            Téléchargements ({downloads.length})
+          Téléchargements ({downloads.length})
           </TabsTrigger>
           <TabsTrigger value="uploaded" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
             <Cloud className="w-4 h-4" />
-            Fichiers Uploadés ({uploadedFiles.length})
+          Fichiers Uploadés ({uploadedFiles.length})
           </TabsTrigger>
         </TabsList>
 
         {/* Downloads Tab Content */}
         <TabsContent value="downloads" className="flex-1 overflow-y-auto mt-0">
         <>
-          {/* Actions */}
-          {completedDownloads.length > 0 && (
-            <div className="mb-4 flex justify-end">
-              <Button variant="outline" size="sm" onClick={clearCompleted}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Supprimer les terminés
-              </Button>
-            </div>
-          )}
+      {/* Actions */}
+      {completedDownloads.length > 0 && (
+        <div className="mb-4 flex justify-end">
+          <Button variant="outline" size="sm" onClick={clearCompleted}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer les terminés
+          </Button>
+        </div>
+      )}
 
-          {/* Active Downloads */}
-          {activeDownloads.length > 0 && (
+      {/* Active Downloads */}
+      {activeDownloads.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
             En cours ({activeDownloads.length})
@@ -622,128 +622,128 @@ export const DownloadsView = () => {
         </div>
       )}
 
-          {/* Completed Downloads */}
-          {completedDownloads.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
-                Terminés ({completedDownloads.length})
-              </h2>
-              <div className="space-y-2">
-                {completedDownloads.map((download) => (
-                  <div
-                    key={download.id}
-                    className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        {getFileIcon(download.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate text-foreground">
-                          {download.filename}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <CheckCircle2 className="w-3 h-3 text-green-500" />
+      {/* Completed Downloads */}
+      {completedDownloads.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
+            Terminés ({completedDownloads.length})
+          </h2>
+          <div className="space-y-2">
+            {completedDownloads.map((download) => (
+              <div
+                key={download.id}
+                className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    {getFileIcon(download.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-foreground">
+                      {download.filename}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      <span className="text-xs text-muted-foreground">
+                        {download.completedAt
+                          ? formatDuration(download.completedAt)
+                          : "Terminé"}
+                      </span>
+                      {download.size > 0 && (
+                        <>
+                          <span className="text-xs text-muted-foreground">•</span>
                           <span className="text-xs text-muted-foreground">
-                            {download.completedAt
-                              ? formatDuration(download.completedAt)
-                              : "Terminé"}
+                            {formatFileSize(download.size)}
                           </span>
-                          {download.size > 0 && (
-                            <>
-                              <span className="text-xs text-muted-foreground">•</span>
-                              <span className="text-xs text-muted-foreground">
-                                {formatFileSize(download.size)}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              const a = document.createElement("a");
-                              a.href = download.url;
-                              a.download = download.filename;
-                              a.click();
-                            }}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Télécharger à nouveau
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => removeDownload(download.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Supprimer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        </>
+                      )}
                     </div>
                   </div>
-                ))}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = download.url;
+                          a.download = download.filename;
+                          a.click();
+                        }}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Télécharger à nouveau
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => removeDownload(download.id)}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+      )}
 
-          {/* Failed Downloads */}
-          {failedDownloads.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
-                Échecs ({failedDownloads.length})
-              </h2>
-              <div className="space-y-2">
-                {failedDownloads.map((download) => (
-                  <div
-                    key={download.id}
-                    className="p-4 rounded-lg bg-card border border-destructive/30"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                        <XCircle className="w-5 h-5 text-destructive" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate text-foreground">
-                          {download.filename}
-                        </p>
-                        <p className="text-xs text-destructive mt-1">
-                          {download.error || "Erreur inconnue"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
+      {/* Failed Downloads */}
+      {failedDownloads.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
+            Échecs ({failedDownloads.length})
+          </h2>
+          <div className="space-y-2">
+            {failedDownloads.map((download) => (
+              <div
+                key={download.id}
+                className="p-4 rounded-lg bg-card border border-destructive/30"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                    <XCircle className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate text-foreground">
+                      {download.filename}
+                    </p>
+                    <p className="text-xs text-destructive mt-1">
+                      {download.error || "Erreur inconnue"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
                           onClick={() => {
                             removeDownload(download.id);
                             startDownload(download.url, download.filename);
                           }}
-                        >
+                    >
                           <Download className="w-4 h-4 mr-2" />
-                          Réessayer
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDownload(download.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                      Réessayer
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeDownload(download.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
+      )}
 
           {/* Empty State for Downloads */}
           {downloads.length === 0 && (
@@ -751,13 +751,13 @@ export const DownloadsView = () => {
               <div className="text-center max-w-md">
                 <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4 mx-auto">
                   <Download className="w-10 h-10 text-muted-foreground" />
-                </div>
+                  </div>
                 <h3 className="text-lg font-medium mb-2">Aucun téléchargement</h3>
                 <p className="text-muted-foreground text-sm">
                   Vos téléchargements de fichiers apparaîtront ici. Utilisez le menu contextuel
                   sur les fichiers pour les télécharger.
-                </p>
-              </div>
+                    </p>
+                  </div>
             </div>
           )}
         </>
@@ -767,16 +767,16 @@ export const DownloadsView = () => {
         <TabsContent value="uploaded" className="flex-1 flex flex-col overflow-hidden mt-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Fichiers Uploadés</h2>
-            <Button
+                  <Button
               variant="outline"
-              size="sm"
+                    size="sm"
               onClick={refreshUploadedFiles}
               disabled={loadingUploaded}
-            >
+                  >
               <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "animate-spin")} />
               Actualiser
-            </Button>
-          </div>
+                  </Button>
+                </div>
 
           {loadingUploaded ? (
             <div className="flex-1 flex items-center justify-center">
@@ -800,7 +800,7 @@ export const DownloadsView = () => {
           ) : (() => {
             // Get providers that have files
             const providersWithFiles = providerOrder.filter(provider => {
-              const files = filesByProvider[provider] || [];
+                const files = filesByProvider[provider] || [];
               return files.length > 0;
             });
 
@@ -831,27 +831,27 @@ export const DownloadsView = () => {
                     <tbody>
                       {files.map((file) => {
                         const fileType = getFileType(file.name);
-                        return (
+                return (
                           <tr
-                            key={file.id}
+                          key={file.id}
                             className="group cursor-pointer transition-all duration-200 ease-out hover:bg-muted/40 active:bg-muted/50"
-                          >
+                        >
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                                   {getFileIcon(fileType)}
-                                </div>
+                            </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium truncate text-foreground">
-                                    {file.name}
-                                  </p>
-                                  <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm font-medium truncate text-foreground">
+                                {file.name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
                                     {getProviderIcon(file.cloudProvider)}
-                                    <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-muted-foreground">
                                       {getProviderName(file.cloudProvider)}
-                                    </span>
-                                  </div>
-                                </div>
+                                </span>
+                              </div>
+                            </div>
                               </div>
                             </td>
                             <td className="px-4 py-3 hidden md:table-cell">
@@ -871,82 +871,82 @@ export const DownloadsView = () => {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                {file.url && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
+                              {file.url && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       startDownload(file.url!, file.name);
                                     }}
-                                  >
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Télécharger
-                                  </Button>
-                                )}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Télécharger
+                                </Button>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
                                     <Button 
                                       variant="ghost" 
                                       size="sm"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {file.url && (
-                                      <>
-                                        <DropdownMenuItem
-                                          onClick={() => {
-                                            const a = document.createElement("a");
-                                            a.href = file.url!;
-                                            a.download = file.name;
-                                            a.click();
-                                          }}
-                                        >
-                                          <Download className="w-4 h-4 mr-2" />
-                                          Télécharger directement
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                      </>
-                                    )}
-                                    <DropdownMenuItem
-                                      onClick={async () => {
-                                        const updated = uploadedFiles.filter(f => f.id !== file.id);
-                                        setUploadedFiles(updated);
-                                        
-                                        // Get user-isolated storage key
-                                        const userId = await getCurrentUserId();
-                                        const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
-                                        localStorage.setItem(storageKey, JSON.stringify(updated));
-                                        
-                                        // Sync to Firebase if available
-                                        try {
-                                          const { firebaseSyncService } = await import('@/services/firebase-sync');
-                                          firebaseSyncService.queueSync('uploadedMedia', updated);
-                                        } catch (error) {
-                                          // Silently fail if Firebase sync is not available
-                                        }
-                                        
-                                        toast.success("Fichier supprimé de la liste");
-                                      }}
-                                      className="text-destructive"
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Supprimer de la liste
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {file.url && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const a = document.createElement("a");
+                                          a.href = file.url!;
+                                          a.download = file.name;
+                                          a.click();
+                                        }}
+                                      >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Télécharger directement
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      const updated = uploadedFiles.filter(f => f.id !== file.id);
+                                      setUploadedFiles(updated);
+                                      
+                                      // Get user-isolated storage key
+                                      const userId = await getCurrentUserId();
+                                      const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+                                      localStorage.setItem(storageKey, JSON.stringify(updated));
+                                      
+                                      // Sync to Firebase if available
+                                      try {
+                                        const { firebaseSyncService } = await import('@/services/firebase-sync');
+                                        firebaseSyncService.queueSync('uploadedMedia', updated);
+                                      } catch (error) {
+                                        // Silently fail if Firebase sync is not available
+                                      }
+                                      
+                                      toast.success("Fichier supprimé de la liste");
+                                    }}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Supprimer de la liste
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                </div>
-              </div>
+                          </div>
+                        </div>
             );
 
             // If only one provider, show it directly without tabs
@@ -956,7 +956,7 @@ export const DownloadsView = () => {
               return (
                 <div className="flex-1 overflow-hidden">
                   {renderFileTable(files)}
-                </div>
+                  </div>
               );
             }
 
@@ -975,8 +975,8 @@ export const DownloadsView = () => {
                         {getProviderIcon(provider as any)}
                         {getProviderName(provider as any)} ({files.length})
                       </TabsTrigger>
-                    );
-                  })}
+                );
+              })}
                 </TabsList>
 
                 {providersWithFiles.map((provider) => {
