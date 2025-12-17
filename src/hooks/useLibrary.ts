@@ -19,8 +19,8 @@ export function useLibrary(): UseLibraryReturn {
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if running in Electron
-  const isElectron = !!window.electronAPI;
+  // Check if running in Electron - use reliable detection
+  const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
   // Load library on mount
   useEffect(() => {
@@ -34,7 +34,12 @@ export function useLibrary(): UseLibraryReturn {
       }
 
       try {
-        const library = await window.electronAPI!.getLibrary();
+        if (!window.electronAPI) {
+          setTracks([]);
+          setLoading(false);
+          return;
+        }
+        const library = await window.electronAPI.getLibrary();
         // Remove duplicates by ID (additional safety check)
         const uniqueTracks = library.filter((track, index, self) => 
           index === self.findIndex(t => t.id === track.id)
@@ -53,15 +58,15 @@ export function useLibrary(): UseLibraryReturn {
 
   // Listen for scan progress
   useEffect(() => {
-    if (!isElectron) return;
+    if (!isElectron || !window.electronAPI) return;
 
-    const unsubscribe = window.electronAPI!.onScanProgress((progress) => {
+    const unsubscribe = window.electronAPI.onScanProgress((progress) => {
       setScanProgress(progress);
       if (progress.phase === "complete") {
         setScanning(false);
         setScanProgress(null);
         // Final reload to ensure everything is synced
-        window.electronAPI!.getLibrary().then((library) => {
+        window.electronAPI?.getLibrary().then((library) => {
           // Additional safety check to remove duplicates
           const uniqueTracks = library.filter((track, index, self) => 
             index === self.findIndex(t => t.id === track.id)
@@ -113,10 +118,10 @@ export function useLibrary(): UseLibraryReturn {
 
   // Select music folders
   const selectMusicFolders = useCallback(async (): Promise<string[]> => {
-    if (!isElectron) return [];
+    if (!isElectron || !window.electronAPI) return [];
 
     try {
-      const folders = await window.electronAPI!.openDirectory();
+      const folders = await window.electronAPI.openDirectory();
       return folders;
     } catch (err) {
       console.error("Failed to select folders:", err);
@@ -140,9 +145,15 @@ export function useLibrary(): UseLibraryReturn {
     try {
       let foldersToScan = directories;
 
+      if (!window.electronAPI) {
+        setScanning(false);
+        setScanProgress(null);
+        return;
+      }
+
       if (!foldersToScan || foldersToScan.length === 0) {
         // Get folders from settings
-        const settings = await window.electronAPI!.getSettings();
+        const settings = await window.electronAPI.getSettings();
         foldersToScan = settings.musicDirectories;
       }
 
@@ -151,14 +162,14 @@ export function useLibrary(): UseLibraryReturn {
         foldersToScan = await selectMusicFolders();
         if (foldersToScan.length > 0) {
           // Save selected folders to settings
-          await window.electronAPI!.updateSettings({
+          await window.electronAPI.updateSettings({
             musicDirectories: foldersToScan,
           });
         }
       }
 
       if (foldersToScan.length > 0) {
-        await window.electronAPI!.scanLibrary(foldersToScan);
+        await window.electronAPI.scanLibrary(foldersToScan);
       } else {
         setScanning(false);
         setScanProgress(null);
@@ -173,11 +184,11 @@ export function useLibrary(): UseLibraryReturn {
 
   // Refresh library
   const refreshLibrary = useCallback(async () => {
-    if (!isElectron) return;
+    if (!isElectron || !window.electronAPI) return;
 
     setLoading(true);
     try {
-      const library = await window.electronAPI!.getLibrary();
+      const library = await window.electronAPI.getLibrary();
       // Remove duplicates by ID (additional safety check)
       const uniqueTracks = library.filter((track, index, self) => 
         index === self.findIndex(t => t.id === track.id)

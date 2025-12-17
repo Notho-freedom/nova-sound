@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCloudSync } from "@/hooks/useCloudSync";
-import { cn } from "@/lib/utils";
+import { isElectron, getElectronAPI } from "@/lib/electron-detector";
 
 interface TitleBarProps {
   title?: string;
@@ -29,28 +29,32 @@ export const TitleBar = ({
   onToggleNotifications
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isElectron, setIsElectron] = useState(false);
+  // Utiliser la détection centralisée et fiable
+  const electronEnv = isElectron();
+  const electronAPI = getElectronAPI();
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync();
-
-  useEffect(() => {
-    setIsElectron(!!window.electronAPI);
-  }, []);
 
   const handleLogout = async () => {
     await nexusLogout();
   };
 
   const handleMinimize = async () => {
-    await window.electronAPI?.minimize();
+    if (electronAPI) {
+      await electronAPI.minimize();
+    }
   };
 
   const handleMaximize = async () => {
-    await window.electronAPI?.maximize();
-    setIsMaximized(!isMaximized);
+    if (electronAPI) {
+      await electronAPI.maximize();
+      setIsMaximized(!isMaximized);
+    }
   };
 
   const handleClose = async () => {
-    await window.electronAPI?.close();
+    if (electronAPI) {
+      await electronAPI.close();
+    }
   };
 
   return (
@@ -79,7 +83,7 @@ export const TitleBar = ({
           </span>
           <span className="text-[10px] text-muted-foreground ml-1">
             v1.0.0
-            {!isElectron && (
+            {!electronEnv && (
               <span className="ml-2 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[9px]">
                 WEB
               </span>
@@ -239,6 +243,7 @@ export const TitleBar = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    title="Fermer"
                     onClick={handleClose}
                     className="w-8 h-7 flex items-center justify-center rounded hover:bg-destructive/80 transition-all duration-200 ease-out active:scale-95 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:ring-offset-2"
                   >
@@ -253,7 +258,7 @@ export const TitleBar = ({
           )}
 
           {/* Web version indicator */}
-          {!isElectron && (
+          {!electronEnv && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground ml-2">
               <span className="hidden sm:inline">Lecteur Multimédia</span>
             </div>

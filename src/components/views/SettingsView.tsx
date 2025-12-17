@@ -102,7 +102,8 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
   const [patterns, setPatterns] = useState<DetectedGroup[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [showPatterns, setShowPatterns] = useState(false);
-  const isElectron = typeof window !== 'undefined' && window.electronAPI;
+  // Use centralized Electron detection
+  const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
   const unknownTracks = tracks.filter(t => t.artist === 'Artiste inconnu' || t.album === 'Album inconnu');
 
@@ -392,7 +393,7 @@ export const SettingsView = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [bunnyStatus, setBunnyStatus] = useState<{ configured: boolean; message?: string } | null>(null);
   const [bunnyStatusLoading, setBunnyStatusLoading] = useState(false);
-  const isElectron = !!window.electronAPI;
+  // Reuse isElectron already defined above (line 106)
 
   // Load Bunny status when user is Pro
   useEffect(() => {

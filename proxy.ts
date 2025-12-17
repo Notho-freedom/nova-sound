@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Middleware pour optimiser les rechargements et le cache
+ * Proxy pour optimiser les rechargements et le cache
  * Empêche les recompilations inutiles pour certaines routes
+ * 
+ * Note: Le proxy fonctionne uniquement dans le runtime Node.js
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const response = NextResponse.next();
   
   // Empêcher les rechargements inutiles pour certaines routes
@@ -33,4 +35,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
-

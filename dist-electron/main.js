@@ -129,6 +129,7 @@ function createWindow() {
         titleBarStyle: 'hidden',
         backgroundColor: '#00000000',
         icon: path.join(__dirname, '../public/favicon.ico'),
+        show: true, // Explicitly show the window
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
@@ -150,6 +151,25 @@ function createWindow() {
         const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
         mainWindow.loadURL(vercelUrl);
     }
+    // Ensure window is shown after loading
+    mainWindow.once('ready-to-show', () => {
+        if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+            // Bring window to front
+            if (process.platform === 'win32') {
+                mainWindow.setAlwaysOnTop(true);
+                mainWindow.setAlwaysOnTop(false);
+            }
+        }
+    });
+    // Fallback: Show window after a short delay if still not visible
+    setTimeout(() => {
+        if (mainWindow && !mainWindow.isVisible()) {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+    }, 1000);
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
@@ -654,6 +674,11 @@ app.whenReady().then(async () => {
     await storage.init();
     await initServices();
     createWindow();
+    // Ensure window is visible and focused
+    if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+    }
     // Handle files passed as arguments on first launch
     handleFileArgs();
     // Handle pending files (files passed before window was ready)

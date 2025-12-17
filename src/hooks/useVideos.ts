@@ -21,8 +21,8 @@ export function useVideos(): UseVideosReturn {
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if running in Electron
-  const isElectron = !!window.electronAPI;
+  // Check if running in Electron using centralized detector
+  const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
   // Load videos on mount
   useEffect(() => {
@@ -34,7 +34,12 @@ export function useVideos(): UseVideosReturn {
       }
 
       try {
-        const videoLibrary = await window.electronAPI!.getVideos();
+        if (!window.electronAPI) {
+          setVideos([]);
+          setLoading(false);
+          return;
+        }
+        const videoLibrary = await window.electronAPI.getVideos();
         console.log("Loaded videos from Electron:", videoLibrary);
         // Log thumbnail status for debugging
         const videosWithThumbs = videoLibrary?.filter(v => v.thumbnailUrl) || [];

@@ -19,7 +19,8 @@ export function usePlaylists(): UsePlaylistsReturn {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isElectron = !!window.electronAPI;
+  // Check if running in Electron - use reliable detection
+  const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
   // Load playlists on mount and listen to Firebase sync updates
   useEffect(() => {
@@ -35,7 +36,12 @@ export function usePlaylists(): UsePlaylistsReturn {
       }
 
       try {
-        const lists = await window.electronAPI!.getPlaylists();
+        if (!window.electronAPI) {
+          setPlaylists([]);
+          setLoading(false);
+          return;
+        }
+        const lists = await window.electronAPI.getPlaylists();
         setPlaylists(lists);
       } catch (err) {
         console.error("Failed to load playlists:", err);
@@ -71,9 +77,11 @@ export function usePlaylists(): UsePlaylistsReturn {
       try {
         let playlist: Playlist | null = null;
         
-        if (isElectron) {
-          playlist = await window.electronAPI!.createPlaylist(name, trackIds);
-          setPlaylists((prev) => [...prev, playlist!]);
+        if (isElectron && window.electronAPI) {
+          playlist = await window.electronAPI.createPlaylist(name, trackIds);
+          if (playlist) {
+            setPlaylists((prev) => [...prev, playlist]);
+          }
         } else {
           // Web mode
           playlist = {
@@ -156,8 +164,8 @@ export function usePlaylists(): UsePlaylistsReturn {
     async (id: string) => {
       try {
         const playlistToDelete = playlists.find((p) => p.id === id);
-        if (isElectron) {
-          await window.electronAPI!.deletePlaylist(id);
+        if (isElectron && window.electronAPI) {
+          await window.electronAPI.deletePlaylist(id);
         }
         const updatedPlaylists = playlists.filter((p) => p.id !== id);
         setPlaylists(updatedPlaylists);
@@ -230,8 +238,10 @@ export function usePlaylists(): UsePlaylistsReturn {
     async (playlistId: string, format: "m3u" | "pls") => {
       if (!isElectron) return;
 
+      if (!window.electronAPI) return;
+      
       try {
-        await window.electronAPI!.exportPlaylist(playlistId, format);
+        await window.electronAPI.exportPlaylist(playlistId, format);
       } catch (err) {
         console.error("Failed to export playlist:", err);
       }
@@ -242,9 +252,11 @@ export function usePlaylists(): UsePlaylistsReturn {
   const refreshPlaylists = useCallback(async () => {
     if (!isElectron) return;
 
+    if (!isElectron || !window.electronAPI) return;
+
     setLoading(true);
     try {
-      const lists = await window.electronAPI!.getPlaylists();
+      const lists = await window.electronAPI.getPlaylists();
       setPlaylists(lists);
     } catch (err) {
       console.error("Failed to refresh playlists:", err);

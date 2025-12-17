@@ -199,7 +199,8 @@ export const VideoPlayer = ({
 
   const getVideoSource = (video: Video): string => {
     if (!video.filePath) return "";
-    const isElectron = !!window.electronAPI;
+    // Check if running in Electron - use reliable detection
+    const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
     if (isElectron) {
       return `local-video://${encodeURIComponent(video.filePath)}`;
     }

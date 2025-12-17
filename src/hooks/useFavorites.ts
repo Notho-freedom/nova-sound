@@ -13,7 +13,8 @@ export function useFavorites(): UseFavoritesReturn {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isElectron = !!window.electronAPI;
+  // Check if running in Electron - use reliable detection
+  const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
   // Load favorites on mount
   useEffect(() => {
@@ -29,7 +30,12 @@ export function useFavorites(): UseFavoritesReturn {
       }
 
       try {
-        const favs = await window.electronAPI!.getFavorites();
+        if (!window.electronAPI) {
+          setFavorites([]);
+          setLoading(false);
+          return;
+        }
+        const favs = await window.electronAPI.getFavorites();
         setFavorites(favs);
       } catch (err) {
         console.error("Failed to load favorites:", err);
@@ -61,8 +67,8 @@ export function useFavorites(): UseFavoritesReturn {
 
       const newFavorites = [...favorites, trackId];
       
-      if (isElectron) {
-        await window.electronAPI!.addFavorite(trackId);
+      if (isElectron && window.electronAPI) {
+        await window.electronAPI.addFavorite(trackId);
       }
       setFavorites(newFavorites);
       
@@ -83,8 +89,8 @@ export function useFavorites(): UseFavoritesReturn {
 
       const newFavorites = favorites.filter((id) => id !== trackId);
       
-      if (isElectron) {
-        await window.electronAPI!.removeFavorite(trackId);
+      if (isElectron && window.electronAPI) {
+        await window.electronAPI.removeFavorite(trackId);
       }
       setFavorites(newFavorites);
       
