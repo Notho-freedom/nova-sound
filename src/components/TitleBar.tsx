@@ -203,12 +203,12 @@ export const TitleBar = ({
           </Tooltip>
 
           {/* Separator */}
-          {isElectron && (
+          {electronEnv && (
             <div className="w-px h-4 bg-border mx-1" />
           )}
 
           {/* Window Controls - Only show in Electron */}
-          {isElectron && (
+          {electronEnv && (
             <>
               <Tooltip>
                 <TooltipTrigger asChild>
