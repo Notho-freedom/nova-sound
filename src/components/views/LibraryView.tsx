@@ -480,33 +480,35 @@ export const LibraryView = ({
   if (viewMode === "albums" && !selectedAlbum) {
     return (
       <div className="h-full flex flex-col animate-in fade-in duration-200">
-        <PageHeader
-          title={title}
-          subtitle={`${filteredAndSortedAlbums.length} album${filteredAndSortedAlbums.length > 1 ? "s" : ""} • ${tracks.length} titre${tracks.length > 1 ? "s" : ""}`}
-          rightContent={
-            <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setAlbumsViewMode(albumsViewMode === "grid" ? "list" : "grid")}
-                    className="h-9 w-9"
-                  >
-                    {albumsViewMode === "grid" ? (
-                      <List className="h-4 w-4" />
-                    ) : (
-                      <Grid className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {albumsViewMode === "grid" ? "Vue liste" : "Vue grille"}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          }
-        />
+        <div className="px-6 pt-4">
+          <PageHeader
+            title={title}
+            subtitle={`${filteredAndSortedAlbums.length} album${filteredAndSortedAlbums.length > 1 ? "s" : ""} • ${tracks.length} titre${tracks.length > 1 ? "s" : ""}`}
+            rightContent={
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setAlbumsViewMode(albumsViewMode === "grid" ? "list" : "grid")}
+                      className="h-9 w-9"
+                    >
+                      {albumsViewMode === "grid" ? (
+                        <List className="h-4 w-4" />
+                      ) : (
+                        <Grid className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {albumsViewMode === "grid" ? "Vue liste" : "Vue grille"}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            }
+          />
+        </div>
 
         {/* Filters and Search */}
         <div className="px-6 py-4 border-b bg-muted/30 space-y-4">
