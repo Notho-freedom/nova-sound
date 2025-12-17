@@ -164,7 +164,31 @@ export const VideoCarousel = ({
                       alt={video.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        // Hide image and show fallback icon if thumbnail fails to load
+                        // If thumbnail fails to load, try default cover, then show icon
+                        const target = e.target as HTMLImageElement;
+                        const currentSrc = target.src;
+                        
+                        // If not already trying default, try it
+                        if (!currentSrc.includes('album-cover-1.jpg')) {
+                          target.src = '/album-cover-1.jpg';
+                          return;
+                        }
+                        
+                        // If default also failed, show icon
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.style.display = 'flex';
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src="/album-cover-1.jpg"
+                      alt={video.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Hide image and show fallback icon if default also fails
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
                         const fallback = target.nextElementSibling as HTMLElement;
@@ -173,13 +197,10 @@ export const VideoCarousel = ({
                         }
                       }}
                     />
-                  ) : null}
+                  )}
                   <div 
-                    className={cn(
-                      "w-full h-full bg-muted flex items-center justify-center",
-                      (video.thumbnailUrl || video.posterUrl) ? "hidden" : ""
-                    )}
-                    style={{ display: (video.thumbnailUrl || video.posterUrl) ? 'none' : 'flex' }}
+                    className="w-full h-full bg-muted flex items-center justify-center hidden"
+                    style={{ display: 'none' }}
                   >
                     <Film className="w-12 h-12 text-muted-foreground" />
                   </div>
