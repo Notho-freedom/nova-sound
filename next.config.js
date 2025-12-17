@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  poweredByHeader: false, // Désactiver le badge "X-Powered-By: Next.js"
   images: {
     remotePatterns: [
       {
