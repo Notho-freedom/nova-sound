@@ -10,6 +10,7 @@ import {
   onIdTokenChanged,
   signInAnonymously as firebaseSignInAnonymously,
   linkWithCredential,
+  signInWithCredential,
   OAuthCredential,
   User,
   Auth,
@@ -512,9 +513,37 @@ class FirebaseService {
       
       if (authError.code === "auth/credential-already-in-use") {
         // This means the Google account is already linked to another Firebase user
-        // We should sign in to that existing account instead
-        console.log("🔍 Google account already in use, attempting to sign in to existing account");
-        throw new Error("Ce compte Google est déjà utilisé. Veuillez vous connecter avec ce compte.");
+        // Sign in to that existing account instead of throwing an error
+        console.log("🔍 Google account already in use, signing in to existing account...");
+        
+        try {
+          // Sign in with the Google credential to the existing account
+          const credential = GoogleAuthProvider.credential(idToken, accessToken);
+          const userCredential = await signInWithCredential(auth!, credential);
+          const user = userCredential.user;
+          
+          console.log("✅ Signed in to existing Google account:", user.uid);
+          
+          // Update internal reference
+          this.currentUser = user;
+          
+          // Load or create profile for this user
+          await this.loadUserProfile(user.uid);
+          
+          // Notify listeners with the signed-in user
+          this.authStateListeners.forEach((listener) => listener(user));
+          
+          if (!this.userProfile) {
+            // Create profile if it doesn't exist
+            await this.createOrUpdateProfile(user, googleUserData);
+          }
+          
+          console.log("✅ Successfully switched to existing Google account");
+          return this.userProfile!;
+        } catch (signInError: unknown) {
+          console.error("Error signing in to existing account:", signInError);
+          throw new Error("Impossible de se connecter au compte existant. Veuillez réessayer.");
+        }
       } else if (authError.code === "auth/email-already-in-use") {
         throw new Error("Cet email est déjà utilisé par un autre compte.");
       }
@@ -545,16 +574,24 @@ class FirebaseService {
     } catch (error: unknown) {
       const firestoreError = error as { code?: string; message?: string };
       
-      // Handle offline errors gracefully
+      // Handle offline/network errors gracefully
       if (firestoreError.code === 'unavailable' || 
           firestoreError.code === 'failed-precondition' ||
           firestoreError.message?.includes('offline') ||
           firestoreError.message?.includes('network')) {
-        console.warn("⚠️ Firestore query failed (likely network issue), returning null");
+        console.warn("⚠️ Firestore query failed (network issue), returning null");
         return null;
       }
       
-      console.error("Error finding user by email:", error);
+      // Handle permission errors gracefully (Firestore rules may not allow query by email)
+      if (firestoreError.code === 'permission-denied' ||
+          firestoreError.message?.includes('permission') ||
+          firestoreError.message?.includes('Missing or insufficient permissions')) {
+        console.warn("⚠️ Firestore permission denied for email query - this is normal if rules restrict queries");
+        return null;
+      }
+      
+      console.warn("⚠️ Firestore query error:", firestoreError.message || error);
       // Don't throw - return null to allow graceful fallback
       return null;
     }
@@ -672,15 +709,26 @@ class FirebaseService {
         console.warn("⚠️ Firestore load failed (network issue), creating local profile");
         // Create profile from current user data if no profile exists
         if (!this.userProfile) {
-          await this.createOrUpdateProfileOffline(this.currentUser);
+          this.createOrUpdateProfileOffline(this.currentUser);
         }
         return;
       }
       
-      console.error("Error loading user profile:", error);
+      // Handle permission errors gracefully
+      if (firestoreError.code === 'permission-denied' ||
+          firestoreError.message?.includes('permission') ||
+          firestoreError.message?.includes('Missing or insufficient permissions')) {
+        console.warn("⚠️ Firestore permission denied, creating local profile - check Firestore rules");
+        if (!this.userProfile) {
+          this.createOrUpdateProfileOffline(this.currentUser);
+        }
+        return;
+      }
+      
+      console.warn("⚠️ Error loading user profile:", firestoreError.message || error);
       // Don't throw - create local profile as fallback
       if (!this.userProfile) {
-        await this.createOrUpdateProfileOffline(this.currentUser);
+        this.createOrUpdateProfileOffline(this.currentUser);
       }
     }
   }
@@ -746,8 +794,16 @@ class FirebaseService {
         return this.createOrUpdateProfileOffline(user, googleUserData);
       }
       
+      // Handle permission errors gracefully
+      if (firestoreError.code === 'permission-denied' ||
+          firestoreError.message?.includes('permission') ||
+          firestoreError.message?.includes('Missing or insufficient permissions')) {
+        console.warn("⚠️ Firestore permission denied, creating local profile - check Firestore rules");
+        return this.createOrUpdateProfileOffline(user, googleUserData);
+      }
+      
       // For other errors, log and create local profile
-      console.error("Error getting profile from Firestore:", error);
+      console.warn("⚠️ Error getting profile from Firestore:", firestoreError.message || error);
       return this.createOrUpdateProfileOffline(user, googleUserData);
     }
 
@@ -802,8 +858,20 @@ class FirebaseService {
           return this.userProfile;
         }
         
+        // Handle permission errors gracefully
+        if (firestoreError.code === 'permission-denied' ||
+            firestoreError.message?.includes('permission') ||
+            firestoreError.message?.includes('Missing or insufficient permissions')) {
+          console.warn("⚠️ Firestore permission denied for update, using in-memory profile");
+          this.userProfile = {
+            ...existingProfile,
+            ...cleanedProfile,
+          };
+          return this.userProfile;
+        }
+        
         // For other errors, log and use in-memory profile as fallback
-        console.error("Error updating profile in Firestore:", error);
+        console.warn("⚠️ Error updating profile in Firestore:", firestoreError.message || error);
         this.userProfile = {
           ...existingProfile,
           ...cleanedProfile,
@@ -841,8 +909,17 @@ class FirebaseService {
           return this.userProfile;
         }
         
+        // Handle permission errors gracefully
+        if (firestoreError.code === 'permission-denied' ||
+            firestoreError.message?.includes('permission') ||
+            firestoreError.message?.includes('Missing or insufficient permissions')) {
+          console.warn("⚠️ Firestore permission denied for create, using in-memory profile - check Firestore rules");
+          this.userProfile = newProfile;
+          return this.userProfile;
+        }
+        
         // For other errors, log and use in-memory profile as fallback
-        console.error("Error creating profile in Firestore:", error);
+        console.warn("⚠️ Error creating profile in Firestore:", firestoreError.message || error);
         this.userProfile = newProfile;
         return this.userProfile;
       }
@@ -920,5 +997,30 @@ class FirebaseService {
 }
 
 export const firebaseService = new FirebaseService();
+
+// Dynamic getter for Firestore instance (to handle async initialization)
+export function getDb(): Firestore | null {
+  return db;
+}
+
+// Dynamic getter for Auth instance
+export function getAuthInstance(): Auth | null {
+  return auth;
+}
+
+// Dynamic getter for Firebase App instance
+export function getFirebaseApp(): FirebaseApp | null {
+  return app;
+}
+
+// Wait for Firebase to be initialized
+export async function waitForFirebase(): Promise<{ app: FirebaseApp; auth: Auth; db: Firestore } | null> {
+  await firebaseService.ensureInitialized();
+  if (app && auth && db) {
+    return { app, auth, db };
+  }
+  return null;
+}
+
 export { auth, db, app as firebaseApp };
 

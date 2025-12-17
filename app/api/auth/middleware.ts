@@ -90,7 +90,14 @@ export async function verifyAuth(request: NextRequest): Promise<{ userId: string
 
     // Try to verify as access token
     try {
-      const response = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`, {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const userInfo = await response.json() as { id?: string; sub?: string; email?: string };
@@ -102,8 +109,15 @@ export async function verifyAuth(request: NextRequest): Promise<{ userId: string
         const errorText = await response.text();
         console.error('Access token verification failed:', response.status, errorText);
       }
-    } catch (accessTokenError) {
-      console.error('Error verifying access token:', accessTokenError);
+    } catch (accessTokenError: unknown) {
+      const err = accessTokenError as { code?: string; cause?: { code?: string } };
+      // Only log if it's not a network/timeout error (these are expected during connectivity issues)
+      if (err.code !== 'ENOTFOUND' && err.cause?.code !== 'ENOTFOUND' && 
+          err.code !== 'ABORT_ERR' && err.code !== 'ETIMEDOUT') {
+        console.error('Error verifying access token:', accessTokenError);
+      } else {
+        console.warn('⚠️ Network issue verifying access token (this is normal during connectivity issues)');
+      }
     }
     
     return null;

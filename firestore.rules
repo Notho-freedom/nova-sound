@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection - users can read/write their own profile
+    match /users/{userId} {
+      // Allow read/write if the user is authenticated and accessing their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Also allow anonymous users to read/write their own document
+      allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous' && request.auth.uid == userId;
+      
+      // Allow collection queries by email for account linking
+      // This allows findUserByEmail to work for authenticated users
+      // Only matches if: user is authenticated AND (it's their own doc OR the doc's email matches their email)
+      allow read: if request.auth != null 
+        && (request.auth.uid == userId 
+            || resource.data.email == request.auth.token.email);
+    }
+    
+    // AppData subcollection under users - for Firebase sync
+    match /users/{userId}/appData/{dataId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Playlists subcollection under users
+    match /users/{userId}/playlists/{playlistId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Sync data - users can only access their own sync data
+    match /sync/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /sync/{userId}/tracks/{trackId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /sync/{userId}/playlists/{playlistId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Settings - users can only access their own settings
+    match /settings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User preferences
+    match /preferences/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Default: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

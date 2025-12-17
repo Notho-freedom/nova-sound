@@ -11,9 +11,10 @@ import {
   where,
   getDocs,
   Timestamp,
-  serverTimestamp
+  serverTimestamp,
+  Firestore
 } from 'firebase/firestore';
-import { firebaseApp, db as sharedDb } from './firebase';
+import { getDb, getFirebaseApp, waitForFirebase } from './firebase';
 import type { 
   Settings, 
   Playlist, 
@@ -22,16 +23,31 @@ import type {
 } from '../types/music';
 import { getUserStorageKeySync } from '../lib/storage-utils';
 
-// Use the shared Firestore instance from firebase.ts to avoid multiple instances
-let db: ReturnType<typeof getFirestore> | null = sharedDb || null;
-
-// If shared instance is not available, initialize one
-if (!db && firebaseApp) {
-  try {
-    db = getFirestore(firebaseApp);
-  } catch (error) {
-    console.error('Error initializing Firestore for sync:', error);
+// Helper function to get Firestore instance dynamically
+// This handles the async initialization of Firebase
+function getFirestoreInstance(): Firestore | null {
+  // First try to get from the shared firebase.ts module
+  const sharedDb = getDb();
+  if (sharedDb) {
+    return sharedDb;
   }
+  
+  // Fallback: try to initialize from firebase app
+  const app = getFirebaseApp();
+  if (app) {
+    try {
+      return getFirestore(app);
+    } catch (error) {
+      // Firestore may already be initialized, try to get existing instance
+      try {
+        return getFirestore();
+      } catch {
+        console.error('Error getting Firestore instance:', error);
+      }
+    }
+  }
+  
+  return null;
 }
 
 // User data structure in Firestore
@@ -123,9 +139,15 @@ class FirebaseSyncService {
   private isInitialized: boolean = false;
   
   async initializeSync(userId: string): Promise<void> {
+    const db = getFirestoreInstance();
     if (!db) {
       console.warn('Firestore not initialized, cannot sync');
-      return;
+      // Try to wait for Firebase to be ready
+      const firebase = await waitForFirebase();
+      if (!firebase) {
+        console.warn('Firebase not available, sync disabled');
+        return;
+      }
     }
 
     // Empêcher l'initialisation multiple
@@ -190,6 +212,7 @@ class FirebaseSyncService {
   // Load all user data from Firestore (silent mode - minimal logs)
   // Made public for external access (settings, theme, notifications hooks)
   async loadFromFirestore(userId?: string): Promise<UserAppData | null> {
+    const db = getFirestoreInstance();
     const targetUserId = userId || this.currentUserId;
     if (!db || !targetUserId) return null;
     
@@ -220,6 +243,7 @@ class FirebaseSyncService {
 
   // Set up real-time listeners for continuous sync (silent mode - no console logs)
   private setupRealtimeListeners(userId: string): void {
+    const db = getFirestoreInstance();
     if (!db) return;
     
     // Reset reconnect attempts for this user
@@ -258,7 +282,7 @@ class FirebaseSyncService {
 
     // Playlists subcollection listener
     if (!this.syncListeners.has('playlists')) {
-      const playlistsRef = collection(db!, 'users', userId, 'playlists');
+      const playlistsRef = collection(db, 'users', userId, 'playlists');
       const unsubscribePlaylists = onSnapshot(
         playlistsRef,
         (snapshot) => {
@@ -439,6 +463,7 @@ class FirebaseSyncService {
 
   // Save data to Firestore (only if changed)
   async saveToFirestore(userId: string, data?: Partial<UserAppData>): Promise<void> {
+    const db = getFirestoreInstance();
     if (!db || !userId) {
       console.warn('Cannot save to Firestore: no user ID or Firestore not initialized');
       return;
@@ -555,6 +580,7 @@ class FirebaseSyncService {
 
   // Save playlists to Firestore
   async savePlaylistsToFirestore(userId: string, playlists: Playlist[]): Promise<void> {
+    const db = getFirestoreInstance();
     if (!db || !userId) {
       console.warn('Cannot save playlists: no user ID or Firestore not initialized');
       return;
@@ -569,7 +595,7 @@ class FirebaseSyncService {
       
       // Update or create playlists
       for (const playlist of playlists) {
-        const playlistRef = doc(db!, 'users', userId, 'playlists', playlist.id);
+        const playlistRef = doc(db, 'users', userId, 'playlists', playlist.id);
         await setDoc(playlistRef, {
           ...playlist,
           updatedAt: serverTimestamp(),
