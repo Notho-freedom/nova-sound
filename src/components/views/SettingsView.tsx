@@ -390,7 +390,47 @@ export const SettingsView = () => {
   });
   const [savingCloudinary, setSavingCloudinary] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [bunnyStatus, setBunnyStatus] = useState<{ configured: boolean; message?: string } | null>(null);
+  const [bunnyStatusLoading, setBunnyStatusLoading] = useState(false);
   const isElectron = !!window.electronAPI;
+
+  // Load Bunny status when user is Pro
+  useEffect(() => {
+    const loadBunnyStatus = async () => {
+      if (!nexusIsPro || !nexusAuthenticated) {
+        setBunnyStatus(null);
+        return;
+      }
+      
+      setBunnyStatusLoading(true);
+      try {
+        const { firebaseService } = await import('@/services/firebase');
+        const token = await firebaseService.getIdToken();
+        if (!token) {
+          setBunnyStatus({ configured: false, message: 'Token non disponible' });
+          return;
+        }
+        
+        const response = await fetch('/api/storage/bunny-status', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setBunnyStatus(data);
+        } else {
+          setBunnyStatus({ configured: false, message: 'Erreur de vérification' });
+        }
+      } catch (error) {
+        console.error('Error loading Bunny status:', error);
+        setBunnyStatus({ configured: false, message: 'Erreur de connexion' });
+      } finally {
+        setBunnyStatusLoading(false);
+      }
+    };
+    
+    loadBunnyStatus();
+  }, [nexusIsPro, nexusAuthenticated]);
 
   // Load settings from backend, localStorage, and Firebase
   useEffect(() => {
@@ -1259,15 +1299,35 @@ export const SettingsView = () => {
 
                   {nexusIsPro ? (
                     <div className="space-y-3">
-                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <p className="text-sm text-green-400 flex items-center gap-2">
-                          <Check className="w-4 h-4" />
-                          Bunny Storage activé
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Vos uploads utilisent automatiquement Bunny CDN
-                        </p>
-                      </div>
+                      {/* Server-side Bunny configuration status */}
+                      {bunnyStatusLoading ? (
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border/50 animate-pulse">
+                          <p className="text-sm text-muted-foreground flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Vérification de la configuration...
+                          </p>
+                        </div>
+                      ) : bunnyStatus?.configured ? (
+                        <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                          <p className="text-sm text-green-400 flex items-center gap-2">
+                            <Check className="w-4 h-4" />
+                            Bunny Storage configuré et actif
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Vos uploads utilisent automatiquement Bunny CDN
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                          <p className="text-sm text-yellow-400 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Configuration serveur manquante
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {bunnyStatus?.message || 'Contactez l\'administrateur pour configurer BUNNY_STORAGE_NAME et BUNNY_API_KEY'}
+                          </p>
+                        </div>
+                      )}
                       
                       <div className="space-y-2 text-xs text-muted-foreground">
                         <div className="flex items-center gap-2">

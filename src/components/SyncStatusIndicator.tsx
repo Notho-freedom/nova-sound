@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Cloud, CloudOff, RefreshCw, Check, AlertCircle } from "lucide-react";
+import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { firebaseSyncService } from "@/services/firebase-sync";
 import { firebaseService } from "@/services/firebase";
 import { isOnline, onConnectivityChange, isElectron } from "@/lib/connectivity";
 
-export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
+export type SyncStatus = "loading" | "idle" | "syncing" | "synced" | "error" | "offline";
 
 interface SyncStatusIndicatorProps {
   collapsed?: boolean;
@@ -14,20 +14,45 @@ interface SyncStatusIndicatorProps {
 }
 
 export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicatorProps) => {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("loading");
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [firebaseReady, setFirebaseReady] = useState(false);
 
   useEffect(() => {
-    // Check authentication status
-    const checkAuth = () => {
-      const user = firebaseService.getCurrentUser();
-      setIsAuthenticated(!!user && !user.isAnonymous);
-      setUserEmail(user?.email || null);
+    let mounted = true;
+    
+    // Wait for Firebase to be initialized before checking auth
+    const initializeAuth = async () => {
+      try {
+        // Wait for Firebase to be ready
+        await firebaseService.ensureInitialized();
+        
+        if (!mounted) return;
+        setFirebaseReady(true);
+        
+        // Now check the current user
+        const user = firebaseService.getCurrentUser();
+        if (user) {
+          setIsAuthenticated(!user.isAnonymous);
+          setUserEmail(user.email || null);
+          setSyncStatus("idle");
+        } else {
+          setIsAuthenticated(false);
+          setUserEmail(null);
+          setSyncStatus("idle");
+        }
+      } catch (error) {
+        console.error("SyncStatusIndicator: Firebase init error:", error);
+        if (mounted) {
+          setFirebaseReady(true);
+          setSyncStatus("idle");
+        }
+      }
     };
 
-    checkAuth();
+    initializeAuth();
 
     // Listen to sync events
     const handleSyncStart = () => {
@@ -49,9 +74,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
 
     // Check online status using robust connectivity utility
     const handleOnline = () => {
-      if (syncStatus === "offline") {
-        setSyncStatus("idle");
-      }
+      setSyncStatus((prev) => prev === "offline" ? "idle" : prev);
     };
 
     const handleOffline = () => {
@@ -69,21 +92,28 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
 
     // Check initial online status using robust check
     // In Electron, assume online initially - let Firebase handle actual connectivity
-    if (isElectron()) {
-      // Don't check initial status - Electron's navigator.onLine is unreliable
-      // Let the connectivity change listener handle it
-    } else {
+    if (!isElectron()) {
       isOnline().then((online) => {
-        if (!online) {
+        if (!online && mounted) {
           setSyncStatus("offline");
         }
       });
     }
 
-    // Listen for auth state changes
+    // Listen for auth state changes - this is the primary source of truth
     const unsubscribe = firebaseService.onAuthStateChange((user) => {
-      setIsAuthenticated(!!user && !user.isAnonymous);
+      if (!mounted) return;
+      
+      const authenticated = !!user && !user.isAnonymous;
+      setIsAuthenticated(authenticated);
       setUserEmail(user?.email || null);
+      
+      // Update sync status based on auth change
+      if (authenticated && syncStatus === "loading") {
+        setSyncStatus("idle");
+      } else if (!authenticated && syncStatus === "loading") {
+        setSyncStatus("idle");
+      }
     });
 
     // Custom event listeners for sync status
@@ -92,16 +122,19 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     window.addEventListener("nexus-sync-error", handleSyncError);
 
     return () => {
+      mounted = false;
       cleanupConnectivity();
       window.removeEventListener("nexus-sync-start", handleSyncStart);
       window.removeEventListener("nexus-sync-complete", handleSyncComplete);
       window.removeEventListener("nexus-sync-error", handleSyncError);
       unsubscribe();
     };
-  }, [syncStatus]);
+  }, []);
 
   const getIcon = () => {
     switch (syncStatus) {
+      case "loading":
+        return <Loader2 className="w-4 h-4 animate-spin" />;
       case "syncing":
         return <RefreshCw className="w-4 h-4 animate-spin" />;
       case "synced":
@@ -117,6 +150,8 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
 
   const getStatusColor = () => {
     switch (syncStatus) {
+      case "loading":
+        return "text-muted-foreground";
       case "syncing":
         return "text-primary";
       case "synced":
@@ -132,6 +167,8 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
 
   const getStatusText = () => {
     switch (syncStatus) {
+      case "loading":
+        return "Initialisation...";
       case "syncing":
         return "Synchronisation...";
       case "synced":
@@ -159,7 +196,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
   };
 
   const handleManualSync = async () => {
-    if (!isAuthenticated || syncStatus === "syncing" || syncStatus === "offline") return;
+    if (!isAuthenticated || syncStatus === "syncing" || syncStatus === "offline" || syncStatus === "loading") return;
     
     window.dispatchEvent(new CustomEvent("nexus-sync-start"));
     
@@ -175,7 +212,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
   const content = (
     <button
       onClick={handleManualSync}
-      disabled={!isAuthenticated || syncStatus === "syncing" || syncStatus === "offline"}
+      disabled={!isAuthenticated || syncStatus === "syncing" || syncStatus === "offline" || syncStatus === "loading"}
       className={cn(
         "flex items-center gap-2 rounded-lg transition-all duration-200 ease-out",
         collapsed ? "p-2 justify-center" : "px-3 py-2.5 w-full",
@@ -187,10 +224,10 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     >
       <div className={cn(
         "relative",
-        syncStatus === "syncing" && "animate-pulse"
+        (syncStatus === "syncing" || syncStatus === "loading") && "animate-pulse"
       )}>
         {getIcon()}
-        {isAuthenticated && syncStatus !== "offline" && syncStatus !== "error" && (
+        {isAuthenticated && syncStatus !== "offline" && syncStatus !== "error" && syncStatus !== "loading" && (
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-background" />
         )}
       </div>

@@ -4,6 +4,7 @@ import { nexusServerService } from "@/services/nexus-server";
 import { authService, UserProfile } from "@/services/auth";
 import { firebaseService } from "@/services/firebase";
 import { stripeService } from "@/services/stripe";
+import { notificationService } from "@/services/notification-service";
 import { toast } from "sonner";
 
 interface UseCloudSyncReturn {
@@ -587,7 +588,7 @@ export function useCloudSync(): UseCloudSyncReturn {
         setNexusUser(profile);
         setNexusAuthenticated(true);
         setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");
-        toast.success("Connecté avec succès");
+        notificationService.loginSuccess(profile.email || profile.displayName || "Utilisateur");
       } else {
         // Redirect is happening, show info message
         toast.info("Redirection vers Google...");
@@ -619,10 +620,10 @@ export function useCloudSync(): UseCloudSyncReturn {
         tracksUploaded: 0,
         tracksDownloaded: 0,
       });
-      toast.success("Déconnecté");
+      notificationService.logoutSuccess();
     } catch (error: any) {
       console.error("Logout error:", error);
-      toast.error("Erreur lors de la déconnexion");
+      notificationService.error("Erreur lors de la déconnexion");
     }
   }, []);
 

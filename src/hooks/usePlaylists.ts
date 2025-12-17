@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Playlist } from "@/types/music";
+import { notificationService } from "@/services/notification-service";
 
 interface UsePlaylistsReturn {
   playlists: Playlist[];
@@ -94,11 +95,14 @@ export function usePlaylists(): UsePlaylistsReturn {
           } catch (error) {
             console.error('Error syncing playlists to Firebase:', error);
           }
+          // Notify user
+          notificationService.playlistCreated(playlist.name);
         }
         
         return playlist;
       } catch (err) {
         console.error("Failed to create playlist:", err);
+        notificationService.error("Erreur", "Impossible de créer la playlist");
         return null;
       }
     },
@@ -151,6 +155,7 @@ export function usePlaylists(): UsePlaylistsReturn {
   const deletePlaylist = useCallback(
     async (id: string) => {
       try {
+        const playlistToDelete = playlists.find((p) => p.id === id);
         if (isElectron) {
           await window.electronAPI!.deletePlaylist(id);
         }
@@ -163,6 +168,11 @@ export function usePlaylists(): UsePlaylistsReturn {
           firebaseSyncService.queueSync('playlists', updatedPlaylists);
         } catch (error) {
           console.error('Error syncing playlists to Firebase:', error);
+        }
+        
+        // Notify user
+        if (playlistToDelete) {
+          notificationService.playlistDeleted(playlistToDelete.name);
         }
       } catch (err) {
         console.error("Failed to delete playlist:", err);

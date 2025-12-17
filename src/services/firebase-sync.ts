@@ -918,6 +918,7 @@ class FirebaseSyncService {
 
   // Force an immediate sync to Firestore
   async forceSyncNow(): Promise<void> {
+    const db = getFirestoreInstance();
     if (!this.currentUserId || !db) {
       console.warn('Cannot force sync: no user ID or Firestore not initialized');
       return;

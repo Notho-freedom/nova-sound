@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { nexusServerService } from '@/services/nexus-server';
+import { notificationService } from '@/services/notification-service';
 import { toast } from 'sonner';
 import type { Track } from '@/types/music';
 
@@ -154,9 +155,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
         return updated;
       });
 
-      toast.success('Upload réussi', {
-        description: `"${track.title}" a été uploadé vers Nexus/Bunny.`,
-      });
+      notificationService.uploadCompleted(track.title, 'Bunny Storage');
 
       // Remove progress after 3 seconds
       setTimeout(() => {
@@ -182,9 +181,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
         return updated;
       });
 
-      toast.error('Erreur d\'upload', {
-        description: error.message || 'Une erreur est survenue lors de l\'upload vers Nexus/Bunny.',
-      });
+      notificationService.uploadFailed(track.title, error.message || 'Une erreur est survenue lors de l\'upload');
     }
   }, [uploadProgress]);
 

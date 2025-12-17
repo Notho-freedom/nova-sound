@@ -1,9 +1,10 @@
-import { Play, Clock, TrendingUp, Sparkles, Heart, Music, MoreHorizontal } from "lucide-react";
+"use client";
+
+import { Play, Clock, TrendingUp, Sparkles, Heart, Music, MoreHorizontal, Disc, Timer, Users, Star, Zap, Library } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
-import { PageHeader } from "@/components/PageHeader";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,19 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
+import { useListeningStats, formatDuration } from "@/hooks/useListeningStats";
+import { useGenres, formatGenreName } from "@/hooks/useGenres";
+import { Button } from "@/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
+// UI Components
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { HeroSection } from "@/components/ui/HeroSection";
+import { StatCard } from "@/components/ui/StatCard";
+import { ArtistCard } from "@/components/ui/ArtistCard";
+import { PlaylistCard } from "@/components/ui/PlaylistCard";
+import { GenreCard } from "@/components/ui/GenreCard";
+import { TrackCard } from "@/components/ui/TrackCard";
 
 interface HistoryEntry {
   trackId: string;
@@ -27,10 +41,16 @@ interface HomeViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayPause?: () => void;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  onShuffle?: () => void;
   onPlayNext?: (track: Track | Track[]) => void;
   onAddToQueue?: (track: Track | Track[]) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
   onPlayTracks?: (trackIds: string[]) => void;
+  onFilterByGenre?: (genre: string) => void;
+  onFilterByArtist?: (artist: string) => void;
   recentTracks?: Track[];
   favoriteTracks?: Track[];
   history?: HistoryEntry[];
@@ -43,25 +63,19 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-// Generate random selections from most played tracks
-const generateMostPlayedSelections = (tracks: Track[], history: HistoryEntry[] = []) => {
-  // Create a map of trackId -> playCount
+// Generate playlist selections from tracks
+const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = []) => {
   const playCountMap = new Map<string, number>();
   history.forEach(entry => {
     playCountMap.set(entry.trackId, entry.playCount || 1);
   });
 
-  // Get tracks with play counts, sort by play count
   const tracksWithCounts = tracks
-    .map(track => ({
-      track,
-      playCount: playCountMap.get(track.id) || 0
-    }))
+    .map(track => ({ track, playCount: playCountMap.get(track.id) || 0 }))
     .filter(item => item.playCount > 0)
     .sort((a, b) => b.playCount - a.playCount)
-    .slice(0, 50); // Take top 50 most played
+    .slice(0, 50);
 
-  // Create 3 random selections from the most played tracks
   const shuffled1 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
   const shuffled2 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
   const shuffled3 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
@@ -78,16 +92,22 @@ export const HomeView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayPause,
+  onNext,
+  onPrevious,
+  onShuffle,
   onPlayTracks,
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
+  onFilterByGenre,
+  onFilterByArtist,
   recentTracks = [],
   favoriteTracks = [],
   history = [],
   loading = false,
 }: HomeViewProps) => {
-  // Hooks for context menu
+  // Hooks
   const playlistsResult = usePlaylists();
   const playlists = playlistsResult?.playlists ?? [];
   const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
@@ -96,135 +116,82 @@ export const HomeView = ({
   const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated, nexusUser } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
+  const { stats } = useListeningStats(tracks, history);
+  const { genres, getTracksByGenre } = useGenres(tracks);
+  
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
-  // Remove duplicates by ID before slicing - memoized
+  // Current track
+  const currentTrack = currentTrackIndex >= 0 ? tracks[currentTrackIndex] : null;
+
+  // Helper to get unique tracks
   const getUniqueTracks = useCallback((trackList: Track[]) => {
     const seen = new Set<string>();
     return trackList.filter(track => {
-      if (seen.has(track.id)) {
-        return false;
-      }
+      if (seen.has(track.id)) return false;
       seen.add(track.id);
       return true;
     });
   }, []);
 
-  const displayRecent = recentTracks.length > 0 
-    ? getUniqueTracks(recentTracks).slice(0, 20) 
-    : getUniqueTracks(tracks).slice(0, 10);
+  // Memoized data
+  const displayRecent = useMemo(() => 
+    recentTracks.length > 0 
+      ? getUniqueTracks(recentTracks).slice(0, 20) 
+      : getUniqueTracks(tracks).slice(0, 10),
+    [recentTracks, tracks, getUniqueTracks]
+  );
   
-  const displayFavorites = favoriteTracks.length > 0 
-    ? getUniqueTracks(favoriteTracks).slice(0, 6) 
-    : getUniqueTracks(tracks).slice(0, 6);
-  
-  // Get random selections from most played tracks - recalculated dynamically when history or tracks change
-  const mostPlayedSelections = useMemo(() => {
-    if (history.length === 0 || tracks.length === 0) {
-      return { discoveries: [], similar: [], mix: [] };
-    }
-    return generateMostPlayedSelections(tracks, history);
-  }, [tracks, history]);
-
-  const uniqueDiscoveries = useMemo(() => 
-    getUniqueTracks(mostPlayedSelections.discoveries), 
-    [mostPlayedSelections.discoveries]
-  );
-  const uniqueSimilar = useMemo(() => 
-    getUniqueTracks(mostPlayedSelections.similar), 
-    [mostPlayedSelections.similar]
-  );
-  const uniqueMix = useMemo(() => 
-    getUniqueTracks(mostPlayedSelections.mix), 
-    [mostPlayedSelections.mix]
+  const displayFavorites = useMemo(() => 
+    favoriteTracks.length > 0 
+      ? getUniqueTracks(favoriteTracks).slice(0, 6) 
+      : [],
+    [favoriteTracks, getUniqueTracks]
   );
 
-  // Force re-render when history updates to ensure fresh random selections
-  const [refreshKey, setRefreshKey] = useState(0);
-  useEffect(() => {
-    // Update selections when history changes significantly
-    const timer = setTimeout(() => {
-      setRefreshKey(prev => prev + 1);
-    }, 1000); // Small delay to batch updates
-    
-    return () => clearTimeout(timer);
-  }, [history.length]);
+  const playlistSelections = useMemo(() => 
+    generatePlaylistSelections(tracks, history),
+    [tracks, history]
+  );
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Bonjour";
-    if (hour < 18) return "Bon après-midi";
-    return "Bonsoir";
-  };
+  // New tracks (added in last 7 days based on file name patterns or just recent)
+  const newTracks = useMemo(() => {
+    // For now, just get the last 10 tracks by ID (assuming newer IDs = newer tracks)
+    return getUniqueTracks(tracks).slice(-10).reverse();
+  }, [tracks, getUniqueTracks]);
+
+  // Top genres (limit to 6)
+  const topGenres = useMemo(() => genres.slice(0, 6), [genres]);
+
+  // Recent artists
+  const recentArtists = useMemo(() => {
+    if (!stats?.recentArtists) return [];
+    return stats.recentArtists.slice(0, 8);
+  }, [stats]);
 
   const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
 
-
+  // Loading skeleton
   if (loading) {
     return (
-      <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
-        {/* Welcome Section Skeleton */}
-        <div>
-          <Skeleton className="h-9 w-96 mb-2" />
-          <Skeleton className="h-5 w-64" />
+      <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
+        {/* Hero Skeleton */}
+        <Skeleton className="w-full h-[280px] rounded-2xl" />
+        
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={`stat-skeleton-${i}`} className="h-24 rounded-xl" />
+          ))}
         </div>
-
-        {/* Recently Played Skeleton */}
+        
+        {/* Recent Section Skeleton */}
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Skeleton className="w-5 h-5" />
-            <Skeleton className="h-6 w-48" />
-          </div>
+          <Skeleton className="h-6 w-48 mb-4" />
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {Array.from({ length: 10 }).map((_, i) => (
-              <TrackCardSkeleton key={`recent-skeleton-${i}`} className="" />
-            ))}
-          </div>
-        </div>
-
-        {/* Favorites Section Skeleton */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Skeleton className="w-5 h-5" />
-            <Skeleton className="h-6 w-32" />
-          </div>
-          <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/30">
-                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
-                    #
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
-                    Titre
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                    Album
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
-                    Durée
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <TableRowSkeleton key={`favorite-skeleton-${i}`} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* For You Section Skeleton */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Skeleton className="w-5 h-5" />
-            <Skeleton className="h-6 w-32" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <PlaylistCardSkeleton key={`playlist-skeleton-${i}`} />
+              <TrackCardSkeleton key={`recent-skeleton-${i}`} />
             ))}
           </div>
         </div>
@@ -233,39 +200,110 @@ export const HomeView = ({
   }
 
   return (
-    <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
-      
-      {/* Welcome Section */}
-      <div>
-        <h1 className="font-display text-3xl font-bold mb-2 text-foreground">
-          {getGreeting()}{userName ? `, ${userName}` : ""}, bienvenue sur <span className="text-primary">NEXUS</span>
-        </h1>
-        <p className="text-muted-foreground">
-          {tracks.length > 0 
-            ? `${tracks.length} pistes disponibles dans votre bibliothèque`
-            : "Votre système audio futuriste personnel"
-          }
-          {nexusAuthenticated && nexusUser && (
-            <span className="ml-2 text-xs">
-              • {nexusUser.subscriptionStatus === "active" ? "Pro" : "Gratuit"}
-            </span>
-          )}
-        </p>
-      </div>
+    <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
+      {/* Hero Section */}
+      <HeroSection
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        userName={userName}
+        onPlay={onPlayPause}
+        onPause={onPlayPause}
+        onNext={onNext}
+        onPrevious={onPrevious}
+        onShuffle={onShuffle}
+        onToggleFavorite={currentTrack ? () => toggleFavorite(currentTrack.id) : undefined}
+        isFavorite={currentTrack ? isFavorite(currentTrack.id) : false}
+      />
 
-      {/* Quick Play Cards - Recently Played */}
-      {displayRecent.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-primary" />
-            <h2 className="font-display text-lg tracking-wider">
-              {recentTracks.length > 0 ? "ÉCOUTÉ RÉCEMMENT" : "À DÉCOUVRIR"}
-            </h2>
+      {/* Stats Section */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard
+            label="Temps d'écoute"
+            value={formatDuration(stats.weeklyListeningTime)}
+            icon={<Timer className="w-5 h-5" />}
+            subtitle="Cette semaine"
+            trend={stats.weeklyListeningTime > stats.dailyListeningTime * 7 * 0.8 ? "up" : "neutral"}
+          />
+          <StatCard
+            label="Pistes"
+            value={stats.totalTracks.toLocaleString()}
+            icon={<Music className="w-5 h-5" />}
+            subtitle="Dans votre bibliothèque"
+          />
+          <StatCard
+            label="Écoutes"
+            value={stats.totalPlays.toLocaleString()}
+            icon={<Play className="w-5 h-5" />}
+            subtitle="Total"
+            trend="up"
+          />
+          <StatCard
+            label="Artistes"
+            value={stats.topArtists.length.toLocaleString()}
+            icon={<Users className="w-5 h-5" />}
+            subtitle="Différents"
+          />
+        </div>
+      )}
+
+      {/* Recently Played Artists */}
+      {recentArtists.length > 0 && (
+        <section>
+          <SectionHeader
+            title="Artistes récents"
+            icon={<Users className="w-5 h-5" />}
+            subtitle="Vos artistes écoutés récemment"
+          />
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
+            {recentArtists.map((artist, idx) => (
+              <ArtistCard
+                key={`artist-${artist.name}-${idx}`}
+                name={artist.name}
+                imageUrl={artist.imageUrl}
+                trackCount={artist.trackCount}
+                playCount={artist.playCount}
+                onClick={() => onFilterByArtist?.(artist.name)}
+                className="flex-shrink-0"
+              />
+            ))}
           </div>
+        </section>
+      )}
+
+      {/* Genres / Moods */}
+      {topGenres.length > 0 && (
+        <section>
+          <SectionHeader
+            title="Explorer par genre"
+            icon={<Disc className="w-5 h-5" />}
+            count={genres.length}
+          />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {topGenres.map((genre) => (
+              <GenreCard
+                key={genre.name}
+                name={formatGenreName(genre.name)}
+                trackCount={genre.trackCount}
+                onClick={() => onFilterByGenre?.(genre.name)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recently Played Tracks */}
+      {displayRecent.length > 0 && (
+        <section>
+          <SectionHeader
+            title={recentTracks.length > 0 ? "Écouté récemment" : "À découvrir"}
+            icon={<Clock className="w-5 h-5" />}
+            count={displayRecent.length}
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {displayRecent.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
-              const isCurrentTrack = currentTrackIndex === actualIndex;
+              const isCurrent = currentTrackIndex === actualIndex;
               
               return (
                 <TrackContextMenu
@@ -286,74 +324,103 @@ export const HomeView = ({
                   canUploadToNexus={canUploadToNexus && !!track.filePath}
                   isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                 >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                        className={cn(
-                          "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm p-4 text-left transition-all duration-200 ease-out",
-                          "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
-                          isCurrentTrack && isPlaying && "ring-2 ring-primary",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
-                            <img
-                              src={getCoverUrl(track.coverUrl)}
-                              alt={track.album}
-                              className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-110"
-                            />
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                              <Play className="w-5 h-5 text-white fill-current" />
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className={cn(
-                                "text-sm font-medium truncate",
-                                isCurrentTrack ? "text-primary" : "text-foreground"
-                              )}>
-                                {track.title}
-                              </p>
-                              {isUploaded(track.id) && (
-                                <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {track.artist}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-sm font-medium">{track.title}</div>
-                      <div className="text-xs text-muted-foreground">{track.artist}</div>
-                      {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
-                    </TooltipContent>
-                  </Tooltip>
+                  <TrackCard
+                    track={track}
+                    isPlaying={isPlaying}
+                    isCurrent={isCurrent}
+                    onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                    showUploadStatus
+                    uploadProvider={getUploadedProvider(track.id)}
+                  />
                 </TrackContextMenu>
               );
             })}
           </div>
-        </div>
+        </section>
+      )}
+
+      {/* New in Library */}
+      {newTracks.length > 0 && (
+        <section>
+          <SectionHeader
+            title="Nouveautés"
+            icon={<Star className="w-5 h-5 text-yellow-500" />}
+            subtitle="Récemment ajouté à votre bibliothèque"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {newTracks.slice(0, 6).map((track, idx) => {
+              const actualIndex = tracks.findIndex(t => t.id === track.id);
+              const isCurrent = currentTrackIndex === actualIndex;
+              
+              return (
+                <TrackContextMenu
+                  key={`new-${track.id}-${idx}`}
+                  track={track}
+                  playlists={playlists}
+                  isFavorite={isFavorite(track.id)}
+                  onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                  onPlayNext={() => onPlayNext?.(track)}
+                  onAddToQueue={() => onAddToQueue?.(track)}
+                  onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                  onToggleFavorite={() => toggleFavorite(track.id)}
+                  onUploadToCloudinary={() => uploadTrack?.(track)}
+                  canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                  isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                  onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                  canUploadToNexus={canUploadToNexus && !!track.filePath}
+                  isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                >
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-card/30 hover:bg-card/50 transition-all group cursor-pointer">
+                    <div className="relative flex-shrink-0">
+                      <span className="absolute -top-1 -left-1 px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded-full z-10">
+                        NEW
+                      </span>
+                      <div className="w-12 h-12 rounded-lg overflow-hidden">
+                        <img
+                          src={getCoverUrl(track.coverUrl)}
+                          alt={track.album || track.title}
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        "font-medium text-sm truncate",
+                        isCurrent ? "text-primary" : "text-foreground"
+                      )}>
+                        {track.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actualIndex !== -1 && onTrackSelect(actualIndex);
+                      }}
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                    </Button>
+                  </div>
+                </TrackContextMenu>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Favorites Section */}
       {displayFavorites.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Heart className="w-5 h-5 text-red-500" />
-            <h2 className="font-display text-lg tracking-wider">
-              {favoriteTracks.length > 0 ? "VOS FAVORIS" : "POPULAIRES"}
-            </h2>
-            {favoriteTracks.length > 0 && (
-              <span className="text-xs text-muted-foreground ml-2">
-                {favoriteTracks.length} titres
-              </span>
-            )}
-          </div>
+        <section>
+          <SectionHeader
+            title="Vos favoris"
+            icon={<Heart className="w-5 h-5 text-red-500" />}
+            count={favoriteTracks.length}
+          />
           <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30">
             <table className="w-full">
               <thead>
@@ -376,7 +443,6 @@ export const HomeView = ({
                 {displayFavorites.map((track, idx) => {
                   const actualIndex = tracks.findIndex(t => t.id === track.id);
                   const isCurrentTrack = currentTrackIndex === actualIndex;
-                  const tooltipText = `${track.title} - ${track.artist}${track.album ? ` (${track.album})` : ''} - ${formatTime(track.duration)}`;
                   
                   return (
                     <tr
@@ -384,10 +450,7 @@ export const HomeView = ({
                       onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                       className={cn(
                         "group cursor-pointer transition-all duration-200 ease-out",
-                        isCurrentTrack 
-                          ? "bg-primary/10" 
-                          : "hover:bg-muted/40 active:bg-muted/50",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                        isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"
                       )}
                     >
                       <td className="px-4 py-2.5">
@@ -400,116 +463,45 @@ export const HomeView = ({
                             </div>
                           ) : (
                             <>
-                              <span className="text-sm text-muted-foreground group-hover:hidden">
-                                {idx + 1}
-                              </span>
+                              <span className="text-sm text-muted-foreground group-hover:hidden">{idx + 1}</span>
                               <Play className="w-4 h-4 text-foreground hidden group-hover:block fill-current" />
                             </>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-2.5">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <TrackContextMenu
-                                track={track}
-                                playlists={playlists}
-                                isFavorite={isFavorite(track.id)}
-                                onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                                onPlayNext={() => onPlayNext?.(track)}
-                                onAddToQueue={() => onAddToQueue?.(track)}
-                                onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                                onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
-                                onToggleFavorite={() => toggleFavorite(track.id)}
-                                onUploadToCloudinary={() => uploadTrack?.(track)}
-                                canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
-                                isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-                                onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                                canUploadToNexus={canUploadToNexus && !!track.filePath}
-                                isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                                    <img
-                                      src={getCoverUrl(track.coverUrl)}
-                                      alt={track.album}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <p className={cn(
-                                        "text-sm font-medium truncate",
-                                        isCurrentTrack ? "text-primary" : "text-foreground"
-                                      )}>
-                                        {track.title}
-                                      </p>
-                                      {isUploaded(track.id) && (
-                                        <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {track.artist}
-                                    </p>
-                                  </div>
-                                </div>
-                              </TrackContextMenu>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                            <img
+                              src={getCoverUrl(track.coverUrl)}
+                              alt={track.album}
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className={cn(
+                                "text-sm font-medium truncate",
+                                isCurrentTrack ? "text-primary" : "text-foreground"
+                              )}>
+                                {track.title}
+                              </p>
+                              {isUploaded(track.id) && (
+                                <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                              )}
                             </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-sm font-medium">{track.title}</div>
-                            <div className="text-xs text-muted-foreground">{track.artist}</div>
-                            {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
-                            <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
-                          </TooltipContent>
-                        </Tooltip>
+                            <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-2.5 hidden md:table-cell">
-                        <p className="text-sm text-muted-foreground truncate">
-                          {track.album}
-                        </p>
+                        <p className="text-sm text-muted-foreground truncate">{track.album}</p>
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <span className="text-sm text-muted-foreground font-mono">
                           {formatTime(track.duration)}
                         </span>
-                      </td>
-                      <td className="px-4 py-2.5 w-12">
-                        <TrackContextMenu
-                          track={track}
-                          playlists={playlists}
-                          isFavorite={isFavorite(track.id)}
-                          onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                          onPlayNext={() => onPlayNext?.(track)}
-                          onAddToQueue={() => onAddToQueue?.(track)}
-                          onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                          onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
-                          onToggleFavorite={() => toggleFavorite(track.id)}
-                          onUploadToCloudinary={() => uploadTrack?.(track)}
-                          canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
-                          isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-                          onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                          canUploadToNexus={canUploadToNexus && !!track.filePath}
-                          isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                                className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                                aria-label="Options"
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">Options</div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TrackContextMenu>
                       </td>
                     </tr>
                   );
@@ -517,271 +509,77 @@ export const HomeView = ({
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* For You Section - Dynamic Recommendations */}
-      {(uniqueDiscoveries.length > 0 || uniqueSimilar.length > 0 || uniqueMix.length > 0) && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            <h2 className="font-display text-lg tracking-wider">POUR VOUS</h2>
-          </div>
+      {/* Made For You - Playlist Recommendations */}
+      {(playlistSelections.discoveries.length > 0 || playlistSelections.similar.length > 0 || playlistSelections.mix.length > 0) && (
+        <section>
+          <SectionHeader
+            title="Pour vous"
+            icon={<Sparkles className="w-5 h-5 text-amber-500" />}
+            subtitle="Playlists personnalisées basées sur vos goûts"
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Discoveries Playlist - Style explorateur */}
-            {uniqueDiscoveries.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                    onClick={() => {
-                      if (uniqueDiscoveries.length > 0) {
-                        const firstTrack = uniqueDiscoveries[0];
-                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                        if (idx !== -1) onTrackSelect(idx);
-                      }
-                    }}
-                  >
-                {/* Background avec image de la première piste */}
-                <img
-                  src={getCoverUrl(uniqueDiscoveries[0]?.coverUrl)}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
-                />
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-600/90 via-purple-600/80 to-indigo-700/90" />
-                
-                {/* Pattern décoratif */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-400/20 rounded-full blur-2xl" />
-                </div>
-
-                <div className="absolute inset-0 p-5 flex flex-col justify-between">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-                        <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
-                          Découvertes
-                        </h3>
-                      </div>
-                      <p className="text-white/80 text-sm font-medium">
-                        {uniqueDiscoveries.length} perles cachées
-                      </p>
-                      <p className="text-white/60 text-xs mt-1">
-                        Explorations musicales
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
-                      <Play className="w-5 h-5 text-white fill-current ml-0.5" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {uniqueDiscoveries.slice(0, 4).map((track, i) => (
-                      <div 
-                        key={`discovery-${track.id}-${i}`} 
-                        className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
-                        style={{ marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i }}
-                      >
-                        <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    {uniqueDiscoveries.length > 4 && (
-                      <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold">
-                        +{uniqueDiscoveries.length - 4}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm font-medium">Découvertes</div>
-                  <div className="text-xs text-muted-foreground">{uniqueDiscoveries.length} pistes recommandées</div>
-                  <div className="text-xs text-muted-foreground mt-1">Cliquez pour lire</div>
-                </TooltipContent>
-              </Tooltip>
+            {playlistSelections.discoveries.length > 0 && (
+              <PlaylistCard
+                title="Découvertes"
+                subtitle={`${playlistSelections.discoveries.length} perles cachées`}
+                description="Explorations musicales"
+                tracks={playlistSelections.discoveries}
+                gradient="from-violet-600/90 via-purple-600/80 to-indigo-700/90"
+                icon={<Zap className="w-4 h-4 text-cyan-400" />}
+                onClick={() => {
+                  const idx = tracks.findIndex(t => t.id === playlistSelections.discoveries[0]?.id);
+                  if (idx !== -1) onTrackSelect(idx);
+                }}
+              />
             )}
-
-            {/* Similar to Favorites - Style chaleureux */}
-            {uniqueSimilar.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                    onClick={() => {
-                      if (uniqueSimilar.length > 0) {
-                        const firstTrack = uniqueSimilar[0];
-                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                        if (idx !== -1) onTrackSelect(idx);
-                      }
-                    }}
-                  >
-                {/* Background avec image de la première piste */}
-                <img
-                  src={getCoverUrl(uniqueSimilar[0]?.coverUrl)}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
-                />
-                <div className="absolute inset-0 bg-gradient-to-br from-rose-500/90 via-pink-600/80 to-fuchsia-700/90" />
-                
-                {/* Pattern décoratif */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute top-0 left-0 w-28 h-28 bg-yellow-300/30 rounded-full blur-3xl" />
-                  <div className="absolute bottom-0 right-0 w-32 h-32 bg-pink-400/20 rounded-full blur-3xl" />
-                </div>
-
-                <div className="absolute inset-0 p-5 flex flex-col justify-between">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Heart className="w-4 h-4 text-red-300 fill-red-300" />
-                        <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
-                          Similaires
-                        </h3>
-                      </div>
-                      <p className="text-white/80 text-sm font-medium">
-                        {uniqueSimilar.length} titres qui vous ressemblent
-                      </p>
-                      <p className="text-white/60 text-xs mt-1">
-                        Basé sur vos goûts
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
-                      <Play className="w-5 h-5 text-white fill-current ml-0.5" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {uniqueSimilar.slice(0, 4).map((track, i) => (
-                      <div 
-                        key={`similar-${track.id}-${i}`} 
-                        className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
-                        style={{ marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i }}
-                      >
-                        <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    {uniqueSimilar.length > 4 && (
-                      <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold">
-                        +{uniqueSimilar.length - 4}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm font-medium">Similaires</div>
-                  <div className="text-xs text-muted-foreground">{uniqueSimilar.length} pistes similaires</div>
-                  <div className="text-xs text-muted-foreground mt-1">Basé sur vos goûts</div>
-                </TooltipContent>
-              </Tooltip>
+            
+            {playlistSelections.similar.length > 0 && (
+              <PlaylistCard
+                title="Similaires"
+                subtitle={`${playlistSelections.similar.length} titres qui vous ressemblent`}
+                description="Basé sur vos goûts"
+                tracks={playlistSelections.similar}
+                gradient="from-rose-500/90 via-pink-600/80 to-fuchsia-700/90"
+                icon={<Heart className="w-4 h-4 text-red-300 fill-red-300" />}
+                onClick={() => {
+                  const idx = tracks.findIndex(t => t.id === playlistSelections.similar[0]?.id);
+                  if (idx !== -1) onTrackSelect(idx);
+                }}
+              />
             )}
-
-            {/* Mix based on time - Style dynamique */}
-            {uniqueMix.length > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className="group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
-                    onClick={() => {
-                      if (uniqueMix.length > 0) {
-                        const firstTrack = uniqueMix[0];
-                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                        if (idx !== -1) onTrackSelect(idx);
-                      }
-                    }}
-                  >
-                {/* Background avec image de la première piste */}
-                <img
-                  src={getCoverUrl(uniqueMix[0]?.coverUrl)}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
-                />
-                <div className={cn(
-                  "absolute inset-0 transition-all duration-500",
-                  new Date().getHours() < 18 
-                    ? "bg-gradient-to-br from-amber-500/90 via-orange-600/80 to-red-600/90"
-                    : "bg-gradient-to-br from-indigo-600/90 via-blue-700/80 to-cyan-800/90"
-                )} />
-                
-                {/* Pattern décoratif animé */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className={cn(
-                    "absolute top-0 right-0 w-36 h-36 rounded-full blur-3xl transition-all duration-500",
-                    new Date().getHours() < 18 ? "bg-yellow-300/30" : "bg-cyan-300/30"
-                  )} />
-                  <div className={cn(
-                    "absolute bottom-0 left-0 w-28 h-28 rounded-full blur-2xl transition-all duration-500",
-                    new Date().getHours() < 18 ? "bg-orange-400/20" : "bg-blue-400/20"
-                  )} />
-                </div>
-
-                <div className="absolute inset-0 p-5 flex flex-col justify-between">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className={cn(
-                          "w-4 h-4 transition-colors duration-500",
-                          new Date().getHours() < 18 ? "text-yellow-300" : "text-cyan-300"
-                        )} />
-                        <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
-                          {new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
-                        </h3>
-                      </div>
-                      <p className="text-white/80 text-sm font-medium">
-                        {uniqueMix.length} titres pour {new Date().getHours() < 18 ? "vous booster" : "vous détendre"}
-                      </p>
-                      <p className="text-white/60 text-xs mt-1">
-                        {new Date().getHours() < 18 ? "⚡ Énergisant" : "🌙 Apaisant"}
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
-                      <Play className="w-5 h-5 text-white fill-current ml-0.5" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {uniqueMix.slice(0, 4).map((track, i) => (
-                      <div 
-                        key={`mix-${track.id}-${i}`} 
-                        className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
-                        style={{ marginLeft: i > 0 ? '-8px' : 0, zIndex: 10 - i }}
-                      >
-                        <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    {uniqueMix.length > 4 && (
-                      <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold">
-                        +{uniqueMix.length - 4}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm font-medium">
-                    {new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">{uniqueMix.length} pistes</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {new Date().getHours() < 18 ? "⚡ Énergisant" : "🌙 Apaisant"}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
+            
+            {playlistSelections.mix.length > 0 && (
+              <PlaylistCard
+                title={new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
+                subtitle={`${playlistSelections.mix.length} titres pour ${new Date().getHours() < 18 ? "vous booster" : "vous détendre"}`}
+                description={new Date().getHours() < 18 ? "⚡ Énergisant" : "🌙 Apaisant"}
+                tracks={playlistSelections.mix}
+                gradient={new Date().getHours() < 18 
+                  ? "from-amber-500/90 via-orange-600/80 to-red-600/90"
+                  : "from-indigo-600/90 via-blue-700/80 to-cyan-800/90"
+                }
+                icon={<TrendingUp className={cn(
+                  "w-4 h-4",
+                  new Date().getHours() < 18 ? "text-yellow-300" : "text-cyan-300"
+                )} />}
+                onClick={() => {
+                  const idx = tracks.findIndex(t => t.id === playlistSelections.mix[0]?.id);
+                  if (idx !== -1) onTrackSelect(idx);
+                }}
+              />
             )}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Empty state */}
       {tracks.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
-            <Music className="w-10 h-10 text-muted-foreground" />
+            <Library className="w-10 h-10 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium mb-2">Bibliothèque vide</h3>
           <p className="text-muted-foreground text-sm max-w-md">

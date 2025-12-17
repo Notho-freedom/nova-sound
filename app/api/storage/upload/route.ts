@@ -81,8 +81,11 @@ export async function POST(request: NextRequest) {
 
     // Pro users: upload to cloud storage (Bunny or PlanetHoster)
     if (auth.isPro) {
+      console.log(`[Upload] Pro user ${auth.userId} uploading file: ${file.name} (${file.size} bytes)`);
+      
       // Try Bunny first (if configured)
       if (isBunnyConfigured()) {
+        console.log('[Upload] Bunny Storage is configured, attempting upload...');
         try {
           const fileName = `${fileId}${fileExtension}`;
           const bunnyPath = `nexus/${auth.userId}/${fileName}`;
@@ -91,7 +94,9 @@ export async function POST(request: NextRequest) {
           const buffer = Buffer.from(bytes);
           const contentType = file.type || 'application/octet-stream';
           
+          console.log(`[Upload] Uploading to Bunny: ${bunnyPath} (${contentType})`);
           const result = await uploadToBunny(bunnyPath, buffer, contentType);
+          console.log(`[Upload] Bunny upload successful: ${result.url}`);
 
           return NextResponse.json({
             id: fileId,
@@ -101,9 +106,12 @@ export async function POST(request: NextRequest) {
             provider: 'bunny',
           });
         } catch (bunnyError: any) {
-          console.error('Bunny upload failed, trying PlanetHoster:', bunnyError);
+          console.error('[Upload] Bunny upload failed:', bunnyError.message || bunnyError);
+          console.log('[Upload] Falling back to PlanetHoster...');
           // Fallback to PlanetHoster if Bunny fails
         }
+      } else {
+        console.log('[Upload] Bunny Storage not configured, checking PlanetHoster...');
       }
 
       // Try PlanetHoster SFTP (if configured)
