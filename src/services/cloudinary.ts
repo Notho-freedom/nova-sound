@@ -170,6 +170,13 @@ class CloudinaryService {
             const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== track.id)].slice(0, 100); // Keep last 100
             localStorage.setItem(storageKey, JSON.stringify(updated));
             firebaseSyncService.queueSync('uploadedMedia', updated);
+            
+            // Dispatch custom event to notify DownloadsView
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('uploadedMediaChanged', { 
+                detail: { storageKey, count: updated.length } 
+              }));
+            }
           } catch (error) {
             // Silently fail if Firebase sync is not available
           }
