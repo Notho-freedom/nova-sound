@@ -108,9 +108,23 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
         description: `"${track.title}" a été uploadé vers Cloudinary.`,
       });
     } catch (error: any) {
-      console.error('Error uploading track:', error);
-      toast.error('Erreur d\'upload', {
-        description: error.message || 'Une erreur est survenue lors de l\'upload.',
+      console.error('Error uploading track to Cloudinary:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Une erreur est survenue lors de l\'upload.';
+      let errorTitle = 'Erreur d\'upload Cloudinary';
+      
+      if (error.message?.includes('401') || error.message?.includes('authentication')) {
+        errorTitle = 'Erreur d\'authentification Cloudinary';
+        errorMessage = 'Les identifiants Cloudinary sont invalides. Vérifiez votre configuration dans les paramètres. L\'upload preset doit être configuré en mode "unsigned" dans votre dashboard Cloudinary.';
+      } else if (error.message?.includes('not configured')) {
+        errorTitle = 'Cloudinary non configuré';
+        errorMessage = 'Veuillez configurer Cloudinary dans les paramètres avant d\'uploader des fichiers.';
+      }
+      
+      toast.error(errorTitle, {
+        description: errorMessage,
+        duration: 5000, // Show longer for important errors
       });
     }
   }, [cloudinaryConfigured, nexusIsPro, uploadProgress]);

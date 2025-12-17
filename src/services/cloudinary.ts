@@ -57,7 +57,8 @@ class CloudinaryService {
   isConfigured(): boolean {
     return this.config !== null && 
            !!this.config.cloudName && 
-           !!this.config.uploadPreset;
+           !!this.config.uploadPreset &&
+           !!this.config.apiKey; // Also check for API key
   }
 
   // Subscribe to progress updates
@@ -129,7 +130,30 @@ class CloudinaryService {
               reject(new Error("Invalid response from Cloudinary"));
             }
           } else {
-            reject(new Error(`Upload failed: ${xhr.status}`));
+            // Parse error response for better error messages
+            let errorMessage = `Upload failed: ${xhr.status}`;
+            try {
+              const errorResponse = JSON.parse(xhr.responseText);
+              if (errorResponse.error?.message) {
+                errorMessage = errorResponse.error.message;
+              } else if (errorResponse.error) {
+                errorMessage = errorResponse.error;
+              }
+            } catch {
+              // If response is not JSON, use status text
+              errorMessage = xhr.statusText || `Upload failed: ${xhr.status}`;
+            }
+            
+            // Provide specific error messages for common status codes
+            if (xhr.status === 401) {
+              errorMessage = "Cloudinary authentication failed. Please check your API key and upload preset configuration in settings. The upload preset must be set to 'unsigned' mode.";
+            } else if (xhr.status === 400) {
+              errorMessage = "Invalid request to Cloudinary. Please check your configuration.";
+            } else if (xhr.status === 403) {
+              errorMessage = "Cloudinary access forbidden. Please check your upload preset permissions.";
+            }
+            
+            reject(new Error(errorMessage));
           }
         });
 

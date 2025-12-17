@@ -101,13 +101,75 @@ export const DownloadsView = () => {
       const userId = await getCurrentUserId();
       const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
       
-      console.log("Loading uploaded files with key:", storageKey, "userId:", userId);
+      console.log("[DownloadsView] Loading uploaded files with key:", storageKey, "userId:", userId);
+      
+      // Also check for old non-isolated key for backward compatibility
+      const oldKey = UPLOADED_MEDIA_KEY;
+      const oldSaved = localStorage.getItem(oldKey);
+      if (oldSaved) {
+        try {
+          const oldMedia = JSON.parse(oldSaved);
+          console.log("[DownloadsView] Found old key with", Array.isArray(oldMedia) ? oldMedia.length : 0, "files");
+        } catch (e) {
+          console.error("[DownloadsView] Error parsing old key:", e);
+        }
+      }
       
       // Load from localStorage (user-isolated)
       const saved = localStorage.getItem(storageKey);
-      const uploadedMedia: UploadedFile[] = saved ? JSON.parse(saved) : [];
+      let uploadedMedia: UploadedFile[] = [];
       
-      console.log("Loaded from localStorage:", uploadedMedia.length, "files");
+      if (saved) {
+        try {
+          uploadedMedia = JSON.parse(saved);
+          console.log("[DownloadsView] Loaded from localStorage:", uploadedMedia.length, "files");
+        } catch (e) {
+          console.error("[DownloadsView] Error parsing localStorage:", e);
+        }
+      } else {
+        console.log("[DownloadsView] No data found in localStorage for key:", storageKey);
+      }
+      
+      // If no files found with user-isolated key, try old key
+      if (uploadedMedia.length === 0 && oldSaved) {
+        try {
+          console.log("[DownloadsView] Migrating from old key...");
+          const oldMedia: UploadedFile[] = JSON.parse(oldSaved);
+          uploadedMedia = oldMedia;
+          // Save to new key
+          if (userId) {
+            localStorage.setItem(storageKey, JSON.stringify(oldMedia));
+            console.log("[DownloadsView] Migrated", oldMedia.length, "files to new key");
+          }
+        } catch (e) {
+          console.error("[DownloadsView] Error migrating from old key:", e);
+        }
+      }
+      
+      // Debug: List all localStorage keys related to uploaded media
+      if (uploadedMedia.length === 0) {
+        console.log("[DownloadsView] Checking all localStorage keys...");
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.includes('uploaded-media')) {
+            console.log("[DownloadsView] Found related key:", key);
+            try {
+              const data = JSON.parse(localStorage.getItem(key) || '[]');
+              console.log("[DownloadsView] Key", key, "has", Array.isArray(data) ? data.length : 0, "files");
+            } catch (e) {
+              console.error("[DownloadsView] Error parsing key", key, ":", e);
+            }
+          }
+        }
+      }
+
+      // For files without URL, try to construct it from the ID (before API call)
+      uploadedMedia.forEach((file) => {
+        if (!file.url && file.cloudProvider === "nexus") {
+          file.url = `/api/storage/download/${file.id}`;
+          console.log("[DownloadsView] Constructed URL for file without URL:", file.url);
+        }
+      });
 
       // Fetch files from Nexus API for local storage files
       try {
@@ -120,9 +182,16 @@ export const DownloadsView = () => {
           });
           if (response.ok) {
             const nexusFiles = await response.json();
-            console.log("Fetched from Nexus API:", nexusFiles.length, "files");
+            console.log("[DownloadsView] Fetched from Nexus API:", nexusFiles.length, "files");
+            if (nexusFiles.length > 0) {
+              console.log("[DownloadsView] Sample Nexus file:", nexusFiles[0]);
+            }
             // Merge with uploadedMedia, avoiding duplicates
             const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
+            console.log("[DownloadsView] Looking for matches between localStorage files and Nexus API files");
+            console.log("[DownloadsView] localStorage file IDs:", Array.from(nexusFileIds));
+            console.log("[DownloadsView] Nexus API file IDs:", nexusFiles.map((f: any) => f.id));
+            
             nexusFiles.forEach((file: any) => {
               if (!nexusFileIds.has(file.id)) {
                 uploadedMedia.push({
@@ -136,16 +205,26 @@ export const DownloadsView = () => {
               } else {
                 // Update existing entry with URL if missing
                 const existing = uploadedMedia.find(f => f.id === file.id);
-                if (existing && !existing.url) {
-                  existing.url = `/api/storage/download/${file.id}`;
-                  existing.size = file.size;
+                if (existing) {
+                  console.log("[DownloadsView] Found match for file ID:", file.id);
+                  if (!existing.url) {
+                    existing.url = `/api/storage/download/${file.id}`;
+                    console.log("[DownloadsView] Added URL to existing file:", existing.url);
+                  }
+                  if (!existing.size && file.size) {
+                    existing.size = file.size;
+                  }
                 }
               }
             });
+          } else {
+            console.warn("[DownloadsView] Nexus API returned status:", response.status);
           }
+        } else {
+          console.log("[DownloadsView] No Firebase token available, skipping Nexus API fetch");
         }
       } catch (error) {
-        console.error("Failed to fetch Nexus files:", error);
+        console.error("[DownloadsView] Failed to fetch Nexus files:", error);
       }
 
       // Sort by upload date (newest first)
@@ -153,10 +232,13 @@ export const DownloadsView = () => {
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
       );
 
-      console.log("Final uploaded files count:", uploadedMedia.length);
+      console.log("[DownloadsView] Final uploaded files count:", uploadedMedia.length);
+      if (uploadedMedia.length > 0) {
+        console.log("[DownloadsView] Sample file:", uploadedMedia[0]);
+      }
       setUploadedFiles(uploadedMedia);
     } catch (error) {
-      console.error("Failed to load uploaded files:", error);
+      console.error("[DownloadsView] Failed to load uploaded files:", error);
     } finally {
       setLoadingUploaded(false);
     }
@@ -428,6 +510,12 @@ export const DownloadsView = () => {
     acc[provider].push(file);
     return acc;
   }, {} as Record<string, UploadedFile[]>);
+  
+  // Debug: Log filesByProvider
+  console.log("[DownloadsView] Files grouped by provider:", Object.keys(filesByProvider).map(key => ({
+    provider: key,
+    count: filesByProvider[key].length
+  })));
 
   const providerOrder = ["bunny", "planethoster", "cloudinary", "nexus", "local"];
 
