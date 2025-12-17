@@ -393,7 +393,8 @@ export const SettingsView = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [bunnyStatus, setBunnyStatus] = useState<{ configured: boolean; message?: string } | null>(null);
   const [bunnyStatusLoading, setBunnyStatusLoading] = useState(false);
-  // Reuse isElectron already defined above (line 106)
+  // Check if running in Electron - use reliable detection
+  const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
   // Load Bunny status when user is Pro
   useEffect(() => {
@@ -452,9 +453,10 @@ export const SettingsView = () => {
       
       if (isElectron) {
         try {
+          if (!window.electronAPI) return;
           const [electronSettings, status] = await Promise.all([
-            window.electronAPI!.getSettings(),
-            window.electronAPI!.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false, username: undefined }, libreFm: { connected: false, username: undefined } }),
+            window.electronAPI.getSettings(),
+            window.electronAPI.getScrobblerStatus?.() || Promise.resolve({ lastFm: { connected: false, username: undefined }, libreFm: { connected: false, username: undefined } }),
           ]);
           loadedSettings = { ...loadedSettings, ...electronSettings };
           setScrobblerStatus({
@@ -586,9 +588,9 @@ export const SettingsView = () => {
     localStorage.setItem(`nexus-setting-${key}`, JSON.stringify(value));
     
     // Save to Electron storage if in Electron
-    if (isElectron) {
+    if (isElectron && window.electronAPI) {
       try {
-        await window.electronAPI!.updateSettings({ [key]: value });
+        await window.electronAPI.updateSettings({ [key]: value });
       } catch (err) {
         console.error("Failed to save setting to Electron:", err);
       }
