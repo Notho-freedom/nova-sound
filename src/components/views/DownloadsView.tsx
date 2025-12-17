@@ -804,167 +804,81 @@ export const DownloadsView = () => {
               return files.length > 0;
             });
 
-            // If only one provider, show it directly without tabs
-            if (providersWithFiles.length === 1) {
-              const provider = providersWithFiles[0];
-              const files = filesByProvider[provider] || [];
-              return (
-                <div className="flex-1 overflow-y-auto">
-                  <div className="space-y-2">
-                    {files.map((file) => (
-                      <div
-                        key={file.id}
-                        className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                            {getFileIcon(getFileType(file.name))}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate text-foreground">
-                              {file.name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-muted-foreground">
-                                {formatDuration(new Date(file.uploadedAt))}
-                              </span>
-                              {file.size && (
-                                <>
-                                  <span className="text-xs text-muted-foreground">•</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatFileSize(file.size)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {file.url && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => startDownload(file.url!, file.name)}
-                              >
-                                <Download className="w-4 h-4 mr-2" />
-                                Télécharger
-                              </Button>
-                            )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {file.url && (
-                                  <>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        const a = document.createElement("a");
-                                        a.href = file.url!;
-                                        a.download = file.name;
-                                        a.click();
-                                      }}
-                                    >
-                                      <Download className="w-4 h-4 mr-2" />
-                                      Télécharger directement
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                  </>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={async () => {
-                                    const updated = uploadedFiles.filter(f => f.id !== file.id);
-                                    setUploadedFiles(updated);
-                                    
-                                    // Get user-isolated storage key
-                                    const userId = await getCurrentUserId();
-                                    const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
-                                    localStorage.setItem(storageKey, JSON.stringify(updated));
-                                    
-                                    // Sync to Firebase if available
-                                    try {
-                                      const { firebaseSyncService } = await import('@/services/firebase-sync');
-                                      firebaseSyncService.queueSync('uploadedMedia', updated);
-                                    } catch (error) {
-                                      // Silently fail if Firebase sync is not available
-                                    }
-                                    
-                                    toast.success("Fichier supprimé de la liste");
-                                  }}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Supprimer de la liste
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-
-            // Multiple providers: use tabs
-            return (
-              <Tabs defaultValue={providersWithFiles[0] || "bunny"} className="flex-1 flex flex-col overflow-hidden">
-                <TabsList className="mb-4 bg-muted/30">
-                  {providersWithFiles.map((provider) => {
-                    const files = filesByProvider[provider] || [];
-                    return (
-                      <TabsTrigger 
-                        key={provider} 
-                        value={provider}
-                        className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
-                      >
-                        {getProviderIcon(provider as any)}
-                        {getProviderName(provider as any)} ({files.length})
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
-
-                {providersWithFiles.map((provider) => {
-                  const files = filesByProvider[provider] || [];
-                  return (
-                    <TabsContent key={provider} value={provider} className="flex-1 overflow-y-auto mt-0">
-                      <div className="space-y-2">
-                        {files.map((file) => (
-                          <div
+            // Helper function to render file table
+            const renderFileTable = (files: UploadedFile[]) => (
+              <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
+                <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
+                  <table className="w-full">
+                    <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
+                      <tr className="border-b border-border/30">
+                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+                          Fichier
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                          Type
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
+                          Taille
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                          Uploadé
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {files.map((file) => {
+                        const fileType = getFileType(file.name);
+                        return (
+                          <tr
                             key={file.id}
-                            className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
+                            className="group cursor-pointer transition-all duration-200 ease-out hover:bg-muted/40 active:bg-muted/50"
                           >
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                                {getFileIcon(getFileType(file.name))}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate text-foreground">
-                                  {file.name}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDuration(new Date(file.uploadedAt))}
-                                  </span>
-                                  {file.size && (
-                                    <>
-                                      <span className="text-xs text-muted-foreground">•</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatFileSize(file.size)}
-                                      </span>
-                                    </>
-                                  )}
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                                  {getFileIcon(fileType)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate text-foreground">
+                                    {file.name}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {getProviderIcon(file.cloudProvider)}
+                                    <span className="text-xs text-muted-foreground">
+                                      {getProviderName(file.cloudProvider)}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              <span className="text-sm text-muted-foreground capitalize">
+                                {fileType}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 hidden lg:table-cell">
+                              <span className="text-sm text-muted-foreground font-mono">
+                                {file.size ? formatFileSize(file.size) : "-"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              <span className="text-sm text-muted-foreground">
+                                {formatDuration(new Date(file.uploadedAt))}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
                                 {file.url && (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => startDownload(file.url!, file.name)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startDownload(file.url!, file.name);
+                                    }}
                                   >
                                     <Download className="w-4 h-4 mr-2" />
                                     Télécharger
@@ -972,7 +886,11 @@ export const DownloadsView = () => {
                                 )}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       <MoreVertical className="w-4 h-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -1021,10 +939,51 @@ export const DownloadsView = () => {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+
+            // If only one provider, show it directly without tabs
+            if (providersWithFiles.length === 1) {
+              const provider = providersWithFiles[0];
+              const files = filesByProvider[provider] || [];
+              return (
+                <div className="flex-1 overflow-hidden">
+                  {renderFileTable(files)}
+                </div>
+              );
+            }
+
+            // Multiple providers: use tabs
+            return (
+              <Tabs defaultValue={providersWithFiles[0] || "bunny"} className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="mb-4 bg-muted/30">
+                  {providersWithFiles.map((provider) => {
+                    const files = filesByProvider[provider] || [];
+                    return (
+                      <TabsTrigger 
+                        key={provider} 
+                        value={provider}
+                        className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+                      >
+                        {getProviderIcon(provider as any)}
+                        {getProviderName(provider as any)} ({files.length})
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+
+                {providersWithFiles.map((provider) => {
+                  const files = filesByProvider[provider] || [];
+                  return (
+                    <TabsContent key={provider} value={provider} className="flex-1 overflow-hidden mt-0">
+                      {renderFileTable(files)}
                     </TabsContent>
                   );
                 })}
