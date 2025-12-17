@@ -1273,18 +1273,18 @@ export const DesktopApp = () => {
         )}
 
         {/* Title Bar */}
-        <TitleBar 
-          onOpenSettings={handleOpenSettings} 
-          uploadProgress={isUploading ? overallProgress : undefined}
-          hasNotifications={notifications.length > 0}
-          onToggleNotifications={() => {
-            setIsNotificationsOpen(!isNotificationsOpen);
-            if (!isNotificationsOpen) {
-              setIsLyricsOpen(false);
-              setIsQueueOpen(false);
-            }
-          }}
-        />
+          <TitleBar 
+            onOpenSettings={handleOpenSettings} 
+            uploadProgress={isUploading ? overallProgress : undefined}
+            hasNotifications={notifications.length > 0}
+            onToggleNotifications={() => {
+              setIsNotificationsOpen(!isNotificationsOpen);
+              if (!isNotificationsOpen) {
+                setIsLyricsOpen(false);
+                setIsQueueOpen(false);
+              }
+            }}
+          />
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden relative">
