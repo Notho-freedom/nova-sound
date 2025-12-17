@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getFirebaseAdmin } from '~/lib/firebaseAdmin';
 
+// Disable body parsing - Stripe needs raw body for signature verification
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
@@ -148,12 +152,26 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.metadata?.userId;
+        
+        // Try to get userId from session metadata first
+        let userId = session.metadata?.userId;
+        
+        // If not in session metadata, try to get from customer metadata
+        if (!userId && session.customer) {
+          const customerId = typeof session.customer === 'string' 
+            ? session.customer 
+            : session.customer.id;
+          userId = await getUserIdFromStripe(customerId);
+        }
         
         if (!userId) {
-          console.warn('⚠️ No userId in checkout session metadata');
+          console.warn('⚠️ No userId found in checkout session metadata or customer metadata');
+          console.warn('Session metadata:', session.metadata);
+          console.warn('Customer:', session.customer);
           break;
         }
+
+        console.log(`✅ Processing checkout.session.completed for userId: ${userId}`);
 
         // Get subscription end date from subscription if available
         let subscriptionEndDate: Date | undefined;
@@ -162,9 +180,11 @@ export async function POST(request: NextRequest) {
             typeof session.subscription === 'string' ? session.subscription : session.subscription.id
           );
           subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+          console.log(`📅 Subscription end date: ${subscriptionEndDate.toISOString()}`);
         }
 
         await updateUserToPro(userId, subscriptionEndDate);
+        console.log(`✅ Successfully updated user ${userId} to Pro plan`);
         break;
       }
 
@@ -237,9 +257,14 @@ export async function POST(request: NextRequest) {
 
         const userId = await getUserIdFromStripe(customerId, subscription.metadata);
         
-        if (userId) {
-          await updateUserToFree(userId);
+        if (!userId) {
+          console.warn(`⚠️ Could not find userId for customer ${customerId} (subscription deleted)`);
+          break;
         }
+
+        console.log(`🗑️ Processing subscription deletion for userId: ${userId}`);
+        await updateUserToFree(userId);
+        console.log(`✅ Updated user ${userId} to Free plan (subscription deleted)`);
         break;
       }
 

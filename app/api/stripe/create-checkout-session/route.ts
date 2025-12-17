@@ -85,17 +85,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Find or create Stripe customer with userId in metadata
+    let customer = null;
+    
+    // Try to find existing customer by userId
+    const customers = await stripe.customers.list({
+      limit: 100,
+    });
+    
+    customer = customers.data.find(
+      (c) => c.metadata?.userId === auth.userId
+    );
+    
+    // If customer doesn't exist, create one with userId in metadata
+    if (!customer) {
+      customer = await stripe.customers.create({
+        email: auth.userEmail,
+        metadata: {
+          userId: auth.userId,
+        },
+      });
+      console.log(`[API] Created new Stripe customer for user: ${auth.userId}`);
+    }
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
+      customer: customer.id, // Use existing/created customer
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      customer_email: auth.userEmail,
       metadata: {
         userId: auth.userId,
       },
