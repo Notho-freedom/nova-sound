@@ -1,6 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-
 /**
  * Skeleton pour une carte de piste
  */
@@ -252,6 +251,43 @@ export const ArtistTableSkeleton = ({ count = 10 }: { count?: number }) => (
         </tbody>
       </table>
     </div>
+  </div>
+);
+
+/**
+ * Skeleton pour une carte de vidéo
+ */
+export const VideoCardSkeleton = ({ className }: { className?: string }) => (
+  <div className={cn("flex flex-col", className)}>
+    <Skeleton className="aspect-video w-full rounded-lg" />
+    <div className="mt-2 space-y-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-3 w-1/2" />
+    </div>
+  </div>
+);
+
+/**
+ * Skeleton pour une grille de vidéos
+ */
+export const VideoGridSkeleton = ({ count = 12 }: { count?: number }) => (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+    {Array.from({ length: count }).map((_, i) => (
+      <VideoCardSkeleton key={`video-skeleton-${i}`} />
+    ))}
+  </div>
+);
+
+/**
+ * Skeleton pour un carrousel de vidéos
+ */
+export const VideoCarouselSkeleton = ({ count = 8 }: { count?: number }) => (
+  <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-4">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={`carousel-skeleton-${i}`} className="flex-shrink-0" style={{ width: '220px' }}>
+        <VideoCardSkeleton />
+      </div>
+    ))}
   </div>
 );
 

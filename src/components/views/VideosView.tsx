@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { CinemaMode } from "@/components/CinemaMode";
 import { VideoHero } from "@/components/VideoHero";
@@ -51,6 +52,7 @@ import { UploadIndicator } from "@/components/UploadIndicator";
 import type { Video, VideoGenre } from "@/types/music";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { VideoGridSkeleton, VideoCarouselSkeleton } from "@/components/ui/skeletons";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -139,6 +141,7 @@ export const VideosView = () => {
   } = useVideoUpload();
 
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
+  const { isUploaded: isVideoUploaded, getUploadedProvider } = useUploadedStatus();
 
   // View states
   const [viewMode, setViewMode] = useState<ViewMode>("home");
@@ -153,6 +156,8 @@ export const VideosView = () => {
   const [showUrlDialog, setShowUrlDialog] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlTitle, setUrlTitle] = useState("");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
 
   // Get featured videos for hero rotation
   const featuredVideos = useMemo(() => {
@@ -491,9 +496,10 @@ export const VideosView = () => {
       <div className="flex-1 overflow-y-auto">
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-muted-foreground">Chargement des vidéos...</p>
+          <div className="p-6 space-y-8">
+            <VideoCarouselSkeleton count={8} />
+            <VideoCarouselSkeleton count={8} />
+            <VideoGridSkeleton count={12} />
           </div>
         )}
 
@@ -712,35 +718,73 @@ export const VideosView = () => {
                 </SelectContent>
               </Select>
 
-              <div className="flex rounded-lg bg-muted/30 p-1 ml-auto">
-                <button
-                  onClick={() => setDisplayMode("grid")}
-                  aria-label="Vue grille"
-                  className={cn(
-                    "p-2 rounded transition-all",
-                    displayMode === "grid"
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setDisplayMode("list")}
-                  aria-label="Vue liste"
-                  className={cn(
-                    "p-2 rounded transition-all",
-                    displayMode === "list"
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <List className="w-4 h-4" />
-                </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectionMode(!selectionMode);
+                        if (selectionMode) {
+                          setSelectedVideoIds(new Set());
+                        }
+                      }}
+                      className={cn(
+                        selectionMode && "bg-primary/20 text-primary"
+                      )}
+                    >
+                      <CheckSquare className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {selectionMode ? "Désactiver la sélection" : "Activer la sélection multiple"}
+                  </TooltipContent>
+                </Tooltip>
+
+                <div className="flex rounded-lg bg-muted/30 p-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setDisplayMode("grid")}
+                        aria-label="Vue grille"
+                        className={cn(
+                          "p-2 rounded transition-all",
+                          displayMode === "grid"
+                            ? "bg-primary/20 text-primary"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Grid className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Vue grille</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setDisplayMode("list")}
+                        aria-label="Vue liste"
+                        className={cn(
+                          "p-2 rounded transition-all",
+                          displayMode === "list"
+                            ? "bg-primary/20 text-primary"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <List className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Vue liste</TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
 
               <span className="text-sm text-muted-foreground">
-                {filteredVideos.length} vidéo(s)
+                {selectionMode && selectedVideoIds.size > 0 
+                  ? `${selectedVideoIds.size} sélectionné(s)`
+                  : `${filteredVideos.length} vidéo(s)`
+                }
               </span>
             </div>
 
@@ -766,10 +810,16 @@ export const VideosView = () => {
                     canUploadToNexus={nexusIsPro && nexusAuthenticated}
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
-                    <div
-                      className="group cursor-pointer p-2 rounded-xl hover:bg-card/50 transition-all"
-                      onClick={() => handleViewDetails(video)}
-                    >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className="group cursor-pointer p-2 rounded-xl hover:bg-card/50 transition-all"
+                          onClick={() => {
+                            if (!selectionMode) {
+                              handleViewDetails(video);
+                            }
+                          }}
+                        >
                       <div className="aspect-video rounded-lg overflow-hidden relative bg-muted">
                         {video.thumbnailUrl || video.posterUrl ? (
                           <img
@@ -819,32 +869,71 @@ export const VideosView = () => {
                         </div>
 
                         {/* Cloud indicator */}
-                        {video.cloudStatus?.isUploaded && (
-                          <div className="absolute top-2 left-2">
-                            <UploadIndicator provider={video.cloudStatus.provider} size="sm" />
+                        {(video.cloudStatus?.isUploaded || isVideoUploaded(video.id)) && (
+                          <div className="absolute top-2 left-2 z-10">
+                            <UploadIndicator 
+                              provider={video.cloudStatus?.provider || getUploadedProvider(video.id) || undefined} 
+                              size="sm" 
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Selection checkbox */}
+                        {selectionMode && (
+                          <div className="absolute top-2 right-2 z-10">
+                            <input
+                              type="checkbox"
+                              checked={selectedVideoIds.has(video.id)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedVideoIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(video.id)) {
+                                    next.delete(video.id);
+                                  } else {
+                                    next.add(video.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-5 h-5 rounded border-2 border-white bg-black/50 checked:bg-primary checked:border-primary"
+                            />
                           </div>
                         )}
 
                         {/* Hover overlay */}
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            size="icon"
-                            className="w-12 h-12 rounded-full bg-primary"
-                            aria-label={`Lire ${video.title}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePlayVideo(video);
-                            }}
-                          >
-                            <Play className="w-6 h-6 fill-current" />
-                          </Button>
-                        </div>
+                        {!selectionMode && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  className="w-12 h-12 rounded-full bg-primary"
+                                  aria-label={`Lire ${video.title}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePlayVideo(video);
+                                  }}
+                                >
+                                  <Play className="w-6 h-6 fill-current" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Lire {video.title}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
 
                         {/* Duration */}
                         {video.duration > 0 && (
-                          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/70 text-xs text-white font-mono">
-                            {formatTime(video.duration)}
-                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/70 text-xs text-white font-mono">
+                                {formatTime(video.duration)}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>Durée: {formatTime(video.duration)}</TooltipContent>
+                          </Tooltip>
                         )}
 
                         {/* Progress bar */}

@@ -272,6 +272,12 @@ export const VideoContextMenu = ({
               <Zap className="w-4 h-4 mr-2 text-green-500" />
               Uploadé sur {video.cloudStatus.provider}
             </ContextMenuItem>
+            {video.cloudStatus.cloudUrl && (
+              <ContextMenuItem onClick={() => window.open(video.cloudStatus!.cloudUrl, '_blank')}>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Ouvrir le lien cloud
+              </ContextMenuItem>
+            )}
             <ContextMenuSeparator />
           </>
         )}

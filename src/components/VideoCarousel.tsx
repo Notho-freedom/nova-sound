@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Video } from "@/types/music";
 import { VideoContextMenu } from "./VideoContextMenu";
 import { UploadIndicator } from "./UploadIndicator";
+import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 
 interface VideoCarouselProps {
   title: string;
@@ -43,6 +44,7 @@ export const VideoCarousel = ({
   className,
 }: VideoCarouselProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { isUploaded, getUploadedProvider } = useUploadedStatus();
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
   const [hoveredVideo, setHoveredVideo] = useState<string | null>(null);
@@ -205,12 +207,7 @@ export const VideoCarousel = ({
                     <Film className="w-12 h-12 text-muted-foreground" />
                   </div>
 
-                  {/* Cloud Upload Indicator */}
-                  {video.cloudStatus?.isUploaded && (
-                    <div className="absolute top-2 left-2 z-10">
-                      <UploadIndicator provider={video.cloudStatus.provider} size="sm" />
-                    </div>
-                  )}
+                  {/* Cloud Upload Indicator - will be handled by VideoCarouselItem */}
 
                   {/* Duration Badge */}
                   {video.duration > 0 && !showProgress && (
