@@ -181,7 +181,18 @@ export function useNexusUpload(): UseNexusUploadReturn {
         return updated;
       });
 
-      notificationService.uploadFailed(track.title, error.message || 'Une erreur est survenue lors de l\'upload');
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Une erreur est survenue lors de l\'upload';
+      
+      // Check if error indicates cloud storage is not configured
+      if (errorMessage.includes('Aucun service de stockage cloud configuré') || 
+          errorMessage.includes('cloud storage configuré')) {
+        errorMessage = 'Bunny Storage n\'est pas configuré côté serveur. Veuillez contacter le support.';
+      } else if (errorMessage.includes('Upload vers le cloud storage a échoué')) {
+        errorMessage = 'L\'upload vers Bunny Storage a échoué. Veuillez réessayer.';
+      }
+
+      notificationService.uploadFailed(track.title, errorMessage);
     }
   }, [uploadProgress]);
 

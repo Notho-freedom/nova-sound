@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
     if (auth.isPro) {
       console.log(`[Upload] Pro user ${auth.userId} uploading file: ${file.name} (${file.size} bytes)`);
       
+      let lastError: Error | null = null;
+      
       // Try Bunny first (if configured)
       if (isBunnyConfigured()) {
         console.log('[Upload] Bunny Storage is configured, attempting upload...');
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
           
           console.log(`[Upload] Uploading to Bunny: ${bunnyPath} (${contentType})`);
           const result = await uploadToBunny(bunnyPath, buffer, contentType);
-          console.log(`[Upload] Bunny upload successful: ${result.url}`);
+          console.log(`[Upload] ✅ Bunny upload successful: ${result.url}`);
 
           return NextResponse.json({
             id: fileId,
@@ -106,12 +108,13 @@ export async function POST(request: NextRequest) {
             provider: 'bunny',
           });
         } catch (bunnyError: any) {
-          console.error('[Upload] Bunny upload failed:', bunnyError.message || bunnyError);
+          console.error('[Upload] ❌ Bunny upload failed:', bunnyError.message || bunnyError);
+          lastError = bunnyError instanceof Error ? bunnyError : new Error(bunnyError.message || 'Bunny upload failed');
           console.log('[Upload] Falling back to PlanetHoster...');
-          // Fallback to PlanetHoster if Bunny fails
+          // Continue to try PlanetHoster
         }
       } else {
-        console.log('[Upload] Bunny Storage not configured, checking PlanetHoster...');
+        console.warn('[Upload] ⚠️ Bunny Storage not configured for Pro user');
       }
 
       // Try PlanetHoster SFTP (if configured)
@@ -123,7 +126,9 @@ export async function POST(request: NextRequest) {
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
           
+          console.log(`[Upload] Uploading to PlanetHoster: ${remotePath}`);
           const result = await uploadToPlanetHoster(remotePath, buffer);
+          console.log(`[Upload] ✅ PlanetHoster upload successful: ${result.url}`);
 
           return NextResponse.json({
             id: fileId,
@@ -133,10 +138,31 @@ export async function POST(request: NextRequest) {
             provider: 'planethoster',
           });
         } catch (planethosterError: any) {
-          console.error('PlanetHoster upload failed, falling back to local storage:', planethosterError);
-          // Fallback to local storage if PlanetHoster fails
+          console.error('[Upload] ❌ PlanetHoster upload failed:', planethosterError.message || planethosterError);
+          lastError = planethosterError instanceof Error ? planethosterError : new Error(planethosterError.message || 'PlanetHoster upload failed');
         }
+      } else {
+        console.warn('[Upload] ⚠️ PlanetHoster not configured for Pro user');
       }
+
+      // If we reach here, both Bunny and PlanetHoster failed or are not configured
+      // For Pro users, we should return an error instead of falling back to local storage
+      const errorMessage = isBunnyConfigured() || isPlanetHosterConfigured()
+        ? `Upload vers le cloud storage a échoué. ${lastError?.message || 'Veuillez réessayer.'}`
+        : 'Aucun service de stockage cloud configuré. Veuillez configurer Bunny Storage ou PlanetHoster pour les utilisateurs Pro.';
+      
+      console.error(`[Upload] ❌ Pro user upload failed: ${errorMessage}`);
+      return createErrorResponse(
+        ErrorCodes.INTERNAL_ERROR,
+        errorMessage,
+        500,
+        {
+          isPro: true,
+          bunnyConfigured: isBunnyConfigured(),
+          planethosterConfigured: isPlanetHosterConfigured(),
+          lastError: lastError?.message,
+        }
+      );
     }
 
     // Free users or Bunny fallback: use local storage
