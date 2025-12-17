@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Play,
@@ -154,13 +154,43 @@ export const VideosView = () => {
   const [urlInput, setUrlInput] = useState("");
   const [urlTitle, setUrlTitle] = useState("");
 
-  // Get hero video (featured - first from continue watching or recently added)
-  const heroVideo = useMemo(() => {
-    if (continueWatching.length > 0) return continueWatching[0];
-    if (recentlyAdded.length > 0) return recentlyAdded[0];
-    if (enhancedVideos.length > 0) return enhancedVideos[0];
-    return null;
-  }, [continueWatching, recentlyAdded, enhancedVideos]);
+  // Get featured videos for hero rotation
+  const featuredVideos = useMemo(() => {
+    const videos: Video[] = [];
+    // Priority: continue watching > recently added > recently watched > top rated
+    videos.push(...continueWatching.slice(0, 5));
+    videos.push(...recentlyAdded.slice(0, 5));
+    videos.push(...recentlyWatched.slice(0, 5));
+    
+    // Add top rated videos
+    const topRated = [...enhancedVideos]
+      .filter(v => v.ratings && v.ratings.length > 0)
+      .sort((a, b) => {
+        const aRating = a.ratings?.[0]?.value || 0;
+        const bRating = b.ratings?.[0]?.value || 0;
+        return bRating - aRating;
+      })
+      .slice(0, 5);
+    videos.push(...topRated);
+    
+    // Remove duplicates and limit to 10
+    const unique = videos.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+    return unique.slice(0, 10);
+  }, [continueWatching, recentlyAdded, recentlyWatched, enhancedVideos]);
+
+  // Auto-rotate hero video every 10 seconds
+  const [heroVideoIndex, setHeroVideoIndex] = useState(0);
+  const heroVideo = featuredVideos[heroVideoIndex] || null;
+
+  useEffect(() => {
+    if (featuredVideos.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setHeroVideoIndex((prev) => (prev + 1) % featuredVideos.length);
+    }, 10000); // Change every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [featuredVideos.length]);
 
   // Filtered and sorted videos for browse mode
   const filteredVideos = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   Play,
   Plus,
@@ -19,6 +19,7 @@ import {
   Upload,
   Subtitles,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +123,24 @@ export const VideoDetailView = ({
 }: VideoDetailViewProps) => {
   const [showFullSynopsis, setShowFullSynopsis] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState(1);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Determine teaser source: trailer/preview or auto-generated from video file
+  const teaserSource = video.trailerUrl || video.previewUrl || video.filePath;
+  const hasTeaser = !!(video.trailerUrl || video.previewUrl || video.filePath);
+  
+  // Convert file path to local-video:// protocol if needed
+  const getTeaserUrl = () => {
+    if (video.trailerUrl || video.previewUrl) {
+      return video.trailerUrl || video.previewUrl;
+    }
+    // Use local-video:// protocol for local files in Electron
+    if (video.filePath && window.electronAPI) {
+      return `local-video://${encodeURIComponent(video.filePath)}`;
+    }
+    return video.filePath;
+  };
 
   const backdrop = video.backdropUrl || video.posterUrl || video.thumbnailUrl;
   const rating = video.ratings?.[0];
@@ -161,8 +180,35 @@ export const VideoDetailView = ({
 
       {/* Hero Section */}
       <div className="relative w-full h-[50vh] min-h-[400px]">
-        {/* Background */}
-        {backdrop ? (
+        {/* Background Video/Image */}
+        {hasTeaser ? (
+          <>
+            <video
+              ref={videoRef}
+              src={getTeaserUrl()}
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+              className="w-full h-full object-cover"
+              onLoadedData={() => {
+                // For auto-generated teaser, start from beginning
+                if (videoRef.current && !video.trailerUrl && !video.previewUrl) {
+                  videoRef.current.currentTime = 0;
+                }
+              }}
+            />
+            {/* Fallback backdrop image */}
+            {backdrop && (
+              <img
+                src={backdrop}
+                alt={video.title}
+                className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
+                style={{ zIndex: -1 }}
+              />
+            )}
+          </>
+        ) : backdrop ? (
           <img
             src={backdrop}
             alt={video.title}
@@ -177,6 +223,22 @@ export const VideoDetailView = ({
         {/* Gradient Overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />
+
+        {/* Mute Button (when teaser is playing) */}
+        {hasTeaser && (
+          <Button
+            size="icon"
+            variant="outline"
+            className="absolute bottom-8 right-8 w-10 h-10 rounded-full border-white/50 bg-black/30 hover:bg-black/50 backdrop-blur-sm z-20"
+            onClick={() => setIsMuted(!isMuted)}
+          >
+            {isMuted ? (
+              <VolumeX className="w-5 h-5" />
+            ) : (
+              <Volume2 className="w-5 h-5" />
+            )}
+          </Button>
+        )}
 
         {/* Poster (for series/movies) */}
         <div className="absolute bottom-0 left-8 transform translate-y-1/4 hidden md:block">
