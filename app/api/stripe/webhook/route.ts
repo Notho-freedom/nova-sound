@@ -154,14 +154,17 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         
         // Try to get userId from session metadata first
-        let userId = session.metadata?.userId;
+        let userId: string | null | undefined = session.metadata?.userId;
         
         // If not in session metadata, try to get from customer metadata
         if (!userId && session.customer) {
           const customerId = typeof session.customer === 'string' 
             ? session.customer 
             : session.customer.id;
-          userId = await getUserIdFromStripe(customerId);
+          const fetchedUserId = await getUserIdFromStripe(customerId);
+          if (fetchedUserId) {
+            userId = fetchedUserId;
+          }
         }
         
         if (!userId) {
@@ -179,7 +182,7 @@ export async function POST(request: NextRequest) {
           const subscription = await stripe.subscriptions.retrieve(
             typeof session.subscription === 'string' ? session.subscription : session.subscription.id
           );
-          subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+          subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
           console.log(`📅 Subscription end date: ${subscriptionEndDate.toISOString()}`);
         }
 
@@ -207,7 +210,7 @@ export async function POST(request: NextRequest) {
         const isPro = priceId === PRICE_PRO_MONTHLY || priceId === PRICE_PRO_YEARLY;
 
         if (isPro && subscription.status === 'active') {
-          const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+          const subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
           await updateUserToPro(userId, subscriptionEndDate);
         } else if (subscription.status === 'canceled' || subscription.status === 'past_due') {
           await updateUserToFree(userId);
@@ -217,16 +220,17 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
+        
+        // Only process if it's a subscription invoice
+        if (!(invoice as any).subscription || !invoice.customer) {
+          break;
+        }
+        
         const customerId = typeof invoice.customer === 'string' 
           ? invoice.customer 
           : invoice.customer.id;
 
-        // Only process if it's a subscription invoice
-        if (!invoice.subscription) {
-          break;
-        }
-
-        const userId = await getUserIdFromStripe(customerId, invoice.metadata);
+        const userId = await getUserIdFromStripe(customerId, invoice.metadata || undefined);
         
         if (!userId) {
           console.warn(`⚠️ Could not find userId for customer ${customerId}`);
@@ -234,16 +238,16 @@ export async function POST(request: NextRequest) {
         }
 
         // Get subscription to check if it's Pro
-        const subscriptionId = typeof invoice.subscription === 'string' 
-          ? invoice.subscription 
-          : invoice.subscription.id;
+        const subscriptionId = typeof (invoice as any).subscription === 'string' 
+          ? (invoice as any).subscription 
+          : (invoice as any).subscription.id;
 
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         const priceId = subscription.items.data[0]?.price.id;
         const isPro = priceId === PRICE_PRO_MONTHLY || priceId === PRICE_PRO_YEARLY;
 
         if (isPro && subscription.status === 'active') {
-          const subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+          const subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
           await updateUserToPro(userId, subscriptionEndDate);
         }
         break;

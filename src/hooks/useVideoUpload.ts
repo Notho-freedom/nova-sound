@@ -571,6 +571,10 @@ export function useVideoUpload(): UseVideoUploadReturn {
     return cloudinaryProgress.get(videoId) || null;
   }, [cloudinaryProgress]);
 
+  const getBunnyProgress = useCallback((videoId: string) => {
+    return bunnyProgress.get(videoId) || null;
+  }, [bunnyProgress]);
+
   const getNexusProgress = useCallback((videoId: string) => {
     return nexusProgress.get(videoId) || null;
   }, [nexusProgress]);

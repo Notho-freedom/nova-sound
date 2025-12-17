@@ -19,19 +19,21 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import * as dotenv from 'dotenv';
 
-// Load environment variables
+// Load environment variables (in order of priority)
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env.production' });
+dotenv.config({ path: '.env' }); // Fallback to .env
 
 const REQUIRED_ENV_VARS = [
-  'NEXT_PUBLIC_FIREBASE_API_KEY',
-  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  'FIREBASE_PROJECT_ID',
   'FIREBASE_PRIVATE_KEY',
   'FIREBASE_CLIENT_EMAIL',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
 ];
+
+// Note: Les variables NEXT_PUBLIC_* peuvent être chargées depuis .env ou .env.local
+// Elles sont nécessaires pour le build mais peuvent être dans différents fichiers
 
 const OPTIONAL_ENV_VARS = [
   'BUNNY_STORAGE_NAME',
@@ -120,24 +122,35 @@ function main() {
   const version = getVersion();
   console.log(`📌 Version: ${version}\n`);
 
-  // Set production environment
-  process.env.NODE_ENV = 'production';
-  process.env.NEXT_PUBLIC_NODE_ENV = 'production';
-
   // Build steps
   console.log('🔨 Démarrage du build de production...\n');
 
   // 1. Clean previous builds
   console.log('🧹 Nettoyage des builds précédents...');
   try {
+    const platform = process.platform;
+    const isWindows = platform === 'win32';
+    
     if (existsSync('.next')) {
-      execSync('rm -rf .next', { stdio: 'inherit' });
+      if (isWindows) {
+        execSync('powershell -Command "if (Test-Path \'.next\') { Remove-Item -Path \'.next\' -Recurse -Force }"', { stdio: 'inherit' });
+      } else {
+        execSync('rm -rf .next', { stdio: 'inherit' });
+      }
     }
     if (existsSync('dist-electron')) {
-      execSync('rm -rf dist-electron', { stdio: 'inherit' });
+      if (isWindows) {
+        execSync('powershell -Command "if (Test-Path \'dist-electron\') { Remove-Item -Path \'dist-electron\' -Recurse -Force }"', { stdio: 'inherit' });
+      } else {
+        execSync('rm -rf dist-electron', { stdio: 'inherit' });
+      }
     }
     if (existsSync('dist')) {
-      execSync('rm -rf dist', { stdio: 'inherit' });
+      if (isWindows) {
+        execSync('powershell -Command "if (Test-Path \'dist\') { Remove-Item -Path \'dist\' -Recurse -Force }"', { stdio: 'inherit' });
+      } else {
+        execSync('rm -rf dist', { stdio: 'inherit' });
+      }
     }
     console.log('✅ Nettoyage terminé.\n');
   } catch (error) {

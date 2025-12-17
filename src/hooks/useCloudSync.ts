@@ -675,13 +675,14 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   const refreshUser = useCallback(async () => {
     // Force reload profile from Firestore
-    const currentUser = authService.getCurrentUser();
+    const { firebaseService } = await import('@/services/firebase');
+    const currentUser = firebaseService.getCurrentUser();
     if (currentUser && !currentUser.isAnonymous) {
       // Use the new refreshProfile method which will reload from Firestore
       // and trigger the snapshot listener
-      await authService.refreshProfile();
+      await firebaseService.refreshProfile();
       // Update state from current profile
-      const profile = authService.getUserProfile();
+      const profile = firebaseService.getUserProfile();
       if (profile) {
         setNexusUser(profile);
         setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");

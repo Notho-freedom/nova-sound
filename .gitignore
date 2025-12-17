@@ -52,3 +52,7 @@ local-ui/
 !local-ui/.gitkeep
 .env.local.tmp
 prices (1).csv
+# Build outputs
+dist-electron/
+out/
+.next/

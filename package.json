@@ -19,7 +19,7 @@
     "package:win": "npm run build:electron && electron-builder --win",
     "package:mac": "npm run build:electron && electron-builder --mac",
     "package:linux": "npm run build:electron && electron-builder --linux",
-    "build:prod": "tsx scripts/build-production.ts",
+    "build:prod": "npx tsx scripts/build-production.ts",
     "lint": "eslint .",
     "preview": "next start",
     "test:api": "node scripts/test-api-routes.mjs",
@@ -135,7 +135,7 @@
   },
   "build": {
     "appId": "com.nexus.audio",
-    "productName": "NEXUS Audio",
+    "productName": "Nexus Player",
     "directories": {
       "output": "release"
     },

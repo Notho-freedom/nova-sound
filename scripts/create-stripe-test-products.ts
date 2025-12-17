@@ -190,7 +190,7 @@ async function main() {
   console.log();
 
   // Check if using test key
-  if (!STRIPE_SECRET_KEY.startsWith('sk_test_')) {
+  if (STRIPE_SECRET_KEY && !STRIPE_SECRET_KEY.startsWith('sk_test_')) {
     console.warn('⚠️  ATTENTION: Vous utilisez une clé qui ne commence pas par sk_test_');
     console.warn('   Ce script est destiné à créer des produits de TEST uniquement.');
     console.warn('   Continuons quand même...\n');
