@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Play, Info, Plus, Check, VolumeX, Volume2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,17 +32,23 @@ export const VideoHero = ({
   className,
 }: VideoHeroProps) => {
   const [isMuted, setIsMuted] = useState(true);
-  const [showTrailer, setShowTrailer] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Auto-play trailer after delay
-  useEffect(() => {
+  // Determine teaser source: trailer/preview or auto-generated from video file
+  const teaserSource = video.trailerUrl || video.previewUrl || video.filePath;
+  const hasTeaser = !!(video.trailerUrl || video.previewUrl || video.filePath);
+  
+  // Convert file path to local-video:// protocol if needed
+  const getTeaserUrl = () => {
     if (video.trailerUrl || video.previewUrl) {
-      const timeout = setTimeout(() => {
-        setShowTrailer(true);
-      }, 3000);
-      return () => clearTimeout(timeout);
+      return video.trailerUrl || video.previewUrl;
     }
-  }, [video.trailerUrl, video.previewUrl]);
+    // Use local-video:// protocol for local files in Electron
+    if (video.filePath && window.electronAPI) {
+      return `local-video://${encodeURIComponent(video.filePath)}`;
+    }
+    return video.filePath;
+  };
 
   const backdrop = video.backdropUrl || video.posterUrl || video.thumbnailUrl;
   const rating = video.ratings?.[0];
@@ -51,15 +57,34 @@ export const VideoHero = ({
     <div className={cn("relative w-full h-[70vh] min-h-[500px] overflow-hidden", className)}>
       {/* Background Image/Video */}
       <div className="absolute inset-0">
-        {showTrailer && (video.trailerUrl || video.previewUrl) ? (
-          <video
-            src={video.trailerUrl || video.previewUrl}
-            autoPlay
-            loop
-            muted={isMuted}
-            playsInline
-            className="w-full h-full object-cover"
-          />
+        {hasTeaser ? (
+          <>
+            <video
+              ref={videoRef}
+              src={getTeaserUrl()}
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+              className="w-full h-full object-cover"
+              onLoadedData={() => {
+                // For auto-generated teaser, start from beginning (or skip intro if long)
+                if (videoRef.current && !video.trailerUrl && !video.previewUrl) {
+                  // Start from beginning for teaser
+                  videoRef.current.currentTime = 0;
+                }
+              }}
+            />
+            {/* Fallback backdrop image */}
+            {backdrop && (
+              <img
+                src={backdrop}
+                alt={video.title}
+                className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
+                style={{ zIndex: -1 }}
+              />
+            )}
+          </>
         ) : backdrop ? (
           <img
             src={backdrop}
@@ -227,12 +252,12 @@ export const VideoHero = ({
         </div>
       </div>
 
-      {/* Mute Button (when trailer is playing) */}
-      {showTrailer && (video.trailerUrl || video.previewUrl) && (
+      {/* Mute Button (when teaser is playing) */}
+      {hasTeaser && (
         <Button
           size="icon"
           variant="outline"
-          className="absolute bottom-8 right-8 w-10 h-10 rounded-full border-white/50"
+          className="absolute bottom-8 right-8 w-10 h-10 rounded-full border-white/50 bg-black/30 hover:bg-black/50 backdrop-blur-sm"
           onClick={() => setIsMuted(!isMuted)}
         >
           {isMuted ? (

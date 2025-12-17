@@ -129,7 +129,7 @@ export const VideoCarousel = ({
                 className={cn(
                   "relative flex-shrink-0 cursor-pointer transition-all duration-300 ease-out",
                   "group/card",
-                  isHovered ? "scale-110 z-10" : "scale-100"
+                  isHovered ? "z-10" : ""
                 )}
                 style={{ width: showRank ? "180px" : "220px" }}
                 onMouseEnter={() => setHoveredVideo(video.id)}
