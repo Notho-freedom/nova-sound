@@ -391,12 +391,53 @@ export const VideoPlayer = ({
                   />
                 </div>
 
+                {/* Subtitles (if available) */}
+                {video.subtitles && video.subtitles.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label="Sous-titres"
+                    >
+                      <option value="">Sous-titres désactivés</option>
+                      {video.subtitles.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Audio Tracks (if available) */}
+                {video.audioTracks && video.audioTracks.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label="Piste audio"
+                    >
+                      {video.audioTracks.map((track) => (
+                        <option key={track.id} value={track.id}>
+                          {track.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Quality (if available) */}
+                {video.quality && (
+                  <div className="px-2 py-1 bg-white/20 rounded text-xs text-white font-medium">
+                    {video.quality}
+                  </div>
+                )}
+
                 {/* Playback Rate */}
                 <div className="flex items-center gap-2">
                   <select
                     value={playbackRate}
                     onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
                     className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    aria-label="Vitesse de lecture"
                   >
                     <option value="0.25">0.25x</option>
                     <option value="0.5">0.5x</option>
@@ -413,11 +454,20 @@ export const VideoPlayer = ({
             {/* Video Info */}
             <div className="text-white">
               <h3 className="font-medium text-sm truncate">{video.title}</h3>
-              {video.width && video.height && (
-                <p className="text-xs text-white/70">
-                  {video.width} × {video.height} • {video.format?.toUpperCase()}
-                </p>
-              )}
+              <div className="flex items-center gap-2 text-xs text-white/70">
+                {video.width && video.height && (
+                  <span>{video.width} × {video.height}</span>
+                )}
+                {video.format && (
+                  <span>• {video.format.toUpperCase()}</span>
+                )}
+                {video.codec && (
+                  <span>• {video.codec}</span>
+                )}
+                {video.duration > 0 && (
+                  <span>• {formatTime(video.duration)}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>

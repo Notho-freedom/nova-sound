@@ -93,12 +93,12 @@ export function useLibrary(): UseLibraryReturn {
     });
 
     // Track removed - remove from library in real-time
-    const unsubscribeRemoved = window.electronAPI!.onTrackRemoved((filePath: string) => {
+    const unsubscribeRemoved = window.electronAPI?.onTrackRemoved?.((filePath: string) => {
       setTracks(prev => prev.filter(t => t.filePath !== filePath));
     });
 
     // Track updated - update in library in real-time
-    const unsubscribeUpdated = window.electronAPI!.onTrackUpdated((track: Track) => {
+    const unsubscribeUpdated = window.electronAPI?.onTrackUpdated?.((track: Track) => {
       setTracks(prev => prev.map(t => 
         (t.id === track.id || t.filePath === track.filePath) ? track : t
       ));
@@ -106,8 +106,8 @@ export function useLibrary(): UseLibraryReturn {
 
     return () => {
       unsubscribeAdded();
-      unsubscribeRemoved();
-      unsubscribeUpdated();
+      unsubscribeRemoved?.();
+      unsubscribeUpdated?.();
     };
   }, [isElectron]);
 

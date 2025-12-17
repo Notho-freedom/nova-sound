@@ -272,11 +272,11 @@ export const DownloadsView = () => {
     window.addEventListener("storage", handleStorageChange);
     
     // Listen for custom events (from same tab)
-    window.addEventListener("uploadedMediaChanged", handleCustomEvent as EventListener);
+    window.addEventListener("uploadedMediaChanged", handleCustomEvent as unknown as EventListener);
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("uploadedMediaChanged", handleCustomEvent as EventListener);
+      window.removeEventListener("uploadedMediaChanged", handleCustomEvent as unknown as EventListener);
     };
   }, [loadUploadedFiles]);
 

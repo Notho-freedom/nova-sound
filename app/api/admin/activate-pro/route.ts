@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '~/lib/firebaseAdmin';
 
-const admin = getFirebaseAdmin();
-const db = admin.firestore();
-
 /**
  * Activate Pro plan for a user by email
  * POST /api/admin/activate-pro
@@ -11,6 +8,9 @@ const db = admin.firestore();
  */
 export async function POST(request: NextRequest) {
   try {
+    const admin = getFirebaseAdmin();
+    const db = admin.firestore();
+
     const body = await request.json();
     const { email } = body;
 
@@ -36,11 +36,12 @@ export async function POST(request: NextRequest) {
     const userId = userDoc.id;
 
     // Update user profile to Pro
+    const adminInstance = getFirebaseAdmin();
     await userDoc.ref.update({
       plan: 'pro',
       subscriptionStatus: 'active',
       subscriptionEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
-      updatedAt: admin.firestore.Timestamp.now(),
+      updatedAt: adminInstance.firestore.Timestamp.now(),
     });
 
     return NextResponse.json({
@@ -65,6 +66,9 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    const admin = getFirebaseAdmin();
+    const db = admin.firestore();
+
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
 

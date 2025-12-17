@@ -119,7 +119,7 @@ export function useAudioVibes(
           if (optionsRef.current.enableBassFilter) {
             bassFilter = audioContext.createBiquadFilter();
             bassFilter.type = 'lowshelf';
-            bassFilter.frequency.value = optionsRef.current.bassFrequency;
+            bassFilter.frequency.value = optionsRef.current.bassFrequency ?? 200;
             bassFilter.gain.value = 20; // Amplifier les basses
 
             // Connecter source -> filtre -> analyseur (pour l'analyse uniquement)
@@ -181,13 +181,15 @@ export function useAudioVibes(
           const binWidth = nyquist / bufferLength;
 
           // Basses : 0-100Hz (environ les premiers bins)
-          const bassBins = Math.floor(optionsRef.current.bassFrequency / binWidth);
+          const bassFreq = optionsRef.current.bassFrequency ?? 200;
+          const midFreq = optionsRef.current.midFrequency ?? 2000;
+          const bassBins = Math.floor(bassFreq / binWidth);
           const bassEnergy = Array.from(frequencyData.slice(0, bassBins))
             .reduce((sum, val) => sum + val, 0) / bassBins;
 
           // Médiums : 100-2000Hz
           const midStartBin = bassBins;
-          const midEndBin = Math.floor(optionsRef.current.midFrequency / binWidth);
+          const midEndBin = Math.floor(midFreq / binWidth);
           const midEnergy = Array.from(frequencyData.slice(midStartBin, midEndBin))
             .reduce((sum, val) => sum + val, 0) / (midEndBin - midStartBin);
 

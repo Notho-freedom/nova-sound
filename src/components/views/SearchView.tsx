@@ -358,44 +358,44 @@ export const SearchView = ({
                       isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                     >
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div
-                            onClick={() => onTrackSelect(actualIndex)}
-                            className={cn(
-                              "flex items-center gap-4 px-3 py-2.5 cursor-pointer transition-all duration-200 ease-out group",
-                              isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                            )}
-                          >
-                            <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
-                              <img
-                                src={getCoverUrl(track.coverUrl)}
-                                alt={track.album}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                                <Play className="w-5 h-5 text-white fill-current" />
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
+                      <TooltipTrigger asChild>
+                        <div
+                          onClick={() => onTrackSelect(actualIndex)}
+                          className={cn(
+                            "flex items-center gap-4 px-3 py-2.5 cursor-pointer transition-all duration-200 ease-out group",
+                            isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                          )}
+                        >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
+                        <img
+                          src={getCoverUrl(track.coverUrl)}
+                          alt={track.album}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                          <Play className="w-5 h-5 text-white fill-current" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <p className={cn(
-                                  "text-sm font-medium truncate",
-                                  isCurrentTrack ? "text-primary" : "text-foreground"
-                                )}>
-                                  {track.title}
-                                </p>
+                        <p className={cn(
+                          "text-sm font-medium truncate",
+                          isCurrentTrack ? "text-primary" : "text-foreground"
+                        )}>
+                          {track.title}
+                        </p>
                                 {isUploaded(track.id) && (
                                   <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {track.artist} • {track.album}
-                              </p>
-                            </div>
-                            <span className="text-sm text-muted-foreground font-mono">
-                              {formatTime(track.duration)}
-                            </span>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {track.artist} • {track.album}
+                        </p>
+                      </div>
+                      <span className="text-sm text-muted-foreground font-mono">
+                        {formatTime(track.duration)}
+                      </span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -405,15 +405,15 @@ export const SearchView = ({
                             >
                               <MoreHorizontal className="w-4 h-4" />
                             </button>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <div className="text-sm font-medium">{track.title}</div>
-                          <div className="text-xs text-muted-foreground">{track.artist}</div>
-                          {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
-                          <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
-                        </TooltipContent>
-                      </Tooltip>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm font-medium">{track.title}</div>
+                        <div className="text-xs text-muted-foreground">{track.artist}</div>
+                        {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                        <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
+                      </TooltipContent>
+                    </Tooltip>
                     </TrackContextMenu>
                   );
                 })}

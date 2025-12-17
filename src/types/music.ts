@@ -194,19 +194,189 @@ export interface PlayerState {
   queue: QueueState;
 }
 
+// Video genres/categories
+export type VideoGenre = 
+  | 'action'
+  | 'adventure'
+  | 'animation'
+  | 'comedy'
+  | 'crime'
+  | 'documentary'
+  | 'drama'
+  | 'family'
+  | 'fantasy'
+  | 'horror'
+  | 'music'
+  | 'mystery'
+  | 'romance'
+  | 'scifi'
+  | 'thriller'
+  | 'war'
+  | 'western'
+  | 'sport'
+  | 'biography'
+  | 'history'
+  | 'anime'
+  | 'gaming'
+  | 'tutorial'
+  | 'vlog'
+  | 'short'
+  | 'other';
+
+// Video content type
+export type VideoType = 'movie' | 'series' | 'episode' | 'clip' | 'trailer' | 'music_video' | 'documentary' | 'other';
+
+// Video quality
+export type VideoQuality = '480p' | '720p' | '1080p' | '1440p' | '4k' | '8k' | 'unknown';
+
+// Subtitle track
+export interface SubtitleTrack {
+  id: string;
+  language: string;
+  label: string;
+  filePath?: string;
+  url?: string;
+  isDefault?: boolean;
+}
+
+// Audio track for multi-audio videos
+export interface AudioTrack {
+  id: string;
+  language: string;
+  label: string;
+  codec?: string;
+  isDefault?: boolean;
+}
+
+// Video chapter/segment
+export interface VideoChapter {
+  id: string;
+  title: string;
+  startTime: number;
+  endTime: number;
+  thumbnailUrl?: string;
+}
+
+// Episode info for series
+export interface EpisodeInfo {
+  seasonNumber: number;
+  episodeNumber: number;
+  episodeTitle?: string;
+  airDate?: string;
+}
+
+// Series/Collection info
+export interface VideoSeries {
+  id: string;
+  title: string;
+  description?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
+  totalSeasons?: number;
+  totalEpisodes?: number;
+  status?: 'ongoing' | 'ended' | 'cancelled';
+  startYear?: number;
+  endYear?: number;
+}
+
+// Watch progress for continue watching
+export interface WatchProgress {
+  videoId: string;
+  currentTime: number;
+  duration: number;
+  percentage: number;
+  lastWatchedAt: string;
+  completed: boolean;
+}
+
+// Video rating
+export interface VideoRating {
+  source: 'user' | 'imdb' | 'tmdb' | 'rottentomatoes';
+  value: number;
+  maxValue: number;
+  votes?: number;
+}
+
+// Cloud upload status for videos
+export interface VideoCloudStatus {
+  isUploaded: boolean;
+  provider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster';
+  uploadedAt?: string;
+  cloudUrl?: string;
+  cloudId?: string;
+}
+
 export interface Video {
   id: string;
   filePath: string;
   title: string;
   duration: number;
   thumbnailUrl?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
   width?: number;
   height?: number;
   format?: string;
+  codec?: string;
+  bitrate?: number;
+  frameRate?: number;
   fileSize: number;
   addedAt: string;
   lastPlayedAt?: string;
   playCount?: number;
+  
+  // Enhanced metadata
+  type?: VideoType;
+  genres?: VideoGenre[];
+  quality?: VideoQuality;
+  description?: string;
+  synopsis?: string;
+  tagline?: string;
+  year?: number;
+  releaseDate?: string;
+  director?: string;
+  cast?: string[];
+  studio?: string;
+  country?: string;
+  language?: string;
+  
+  // Ratings
+  ratings?: VideoRating[];
+  userRating?: number;
+  
+  // Content info
+  ageRating?: string;
+  contentWarnings?: string[];
+  
+  // Series/Episode info
+  seriesId?: string;
+  series?: VideoSeries;
+  episodeInfo?: EpisodeInfo;
+  
+  // Multi-media tracks
+  subtitles?: SubtitleTrack[];
+  audioTracks?: AudioTrack[];
+  chapters?: VideoChapter[];
+  
+  // User interaction
+  isFavorite?: boolean;
+  isInWatchlist?: boolean;
+  watchProgress?: WatchProgress;
+  tags?: string[];
+  
+  // Cloud status
+  cloudStatus?: VideoCloudStatus;
+  
+  // Trailer/Preview
+  trailerUrl?: string;
+  previewUrl?: string;
+  
+  // Related content
+  relatedVideoIds?: string[];
+  
+  // External IDs
+  imdbId?: string;
+  tmdbId?: string;
 }
 
 // Music recognition types

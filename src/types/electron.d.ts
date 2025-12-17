@@ -41,6 +41,8 @@ export interface ElectronAPI {
   updateVideoMetadata?: (videoId: string, metadata: Partial<Video>) => Promise<Video | null>;
   addVideoFiles?: (filePaths: string[]) => Promise<Video[]>;
   addVideoFromUrl?: (url: string, title?: string) => Promise<Video>;
+  regenerateVideoThumbnail?: (videoId: string) => Promise<string | null>;
+  regenerateAllVideoThumbnails?: () => Promise<number>;
   onVideoScanProgress: (callback: (progress: ScanProgress) => void) => () => void;
   onVideoAdded: (callback: (video: Video) => void) => () => void;
   onVideoRemoved: (callback: (filePath: string) => void) => () => void;
@@ -94,6 +96,25 @@ export interface ElectronAPI {
   getAudioDuration: (filePath: string) => Promise<number>;
   readFileAsBase64: (filePath: string) => Promise<string>;
   openPath?: (filePath: string) => Promise<void>;
+  getFileInfo?: (filePath: string) => Promise<{
+    size: number;
+    exists: boolean;
+    isFile: boolean;
+    path: string;
+  }>;
+  uploadToCloud?: (options: {
+    filePath: string;
+    cloudName: string;
+    uploadPreset: string;
+    resourceType: 'video' | 'image' | 'raw' | 'auto';
+    publicId?: string;
+  }) => Promise<{
+    success: boolean;
+    url?: string;
+    publicId?: string;
+    bytes?: number;
+    error?: string;
+  }>;
   
   // File open event (from "Open with..." or command line)
   onFileOpen: (callback: (filePath: string) => void) => () => void;

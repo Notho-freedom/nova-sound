@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateVideoMetadata: (videoId, metadata) => ipcRenderer.invoke('videos:updateMetadata', videoId, metadata),
   addVideoFiles: (filePaths) => ipcRenderer.invoke('videos:addFiles', filePaths),
   addVideoFromUrl: (url, title) => ipcRenderer.invoke('videos:addFromUrl', url, title),
+  regenerateVideoThumbnail: (videoId) => ipcRenderer.invoke('videos:regenerateThumbnail', videoId),
+  regenerateAllVideoThumbnails: () => ipcRenderer.invoke('videos:regenerateAllThumbnails'),
   onVideoScanProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('videos:scan-progress', listener);
@@ -119,6 +121,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAudioDuration: (filePath) => ipcRenderer.invoke('audio:duration', filePath),
   readFileAsBase64: (filePath) => ipcRenderer.invoke('file:readAsBase64', filePath),
   openPath: (filePath) => ipcRenderer.invoke('fs:openPath', filePath),
+  getFileInfo: (filePath) => ipcRenderer.invoke('file:getInfo', filePath),
+  uploadToCloud: (options) => ipcRenderer.invoke('file:uploadToCloud', options),
   
   // File open event (from "Open with..." or command line)
   onFileOpen: (callback) => {

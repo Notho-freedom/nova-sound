@@ -511,9 +511,9 @@ export const LibraryView = ({
                               isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                             >
                               <div className="flex items-center gap-2">
-                                <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                                  {track.title}
-                                </p>
+                          <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                            {track.title}
+                          </p>
                                 {isUploaded(track.id) && (
                                   <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
                                 )}
@@ -728,12 +728,12 @@ export const LibraryView = ({
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
                                 <Disc3 className="w-10 h-10 text-primary/50" />
-                              </div>
+          </div>
                             )}
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
                               <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
                                 <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
-                              </div>
+        </div>
                             </div>
                           </div>
                           <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
@@ -1067,44 +1067,44 @@ export const LibraryView = ({
               </p>
             </div>
           ) : albumsViewMode === "grid" ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredAndSortedAlbums.map((album) => (
-                <AlbumContextMenu
-                  key={`${album.name}-${album.artist}`}
-                  album={album}
-                  playlists={playlists}
-                  onPlay={() => {
-                    const firstTrack = album.tracks[0];
-                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }}
-                  onShuffle={() => {
-                    const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
-                    const idx = tracks.findIndex(t => t.id === shuffled[0].id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }}
-                  onAddToQueue={() => {
-                    if (onAddToQueue) {
-                      album.tracks.forEach(track => onAddToQueue(track));
-                    }
-                  }}
-                  onAddToPlaylist={(playlistId) => {
-                    if (onAddToPlaylist) {
-                      album.tracks.forEach(track => onAddToPlaylist(playlistId, track));
-                    }
-                  }}
-                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
-                  onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                  onViewArtist={() => setSelectedArtist(album.artist)}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="group relative">
-                        <button
-                          onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                          className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                        >
-                          <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+            <AlbumContextMenu
+              key={`${album.name}-${album.artist}`}
+              album={album}
+              playlists={playlists}
+              onPlay={() => {
+                const firstTrack = album.tracks[0];
+                const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                if (idx !== -1) onTrackSelect(idx);
+              }}
+              onShuffle={() => {
+                const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
+                const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                if (idx !== -1) onTrackSelect(idx);
+              }}
+              onAddToQueue={() => {
+                if (onAddToQueue) {
+                  album.tracks.forEach(track => onAddToQueue(track));
+                }
+              }}
+              onAddToPlaylist={(playlistId) => {
+                if (onAddToPlaylist) {
+                  album.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                }
+              }}
+              onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
+              onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+              onViewArtist={() => setSelectedArtist(album.artist)}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="group relative">
+                    <button
+                      onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                      className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                    >
+                  <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
                             {album.coverUrl ? (
                               <img
                                 src={getCoverUrl(album.coverUrl)}
@@ -1116,38 +1116,38 @@ export const LibraryView = ({
                                 <Disc3 className="w-10 h-10 text-primary/50" />
                               </div>
                             )}
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                                <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
-                              </div>
-                            </div>
-                          </div>
-                          <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
-                          <p className="text-xs text-muted-foreground/70">{album.tracks.length} titres</p>
-                        </button>
-                        <button
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                        <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
+                  <p className="text-xs text-muted-foreground/70">{album.tracks.length} titres</p>
+                    </button>
+                    <button
                           onClick={(e) => {
                             e.stopPropagation();
                           }}
-                          className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
                           aria-label="Plus d'options"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-sm font-medium">{album.name}</div>
-                      <div className="text-xs text-muted-foreground">{album.artist}</div>
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm font-medium">{album.name}</div>
+                  <div className="text-xs text-muted-foreground">{album.artist}</div>
                       <div className="text-xs text-muted-foreground mt-1">
                         {album.tracks.length} titre{album.tracks.length > 1 ? "s" : ""}
                       </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </AlbumContextMenu>
-              ))}
-            </div>
+                </TooltipContent>
+              </Tooltip>
+            </AlbumContextMenu>
+          ))}
+        </div>
           ) : (
             <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
               <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
@@ -1336,7 +1336,7 @@ export const LibraryView = ({
                     {artistsViewMode === "grid" ? "Vue liste" : "Vue grille"}
                   </TooltipContent>
                 </Tooltip>
-              </div>
+          </div>
             }
           />
         </div>
@@ -1443,89 +1443,89 @@ export const LibraryView = ({
               </p>
             </div>
           ) : artistsViewMode === "grid" ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredAndSortedArtists.map((artist) => {
-                const coverUrl = artist.tracks[0]?.coverUrl;
-                return (
-                  <ArtistContextMenu
-                    key={artist.name}
-                    artist={artist}
-                    playlists={playlists}
-                    onPlay={() => {
-                      const firstTrack = artist.tracks[0];
-                      const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                      if (idx !== -1) onTrackSelect(idx);
-                    }}
-                    onShuffle={() => {
-                      const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
-                      const idx = tracks.findIndex(t => t.id === shuffled[0].id);
-                      if (idx !== -1) onTrackSelect(idx);
-                    }}
-                    onAddToQueue={() => {
-                      if (onAddToQueue) {
-                        artist.tracks.forEach(track => onAddToQueue(track));
-                      }
-                    }}
-                    onAddToPlaylist={(playlistId) => {
-                      if (onAddToPlaylist) {
-                        artist.tracks.forEach(track => onAddToPlaylist(playlistId, track));
-                      }
-                    }}
-                    onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
-                    onViewArtist={() => setSelectedArtist(artist.name)}
-                  >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="group relative">
-                          <button
+            const coverUrl = artist.tracks[0]?.coverUrl;
+            return (
+              <ArtistContextMenu
+                key={artist.name}
+                artist={artist}
+                playlists={playlists}
+                onPlay={() => {
+                  const firstTrack = artist.tracks[0];
+                  const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                  if (idx !== -1) onTrackSelect(idx);
+                }}
+                onShuffle={() => {
+                  const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
+                  const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                  if (idx !== -1) onTrackSelect(idx);
+                }}
+                onAddToQueue={() => {
+                  if (onAddToQueue) {
+                    artist.tracks.forEach(track => onAddToQueue(track));
+                  }
+                }}
+                onAddToPlaylist={(playlistId) => {
+                  if (onAddToPlaylist) {
+                    artist.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                  }
+                }}
+                onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
+                onViewArtist={() => setSelectedArtist(artist.name)}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="group relative">
+                      <button
                             onClick={() => setSelectedArtist(artist.name)}
-                            className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                          >
-                            <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
-                              {coverUrl ? (
+                        className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                      >
+                    <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
+                      {coverUrl ? (
                                 <img
                                   src={getCoverUrl(coverUrl)}
                                   alt={artist.name}
                                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                 />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                                  <User className="w-12 h-12 text-muted-foreground" />
-                                </div>
-                              )}
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                                  <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
-                                </div>
-                              </div>
-                            </div>
-                            <p className="text-sm font-medium text-center truncate text-foreground">{artist.name}</p>
-                            <p className="text-xs text-muted-foreground text-center">
-                              {artist.albums.size} albums • {artist.tracks.length} titres
-                            </p>
-                          </button>
-                          <button
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                          <User className="w-12 h-12 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                          <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-center truncate text-foreground">{artist.name}</p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {artist.albums.size} albums • {artist.tracks.length} titres
+                    </p>
+                      </button>
+                      <button
                             onClick={(e) => {
                               e.stopPropagation();
                             }}
-                            className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
                             aria-label="Plus d'options"
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-sm font-medium">{artist.name}</div>
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm font-medium">{artist.name}</div>
                         <div className="text-xs text-muted-foreground">
                           {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titre{artist.tracks.length > 1 ? "s" : ""}
                         </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </ArtistContextMenu>
-                );
-              })}
-            </div>
+                  </TooltipContent>
+                </Tooltip>
+              </ArtistContextMenu>
+            );
+          })}
+        </div>
           ) : (
             <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
               <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
@@ -1910,9 +1910,9 @@ export const LibraryView = ({
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2">
-                                    <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                                      {track.title}
-                                    </p>
+                                  <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                    {track.title}
+                                  </p>
                                     {isUploaded(track.id) && (
                                       <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
                                     )}
@@ -2053,9 +2053,9 @@ export const LibraryView = ({
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                          {track.title}
-                        </p>
+                      <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                        {track.title}
+                      </p>
                         {isUploaded(track.id) && (
                           <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
                         )}

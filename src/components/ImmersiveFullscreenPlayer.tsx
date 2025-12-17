@@ -83,7 +83,7 @@ export const ImmersiveFullscreenPlayer = ({
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Audio analysis
-  const sensesData = useAudioSenses(audioElement, {
+  const sensesData = useAudioSenses(audioElement ?? null, {
     enablePitchDetection: false,
     enableBPMDetection: true,
   });

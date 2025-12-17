@@ -86,24 +86,61 @@ async function getFileStats(filePath: string): Promise<{ size: number; mtime: Da
   }
 }
 
+// Check if ffmpeg is available
+let ffmpegAvailable: boolean | null = null;
+
+async function checkFfmpegAvailable(): Promise<boolean> {
+  if (ffmpegAvailable !== null) return ffmpegAvailable;
+  
+  try {
+    await execAsync('ffmpeg -version');
+    ffmpegAvailable = true;
+    console.log('ffmpeg is available for thumbnail generation');
+  } catch {
+    ffmpegAvailable = false;
+    console.log('ffmpeg is not available - thumbnails will not be generated');
+  }
+  return ffmpegAvailable;
+}
+
 /**
  * Generate thumbnail for video using ffmpeg
  */
-async function generateThumbnail(filePath: string): Promise<string | null> {
+async function generateThumbnail(filePath: string, forceRegenerate = false): Promise<string | null> {
   try {
-    // Check if thumbnail already exists
-    const existingThumbnail = await storage.getThumbnailPath(filePath);
-    if (existingThumbnail) {
-      return existingThumbnail;
+    // Check if thumbnail already exists (unless forcing regeneration)
+    if (!forceRegenerate) {
+      const existingThumbnail = await storage.getThumbnailPath(filePath);
+      if (existingThumbnail) {
+        return existingThumbnail;
+      }
     }
 
-    // Try to use ffmpeg to extract a frame
-    // Extract frame at 1 second (or 10% of duration if available)
-    const thumbnailPath = path.join(path.dirname(filePath), `temp_thumb_${Date.now()}.jpg`);
+    // Check if ffmpeg is available
+    const hasFfmpeg = await checkFfmpegAvailable();
+    if (!hasFfmpeg) {
+      return null;
+    }
+
+    // Create temp directory in user data folder
+    const os = await import('os');
+    const tempDir = os.tmpdir();
+    const thumbnailPath = path.join(tempDir, `nexus_thumb_${Date.now()}.jpg`);
     
     try {
-      // Try ffmpeg command
-      await execAsync(`ffmpeg -i "${filePath}" -ss 00:00:01 -vframes 1 -vf "scale=320:-1" "${thumbnailPath}"`);
+      // Try ffmpeg command with better error handling
+      // Use -y to overwrite, -hide_banner for less output
+      await execAsync(`ffmpeg -y -hide_banner -loglevel error -i "${filePath}" -ss 00:00:02 -vframes 1 -vf "scale=320:-1" "${thumbnailPath}"`, {
+        timeout: 30000, // 30 second timeout
+      });
+      
+      // Check if thumbnail was created
+      try {
+        await fs.access(thumbnailPath);
+      } catch {
+        console.log(`Thumbnail not created for ${filePath}`);
+        return null;
+      }
       
       // Read the generated thumbnail
       const thumbnailData = await fs.readFile(thumbnailPath);
@@ -118,10 +155,11 @@ async function generateThumbnail(filePath: string): Promise<string | null> {
         // Ignore cleanup errors
       }
       
+      console.log(`Generated thumbnail for: ${path.basename(filePath)}`);
       return savedUrl;
-    } catch (ffmpegError) {
-      // ffmpeg not available or failed
-      console.log(`ffmpeg not available for ${filePath}, skipping thumbnail generation`);
+    } catch (ffmpegError: any) {
+      // ffmpeg failed for this file
+      console.log(`ffmpeg failed for ${path.basename(filePath)}:`, ffmpegError.message);
       
       // Clean up temp file if it exists
       try {
@@ -136,6 +174,27 @@ async function generateThumbnail(filePath: string): Promise<string | null> {
     console.error(`Error generating thumbnail for ${filePath}:`, error);
     return null;
   }
+}
+
+/**
+ * Regenerate thumbnail for a specific video
+ */
+export async function regenerateThumbnail(videoId: string): Promise<string | null> {
+  const videos = await storage.getVideos();
+  const video = videos.find(v => v.id === videoId);
+  
+  if (!video) {
+    return null;
+  }
+  
+  const thumbnailUrl = await generateThumbnail(video.filePath, true);
+  
+  if (thumbnailUrl) {
+    // Update video with new thumbnail
+    await storage.updateVideo(videoId, { thumbnailUrl });
+  }
+  
+  return thumbnailUrl;
 }
 
 /**
@@ -438,7 +497,30 @@ export function initVideoScanner() {
 
     return video;
   });
+
+  // Regenerate thumbnail for a specific video
+  ipcMain.handle('videos:regenerateThumbnail', async (_event, videoId: string) => {
+    return regenerateThumbnail(videoId);
+  });
+
+  // Regenerate all thumbnails
+  ipcMain.handle('videos:regenerateAllThumbnails', async () => {
+    const videos = await storage.getVideos();
+    let regenerated = 0;
+    
+    for (const video of videos) {
+      if (!video.thumbnailUrl || !video.thumbnailUrl.startsWith('file://')) {
+        const thumbnail = await generateThumbnail(video.filePath, true);
+        if (thumbnail) {
+          await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
+          regenerated++;
+        }
+      }
+    }
+    
+    return regenerated;
+  });
 }
 
-export { scanVideos, startWatching, stopWatching };
+export { scanVideos, startWatching, stopWatching, regenerateThumbnail };
 

@@ -61,6 +61,11 @@ class CloudinaryService {
            !!this.config.apiKey; // Also check for API key
   }
 
+  // Get config for external use
+  getConfig(): CloudinaryConfig | null {
+    return this.config;
+  }
+
   // Subscribe to progress updates
   onProgressUpdate(listener: (progress: Map<string, UploadProgress>) => void): () => void {
     this.listeners.add(listener);

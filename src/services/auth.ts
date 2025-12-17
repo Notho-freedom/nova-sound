@@ -634,7 +634,7 @@ class AuthService {
     // If there's an anonymous user, we'll link the account after OAuth
     const isLinking = this.currentUser?.isAnonymous === true;
     
-    if (isLinking) {
+    if (isLinking && this.currentUser) {
       // Store anonymous UID to link later
       sessionStorage.setItem("linking_anonymous_uid", this.currentUser.uid);
     }

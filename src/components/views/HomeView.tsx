@@ -27,6 +27,9 @@ interface HomeViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayNext?: (track: Track | Track[]) => void;
+  onAddToQueue?: (track: Track | Track[]) => void;
+  onAddToPlaylist?: (playlistId: string, track: Track) => void;
   onPlayTracks?: (trackIds: string[]) => void;
   recentTracks?: Track[];
   favoriteTracks?: Track[];

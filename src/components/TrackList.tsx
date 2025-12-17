@@ -120,12 +120,12 @@ export const TrackList = memo(({
             {/* Track info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className={cn(
-                  "font-medium truncate transition-colors",
-                  index === currentTrackIndex ? "text-primary neon-text-cyan" : "text-foreground"
-                )}>
-                  {track.title}
-                </p>
+              <p className={cn(
+                "font-medium truncate transition-colors",
+                index === currentTrackIndex ? "text-primary neon-text-cyan" : "text-foreground"
+              )}>
+                {track.title}
+              </p>
                 {isUploaded?.(track.id) && (
                   <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
                 )}

@@ -38,6 +38,7 @@ interface PlaylistViewProps {
 }
 
 type ViewMode = "grid" | "list";
+type PageMode = "list" | "create" | "detail" | "edit";
 
 export const PlaylistView = ({
   tracks,
@@ -276,7 +277,7 @@ export const PlaylistView = ({
     if (!selectedPlaylistId || selectedTracksForPlaylist.length === 0) return;
     await onAddTracksToPlaylist(selectedPlaylistId, selectedTracksForPlaylist);
     toast.success(`${selectedTracksForPlaylist.length} titre(s) ajouté(s)`);
-    setShowAddTracksModal(false);
+    setPageMode("detail");
     setSelectedTracksForPlaylist([]);
   };
 
@@ -284,7 +285,6 @@ export const PlaylistView = ({
     if (!selectedPlaylistId || selectedTracksForPlaylist.length === 0) return;
     await onRemoveTracksFromPlaylist(selectedPlaylistId, selectedTracksForPlaylist);
     toast.success(`${selectedTracksForPlaylist.length} titre(s) retiré(s)`);
-    setShowRemoveTracksModal(false);
     setSelectedTracksForPlaylist([]);
   };
 
@@ -1021,7 +1021,7 @@ export const PlaylistView = ({
               <p className="text-muted-foreground mb-4">
                 Ajoutez des titres à cette playlist pour commencer.
               </p>
-              <Button onClick={() => setShowAddTracksModal(true)}>
+              <Button onClick={() => setPageMode("edit")}>
                 <Plus className="w-4 h-4 mr-2" />
                 Ajouter des titres
               </Button>
@@ -1091,10 +1091,10 @@ export const PlaylistView = ({
                     onRemoveTracksFromPlaylist(selectedPlaylist.id, [track.id]);
                   }}
                   uploadTrack={uploadTrack}
-                  getTrackProgress={getTrackProgress}
+                  getTrackProgress={(trackId) => getTrackProgress(trackId) ?? null}
                   canUploadToCloudinary={canUploadToCloudinary}
                   uploadTrackToNexus={uploadTrackToNexus}
-                  getNexusTrackProgress={getNexusTrackProgress}
+                  getNexusTrackProgress={(trackId) => getNexusTrackProgress(trackId) ?? null}
                   canUploadToNexus={canUploadToNexus}
                   isUploaded={isUploaded}
                   getUploadedProvider={getUploadedProvider}

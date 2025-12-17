@@ -95,7 +95,7 @@ export const FullscreenPlayer = ({
   const [lyrics, setLyrics] = useState<string | null>(null);
   
   // Use FFT data for visualization
-  const vibesData = useAudioVibes(audioElement, {
+  const vibesData = useAudioVibes(audioElement ?? null, {
     fftSize: 1024, // Reduced from 2048 for better performance
     enableBassFilter: false,
   });

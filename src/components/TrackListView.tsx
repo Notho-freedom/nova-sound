@@ -163,9 +163,9 @@ export const TrackListView = ({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                            {track.title}
-                          </p>
+                        <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                          {track.title}
+                        </p>
                           {isUploaded?.(track.id) && (
                             <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
                           )}

@@ -179,8 +179,8 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       // Rafraîchir la bibliothèque
       await refreshLibrary();
       // Recharger les patterns
-      const newPatterns = await window.electronAPI.detectPatterns();
-      setPatterns(newPatterns);
+      const newPatterns = await window.electronAPI?.detectPatterns?.();
+      if (newPatterns) setPatterns(newPatterns);
     } catch (error) {
       console.error('Erreur lors de l\'application:', error);
       toast.error("Erreur lors de l'application du pattern");
