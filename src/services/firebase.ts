@@ -22,6 +22,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  onSnapshot,
   Firestore,
   collection,
   query,
@@ -190,6 +191,7 @@ class FirebaseService {
   private authStateListeners: Set<(user: User | null) => void> = new Set();
   private tokenRefreshInterval: NodeJS.Timeout | null = null;
   private idTokenUnsubscribe: (() => void) | null = null;
+  private profileSnapshotUnsubscribe: (() => void) | null = null;
 
   constructor() {
     // Preload Firebase config from API (non-blocking)
@@ -236,6 +238,12 @@ class FirebaseService {
           }
         } else {
           console.log("Auth state changed: user signed out");
+          
+          // Clean up profile snapshot listener
+          if (this.profileSnapshotUnsubscribe) {
+            this.profileSnapshotUnsubscribe();
+            this.profileSnapshotUnsubscribe = null;
+          }
           
           // Clean up user-isolated storage when signing out
           if (previousUser) {
@@ -671,6 +679,12 @@ class FirebaseService {
     await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized");
+    }
+
+    // Clean up profile snapshot listener
+    if (this.profileSnapshotUnsubscribe) {
+      this.profileSnapshotUnsubscribe();
+      this.profileSnapshotUnsubscribe = null;
     }
 
     await signOut(auth);
