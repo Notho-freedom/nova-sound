@@ -799,8 +799,29 @@ export const SettingsView = () => {
     }
     try {
       setSubscriptionLoading(true);
+      
+      // Ensure Stripe config is loaded and wait for it
+      await stripeService.ensureInitialized();
+      
+      // Small delay to ensure config is fully loaded
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Get the actual price ID after config is loaded
+      const monthlyPriceId = PRICE_IDS.PRO_MONTHLY;
+      
+      console.log('[SettingsView] Monthly price ID:', monthlyPriceId);
+      
+      // Validate that we have a real price ID (not the default fallback)
+      if (monthlyPriceId === 'price_pro_monthly' || !monthlyPriceId.startsWith('price_')) {
+        console.error('[SettingsView] Invalid price ID:', monthlyPriceId);
+        toast.error("Configuration Stripe incomplète", {
+          description: `Les Price IDs ne sont pas configurés. Valeur actuelle: ${monthlyPriceId}`
+        });
+        return;
+      }
+      
       toast.info("Redirection vers Stripe...");
-      await stripeService.redirectToCheckout(PRICE_IDS.PRO_MONTHLY);
+      await stripeService.redirectToCheckout(monthlyPriceId);
     } catch (error: any) {
       console.error("Upgrade error:", error);
       toast.error("Erreur", { description: error.message });
@@ -821,8 +842,23 @@ export const SettingsView = () => {
     }
     try {
       setSubscriptionLoading(true);
+      
+      // Ensure Stripe config is loaded
+      await stripeService.ensureInitialized();
+      
+      // Get the actual price ID
+      const yearlyPriceId = PRICE_IDS.PRO_YEARLY;
+      
+      // Validate that we have a real price ID (not the default fallback)
+      if (yearlyPriceId === 'price_pro_yearly' || !yearlyPriceId.startsWith('price_')) {
+        toast.error("Configuration Stripe incomplète", {
+          description: "Les Price IDs ne sont pas configurés. Vérifiez votre fichier .env.local"
+        });
+        return;
+      }
+      
       toast.info("Redirection vers Stripe...");
-      await stripeService.redirectToCheckout(PRICE_IDS.PRO_YEARLY);
+      await stripeService.redirectToCheckout(yearlyPriceId);
     } catch (error: any) {
       console.error("Upgrade error:", error);
       toast.error("Erreur", { description: error.message });

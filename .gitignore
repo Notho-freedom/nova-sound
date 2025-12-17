@@ -51,3 +51,4 @@ firebase-adminsdk-*.json
 local-ui/
 !local-ui/.gitkeep
 .env.local.tmp
+prices (1).csv

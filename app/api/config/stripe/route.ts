@@ -8,10 +8,12 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     // Récupérer uniquement les clés publiques Stripe
+    // Utiliser NEXT_PUBLIC_* pour la clé publique (exposée au client)
+    // Utiliser les variables serveur pour les Price IDs (exposées via cette route API)
     const stripeConfig = {
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
-      priceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY || '',
-      priceProYearly: process.env.STRIPE_PRICE_PRO_YEARLY || '',
+      publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || '',
+      priceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY || process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || '',
+      priceProYearly: process.env.STRIPE_PRICE_PRO_YEARLY || process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY || '',
     };
 
     // Vérifier que la clé publique est présente (les Price IDs sont optionnels)

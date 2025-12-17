@@ -25,6 +25,7 @@
     "test:api": "node scripts/test-api-routes.mjs",
     "validate:env": "node scripts/validate-env.js",
     "validate:env:all": "node scripts/validate-env.js --check-all",
+    "create:stripe-products": "npx tsx scripts/create-stripe-test-products.ts",
     "clean": "powershell -Command \"if (Test-Path '.next') { Remove-Item -Path '.next' -Recurse -Force }; if (Test-Path 'dist-electron') { Remove-Item -Path 'dist-electron' -Recurse -Force }; if (Test-Path 'dist') { Remove-Item -Path 'dist' -Recurse -Force }\""
   },
   "dependencies": {

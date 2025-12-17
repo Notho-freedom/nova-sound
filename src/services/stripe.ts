@@ -46,7 +46,10 @@ async function loadStripeConfig(): Promise<void> {
           priceProMonthly: config.priceProMonthly || 'price_pro_monthly',
           priceProYearly: config.priceProYearly || 'price_pro_yearly',
         };
-        console.log("Stripe config loaded from API route");
+        console.log("✅ Stripe config loaded from API route:", {
+          monthly: stripeConfig.priceProMonthly,
+          yearly: stripeConfig.priceProYearly,
+        });
       } else {
         throw new Error(`API route returned ${response.status}`);
       }
@@ -75,12 +78,22 @@ async function loadStripeConfig(): Promise<void> {
 }
 
 // Price IDs - loaded from config
+// Note: These are getters that depend on stripeConfig being loaded
+// Always call ensureInitialized() before using these
 export const PRICE_IDS = {
   get PRO_MONTHLY() {
-    return stripeConfig?.priceProMonthly || 'price_pro_monthly';
+    if (!stripeConfig) {
+      console.warn('[Stripe] Config not loaded yet, using default price ID');
+      return 'price_pro_monthly';
+    }
+    return stripeConfig.priceProMonthly || 'price_pro_monthly';
   },
   get PRO_YEARLY() {
-    return stripeConfig?.priceProYearly || 'price_pro_yearly';
+    if (!stripeConfig) {
+      console.warn('[Stripe] Config not loaded yet, using default price ID');
+      return 'price_pro_yearly';
+    }
+    return stripeConfig.priceProYearly || 'price_pro_yearly';
   },
 };
 
@@ -123,6 +136,16 @@ class StripeService {
 
   // Create checkout session for Pro subscription
   async createCheckoutSession(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<string> {
+    // Ensure config is loaded
+    await this.ensureInitialized();
+    
+    // Log the price ID being used for debugging
+    console.log('[Stripe] Creating checkout session with priceId:', priceId);
+    console.log('[Stripe] Available price IDs:', {
+      monthly: PRICE_IDS.PRO_MONTHLY,
+      yearly: PRICE_IDS.PRO_YEARLY,
+    });
+    
     // Try Firebase first (preferred method)
     let accessToken: string | null = null;
     let idToken: string | null = null;
@@ -230,8 +253,37 @@ class StripeService {
   }
 
   // Redirect to Stripe Checkout
-  async redirectToCheckout(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<void> {
-    const checkoutUrl = await this.createCheckoutSession(priceId);
+  async redirectToCheckout(priceId?: string): Promise<void> {
+    // Ensure config is loaded before using PRICE_IDS
+    await this.ensureInitialized();
+    
+    // Wait a bit more to ensure config is fully set
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Use the provided priceId or get from PRICE_IDS
+    let finalPriceId = priceId;
+    
+    if (!finalPriceId) {
+      // Determine which price to use based on the original call
+      // If no priceId provided, default to monthly
+      finalPriceId = PRICE_IDS.PRO_MONTHLY;
+    }
+    
+    console.log('[Stripe] redirectToCheckout called with:', {
+      providedPriceId: priceId,
+      finalPriceId,
+      configMonthly: PRICE_IDS.PRO_MONTHLY,
+      configYearly: PRICE_IDS.PRO_YEARLY,
+    });
+    
+    // Validate that we have a real price ID (not the default fallback)
+    if (finalPriceId === 'price_pro_monthly' || finalPriceId === 'price_pro_yearly') {
+      console.error('❌ Invalid price ID detected:', finalPriceId);
+      console.error('Current stripeConfig:', stripeConfig);
+      throw new Error(`Configuration Stripe incomplète. Price ID invalide: ${finalPriceId}. Vérifiez que STRIPE_PRICE_PRO_MONTHLY et STRIPE_PRICE_PRO_YEARLY sont définis dans .env.local`);
+    }
+    
+    const checkoutUrl = await this.createCheckoutSession(finalPriceId);
     window.location.href = checkoutUrl;
   }
 

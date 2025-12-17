@@ -58,13 +58,30 @@ export async function POST(request: NextRequest) {
 
     const { priceId, successUrl, cancelUrl } = validation.data;
 
+    // Log for debugging
+    console.log('[API] Received checkout request:', {
+      priceId,
+      expectedMonthly: PRICE_PRO_MONTHLY,
+      expectedYearly: PRICE_PRO_YEARLY,
+      userId: auth.userId,
+    });
+
     // Validate price ID
     if (priceId !== PRICE_PRO_MONTHLY && priceId !== PRICE_PRO_YEARLY) {
+      console.error('[API] Invalid price ID:', {
+        provided: priceId,
+        expectedMonthly: PRICE_PRO_MONTHLY,
+        expectedYearly: PRICE_PRO_YEARLY,
+      });
       return createErrorResponse(
         ErrorCodes.VALIDATION_ERROR,
         `Invalid price ID. Expected ${PRICE_PRO_MONTHLY} or ${PRICE_PRO_YEARLY}`,
         400,
-        { providedPriceId: priceId }
+        { 
+          providedPriceId: priceId,
+          expectedMonthly: PRICE_PRO_MONTHLY,
+          expectedYearly: PRICE_PRO_YEARLY,
+        }
       );
     }
 
