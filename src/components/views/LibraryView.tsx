@@ -47,7 +47,7 @@ import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
-import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton, AlbumTableSkeleton } from "@/components/ui/skeletons";
+import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton, AlbumTableSkeleton, ArtistTableSkeleton } from "@/components/ui/skeletons";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -174,6 +174,12 @@ export const LibraryView = ({
   const [albumsSortOrder, setAlbumsSortOrder] = useState<"asc" | "desc">("asc");
   const [albumsFilterArtist, setAlbumsFilterArtist] = useState<string | null>(null);
   
+  // Artists view state
+  const [artistsViewMode, setArtistsViewMode] = useState<"grid" | "list">("grid");
+  const [artistsSearchQuery, setArtistsSearchQuery] = useState("");
+  const [artistsSortBy, setArtistsSortBy] = useState<"name" | "albums" | "tracks">("name");
+  const [artistsSortOrder, setArtistsSortOrder] = useState<"asc" | "desc">("asc");
+  
   // Cloudinary upload
   const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
   // Nexus/Bunny upload (Pro only)
@@ -290,6 +296,38 @@ export const LibraryView = ({
     });
     return Array.from(artistsSet).sort();
   }, [albums]);
+
+  // Filtered and sorted artists
+  const filteredAndSortedArtists = useMemo(() => {
+    let filtered = artists;
+
+    // Apply search filter
+    if (artistsSearchQuery.trim()) {
+      const query = artistsSearchQuery.toLowerCase();
+      filtered = filtered.filter(artist =>
+        artist.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (artistsSortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "albums":
+          comparison = a.albums.size - b.albums.size;
+          break;
+        case "tracks":
+          comparison = a.tracks.length - b.tracks.length;
+          break;
+      }
+      return artistsSortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [artists, artistsSearchQuery, artistsSortBy, artistsSortOrder]);
 
   const totalDuration = tracks.reduce((acc, track) => acc + track.duration, 0);
 
@@ -648,7 +686,7 @@ export const LibraryView = ({
               </p>
             </div>
           ) : albumsViewMode === "grid" ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredAndSortedAlbums.map((album) => (
                 <AlbumContextMenu
                   key={`${album.name}-${album.artist}`}
@@ -678,36 +716,54 @@ export const LibraryView = ({
                   onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
                   onViewArtist={() => setSelectedArtist(album.artist)}
                 >
-                  <div
-                    onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                    className="group relative aspect-[3/4] rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 cursor-pointer transition-all hover:scale-105 hover:shadow-lg"
-                  >
-                    {album.coverUrl ? (
-                      <img
-                        src={getCoverUrl(album.coverUrl)}
-                        alt={album.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Disc3 className="w-10 h-10 text-primary/50" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="group relative">
+                        <button
+                          onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                          className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                        >
+                          <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+                            {album.coverUrl ? (
+                              <img
+                                src={getCoverUrl(album.coverUrl)}
+                                alt={album.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+                                <Disc3 className="w-10 h-10 text-primary/50" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                                <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium truncate text-foreground">{album.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
+                          <p className="text-xs text-muted-foreground/70">{album.tracks.length} titres</p>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                          aria-label="Plus d'options"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
-                        <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
-                      </div>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                      <h3 className="font-semibold truncate mb-0.5 text-sm">{album.name}</h3>
-                      <p className="text-xs text-white/80 truncate">{album.artist}</p>
-                      <p className="text-xs text-white/60 mt-1">
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-sm font-medium">{album.name}</div>
+                      <div className="text-xs text-muted-foreground">{album.artist}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
                         {album.tracks.length} titre{album.tracks.length > 1 ? "s" : ""}
-                        {album.year && ` • ${album.year}`}
-                      </p>
-                    </div>
-                  </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </AlbumContextMenu>
               ))}
             </div>
@@ -858,95 +914,356 @@ export const LibraryView = ({
     );
   }
 
-  // Artists Grid View
+  // Artists View
   if (viewMode === "artists") {
     return (
-      <div className="px-6 py-4 space-y-6 animate-in fade-in duration-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-3xl font-bold mb-1">{title}</h1>
-            <p className="text-muted-foreground">{artists.length} artistes</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {artists.map((artist) => {
-            const coverUrl = artist.tracks[0]?.coverUrl;
-            return (
-              <ArtistContextMenu
-                key={artist.name}
-                artist={artist}
-                playlists={playlists}
-                onPlay={() => {
-                  const firstTrack = artist.tracks[0];
-                  const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                  if (idx !== -1) onTrackSelect(idx);
-                }}
-                onShuffle={() => {
-                  const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
-                  const idx = tracks.findIndex(t => t.id === shuffled[0].id);
-                  if (idx !== -1) onTrackSelect(idx);
-                }}
-                onAddToQueue={() => {
-                  if (onAddToQueue) {
-                    artist.tracks.forEach(track => onAddToQueue(track));
-                  }
-                }}
-                onAddToPlaylist={(playlistId) => {
-                  if (onAddToPlaylist) {
-                    artist.tracks.forEach(track => onAddToPlaylist(playlistId, track));
-                  }
-                }}
-                onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
-                onViewArtist={() => setSelectedArtist(artist.name)}
-              >
+      <div className="h-full flex flex-col animate-in fade-in duration-200">
+        <div className="px-6 pt-4">
+          <PageHeader
+            title={title}
+            subtitle={`${filteredAndSortedArtists.length} artiste${filteredAndSortedArtists.length > 1 ? "s" : ""}`}
+            rightContent={
+              <div className="flex items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="group relative">
-                      <button
-                        onClick={() => {
-                          const firstTrack = artist.tracks[0];
-                          const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                          if (idx !== -1) onTrackSelect(idx);
-                        }}
-                        className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                      >
-                    <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
-                      {coverUrl ? (
-                        <img src={getCoverUrl(coverUrl)} alt={artist.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setArtistsViewMode(artistsViewMode === "grid" ? "list" : "grid")}
+                      className="h-9 w-9"
+                    >
+                      {artistsViewMode === "grid" ? (
+                        <List className="h-4 w-4" />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                          <User className="w-12 h-12 text-muted-foreground" />
-                        </div>
+                        <Grid className="h-4 w-4" />
                       )}
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                          <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium text-center truncate text-foreground">{artist.name}</p>
-                    <p className="text-xs text-muted-foreground text-center">
-                      {artist.albums.size} albums • {artist.tracks.length} titres
-                    </p>
-                      </button>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
-                        aria-label="Plus d'options"
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    </div>
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <div className="text-sm font-medium">{artist.name}</div>
-                    <div className="text-xs text-muted-foreground">{artist.albums.size} album{artist.albums.size > 1 ? 's' : ''} • {artist.tracks.length} titre{artist.tracks.length > 1 ? 's' : ''}</div>
+                    {artistsViewMode === "grid" ? "Vue liste" : "Vue grille"}
                   </TooltipContent>
                 </Tooltip>
-              </ArtistContextMenu>
-            );
-          })}
+              </div>
+            }
+          />
+        </div>
+
+        {/* Filters and Search */}
+        <div className="px-6 py-4 border-b bg-muted/30 space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Search */}
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un artiste..."
+                  value={artistsSearchQuery}
+                  onChange={(e) => setArtistsSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+                {artistsSearchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                    onClick={() => setArtistsSearchQuery("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Sort */}
+            <div className="w-[180px]">
+              <Select
+                value={artistsSortBy}
+                onValueChange={(value) => setArtistsSortBy(value as "name" | "albums" | "tracks")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Trier par" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Nom</SelectItem>
+                  <SelectItem value="albums">Nombre d'albums</SelectItem>
+                  <SelectItem value="tracks">Nombre de titres</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort Order */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setArtistsSortOrder(artistsSortOrder === "asc" ? "desc" : "asc")}
+                  className="h-9 w-9"
+                >
+                  {artistsSortOrder === "asc" ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {artistsSortOrder === "asc" ? "Ordre croissant" : "Ordre décroissant"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Badges */}
+          {artistsSearchQuery && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="secondary" className="gap-1">
+                Recherche: {artistsSearchQuery}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 hover:bg-transparent"
+                  onClick={() => setArtistsSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        {/* Artists Content */}
+        <div className="flex-1 overflow-auto px-6 py-4">
+          {loading ? (
+            artistsViewMode === "grid" ? (
+              <AlbumGridSkeleton />
+            ) : (
+              <ArtistTableSkeleton />
+            )
+          ) : filteredAndSortedArtists.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-12">
+              <User className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Aucun artiste trouvé</h3>
+              <p className="text-sm text-muted-foreground">
+                {artistsSearchQuery
+                  ? "Essayez de modifier vos filtres de recherche"
+                  : "Aucun artiste dans votre bibliothèque"}
+              </p>
+            </div>
+          ) : artistsViewMode === "grid" ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {filteredAndSortedArtists.map((artist) => {
+                const coverUrl = artist.tracks[0]?.coverUrl;
+                return (
+                  <ArtistContextMenu
+                    key={artist.name}
+                    artist={artist}
+                    playlists={playlists}
+                    onPlay={() => {
+                      const firstTrack = artist.tracks[0];
+                      const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                      if (idx !== -1) onTrackSelect(idx);
+                    }}
+                    onShuffle={() => {
+                      const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
+                      const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                      if (idx !== -1) onTrackSelect(idx);
+                    }}
+                    onAddToQueue={() => {
+                      if (onAddToQueue) {
+                        artist.tracks.forEach(track => onAddToQueue(track));
+                      }
+                    }}
+                    onAddToPlaylist={(playlistId) => {
+                      if (onAddToPlaylist) {
+                        artist.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                      }
+                    }}
+                    onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
+                    onViewArtist={() => setSelectedArtist(artist.name)}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="group relative">
+                          <button
+                            onClick={() => {
+                              const firstTrack = artist.tracks[0];
+                              const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                              if (idx !== -1) onTrackSelect(idx);
+                            }}
+                            className="w-full p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                          >
+                            <div className="aspect-square rounded-full overflow-hidden mb-3 relative shadow-lg mx-auto w-32">
+                              {coverUrl ? (
+                                <img
+                                  src={getCoverUrl(coverUrl)}
+                                  alt={artist.name}
+                                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                                  <User className="w-12 h-12 text-muted-foreground" />
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                                  <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-sm font-medium text-center truncate text-foreground">{artist.name}</p>
+                            <p className="text-xs text-muted-foreground text-center">
+                              {artist.albums.size} albums • {artist.tracks.length} titres
+                            </p>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background text-muted-foreground hover:text-foreground"
+                            aria-label="Plus d'options"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm font-medium">{artist.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titre{artist.tracks.length > 1 ? "s" : ""}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </ArtistContextMenu>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
+              <div className="overflow-y-auto max-h-[calc(100vh-400px)]">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 bg-muted/50 backdrop-blur-sm">
+                    <tr className="border-b border-border/30">
+                      <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
+                        Artiste
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                        Albums
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
+                        Titres
+                      </th>
+                      <th className="px-4 py-2.5 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAndSortedArtists.map((artist) => {
+                      const coverUrl = artist.tracks[0]?.coverUrl;
+                      const handlePlay = () => {
+                        const firstTrack = artist.tracks[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      };
+
+                      return (
+                        <ArtistContextMenu
+                          key={artist.name}
+                          artist={artist}
+                          playlists={playlists}
+                          onPlay={handlePlay}
+                          onShuffle={() => {
+                            const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
+                            const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                            if (idx !== -1) onTrackSelect(idx);
+                          }}
+                          onAddToQueue={() => {
+                            if (onAddToQueue) {
+                              artist.tracks.forEach(track => onAddToQueue(track));
+                            }
+                          }}
+                          onAddToPlaylist={(playlistId) => {
+                            if (onAddToPlaylist) {
+                              artist.tracks.forEach(track => onAddToPlaylist(playlistId, track));
+                            }
+                          }}
+                          onCreatePlaylist={() => createPlaylist("Nouvelle playlist", artist.tracks.map(t => t.id))}
+                          onViewArtist={() => setSelectedArtist(artist.name)}
+                        >
+                          <tr
+                            onClick={() => setSelectedArtist(artist.name)}
+                            className="group cursor-pointer transition-all duration-200 ease-out hover:bg-muted/40 active:bg-muted/50"
+                          >
+                            <td className="px-4 py-3">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-3">
+                                    <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary/20 to-secondary/20">
+                                      {coverUrl ? (
+                                        <img
+                                          src={getCoverUrl(coverUrl)}
+                                          alt={artist.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <User className="w-6 h-6 text-primary/50" />
+                                        </div>
+                                      )}
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                                        <Play className="w-4 h-4 text-white fill-current ml-0.5" />
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate text-foreground">
+                                        {artist.name}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm font-medium">{artist.name}</div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titre{artist.tracks.length > 1 ? "s" : ""}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              <span className="text-sm text-muted-foreground">
+                                {artist.albums.size}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="text-sm text-muted-foreground font-mono">
+                                {artist.tracks.length}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
+                                    className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                    aria-label="Options"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm">Clic droit pour plus d'options</div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </td>
+                          </tr>
+                        </ArtistContextMenu>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
