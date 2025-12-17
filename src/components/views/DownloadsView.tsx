@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { firebaseService } from "@/services/firebase";
 import { getUserStorageKey, getCurrentUserId } from "@/lib/storage-utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCloudSync } from "@/hooks/useCloudSync";
 
 interface DownloadItem {
   id: string;
@@ -60,6 +61,8 @@ const DOWNLOADS_STORAGE_KEY = "nexus-downloads";
 const UPLOADED_MEDIA_KEY = "nexus-uploaded-media";
 
 export const DownloadsView = () => {
+  const { nexusAuthenticated } = useCloudSync();
+  
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -172,59 +175,65 @@ export const DownloadsView = () => {
       });
 
         // Fetch files from Nexus API for local storage files
-        try {
-          const token = await firebaseService.getIdToken();
-          if (token) {
-            const response = await fetch("/api/storage/files", {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            });
-            if (response.ok) {
-              const nexusFiles = await response.json();
-            console.log("[DownloadsView] Fetched from Nexus API:", nexusFiles.length, "files");
-            if (nexusFiles.length > 0) {
-              console.log("[DownloadsView] Sample Nexus file:", nexusFiles[0]);
-            }
-              // Merge with uploadedMedia, avoiding duplicates
-              const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
-            console.log("[DownloadsView] Looking for matches between localStorage files and Nexus API files");
-            console.log("[DownloadsView] localStorage file IDs:", Array.from(nexusFileIds));
-            console.log("[DownloadsView] Nexus API file IDs:", nexusFiles.map((f: any) => f.id));
-            
-              nexusFiles.forEach((file: any) => {
-                if (!nexusFileIds.has(file.id)) {
-                  uploadedMedia.push({
-                    id: file.id,
-                    name: file.name,
-                    uploadedAt: file.uploadedAt,
-                    cloudProvider: "nexus",
-                    url: `/api/storage/download/${file.id}`,
-                    size: file.size,
-                  });
-                } else {
-                  // Update existing entry with URL if missing
-                  const existing = uploadedMedia.find(f => f.id === file.id);
-                if (existing) {
-                  console.log("[DownloadsView] Found match for file ID:", file.id);
-                  if (!existing.url) {
-                    existing.url = `/api/storage/download/${file.id}`;
-                    console.log("[DownloadsView] Added URL to existing file:", existing.url);
-                  }
-                  if (!existing.size && file.size) {
-                    existing.size = file.size;
-                  }
-                  }
-                }
+        // Only try if user is authenticated
+        const currentUser = firebaseService.getCurrentUser();
+        if (currentUser && !currentUser.isAnonymous) {
+          try {
+            const token = await firebaseService.getIdToken();
+            if (token) {
+              const response = await fetch("/api/storage/files", {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
               });
-          } else {
-            console.warn("[DownloadsView] Nexus API returned status:", response.status);
+              if (response.ok) {
+                const nexusFiles = await response.json();
+                console.log("[DownloadsView] Fetched from Nexus API:", nexusFiles.length, "files");
+                if (nexusFiles.length > 0) {
+                  console.log("[DownloadsView] Sample Nexus file:", nexusFiles[0]);
+                }
+                // Merge with uploadedMedia, avoiding duplicates
+                const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
+                console.log("[DownloadsView] Looking for matches between localStorage files and Nexus API files");
+                console.log("[DownloadsView] localStorage file IDs:", Array.from(nexusFileIds));
+                console.log("[DownloadsView] Nexus API file IDs:", nexusFiles.map((f: any) => f.id));
+                
+                nexusFiles.forEach((file: any) => {
+                  if (!nexusFileIds.has(file.id)) {
+                    uploadedMedia.push({
+                      id: file.id,
+                      name: file.name,
+                      uploadedAt: file.uploadedAt,
+                      cloudProvider: "nexus",
+                      url: `/api/storage/download/${file.id}`,
+                      size: file.size,
+                    });
+                  } else {
+                    // Update existing entry with URL if missing
+                    const existing = uploadedMedia.find(f => f.id === file.id);
+                    if (existing) {
+                      console.log("[DownloadsView] Found match for file ID:", file.id);
+                      if (!existing.url) {
+                        existing.url = `/api/storage/download/${file.id}`;
+                        console.log("[DownloadsView] Added URL to existing file:", existing.url);
+                      }
+                      if (!existing.size && file.size) {
+                        existing.size = file.size;
+                      }
+                    }
+                  }
+                });
+              } else {
+                console.warn("[DownloadsView] Nexus API returned status:", response.status);
+              }
+            } else {
+              console.log("[DownloadsView] No Firebase token available, skipping Nexus API fetch");
             }
-        } else {
-          console.log("[DownloadsView] No Firebase token available, skipping Nexus API fetch");
+          } catch (error) {
+            console.error("[DownloadsView] Failed to fetch Nexus files:", error);
           }
-        } catch (error) {
-        console.error("[DownloadsView] Failed to fetch Nexus files:", error);
+        } else {
+          console.log("[DownloadsView] User not authenticated yet, skipping Nexus API fetch");
         }
 
         // Sort by upload date (newest first)
@@ -244,10 +253,10 @@ export const DownloadsView = () => {
       }
   }, []);
 
-  // Load on mount
+  // Load on mount and when authentication state changes
   useEffect(() => {
     loadUploadedFiles();
-  }, [loadUploadedFiles]);
+  }, [loadUploadedFiles, nexusAuthenticated]);
 
   // Listen for localStorage changes and custom events (for when files are uploaded)
   useEffect(() => {
