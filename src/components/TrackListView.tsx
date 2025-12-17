@@ -3,6 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { UploadIndicator } from "@/components/UploadIndicator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);

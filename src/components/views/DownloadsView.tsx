@@ -244,17 +244,10 @@ export const DownloadsView = () => {
     }
   }, []);
 
-  // Load on mount and when switching to uploaded tab
+  // Load on mount
   useEffect(() => {
     loadUploadedFiles();
   }, [loadUploadedFiles]);
-
-  // Reload when switching to uploaded tab
-  useEffect(() => {
-    if (activeTab === "uploaded") {
-      loadUploadedFiles();
-    }
-  }, [activeTab, loadUploadedFiles]);
 
   // Listen for localStorage changes and custom events (for when files are uploaded)
   useEffect(() => {
@@ -771,7 +764,7 @@ export const DownloadsView = () => {
         </TabsContent>
 
         {/* Uploaded Files Tab Content */}
-        <TabsContent value="uploaded" className="flex-1 overflow-y-auto mt-0">
+        <TabsContent value="uploaded" className="flex-1 flex flex-col overflow-hidden mt-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Fichiers Uploadés</h2>
             <Button
@@ -804,119 +797,240 @@ export const DownloadsView = () => {
                 </p>
               </div>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {providerOrder.map((provider) => {
-                const files = filesByProvider[provider] || [];
-                if (files.length === 0) return null;
+          ) : (() => {
+            // Get providers that have files
+            const providersWithFiles = providerOrder.filter(provider => {
+              const files = filesByProvider[provider] || [];
+              return files.length > 0;
+            });
 
-                return (
-                  <div key={provider}>
-                    <div className="flex items-center gap-2 mb-3">
-                      {getProviderIcon(provider as any)}
-                      <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground">
-                        {getProviderName(provider as any)} ({files.length})
-                      </h2>
-                    </div>
-                    <div className="space-y-2">
-                      {files.map((file) => (
-                        <div
-                          key={file.id}
-                          className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                              {getFileIcon(getFileType(file.name))}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate text-foreground">
-                                {file.name}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-muted-foreground">
-                                  {formatDuration(new Date(file.uploadedAt))}
-                                </span>
-                                {file.size && (
-                                  <>
-                                    <span className="text-xs text-muted-foreground">•</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatFileSize(file.size)}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {file.url && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => startDownload(file.url!, file.name)}
-                                >
-                                  <Download className="w-4 h-4 mr-2" />
-                                  Télécharger
-                                </Button>
+            // If only one provider, show it directly without tabs
+            if (providersWithFiles.length === 1) {
+              const provider = providersWithFiles[0];
+              const files = filesByProvider[provider] || [];
+              return (
+                <div className="flex-1 overflow-y-auto">
+                  <div className="space-y-2">
+                    {files.map((file) => (
+                      <div
+                        key={file.id}
+                        className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            {getFileIcon(getFileType(file.name))}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate text-foreground">
+                              {file.name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-muted-foreground">
+                                {formatDuration(new Date(file.uploadedAt))}
+                              </span>
+                              {file.size && (
+                                <>
+                                  <span className="text-xs text-muted-foreground">•</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatFileSize(file.size)}
+                                  </span>
+                                </>
                               )}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  {file.url && (
-                                    <>
-                                      <DropdownMenuItem
-                                        onClick={() => {
-                                          const a = document.createElement("a");
-                                          a.href = file.url!;
-                                          a.download = file.name;
-                                          a.click();
-                                        }}
-                                      >
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Télécharger directement
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                    </>
-                                  )}
-                                  <DropdownMenuItem
-                                    onClick={async () => {
-                                      const updated = uploadedFiles.filter(f => f.id !== file.id);
-                                      setUploadedFiles(updated);
-                                      
-                                      // Get user-isolated storage key
-                                      const userId = await getCurrentUserId();
-                                      const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
-                                      localStorage.setItem(storageKey, JSON.stringify(updated));
-                                      
-                                      // Sync to Firebase if available
-                                      try {
-                                        const { firebaseSyncService } = await import('@/services/firebase-sync');
-                                        firebaseSyncService.queueSync('uploadedMedia', updated);
-                                      } catch (error) {
-                                        // Silently fail if Firebase sync is not available
-                                      }
-                                      
-                                      toast.success("Fichier supprimé de la liste");
-                                    }}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    Supprimer de la liste
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
                             </div>
                           </div>
+                          <div className="flex items-center gap-2">
+                            {file.url && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => startDownload(file.url!, file.name)}
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Télécharger
+                              </Button>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {file.url && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        const a = document.createElement("a");
+                                        a.href = file.url!;
+                                        a.download = file.name;
+                                        a.click();
+                                      }}
+                                    >
+                                      <Download className="w-4 h-4 mr-2" />
+                                      Télécharger directement
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    const updated = uploadedFiles.filter(f => f.id !== file.id);
+                                    setUploadedFiles(updated);
+                                    
+                                    // Get user-isolated storage key
+                                    const userId = await getCurrentUserId();
+                                    const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+                                    localStorage.setItem(storageKey, JSON.stringify(updated));
+                                    
+                                    // Sync to Firebase if available
+                                    try {
+                                      const { firebaseSyncService } = await import('@/services/firebase-sync');
+                                      firebaseSyncService.queueSync('uploadedMedia', updated);
+                                    } catch (error) {
+                                      // Silently fail if Firebase sync is not available
+                                    }
+                                    
+                                    toast.success("Fichier supprimé de la liste");
+                                  }}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Supprimer de la liste
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+              );
+            }
+
+            // Multiple providers: use tabs
+            return (
+              <Tabs defaultValue={providersWithFiles[0] || "bunny"} className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="mb-4 bg-muted/30">
+                  {providersWithFiles.map((provider) => {
+                    const files = filesByProvider[provider] || [];
+                    return (
+                      <TabsTrigger 
+                        key={provider} 
+                        value={provider}
+                        className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+                      >
+                        {getProviderIcon(provider as any)}
+                        {getProviderName(provider as any)} ({files.length})
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+
+                {providersWithFiles.map((provider) => {
+                  const files = filesByProvider[provider] || [];
+                  return (
+                    <TabsContent key={provider} value={provider} className="flex-1 overflow-y-auto mt-0">
+                      <div className="space-y-2">
+                        {files.map((file) => (
+                          <div
+                            key={file.id}
+                            className="p-4 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                                {getFileIcon(getFileType(file.name))}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate text-foreground">
+                                  {file.name}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDuration(new Date(file.uploadedAt))}
+                                  </span>
+                                  {file.size && (
+                                    <>
+                                      <span className="text-xs text-muted-foreground">•</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatFileSize(file.size)}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {file.url && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startDownload(file.url!, file.name)}
+                                  >
+                                    <Download className="w-4 h-4 mr-2" />
+                                    Télécharger
+                                  </Button>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {file.url && (
+                                      <>
+                                        <DropdownMenuItem
+                                          onClick={() => {
+                                            const a = document.createElement("a");
+                                            a.href = file.url!;
+                                            a.download = file.name;
+                                            a.click();
+                                          }}
+                                        >
+                                          <Download className="w-4 h-4 mr-2" />
+                                          Télécharger directement
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                      </>
+                                    )}
+                                    <DropdownMenuItem
+                                      onClick={async () => {
+                                        const updated = uploadedFiles.filter(f => f.id !== file.id);
+                                        setUploadedFiles(updated);
+                                        
+                                        // Get user-isolated storage key
+                                        const userId = await getCurrentUserId();
+                                        const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+                                        localStorage.setItem(storageKey, JSON.stringify(updated));
+                                        
+                                        // Sync to Firebase if available
+                                        try {
+                                          const { firebaseSyncService } = await import('@/services/firebase-sync');
+                                          firebaseSyncService.queueSync('uploadedMedia', updated);
+                                        } catch (error) {
+                                          // Silently fail if Firebase sync is not available
+                                        }
+                                        
+                                        toast.success("Fichier supprimé de la liste");
+                                      }}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Supprimer de la liste
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            );
+          })()}
         </TabsContent>
       </Tabs>
     </div>

@@ -60,6 +60,10 @@ export const AlbumContextMenu = ({
   onViewArtist,
   onToggleFavorite,
   isFavorite = false,
+  onUploadToCloudinary,
+  canUploadToCloudinary = false,
+  onUploadToNexus,
+  canUploadToNexus = false,
 }: AlbumContextMenuProps) => {
   return (
     <ContextMenu>
