@@ -123,7 +123,43 @@ class StripeService {
 
   // Create checkout session for Pro subscription
   async createCheckoutSession(priceId: string = PRICE_IDS.PRO_MONTHLY): Promise<string> {
-    const accessToken = await authService.getAccessToken();
+    // Try Firebase first (preferred method)
+    let accessToken: string | null = null;
+    let idToken: string | null = null;
+    
+    try {
+      const { firebaseService } = await import('./firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        const firebaseUser = firebaseService.getCurrentUser();
+        // Only use Firebase token if user is not anonymous
+        if (firebaseUser && !firebaseUser.isAnonymous) {
+          idToken = await firebaseService.getIdToken();
+          if (idToken) {
+            accessToken = idToken; // Use ID token for Firebase users
+          }
+        }
+      }
+    } catch (error) {
+      // Silent fail, will try authService
+    }
+    
+    // Fallback to authService (manual OAuth) if Firebase token not available
+    if (!accessToken) {
+      try {
+        accessToken = await authService.getAccessToken();
+        // Also try to get ID token for better compatibility
+        if (!idToken) {
+          idToken = await authService.getIdToken();
+          // Prefer ID token if available (better for backend verification)
+          if (idToken) {
+            accessToken = idToken;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to get access token from authService:', error);
+      }
+    }
+
     if (!accessToken) {
       throw new Error("User not authenticated");
     }
@@ -145,12 +181,35 @@ class StripeService {
       // Check if response is JSON
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
-        const error = await response.json();
+        const errorData = await response.json();
+        
+        // Extract error message from standardized error response format
+        // API returns: { error: { code, message, details? } }
+        let errorMessage = "Failed to create checkout session";
+        
+        if (errorData.error) {
+          // Standardized error format
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (errorData.error.message) {
+            errorMessage = errorData.error.message;
+          } else if (errorData.error.code) {
+            errorMessage = `Error ${errorData.error.code}: ${errorData.error.message || 'Unknown error'}`;
+          }
+        } else if (errorData.message) {
+          // Direct message format
+          errorMessage = typeof errorData.message === 'string' ? errorData.message : JSON.stringify(errorData.message);
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+        
         // Check if it's a Stripe configuration error
-        if (response.status === 503 && error.error?.includes("Stripe is not configured")) {
+        if (response.status === 503 && errorMessage.includes("Stripe is not configured")) {
           throw new Error("Stripe n'est pas configuré. Veuillez ajouter STRIPE_SECRET_KEY dans le fichier .env à la racine du projet.");
         }
-        throw new Error(error.message || error.error || "Failed to create checkout session");
+        
+        console.error("Stripe checkout error:", errorData);
+        throw new Error(errorMessage);
       } else {
         const text = await response.text();
         console.error("Unexpected response from create-checkout-session:", text.substring(0, 200));
@@ -335,7 +394,26 @@ class StripeService {
 
   // Handle post-checkout success
   async handleCheckoutSuccess(sessionId: string): Promise<void> {
-    const accessToken = await authService.getAccessToken();
+    // Try Firebase first (preferred method)
+    let accessToken: string | null = null;
+    
+    try {
+      const { firebaseService } = await import('./firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        const firebaseUser = firebaseService.getCurrentUser();
+        if (firebaseUser && !firebaseUser.isAnonymous) {
+          accessToken = await firebaseService.getIdToken();
+        }
+      }
+    } catch (error) {
+      // Silent fail, will try authService
+    }
+    
+    // Fallback to authService (manual OAuth) if Firebase token not available
+    if (!accessToken) {
+      accessToken = await authService.getAccessToken();
+    }
+
     if (!accessToken) {
       throw new Error("User not authenticated");
     }
