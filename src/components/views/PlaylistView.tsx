@@ -16,6 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useNexusUpload } from "@/hooks/useNexusUpload";
+import { useUploadedStatus } from "@/hooks/useUploadedStatus";
+import { useCloudSync } from "@/hooks/useCloudSync";
 
 interface PlaylistViewProps {
   tracks: Track[];
@@ -58,6 +62,15 @@ export const PlaylistView = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
   const [editingPlaylistName, setEditingPlaylistName] = useState("");
+  
+  // Upload hooks
+  const { uploadPlaylist, uploadTrack, getTrackProgress } = useCloudinaryUpload();
+  const { uploadPlaylist: uploadPlaylistToNexus, uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
+  const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
+  const { isUploaded, getUploadedProvider } = useUploadedStatus();
+  
+  const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
   // Table state for create/edit pages
   const [tableSearchQuery, setTableSearchQuery] = useState("");
@@ -1077,6 +1090,14 @@ export const PlaylistView = ({
                   onRemoveFromPlaylist={(track) => {
                     onRemoveTracksFromPlaylist(selectedPlaylist.id, [track.id]);
                   }}
+                  uploadTrack={uploadTrack}
+                  getTrackProgress={getTrackProgress}
+                  canUploadToCloudinary={canUploadToCloudinary}
+                  uploadTrackToNexus={uploadTrackToNexus}
+                  getNexusTrackProgress={getNexusTrackProgress}
+                  canUploadToNexus={canUploadToNexus}
+                  isUploaded={isUploaded}
+                  getUploadedProvider={getUploadedProvider}
                 />
               )}
             </div>
@@ -1220,6 +1241,20 @@ export const PlaylistView = ({
                     onEdit={() => handleEditPlaylist(playlist)}
                     onDelete={() => handleDeletePlaylist(playlist.id)}
                     onView={() => setSelectedPlaylistId(playlist.id)}
+                    onUploadToCloudinary={() => {
+                      const playlistTracks = playlist.trackIds
+                        .map((id) => tracks.find((t) => t.id === id))
+                        .filter((t): t is Track => !!t);
+                      uploadPlaylist(playlistTracks);
+                    }}
+                    canUploadToCloudinary={canUploadToCloudinary && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
+                    onUploadToNexus={() => {
+                      const playlistTracks = playlist.trackIds
+                        .map((id) => tracks.find((t) => t.id === id))
+                        .filter((t): t is Track => !!t);
+                      uploadPlaylistToNexus(playlistTracks);
+                    }}
+                    canUploadToNexus={canUploadToNexus && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
                   >
                     <div
                       onClick={() => setSelectedPlaylistId(playlist.id)}
@@ -1268,6 +1303,20 @@ export const PlaylistView = ({
                     onEdit={() => handleEditPlaylist(playlist)}
                     onDelete={() => handleDeletePlaylist(playlist.id)}
                     onView={() => setSelectedPlaylistId(playlist.id)}
+                    onUploadToCloudinary={() => {
+                      const playlistTracks = playlist.trackIds
+                        .map((id) => tracks.find((t) => t.id === id))
+                        .filter((t): t is Track => !!t);
+                      uploadPlaylist(playlistTracks);
+                    }}
+                    canUploadToCloudinary={canUploadToCloudinary && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
+                    onUploadToNexus={() => {
+                      const playlistTracks = playlist.trackIds
+                        .map((id) => tracks.find((t) => t.id === id))
+                        .filter((t): t is Track => !!t);
+                      uploadPlaylistToNexus(playlistTracks);
+                    }}
+                    canUploadToNexus={canUploadToNexus && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
                   >
                     <div
                       onClick={() => setSelectedPlaylistId(playlist.id)}

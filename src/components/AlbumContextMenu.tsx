@@ -18,14 +18,16 @@ import {
   MoreHorizontal,
   Heart,
   User,
+  Cloud,
+  Zap,
 } from "lucide-react";
-import { Playlist } from "@/types/music";
+import { Playlist, Track } from "@/types/music";
 
 interface AlbumContextMenuProps {
   album: {
     name: string;
     artist: string;
-    tracks: any[];
+    tracks: Track[];
     coverUrl?: string;
   };
   children: React.ReactNode;
@@ -39,6 +41,10 @@ interface AlbumContextMenuProps {
   onViewArtist?: () => void;
   onToggleFavorite?: () => void;
   isFavorite?: boolean;
+  onUploadToCloudinary?: () => void;
+  canUploadToCloudinary?: boolean;
+  onUploadToNexus?: () => void;
+  canUploadToNexus?: boolean;
 }
 
 export const AlbumContextMenu = ({
@@ -119,6 +125,24 @@ export const AlbumContextMenu = ({
             <User className="w-4 h-4 mr-2" />
             Voir l'artiste
           </ContextMenuItem>
+        )}
+
+        {(onUploadToCloudinary || onUploadToNexus) && (
+          <>
+            <ContextMenuSeparator />
+            {onUploadToCloudinary && canUploadToCloudinary && (
+              <ContextMenuItem onClick={onUploadToCloudinary}>
+                <Cloud className="w-4 h-4 mr-2" />
+                Uploader l'album vers Cloudinary
+              </ContextMenuItem>
+            )}
+            {onUploadToNexus && canUploadToNexus && (
+              <ContextMenuItem onClick={onUploadToNexus}>
+                <Zap className="w-4 h-4 mr-2" />
+                Uploader l'album vers Nexus/Bunny (Pro)
+              </ContextMenuItem>
+            )}
+          </>
         )}
       </ContextMenuContent>
     </ContextMenu>

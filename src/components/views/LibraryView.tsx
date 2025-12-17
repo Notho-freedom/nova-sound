@@ -44,9 +44,11 @@ import { ArtistContextMenu } from "@/components/ArtistContextMenu";
 import { PageHeader } from "@/components/PageHeader";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
+import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
+import { UploadIndicator } from "@/components/UploadIndicator";
 import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton, AlbumTableSkeleton, ArtistTableSkeleton } from "@/components/ui/skeletons";
 
 interface LibraryViewProps {
@@ -181,12 +183,13 @@ export const LibraryView = ({
   const [artistsSortOrder, setArtistsSortOrder] = useState<"asc" | "desc">("asc");
   
   // Cloudinary upload
-  const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
+  const { uploadTrack, uploadAlbum, uploadPlaylist, getTrackProgress } = useCloudinaryUpload();
   // Nexus/Bunny upload (Pro only)
-  const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
+  const { uploadTrack: uploadTrackToNexus, uploadAlbum: uploadAlbumToNexus, uploadPlaylist: uploadPlaylistToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const playlistsResult = usePlaylists();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { isUploaded, getUploadedProvider } = useUploadedStatus();
   
   // Ensure playlists is always an array
   const playlists = playlistsResult?.playlists ?? [];
@@ -507,9 +510,14 @@ export const LibraryView = ({
                               canUploadToNexus={canUploadToNexus && !!track.filePath}
                               isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                             >
-                              <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                                {track.title}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                  {track.title}
+                                </p>
+                                {isUploaded(track.id) && (
+                                  <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                                )}
+                              </div>
                             </TrackContextMenu>
                           </div>
                         </TooltipTrigger>
@@ -695,6 +703,10 @@ export const LibraryView = ({
                     setSelectedAlbum(`${album.name}-${artist.name}`);
                   }}
                   onViewArtist={() => {}}
+                  onUploadToCloudinary={() => uploadAlbum(album.tracks)}
+                  canUploadToCloudinary={canUploadToCloudinary && album.tracks.some(t => t.filePath)}
+                  onUploadToNexus={() => uploadAlbumToNexus(album.tracks)}
+                  canUploadToNexus={canUploadToNexus && album.tracks.some(t => t.filePath)}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -810,9 +822,14 @@ export const LibraryView = ({
                                   canUploadToNexus={canUploadToNexus && !!track.filePath}
                                   isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                                 >
-                                  <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                                    {track.title}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                      {track.title}
+                                    </p>
+                                    {isUploaded(track.id) && (
+                                      <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                                    )}
+                                  </div>
                                 </TrackContextMenu>
                               </div>
                             </TooltipTrigger>
@@ -1184,6 +1201,10 @@ export const LibraryView = ({
                           onCreatePlaylist={() => createPlaylist("Nouvelle playlist", album.tracks.map(t => t.id))}
                           onViewAlbum={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
                           onViewArtist={() => setSelectedArtist(album.artist)}
+                          onUploadToCloudinary={() => uploadAlbum(album.tracks)}
+                          canUploadToCloudinary={canUploadToCloudinary && album.tracks.some(t => t.filePath)}
+                          onUploadToNexus={() => uploadAlbumToNexus(album.tracks)}
+                          canUploadToNexus={canUploadToNexus && album.tracks.some(t => t.filePath)}
                         >
                           <tr
                             onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
@@ -1209,10 +1230,18 @@ export const LibraryView = ({
                                         <Play className="w-4 h-4 text-white fill-current ml-0.5" />
                                       </div>
                                     </div>
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium truncate text-foreground">
-                                        {album.name}
-                                      </p>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium truncate text-foreground">
+                                          {album.name}
+                                        </p>
+                                        {album.tracks.some(t => isUploaded(t.id)) && (
+                                          <UploadIndicator 
+                                            provider={album.tracks.find(t => isUploaded(t.id)) ? getUploadedProvider(album.tracks.find(t => isUploaded(t.id))!.id) || undefined : undefined} 
+                                            size="sm" 
+                                          />
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </TooltipTrigger>
@@ -1879,10 +1908,15 @@ export const LibraryView = ({
                                     </div>
                                   )}
                                 </div>
-                                <div className="min-w-0">
-                                  <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                                    {track.title}
-                                  </p>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                      {track.title}
+                                    </p>
+                                    {isUploaded(track.id) && (
+                                      <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                                    )}
+                                  </div>
                                   <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                                 </div>
                               </div>
@@ -2018,9 +2052,14 @@ export const LibraryView = ({
                           </div>
                         )}
                       </div>
-                      <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                        {track.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                          {track.title}
+                        </p>
+                        {isUploaded(track.id) && (
+                          <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                     </button>
                   </TooltipTrigger>

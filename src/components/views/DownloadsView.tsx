@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { firebaseService } from "@/services/firebase";
@@ -80,7 +81,6 @@ export const DownloadsView = () => {
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [loadingUploaded, setLoadingUploaded] = useState(true);
-  const [activeTab, setActiveTab] = useState<"downloads" | "uploaded">("downloads");
 
   // Save to localStorage whenever downloads change
   useEffect(() => {
@@ -525,36 +525,6 @@ export const DownloadsView = () => {
   const completedDownloads = downloads.filter((d) => d.status === "completed");
   const failedDownloads = downloads.filter((d) => d.status === "failed");
 
-  // Loading skeleton for uploaded files tab
-  if (loadingUploaded && activeTab === "uploaded") {
-    return (
-      <div className="p-6 h-full flex flex-col">
-        <div className="mb-6">
-          <Skeleton className="h-9 w-64 mb-2" />
-          <Skeleton className="h-5 w-96" />
-        </div>
-        <div className="flex gap-2 mb-6">
-          <Skeleton className="h-10 w-40" />
-          <Skeleton className="h-10 w-40" />
-        </div>
-        <div className="space-y-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="p-4 rounded-lg bg-card border border-border">
-              <div className="flex items-center gap-4">
-                <Skeleton className="w-10 h-10 rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-                <Skeleton className="h-8 w-20" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 h-full flex flex-col">
       <div className="mb-6">
@@ -562,17 +532,6 @@ export const DownloadsView = () => {
           <h1 className="font-display text-3xl font-bold text-foreground">
             Téléchargements
           </h1>
-          {activeTab === "uploaded" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshUploadedFiles}
-              disabled={loadingUploaded}
-            >
-              <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "animate-spin")} />
-              Actualiser
-            </Button>
-          )}
         </div>
         <p className="text-muted-foreground">
           Gérez vos téléchargements et fichiers uploadés.
@@ -580,33 +539,20 @@ export const DownloadsView = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-border">
-        <button
-          onClick={() => setActiveTab("downloads")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-            activeTab === "downloads"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Téléchargements ({downloads.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("uploaded")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-            activeTab === "uploaded"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Fichiers Uploadés ({uploadedFiles.length})
-        </button>
-      </div>
+      <Tabs defaultValue="downloads" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className="mb-6 bg-muted/30">
+          <TabsTrigger value="downloads" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+            <Download className="w-4 h-4" />
+            Téléchargements ({downloads.length})
+          </TabsTrigger>
+          <TabsTrigger value="uploaded" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+            <Cloud className="w-4 h-4" />
+            Fichiers Uploadés ({uploadedFiles.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Downloads Tab Content */}
-      {activeTab === "downloads" && (
+        {/* Downloads Tab Content */}
+        <TabsContent value="downloads" className="flex-1 overflow-y-auto mt-0">
         <>
           {/* Actions */}
           {completedDownloads.length > 0 && (
@@ -822,11 +768,23 @@ export const DownloadsView = () => {
             </div>
           )}
         </>
-      )}
+        </TabsContent>
 
-      {/* Uploaded Files View */}
-      {activeTab === "uploaded" && (
-        <>
+        {/* Uploaded Files Tab Content */}
+        <TabsContent value="uploaded" className="flex-1 overflow-y-auto mt-0">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Fichiers Uploadés</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshUploadedFiles}
+              disabled={loadingUploaded}
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "animate-spin")} />
+              Actualiser
+            </Button>
+          </div>
+
           {loadingUploaded ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -847,13 +805,13 @@ export const DownloadsView = () => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto">
+            <div className="space-y-6">
               {providerOrder.map((provider) => {
                 const files = filesByProvider[provider] || [];
                 if (files.length === 0) return null;
 
                 return (
-                  <div key={provider} className="mb-6">
+                  <div key={provider}>
                     <div className="flex items-center gap-2 mb-3">
                       {getProviderIcon(provider as any)}
                       <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground">
@@ -959,8 +917,8 @@ export const DownloadsView = () => {
               })}
             </div>
           )}
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { Music, Play, Pause, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Track } from "@/types/music";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { UploadIndicator } from "@/components/UploadIndicator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,8 @@ interface TrackListProps {
   uploadTrackToNexus?: (track: Track) => void;
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToNexus?: boolean;
+  isUploaded?: (trackId: string) => boolean;
+  getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
 }
 
 const formatDuration = (seconds: number): string => {
@@ -55,6 +58,8 @@ export const TrackList = memo(({
   uploadTrackToNexus,
   getNexusTrackProgress,
   canUploadToNexus = false,
+  isUploaded,
+  getUploadedProvider,
 }: TrackListProps) => {
   return (
     <div className="h-full overflow-y-auto space-y-1 pr-2">
@@ -114,12 +119,17 @@ export const TrackList = memo(({
             
             {/* Track info */}
             <div className="flex-1 min-w-0">
-              <p className={cn(
-                "font-medium truncate transition-colors",
-                index === currentTrackIndex ? "text-primary neon-text-cyan" : "text-foreground"
-              )}>
-                {track.title}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className={cn(
+                  "font-medium truncate transition-colors",
+                  index === currentTrackIndex ? "text-primary neon-text-cyan" : "text-foreground"
+                )}>
+                  {track.title}
+                </p>
+                {isUploaded?.(track.id) && (
+                  <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
+                )}
+              </div>
               <p className="text-sm text-muted-foreground truncate">
                 {track.artist}
               </p>

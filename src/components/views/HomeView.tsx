@@ -9,10 +9,12 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrackCardSkeleton, PlaylistCardSkeleton, TableRowSkeleton } from "@/components/ui/skeletons";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { UploadIndicator } from "@/components/UploadIndicator";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
+import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 
 interface HistoryEntry {
   trackId: string;
@@ -90,6 +92,7 @@ export const HomeView = ({
   const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
   const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated, nexusUser } = useCloudSync();
+  const { isUploaded, getUploadedProvider } = useUploadedStatus();
   const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
@@ -303,12 +306,17 @@ export const HomeView = ({
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "text-sm font-medium truncate",
-                              isCurrentTrack ? "text-primary" : "text-foreground"
-                            )}>
-                              {track.title}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className={cn(
+                                "text-sm font-medium truncate",
+                                isCurrentTrack ? "text-primary" : "text-foreground"
+                              )}>
+                                {track.title}
+                              </p>
+                              {isUploaded(track.id) && (
+                                <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground truncate">
                               {track.artist}
                             </p>
@@ -426,13 +434,18 @@ export const HomeView = ({
                                       className="w-full h-full object-cover"
                                     />
                                   </div>
-                                  <div className="min-w-0">
-                                    <p className={cn(
-                                      "text-sm font-medium truncate",
-                                      isCurrentTrack ? "text-primary" : "text-foreground"
-                                    )}>
-                                      {track.title}
-                                    </p>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className={cn(
+                                        "text-sm font-medium truncate",
+                                        isCurrentTrack ? "text-primary" : "text-foreground"
+                                      )}>
+                                        {track.title}
+                                      </p>
+                                      {isUploaded(track.id) && (
+                                        <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                                      )}
+                                    </div>
                                     <p className="text-xs text-muted-foreground truncate">
                                       {track.artist}
                                     </p>

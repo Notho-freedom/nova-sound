@@ -33,6 +33,8 @@ interface TrackListViewProps {
   showTrackNumber?: boolean;
   showRemoveFromPlaylist?: boolean;
   onRemoveFromPlaylist?: (track: Track) => void;
+  isUploaded?: (trackId: string) => boolean;
+  getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
 }
 
 export const TrackListView = ({
@@ -58,6 +60,8 @@ export const TrackListView = ({
   showTrackNumber = false,
   showRemoveFromPlaylist = false,
   onRemoveFromPlaylist,
+  isUploaded,
+  getUploadedProvider,
 }: TrackListViewProps) => {
   return (
     <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden relative">
@@ -156,10 +160,15 @@ export const TrackListView = ({
                           </div>
                         )}
                       </div>
-                      <div className="min-w-0">
-                        <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                          {track.title}
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                            {track.title}
+                          </p>
+                          {isUploaded?.(track.id) && (
+                            <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                       </div>
                     </div>

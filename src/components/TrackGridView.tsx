@@ -3,6 +3,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { UploadIndicator } from "@/components/UploadIndicator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -30,6 +31,8 @@ interface TrackGridViewProps {
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToNexus?: boolean;
   columns?: 2 | 3 | 4 | 5;
+  isUploaded?: (trackId: string) => boolean;
+  getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
 }
 
 export const TrackGridView = ({
@@ -51,6 +54,8 @@ export const TrackGridView = ({
   getNexusTrackProgress,
   canUploadToNexus = false,
   columns = 5,
+  isUploaded,
+  getUploadedProvider,
 }: TrackGridViewProps) => {
   const gridCols = {
     2: "grid-cols-2",
@@ -96,6 +101,12 @@ export const TrackGridView = ({
                 >
               <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
                 <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105" />
+                {/* Upload indicator badge */}
+                {isUploaded?.(track.id) && (
+                  <div className="absolute top-2 right-2 z-20">
+                    <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
+                  </div>
+                )}
                 {/* Upload progress overlay */}
                 {getTrackProgress?.(track.id) && (
                   <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
@@ -134,7 +145,12 @@ export const TrackGridView = ({
                   </div>
                 </div>
               </div>
-              <p className="text-sm font-medium truncate text-foreground mb-1">{track.title}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium truncate text-foreground mb-1 flex-1">{track.title}</p>
+                {isUploaded?.(track.id) && (
+                  <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
+                )}
+              </div>
               <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
               <p className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</p>
             </button>

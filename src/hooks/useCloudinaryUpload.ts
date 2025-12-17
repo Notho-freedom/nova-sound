@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 
 interface UseCloudinaryUploadReturn {
   uploadTrack: (track: Track) => Promise<void>;
+  uploadAlbum: (tracks: Track[]) => Promise<void>;
+  uploadPlaylist: (tracks: Track[]) => Promise<void>;
   uploadProgress: Map<string, UploadProgress>;
   overallProgress: number;
   isUploading: boolean;
@@ -129,8 +131,96 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
     }
   }, [cloudinaryConfigured, nexusIsPro, uploadProgress]);
 
+  // Upload an entire album (all tracks without duplicates)
+  const uploadAlbum = useCallback(async (tracks: Track[]) => {
+    if (!cloudinaryConfigured && !nexusIsPro) {
+      toast.error('Cloudinary non configuré', {
+        description: 'Configurez Cloudinary dans les paramètres ou passez au plan Pro pour utiliser le stockage Nexus.',
+      });
+      return;
+    }
+
+    // Remove duplicates by ID
+    const uniqueTracks = Array.from(new Map(tracks.map(t => [t.id, t])).values());
+    
+    if (uniqueTracks.length === 0) {
+      toast.error('Aucune piste à uploader', {
+        description: 'L\'album ne contient aucune piste valide.',
+      });
+      return;
+    }
+
+    toast.info(`Upload de l'album en cours...`, {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
+    });
+
+    // Upload tracks sequentially to avoid overwhelming the service
+    for (let i = 0; i < uniqueTracks.length; i++) {
+      const track = uniqueTracks[i];
+      try {
+        await uploadTrack(track);
+        // Small delay between uploads
+        if (i < uniqueTracks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Failed to upload track ${track.title}:`, error);
+        // Continue with next track even if one fails
+      }
+    }
+
+    toast.success('Upload de l\'album terminé', {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} uploadée${uniqueTracks.length > 1 ? 's' : ''}.`,
+    });
+  }, [cloudinaryConfigured, nexusIsPro, uploadTrack]);
+
+  // Upload an entire playlist (all tracks without duplicates)
+  const uploadPlaylist = useCallback(async (tracks: Track[]) => {
+    if (!cloudinaryConfigured && !nexusIsPro) {
+      toast.error('Cloudinary non configuré', {
+        description: 'Configurez Cloudinary dans les paramètres ou passez au plan Pro pour utiliser le stockage Nexus.',
+      });
+      return;
+    }
+
+    // Remove duplicates by ID
+    const uniqueTracks = Array.from(new Map(tracks.map(t => [t.id, t])).values());
+    
+    if (uniqueTracks.length === 0) {
+      toast.error('Aucune piste à uploader', {
+        description: 'La playlist ne contient aucune piste valide.',
+      });
+      return;
+    }
+
+    toast.info(`Upload de la playlist en cours...`, {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
+    });
+
+    // Upload tracks sequentially to avoid overwhelming the service
+    for (let i = 0; i < uniqueTracks.length; i++) {
+      const track = uniqueTracks[i];
+      try {
+        await uploadTrack(track);
+        // Small delay between uploads
+        if (i < uniqueTracks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Failed to upload track ${track.title}:`, error);
+        // Continue with next track even if one fails
+      }
+    }
+
+    toast.success('Upload de la playlist terminé', {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} uploadée${uniqueTracks.length > 1 ? 's' : ''}.`,
+    });
+  }, [cloudinaryConfigured, nexusIsPro, uploadTrack]);
+
   return {
     uploadTrack,
+    uploadAlbum,
+    uploadPlaylist,
     uploadProgress,
     overallProgress,
     isUploading,

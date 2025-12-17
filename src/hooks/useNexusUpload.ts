@@ -12,6 +12,8 @@ export interface NexusUploadProgress {
 
 interface UseNexusUploadReturn {
   uploadTrack: (track: Track) => Promise<void>;
+  uploadAlbum: (tracks: Track[]) => Promise<void>;
+  uploadPlaylist: (tracks: Track[]) => Promise<void>;
   uploadProgress: Map<string, NexusUploadProgress>;
   overallProgress: number;
   isUploading: boolean;
@@ -186,8 +188,126 @@ export function useNexusUpload(): UseNexusUploadReturn {
     }
   }, [uploadProgress]);
 
+  // Upload an entire album (all tracks without duplicates)
+  const uploadAlbum = useCallback(async (tracks: Track[]) => {
+    // Check authentication and Pro status
+    let isAuthenticated = false;
+    let isPro = false;
+    
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        isAuthenticated = true;
+        isPro = firebaseService.isPro();
+      }
+    } catch (error) {
+      isAuthenticated = nexusServerService.isAuthenticated();
+      isPro = nexusServerService.isPro();
+    }
+    
+    if (!isAuthenticated || !isPro) {
+      toast.error('Plan Pro requis', {
+        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+      });
+      return;
+    }
+
+    // Remove duplicates by ID
+    const uniqueTracks = Array.from(new Map(tracks.map(t => [t.id, t])).values());
+    
+    if (uniqueTracks.length === 0) {
+      toast.error('Aucune piste à uploader', {
+        description: 'L\'album ne contient aucune piste valide.',
+      });
+      return;
+    }
+
+    toast.info(`Upload de l'album vers Nexus/Bunny en cours...`, {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
+    });
+
+    // Upload tracks sequentially
+    for (let i = 0; i < uniqueTracks.length; i++) {
+      const track = uniqueTracks[i];
+      try {
+        await uploadTrack(track);
+        // Small delay between uploads
+        if (i < uniqueTracks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Failed to upload track ${track.title}:`, error);
+        // Continue with next track even if one fails
+      }
+    }
+
+    toast.success('Upload de l\'album terminé', {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} uploadée${uniqueTracks.length > 1 ? 's' : ''}.`,
+    });
+  }, [uploadTrack]);
+
+  // Upload an entire playlist (all tracks without duplicates)
+  const uploadPlaylist = useCallback(async (tracks: Track[]) => {
+    // Check authentication and Pro status
+    let isAuthenticated = false;
+    let isPro = false;
+    
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        isAuthenticated = true;
+        isPro = firebaseService.isPro();
+      }
+    } catch (error) {
+      isAuthenticated = nexusServerService.isAuthenticated();
+      isPro = nexusServerService.isPro();
+    }
+    
+    if (!isAuthenticated || !isPro) {
+      toast.error('Plan Pro requis', {
+        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+      });
+      return;
+    }
+
+    // Remove duplicates by ID
+    const uniqueTracks = Array.from(new Map(tracks.map(t => [t.id, t])).values());
+    
+    if (uniqueTracks.length === 0) {
+      toast.error('Aucune piste à uploader', {
+        description: 'La playlist ne contient aucune piste valide.',
+      });
+      return;
+    }
+
+    toast.info(`Upload de la playlist vers Nexus/Bunny en cours...`, {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
+    });
+
+    // Upload tracks sequentially
+    for (let i = 0; i < uniqueTracks.length; i++) {
+      const track = uniqueTracks[i];
+      try {
+        await uploadTrack(track);
+        // Small delay between uploads
+        if (i < uniqueTracks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Failed to upload track ${track.title}:`, error);
+        // Continue with next track even if one fails
+      }
+    }
+
+    toast.success('Upload de la playlist terminé', {
+      description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} uploadée${uniqueTracks.length > 1 ? 's' : ''}.`,
+    });
+  }, [uploadTrack]);
+
   return {
     uploadTrack,
+    uploadAlbum,
+    uploadPlaylist,
     uploadProgress,
     overallProgress,
     isUploading,
