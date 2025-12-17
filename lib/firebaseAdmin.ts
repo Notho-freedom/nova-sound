@@ -43,15 +43,15 @@ export function getFirebaseAdmin(): typeof admin {
           throw initializationError;
         }
 
-        admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
             privateKey: formattedPrivateKey,
-          }),
-        });
-        initialized = true;
-        console.log('Firebase Admin initialized successfully');
+        }),
+      });
+      initialized = true;
+      console.log('Firebase Admin initialized successfully');
       } catch (error: any) {
         initializationError = new Error(
           `Failed to initialize Firebase Admin: ${error.message}`

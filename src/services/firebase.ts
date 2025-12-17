@@ -34,6 +34,7 @@ import {
 } from "firebase/firestore";
 
 // Firebase configuration - loaded from API route (server-side only)
+// Fallback to NEXT_PUBLIC_* for backward compatibility
 let firebaseConfig: {
   apiKey: string;
   authDomain: string;
@@ -47,17 +48,28 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let configLoadPromise: Promise<void> | null = null;
-let initializationComplete = false;
-let initializationPromise: Promise<void> | null = null;
 
 // Load Firebase configuration from API route
 async function loadFirebaseConfig(): Promise<void> {
-  if (typeof window === 'undefined') return;
-  if (firebaseConfig) return;
-  if (configLoadPromise) return configLoadPromise;
+  // Only load on client side
+  if (typeof window === 'undefined') {
+    return;
+  }
 
+  // If already loaded, return
+  if (firebaseConfig) {
+    return;
+  }
+
+  // If already loading, wait for it
+  if (configLoadPromise) {
+    return configLoadPromise;
+  }
+
+  // Start loading
   configLoadPromise = (async () => {
     try {
+      // Try to load from API route first (secure method)
       const response = await fetch('/api/config/firebase');
       
       if (response.ok) {
@@ -77,6 +89,7 @@ async function loadFirebaseConfig(): Promise<void> {
     } catch (error) {
       console.warn("Failed to load Firebase config from API, trying fallback:", error);
       
+      // Fallback to NEXT_PUBLIC_* for backward compatibility
       firebaseConfig = {
         apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
         authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
@@ -85,121 +98,146 @@ async function loadFirebaseConfig(): Promise<void> {
         messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
         appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
       };
-      console.log("Firebase config loaded from environment variables");
+    }
+
+    // Validate config
+    const isConfigValid = firebaseConfig && Object.values(firebaseConfig).every(
+      (value) => value && value !== "undefined" && value !== ''
+    );
+
+    if (isConfigValid && firebaseConfig) {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        
+        // Check if running in Electron (for long-polling support)
+        const isElectron = typeof window !== 'undefined' && window.electronAPI;
+        
+        // Use long-polling in Electron to avoid WebSocket issues
+        // Also enable offline persistence for better experience
+        if (isElectron) {
+          db = initializeFirestore(app, {
+            experimentalForceLongPolling: true,
+            // Enable local cache for offline support
+            localCache: persistentLocalCache({
+              tabManager: persistentMultipleTabManager(),
+              cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+            }),
+          });
+          console.log("Firebase initialized with long-polling and persistent cache (Electron mode)");
+        } else {
+          // For web browsers, use default settings with persistence
+          db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+              tabManager: persistentMultipleTabManager(),
+              cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+            }),
+          });
+          console.log("Firebase initialized with persistent cache");
+        }
+      } catch (error) {
+        console.error("Firebase initialization error:", error);
+        // Fallback to simpler initialization if advanced features fail
+        try {
+          if (!app) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+          }
+          if (!db) {
+            db = getFirestore(app);
+            console.log("Firebase initialized with fallback settings");
+          }
+        } catch (fallbackError) {
+          console.error("Firebase fallback initialization failed:", fallbackError);
+        }
+      }
+    } else {
+      console.warn("Firebase config incomplete. Please check your .env file and ensure /api/config/firebase is configured.");
     }
   })();
 
   return configLoadPromise;
 }
 
+// Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('email');
-googleProvider.addScope('profile');
+googleProvider.addScope("profile");
+googleProvider.addScope("email");
+// Set custom parameters for better redirect handling
+googleProvider.setCustomParameters({
+  prompt: "select_account",
+});
 
+// User profile interface
 export interface UserProfile {
   uid: string;
-  email: string | null;
-  displayName: string | null;
+  email: string;
+  displayName: string;
   photoURL: string | null;
   plan: "free" | "pro";
-  subscriptionStatus: "active" | "cancelled" | "canceled" | "past_due" | "trialing" | "none" | null;
+  stripeCustomerId?: string;
+  subscriptionId?: string;
+  subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing";
+  subscriptionEndDate?: string;
   storageUsed: number;
   createdAt: string;
-  updatedAt?: string;
-  lastLoginAt?: string;
-  isAnonymous?: boolean;
+  lastLoginAt: string;
 }
 
 class FirebaseService {
   private currentUser: User | null = null;
   private userProfile: UserProfile | null = null;
   private authStateListeners: Set<(user: User | null) => void> = new Set();
-  private idTokenUnsubscribe: (() => void) | null = null;
   private tokenRefreshInterval: NodeJS.Timeout | null = null;
-  private authReadyPromise: Promise<User | null> | null = null;
-  private authReadyResolver: ((user: User | null) => void) | null = null;
+  private idTokenUnsubscribe: (() => void) | null = null;
 
   constructor() {
-    // Create a promise that resolves when auth is ready
-    this.authReadyPromise = new Promise((resolve) => {
-      this.authReadyResolver = resolve;
-    });
-
+    // Preload Firebase config from API (non-blocking)
     if (typeof window !== 'undefined') {
-      this.initialize();
+      loadFirebaseConfig().catch((error) => {
+        console.warn("Failed to preload Firebase config:", error);
+      });
     }
-  }
-
-  private async initialize(): Promise<void> {
-    if (initializationPromise) return initializationPromise;
     
-    initializationPromise = this.doInitialize();
-    return initializationPromise;
-  }
-
-  private async doInitialize(): Promise<void> {
-    if (typeof window === 'undefined') return;
-    if (initializationComplete) return;
-
-    try {
-      await loadFirebaseConfig();
-
-      if (!firebaseConfig || !firebaseConfig.apiKey) {
-        console.warn("Firebase configuration is missing or incomplete");
-        initializationComplete = true;
-        this.authReadyResolver?.(null);
-        return;
-      }
-
-      // Initialize Firebase app
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-
-      // Initialize Firestore with persistent cache (Electron compatible)
-      try {
-        const isElectron = typeof window !== 'undefined' && window.electronAPI;
-        
-        if (isElectron) {
-          db = initializeFirestore(app, {
-            localCache: persistentLocalCache({
-              cacheSizeBytes: CACHE_SIZE_UNLIMITED,
-            }),
-            experimentalForceLongPolling: true,
-          });
-          console.log("Firebase initialized with long-polling and persistent cache (Electron mode)");
-        } else {
-          db = getFirestore(app);
-          console.log("Firebase initialized with default settings (Browser mode)");
-        }
-      } catch (firestoreError: any) {
-        if (firestoreError.code !== 'failed-precondition') {
-          console.error("Firestore initialization error:", firestoreError);
-        }
-        db = getFirestore(app);
-      }
-
-      // Setup auth state listener - this is the SINGLE source of truth
+    // Listen for auth state changes
+    // This will automatically handle transitions from anonymous to Google user
+    if (auth) {
       onAuthStateChanged(auth, async (user) => {
-        console.log("🔐 Auth state changed:", user ? `${user.isAnonymous ? 'Anonymous' : 'Google'} - ${user.email || user.uid}` : 'Signed out');
-        
         const previousUser = this.currentUser;
         this.currentUser = user;
-
+        
         if (user) {
-          // Load or create profile
+          const userType = user.isAnonymous ? "anonymous" : (user.email || "authenticated");
+          console.log("Auth state changed: user signed in", userType, user.uid);
+          
+          // If user transitioned from anonymous to Google, log it
+          if (previousUser?.isAnonymous && !user.isAnonymous) {
+            console.log("✅ User transitioned from anonymous to Google account:", user.email);
+            // The anonymous user is automatically replaced by Firebase
+          }
+          
+          // Verify token is available (only for non-anonymous users)
+          if (!user.isAnonymous) {
+            try {
+              const token = await user.getIdToken();
+              console.log("Token available after auth state change:", token ? "✓" : "✗");
+            } catch (tokenError) {
+              console.error("Error getting token after auth state change:", tokenError);
+            }
+          }
+          
+          // Load profile - this will use Firebase user data (which includes Google data after merge)
           await this.loadUserProfile(user.uid);
           
-          // If transitioning from anonymous to Google, log it
-          if (previousUser?.isAnonymous && !user.isAnonymous) {
-            console.log("✅ User upgraded from anonymous to Google:", user.email);
-          }
-          
-          // Setup token refresh for non-anonymous users
-          if (!user.isAnonymous) {
-            this.setupTokenRefreshListener(user);
+          // Force notify listeners with updated profile (so UI uses correct data from Firestore)
+          if (this.userProfile) {
+            // Notify with User object (for Firebase listeners)
+            this.authStateListeners.forEach((listener) => listener(user));
           }
         } else {
-          // User signed out
+          console.log("Auth state changed: user signed out");
+          
+          // Clean up user-isolated storage when signing out
           if (previousUser) {
             try {
               const { cleanupUserStorage } = await import('@/lib/storage-utils');
@@ -208,61 +246,45 @@ class FirebaseService {
               console.error('Failed to cleanup user storage:', error);
             }
           }
+          
           this.userProfile = null;
+          // Notify listeners
+          this.authStateListeners.forEach((listener) => listener(null));
         }
-
-        // Notify all listeners
-        this.authStateListeners.forEach((listener) => listener(user));
         
-        // Resolve auth ready promise on first auth state
-        if (this.authReadyResolver) {
-          this.authReadyResolver(user);
-          this.authReadyResolver = null;
-        }
+        // Setup token refresh listener when user changes
+        this.setupTokenRefreshListener(user);
       });
-
-      // Handle redirect result (for returning from Google sign-in)
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          console.log("📥 Redirect result: user signed in:", result.user.email);
-          await this.createOrUpdateProfile(result.user);
-        }
-      } catch (redirectError) {
-        console.warn("Redirect result check failed (normal if no redirect):", redirectError);
-      }
-
-      initializationComplete = true;
-      console.log("✅ Firebase initialization complete");
-
-    } catch (error) {
-      console.error("Firebase initialization error:", error);
-      initializationComplete = true;
-      this.authReadyResolver?.(null);
     }
   }
 
   // Setup automatic token refresh listener
   private setupTokenRefreshListener(user: User | null): void {
-    // Cleanup previous listeners
+    // Cleanup previous listener
     if (this.idTokenUnsubscribe) {
       this.idTokenUnsubscribe();
       this.idTokenUnsubscribe = null;
     }
+    
+    // Clear previous interval
     if (this.tokenRefreshInterval) {
       clearInterval(this.tokenRefreshInterval);
       this.tokenRefreshInterval = null;
     }
     
-    if (!user || user.isAnonymous || !auth) return;
+    if (!user || user.isAnonymous || !auth) {
+      return;
+    }
     
-    // Listen to token changes
+    // Listen to token changes (Firebase automatically refreshes tokens)
+    // This listener is called whenever the token changes (including automatic refresh)
     this.idTokenUnsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser && !firebaseUser.isAnonymous) {
         try {
+          // Get token (Firebase automatically refreshes if needed)
           const token = await firebaseUser.getIdToken(false);
           if (token) {
-            console.log("🔄 Token refreshed, length:", token.length);
+            console.log("🔄 Token updated by Firebase (auto-refresh), length:", token.length);
           }
         } catch (error) {
           console.error("Error getting token after change:", error);
@@ -270,67 +292,70 @@ class FirebaseService {
       }
     });
     
-    // Proactive refresh every 50 minutes
+    // Also set up a proactive refresh interval (refresh 10 minutes before expiration)
+    // Firebase tokens typically expire after 1 hour, so refresh every 50 minutes
     this.tokenRefreshInterval = setInterval(async () => {
-      if (auth?.currentUser && !auth.currentUser.isAnonymous) {
+      if (user && !user.isAnonymous && auth) {
         try {
-          await auth.currentUser.getIdToken(true);
-          console.log("🔄 Token proactively refreshed");
+          // Force refresh to get a new token
+          const token = await user.getIdToken(true);
+          console.log("🔄 Token refreshed proactively, length:", token?.length || 0);
         } catch (error) {
-          console.error("Proactive token refresh failed:", error);
+          console.error("Error in proactive token refresh:", error);
         }
       }
-    }, 50 * 60 * 1000);
+    }, 50 * 60 * 1000); // Every 50 minutes
   }
 
-  // Wait for Firebase to be fully initialized and auth state to be determined
-  async waitForAuthReady(): Promise<User | null> {
-    await this.ensureInitialized();
-    return this.authReadyPromise || Promise.resolve(null);
-  }
-
-  // Handle redirect result (for compatibility with FirebaseProvider)
+  // Handle redirect result after Google sign-in (call this on app initialization)
   async handleRedirectResult(): Promise<UserProfile | null> {
     await this.ensureInitialized();
     if (!auth) return null;
 
     try {
       const result = await getRedirectResult(auth);
-      if (result?.user) {
-        console.log("📥 Redirect result: user signed in:", result.user.email);
+      if (result && result.user) {
+        console.log("Redirect result received, user:", result.user.email);
         
-        if (result.user.email) {
-          localStorage.setItem('nexus-google-email', result.user.email);
+        // Set current user
+        this.currentUser = result.user;
+        
+        // Get and verify token is available
+        try {
+          const token = await result.user.getIdToken();
+          console.log("ID token retrieved after redirect:", token ? "✓ Token length: " + token.length : "✗");
+        } catch (tokenError) {
+          console.error("Error getting token after redirect:", tokenError);
         }
         
-        return this.createOrUpdateProfile(result.user);
+        const profile = await this.createOrUpdateProfile(result.user);
+        
+        // Force notify listeners
+        this.authStateListeners.forEach((listener) => listener(result.user));
+        
+        return profile;
       }
     } catch (error) {
-      console.warn("Redirect result check failed:", error);
+      console.error("Error handling redirect result:", error);
     }
     return null;
   }
 
   // Check if Firebase is initialized
   isInitialized(): boolean {
-    return initializationComplete && app !== null && auth !== null;
+    return app !== null && auth !== null;
   }
 
-  // Ensure Firebase is initialized
+  // Ensure Firebase config is loaded
   async ensureInitialized(): Promise<void> {
-    if (!initializationComplete) {
-      await this.initialize();
+    if (!this.isInitialized()) {
+      await loadFirebaseConfig();
     }
   }
 
-  // Get current user (returns cached value, use waitForAuthReady for guaranteed state)
+  // Get current user
   getCurrentUser(): User | null {
     return this.currentUser;
-  }
-
-  // Get current user directly from Firebase Auth (most reliable)
-  getAuthCurrentUser(): User | null {
-    return auth?.currentUser || null;
   }
 
   // Get user profile
@@ -341,282 +366,309 @@ class FirebaseService {
   // Subscribe to auth state changes
   onAuthStateChange(callback: (user: User | null) => void): () => void {
     this.authStateListeners.add(callback);
-    // Call immediately with current state if auth is ready
-    if (initializationComplete) {
-      callback(this.currentUser);
-    }
+    // Call immediately with current state
+    callback(this.currentUser);
     return () => this.authStateListeners.delete(callback);
   }
 
-  // ======== ROBUST AUTHENTICATION METHODS ========
-
-  /**
-   * Initialize user session - this is the main entry point
-   * 1. Wait for Firebase auth to be ready
-   * 2. If a Google user exists, use it (no anonymous creation)
-   * 3. If only anonymous user exists, keep it
-   * 4. If no user exists, create anonymous user
-   */
-  async initializeUserSession(): Promise<UserProfile | null> {
-    await this.ensureInitialized();
-    
-    // Wait for initial auth state
-    const user = await this.waitForAuthReady();
-    
-    if (user) {
-      // User already exists (Google or anonymous)
-      console.log(`✅ Existing user found: ${user.isAnonymous ? 'Anonymous' : 'Google'} - ${user.email || user.uid}`);
-      
-      // Ensure profile is loaded
-      if (!this.userProfile) {
-        await this.loadUserProfile(user.uid);
-      }
-      
-      return this.userProfile;
-    }
-    
-    // No user exists - check localStorage for saved Google token
-    const savedGoogleEmail = localStorage.getItem('nexus-google-email');
-    if (savedGoogleEmail) {
-      console.log("📧 Found saved Google email, checking Firestore...");
-      const existingUser = await this.findUserByEmail(savedGoogleEmail);
-      if (existingUser) {
-        console.log("⚠️ Google account exists but not signed in. User should sign in with Google.");
-        // Don't create anonymous user - wait for Google sign-in
-        return null;
-      }
-    }
-    
-    // No existing account found - create anonymous user
-    return this.signInAnonymously();
-  }
-
-  /**
-   * Sign in anonymously - ONLY if no user exists
-   * This will NOT create a new anonymous user if a Google account is signed in
-   */
+  // Sign in anonymously (Firebase handles persistence automatically)
+  // Only creates anonymous user if no user exists
   async signInAnonymously(): Promise<UserProfile> {
     await this.ensureInitialized();
-    
     if (!auth) {
-      throw new Error("Firebase not initialized");
+      throw new Error("Firebase not initialized. Check your configuration.");
     }
 
-    // Check current user from Firebase Auth directly (most reliable)
+    // Check if user already exists (Firebase persists auth state)
+    // Get current user from auth (more reliable than this.currentUser)
     const currentAuthUser = auth.currentUser;
-    
-    // If a non-anonymous user exists, DON'T create anonymous user
-    if (currentAuthUser && !currentAuthUser.isAnonymous) {
-      console.log("✅ Google user already signed in, skipping anonymous creation:", currentAuthUser.email);
+    if (currentAuthUser) {
+      // User already exists, update internal reference and return existing profile
       this.currentUser = currentAuthUser;
       
-      if (!this.userProfile) {
+      // If user is not anonymous, don't create anonymous user
+      if (!currentAuthUser.isAnonymous) {
+        console.log("✅ Firebase user already exists (not anonymous):", currentAuthUser.email);
+        const existingProfile = this.userProfile;
+        if (existingProfile) {
+          return existingProfile;
+        }
+        // Load profile if it doesn't exist
         await this.loadUserProfile(currentAuthUser.uid);
-      }
-      
-      if (this.userProfile) {
-        return this.userProfile;
-      }
-      
-      return this.createOrUpdateProfile(currentAuthUser);
-    }
-    
-    // If anonymous user already exists, reuse it
-    if (currentAuthUser?.isAnonymous) {
-      console.log("✅ Reusing existing anonymous user:", currentAuthUser.uid);
-      this.currentUser = currentAuthUser;
-      
-      if (!this.userProfile) {
+        if (this.userProfile) {
+          return this.userProfile;
+        }
+      } else {
+        // User is anonymous, return existing profile
+        const existingProfile = this.userProfile;
+        if (existingProfile) {
+          console.log("✅ Using existing Firebase anonymous user:", currentAuthUser.uid);
+          return existingProfile;
+        }
+        // Load profile if it doesn't exist
         await this.loadUserProfile(currentAuthUser.uid);
+        if (this.userProfile) {
+          return this.userProfile;
+        }
       }
-      
-      if (this.userProfile) {
-        return this.userProfile;
-      }
-      
-      return this.createOrUpdateProfile(currentAuthUser);
     }
 
-    // No user exists - create anonymous user
     try {
-      console.log("🔐 Creating new anonymous user...");
       const userCredential = await firebaseSignInAnonymously(auth);
       const user = userCredential.user;
       
-      console.log("✅ Anonymous user created:", user.uid);
+      console.log("✅ Firebase anonymous user created:", user.uid);
       
-      return this.createOrUpdateProfile(user);
+      // Create or update profile
+      const profile = await this.createOrUpdateProfile(user);
+      
+      return profile;
     } catch (error: unknown) {
+      console.error("Error signing in anonymously:", error);
       const authError = error as { code?: string; message?: string };
-      console.error("Anonymous sign-in failed:", authError.code, authError.message);
       
+      // If user already exists, try to get existing profile
       if (authError.code === "auth/operation-not-allowed") {
-        throw new Error("Anonymous authentication is not enabled in Firebase Console");
+        throw new Error("L'authentification anonyme n'est pas activée. Veuillez l'activer dans Firebase Console.");
       }
       
-      throw error;
+      throw new Error(authError.message || "Erreur lors de la connexion anonyme");
     }
   }
 
-  /**
-   * Sign in with Google - replaces any anonymous user
-   */
-  async signInWithGoogle(): Promise<void> {
+  // Link Google account to anonymous user (using manual OAuth credential)
+  // Google data takes priority over anonymous data
+  // Step 1: Check if Google account already exists
+  // Step 2: If exists, sign in to that account (anonymous user will be replaced)
+  // Step 3: If not, update anonymous profile and link
+  async linkWithGoogleCredential(idToken: string, accessToken: string, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
+    // Ensure Firebase is fully initialized
     await this.ensureInitialized();
     
     if (!auth) {
-      throw new Error("Firebase not initialized");
+      throw new Error("Firebase not initialized. Check your configuration.");
+    }
+    
+    // Get current user from auth (may have changed since last check)
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error("No user signed in. Please sign in anonymously first.");
+    }
+    
+    // Update internal reference
+    this.currentUser = currentUser;
+
+    if (!currentUser.isAnonymous) {
+      throw new Error("Current user is not anonymous. Cannot link account.");
     }
 
+    if (!googleUserData || !googleUserData.email) {
+      throw new Error("Google user data is required to link account");
+    }
+
+    try {
+      // STEP 1: Check if a Google account with this email already exists
+      const existingUser = await this.findUserByEmail(googleUserData.email);
+      
+      if (existingUser && existingUser.uid !== this.currentUser.uid) {
+        // Account Google existe déjà avec un autre UID
+        // Firebase va automatiquement remplacer l'utilisateur anonyme lors de la liaison
+        console.log("🔍 Google account exists, will replace anonymous user during link");
+      }
+      
+      // STEP 2: Update Firebase profile with Google data BEFORE linking
+      console.log("📝 Step 2: Updating anonymous profile with Google data before linking...");
+      await this.createOrUpdateProfile(this.currentUser, googleUserData);
+      console.log("✅ Profile updated with Google data:", this.userProfile);
+      
+      // STEP 3: Link the Google credential to the anonymous user
+      // Firebase will automatically replace the anonymous user with the Google account
+      console.log("🔗 Step 3: Linking Google credential to anonymous user...");
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
+      const userCredential = await linkWithCredential(this.currentUser, credential);
+      const user = userCredential.user;
+      
+      console.log("✅ Firebase anonymous user linked with Google account:", user.uid);
+      console.log("✅ Anonymous user automatically replaced by Firebase");
+      
+      // Wait a bit for Firestore to update
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Force reload profile from Firestore to ensure we have the latest merged data
+      await this.loadUserProfile(user.uid);
+      
+      // Notify listeners with updated profile (triggers UI update)
+      this.authStateListeners.forEach((listener) => listener(user));
+      
+      // Return the updated profile
+      if (!this.userProfile) {
+        throw new Error("Failed to load user profile after merge");
+      }
+      
+      console.log("✅ Final profile with Google data:", this.userProfile);
+      return this.userProfile;
+    } catch (error: unknown) {
+      console.error("Error linking Google account:", error);
+      const authError = error as { code?: string; message?: string };
+      
+      if (authError.code === "auth/credential-already-in-use") {
+        // This means the Google account is already linked to another Firebase user
+        // Sign in to that existing account instead of throwing an error
+        console.log("🔍 Google account already in use, signing in to existing account...");
+        
+        try {
+          // Sign in with the Google credential to the existing account
+          const credential = GoogleAuthProvider.credential(idToken, accessToken);
+          const userCredential = await signInWithCredential(auth!, credential);
+          const user = userCredential.user;
+          
+          console.log("✅ Signed in to existing Google account:", user.uid);
+          
+          // Update internal reference
+          this.currentUser = user;
+          
+          // Load or create profile for this user
+          await this.loadUserProfile(user.uid);
+          
+          // Notify listeners with the signed-in user
+          this.authStateListeners.forEach((listener) => listener(user));
+          
+          if (!this.userProfile) {
+            // Create profile if it doesn't exist
+            await this.createOrUpdateProfile(user, googleUserData);
+          }
+          
+          console.log("✅ Successfully switched to existing Google account");
+          return this.userProfile!;
+        } catch (signInError: unknown) {
+          console.error("Error signing in to existing account:", signInError);
+          throw new Error("Impossible de se connecter au compte existant. Veuillez réessayer.");
+        }
+      } else if (authError.code === "auth/email-already-in-use") {
+        throw new Error("Cet email est déjà utilisé par un autre compte.");
+      }
+      
+      throw new Error(authError.message || "Erreur lors de la liaison du compte");
+    }
+  }
+
+  // Find user by email in Firestore
+  async findUserByEmail(email: string): Promise<UserProfile | null> {
+    if (!db || !email) {
+      return null;
+    }
+
+    // Note: Don't check navigator.onLine - it's unreliable in Electron
+    // Let Firebase SDK handle offline scenarios naturally
+
+    try {
+      // Query Firestore for user with this email
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        return userDoc.data() as UserProfile;
+      }
+    } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
+      
+      // Handle offline/network errors gracefully
+      if (firestoreError.code === 'unavailable' || 
+          firestoreError.code === 'failed-precondition' ||
+          firestoreError.message?.includes('offline') ||
+          firestoreError.message?.includes('network')) {
+        console.warn("⚠️ Firestore query failed (network issue), returning null");
+        return null;
+      }
+      
+      // Handle permission errors gracefully (Firestore rules may not allow query by email)
+      if (firestoreError.code === 'permission-denied' ||
+          firestoreError.message?.includes('permission') ||
+          firestoreError.message?.includes('Missing or insufficient permissions')) {
+        console.warn("⚠️ Firestore permission denied for email query - this is normal if rules restrict queries");
+        return null;
+      }
+      
+      console.warn("⚠️ Firestore query error:", firestoreError.message || error);
+      // Don't throw - return null to allow graceful fallback
+      return null;
+    }
+
+    return null;
+  }
+
+  // Sign in with Google
+  async signInWithGoogle(): Promise<void> {
+    await this.ensureInitialized();
+    if (!auth) {
+      throw new Error("Firebase not initialized. Check your configuration.");
+    }
+
+    // Check if we're in Electron (better to use popup in Electron)
     const isElectron = typeof window !== "undefined" && window.electronAPI;
 
     try {
       if (isElectron) {
-        // Electron: use popup
+        // In Electron, always use popup (works better)
         try {
           const result = await signInWithPopup(auth, googleProvider);
           const user = result.user;
           
-          // Save email for future reference
-          if (user.email) {
-            localStorage.setItem('nexus-google-email', user.email);
-          }
-          
+          // If there was an anonymous user, it will be automatically replaced
+          // Create or update profile
           await this.createOrUpdateProfile(user);
+          
+          // Force UI update
           this.authStateListeners.forEach((listener) => listener(user));
-        } catch (popupError: any) {
-          if (popupError.code === "auth/popup-blocked") {
+          return;
+        } catch (popupError: unknown) {
+          const error = popupError as { code?: string; message?: string };
+          if (error.code === "auth/popup-blocked") {
+            // Fallback to redirect in Electron if popup is blocked
             await signInWithRedirect(auth, googleProvider);
-          } else {
-            throw popupError;
+            return;
           }
+          throw popupError;
         }
       } else {
-        // Browser: use redirect
+        // In browser, use redirect (more reliable, avoids popup blocking)
         await signInWithRedirect(auth, googleProvider);
+        // The redirect will happen, handleRedirectResult will process it on return
+        return;
       }
-    } catch (error: any) {
-      console.error("Google sign-in error:", error);
+    } catch (error: unknown) {
+      console.error("Google sign in error:", error);
+      const authError = error as { code?: string; message?: string };
       
-      if (error.code === "auth/popup-closed-by-user") {
+      if (authError.code === "auth/popup-closed-by-user") {
         throw new Error("Connexion annulée");
-      } else if (error.code === "auth/network-request-failed") {
+      } else if (authError.code === "auth/popup-blocked") {
+        // Fallback to redirect
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      } else if (authError.code === "auth/network-request-failed") {
         throw new Error("Erreur réseau. Vérifiez votre connexion.");
       }
       
-      throw error;
+      throw new Error(authError.message || "Erreur d'authentification");
     }
   }
 
-  /**
-   * Link Google account to anonymous user
-   * If Google account already exists, sign in to that account instead
-   */
-  async linkWithGoogleCredential(
-    idToken: string, 
-    accessToken: string, 
-    googleUserData?: { email?: string; displayName?: string; photoURL?: string }
-  ): Promise<UserProfile> {
-    await this.ensureInitialized();
-    
-    if (!auth) {
-      throw new Error("Firebase not initialized");
-    }
-    
-    const currentUser = auth.currentUser;
-    
-    if (!currentUser) {
-      throw new Error("No user signed in");
-    }
-    
-    if (!googleUserData?.email) {
-      throw new Error("Google email is required");
-    }
-
-    // Save email for future reference
-    localStorage.setItem('nexus-google-email', googleUserData.email);
-
-    try {
-      // If current user is NOT anonymous, just update their profile
-      if (!currentUser.isAnonymous) {
-        console.log("✅ User is already Google signed in, updating profile");
-        return this.createOrUpdateProfile(currentUser, googleUserData);
-      }
-
-      // Check if Google account already exists
-      const existingUser = await this.findUserByEmail(googleUserData.email);
-      
-      if (existingUser && existingUser.uid !== currentUser.uid) {
-        // Google account exists with different UID - sign in to that account
-        console.log("🔄 Google account exists, signing in to existing account...");
-        
-        const credential = GoogleAuthProvider.credential(idToken, accessToken);
-        const userCredential = await signInWithCredential(auth, credential);
-        const user = userCredential.user;
-        
-        console.log("✅ Signed in to existing Google account:", user.email);
-        
-        // The anonymous user is now orphaned - Firebase handles this
-        return this.createOrUpdateProfile(user, googleUserData);
-      }
-
-      // Link anonymous user to Google
-      console.log("🔗 Linking anonymous user to Google account...");
-      
-      // Update profile first
-      await this.createOrUpdateProfile(currentUser, googleUserData);
-      
-      // Then link
-      const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      const userCredential = await linkWithCredential(currentUser, credential);
-      const user = userCredential.user;
-      
-      console.log("✅ Anonymous user linked with Google:", user.email);
-      
-      // Reload profile
-      await this.loadUserProfile(user.uid);
-      
-      return this.userProfile!;
-
-    } catch (error: any) {
-      console.error("Link Google account error:", error);
-      
-      if (error.code === "auth/credential-already-in-use") {
-        // Sign in to existing account
-        console.log("🔄 Credential in use, signing in to existing account...");
-        
-        const credential = GoogleAuthProvider.credential(idToken, accessToken);
-        const userCredential = await signInWithCredential(auth, credential);
-        const user = userCredential.user;
-        
-        return this.createOrUpdateProfile(user, googleUserData);
-      }
-      
-      if (error.code === "auth/email-already-in-use") {
-        throw new Error("Cet email est déjà utilisé par un autre compte");
-      }
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Sign out
-   */
+  // Sign out
   async signOut(): Promise<void> {
-    // Cleanup listeners
+    // Cleanup token refresh listeners
     if (this.idTokenUnsubscribe) {
       this.idTokenUnsubscribe();
       this.idTokenUnsubscribe = null;
     }
+    
     if (this.tokenRefreshInterval) {
       clearInterval(this.tokenRefreshInterval);
       this.tokenRefreshInterval = null;
     }
-
-    // Clear saved email
-    localStorage.removeItem('nexus-google-email');
-
+    await this.ensureInitialized();
     if (!auth) {
       throw new Error("Firebase not initialized");
     }
@@ -626,267 +678,342 @@ class FirebaseService {
     this.userProfile = null;
   }
 
-  // ======== HELPER METHODS ========
+  // Load user profile from Firestore
+  private async loadUserProfile(uid: string): Promise<void> {
+    if (!db || !this.currentUser) return;
 
-  /**
-   * Find user by email in Firestore
-   */
-  async findUserByEmail(email: string): Promise<UserProfile | null> {
-    if (!db || !email) return null;
-
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        return querySnapshot.docs[0].data() as UserProfile;
-      }
-    } catch (error: any) {
-      // Handle gracefully
-      if (error.code === 'permission-denied' || error.code === 'unavailable') {
-        console.warn("Firestore query not available:", error.code);
-        return null;
-      }
-      console.warn("findUserByEmail error:", error.message);
-    }
-
-    return null;
-  }
-
-  /**
-   * Load user profile from Firestore
-   */
-  private async loadUserProfile(userId: string): Promise<void> {
-    if (!db) return;
+    // Note: Don't check navigator.onLine - it's unreliable in Electron
+    // Let Firebase SDK handle offline scenarios naturally
 
     try {
-      const userDocRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userDocRef);
+      const userRef = doc(db, "users", uid);
+      const userSnap = await getDoc(userRef);
 
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        const nowStr = new Date().toISOString();
-        this.userProfile = {
-          uid: userId,
-          email: data.email || null,
-          displayName: data.displayName || null,
-          photoURL: data.photoURL || null,
-          plan: data.plan || "free",
-          subscriptionStatus: data.subscriptionStatus || "none",
-          storageUsed: data.storageUsed || 0,
-          createdAt: data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || nowStr,
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() || data.updatedAt || nowStr,
-          lastLoginAt: data.lastLoginAt?.toDate?.()?.toISOString?.() || data.lastLoginAt || nowStr,
-          isAnonymous: data.isAnonymous || false,
-        };
-      }
-    } catch (error: any) {
-      if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
-        console.error("Error loading user profile:", error);
-      }
-    }
-  }
-
-  /**
-   * Create or update user profile in Firestore
-   */
-  async createOrUpdateProfile(
-    user: User, 
-    additionalData?: { email?: string; displayName?: string; photoURL?: string }
-  ): Promise<UserProfile> {
-    const nowStr = new Date().toISOString();
-    
-    if (!db) {
-      // Return minimal profile if Firestore is not available
-      this.userProfile = {
-        uid: user.uid,
-        email: additionalData?.email || user.email || null,
-        displayName: additionalData?.displayName || user.displayName || null,
-        photoURL: additionalData?.photoURL || user.photoURL || null,
-        plan: "free",
-        subscriptionStatus: "none",
-        storageUsed: 0,
-        createdAt: nowStr,
-        updatedAt: nowStr,
-        lastLoginAt: nowStr,
-        isAnonymous: user.isAnonymous,
-      };
-      return this.userProfile;
-    }
-
-    const userDocRef = doc(db, 'users', user.uid);
-    
-    try {
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        // Update existing profile
-        const existingData = userDoc.data();
-        const updateData: any = {
-          updatedAt: nowStr,
-          lastLoginAt: nowStr,
-        };
-
-        // Only update if new data is provided
-        if (additionalData?.email) updateData.email = additionalData.email;
-        if (additionalData?.displayName) updateData.displayName = additionalData.displayName;
-        if (additionalData?.photoURL) updateData.photoURL = additionalData.photoURL;
-        if (!user.isAnonymous) updateData.isAnonymous = false;
-
-        await updateDoc(userDocRef, updateData);
-
-        const createdAt = existingData.createdAt?.toDate?.()?.toISOString?.() || 
-                          existingData.createdAt || nowStr;
-
-        this.userProfile = {
-          uid: user.uid,
-          email: updateData.email || existingData.email || null,
-          displayName: updateData.displayName || existingData.displayName || null,
-          photoURL: updateData.photoURL || existingData.photoURL || null,
-          plan: existingData.plan || "free",
-          subscriptionStatus: existingData.subscriptionStatus || "none",
-          storageUsed: existingData.storageUsed || 0,
-          createdAt,
-          updatedAt: nowStr,
-          lastLoginAt: nowStr,
-          isAnonymous: updateData.isAnonymous ?? existingData.isAnonymous ?? user.isAnonymous,
-        };
+      if (userSnap.exists()) {
+        const profileData = userSnap.data() as UserProfile;
+        // Ensure we have the latest data from Firestore
+        this.userProfile = profileData;
+        console.log("📥 Profile loaded from Firestore:", this.userProfile);
       } else {
-        // Create new profile
-        const newProfile: UserProfile = {
-          uid: user.uid,
-          email: additionalData?.email || user.email || null,
-          displayName: additionalData?.displayName || user.displayName || null,
-          photoURL: additionalData?.photoURL || user.photoURL || null,
-          plan: "free",
-          subscriptionStatus: "none",
-          storageUsed: 0,
-          createdAt: nowStr,
-          updatedAt: nowStr,
-          lastLoginAt: nowStr,
-          isAnonymous: user.isAnonymous,
-        };
-
-        await setDoc(userDocRef, newProfile);
-        this.userProfile = newProfile;
+        // Profile doesn't exist, create it from current user
+        await this.createOrUpdateProfile(this.currentUser);
       }
-    } catch (error: any) {
-      console.error("Error creating/updating profile:", error);
+    } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
       
-      // Return minimal profile on error
-      this.userProfile = {
-        uid: user.uid,
-        email: additionalData?.email || user.email || null,
-        displayName: additionalData?.displayName || user.displayName || null,
-        photoURL: additionalData?.photoURL || user.photoURL || null,
-        plan: "free",
-        subscriptionStatus: "none",
-        storageUsed: 0,
-        createdAt: nowStr,
-        updatedAt: nowStr,
-        lastLoginAt: nowStr,
-        isAnonymous: user.isAnonymous,
-      };
+      // Handle offline/network errors gracefully
+      if (firestoreError.code === 'unavailable' || 
+          firestoreError.code === 'failed-precondition' ||
+          firestoreError.message?.includes('offline') ||
+          firestoreError.message?.includes('network')) {
+        console.warn("⚠️ Firestore load failed (network issue), creating local profile");
+        // Create profile from current user data if no profile exists
+        if (!this.userProfile) {
+          this.createOrUpdateProfileOffline(this.currentUser);
+        }
+        return;
+      }
+      
+      // Handle permission errors gracefully
+      if (firestoreError.code === 'permission-denied' ||
+          firestoreError.message?.includes('permission') ||
+          firestoreError.message?.includes('Missing or insufficient permissions')) {
+        console.warn("⚠️ Firestore permission denied, creating local profile - check Firestore rules");
+        if (!this.userProfile) {
+          this.createOrUpdateProfileOffline(this.currentUser);
+        }
+        return;
+      }
+      
+      console.warn("⚠️ Error loading user profile:", firestoreError.message || error);
+      // Don't throw - create local profile as fallback
+      if (!this.userProfile) {
+        this.createOrUpdateProfileOffline(this.currentUser);
+      }
     }
-
-    return this.userProfile;
   }
 
-  /**
-   * Check if user is Pro
-   */
+  // Create profile in memory only (for offline scenarios)
+  private createOrUpdateProfileOffline(user: User, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): UserProfile {
+    const email = googleUserData?.email || user.email || "";
+    const displayName = googleUserData?.displayName || user.displayName || 
+      (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
+    const photoURL = googleUserData?.photoURL || user.photoURL || null;
+    
+    const offlineProfile: UserProfile = {
+      uid: user.uid,
+      email,
+      displayName,
+      photoURL,
+      plan: this.userProfile?.plan || "free",
+      storageUsed: this.userProfile?.storageUsed || 0,
+      stripeCustomerId: this.userProfile?.stripeCustomerId,
+      subscriptionId: this.userProfile?.subscriptionId,
+      subscriptionStatus: this.userProfile?.subscriptionStatus,
+      subscriptionEndDate: this.userProfile?.subscriptionEndDate,
+      createdAt: this.userProfile?.createdAt || new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    
+    this.userProfile = offlineProfile;
+    console.log("📝 Created offline profile:", offlineProfile.email || offlineProfile.uid);
+    return offlineProfile;
+  }
+
+  // Create or update user profile
+  // googleUserData takes priority over Firebase user data when provided
+  private async createOrUpdateProfile(user: User, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): Promise<UserProfile> {
+    if (!db) {
+      throw new Error("Firestore not initialized");
+    }
+
+    // Note: Don't check navigator.onLine - it's unreliable in Electron
+    // Let Firebase SDK handle offline scenarios naturally
+
+    const userRef = doc(db, "users", user.uid);
+    
+    // Priority: googleUserData > user (Firebase) > existing profile
+    const email = googleUserData?.email || user.email || "";
+    const displayName = googleUserData?.displayName || user.displayName || 
+      (user.isAnonymous ? "Utilisateur anonyme" : (user.email?.split("@")[0] || "Utilisateur"));
+    const photoURL = googleUserData?.photoURL || user.photoURL || null;
+
+    // Try to get existing profile from Firestore
+    let userSnap;
+    try {
+      userSnap = await getDoc(userRef);
+    } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
+      
+      // Handle network errors gracefully - create profile in memory
+      if (firestoreError.code === 'unavailable' || 
+          firestoreError.code === 'failed-precondition' ||
+          firestoreError.message?.includes('offline') ||
+          firestoreError.message?.includes('network')) {
+        console.warn("⚠️ Firestore getDoc failed (network issue), creating local profile");
+        return this.createOrUpdateProfileOffline(user, googleUserData);
+      }
+      
+      // Handle permission errors gracefully
+      if (firestoreError.code === 'permission-denied' ||
+          firestoreError.message?.includes('permission') ||
+          firestoreError.message?.includes('Missing or insufficient permissions')) {
+        console.warn("⚠️ Firestore permission denied, creating local profile - check Firestore rules");
+        return this.createOrUpdateProfileOffline(user, googleUserData);
+      }
+      
+      // For other errors, log and create local profile
+      console.warn("⚠️ Error getting profile from Firestore:", firestoreError.message || error);
+      return this.createOrUpdateProfileOffline(user, googleUserData);
+    }
+
+    if (userSnap.exists()) {
+      // Update last login and merge data (Google data takes priority)
+      const existingProfile = userSnap.data() as UserProfile;
+      
+      // Merge: Google data > Firebase user data > existing profile data
+      // Firestore doesn't accept undefined, so we need to filter it out or use null
+      const mergedProfile: Partial<UserProfile> = {
+        lastLoginAt: new Date().toISOString(),
+        // Google data takes priority
+        ...(email && { email }),
+        ...(displayName && { displayName }),
+        ...(photoURL !== null && { photoURL }),
+        // Keep existing plan and subscription if not provided
+        plan: existingProfile.plan || "free",
+        storageUsed: existingProfile.storageUsed || 0,
+      };
+      
+      // Only include subscriptionStatus if it exists and is not undefined
+      if (existingProfile.subscriptionStatus !== undefined && existingProfile.subscriptionStatus !== null) {
+        mergedProfile.subscriptionStatus = existingProfile.subscriptionStatus;
+      }
+      
+      // Remove undefined values (Firestore doesn't accept them)
+      const cleanedProfile = Object.fromEntries(
+        Object.entries(mergedProfile).filter(([_, v]) => v !== undefined)
+      ) as Partial<UserProfile>;
+      
+      try {
+        await updateDoc(userRef, cleanedProfile);
+        
+        this.userProfile = {
+          ...existingProfile,
+          ...cleanedProfile,
+        };
+        console.log("📥 Profile updated in Firestore");
+      } catch (error: unknown) {
+        const firestoreError = error as { code?: string; message?: string };
+        
+        // Handle offline/network errors gracefully
+        if (firestoreError.code === 'unavailable' || 
+            firestoreError.code === 'failed-precondition' ||
+            firestoreError.message?.includes('offline') ||
+            firestoreError.message?.includes('network')) {
+          console.warn("⚠️ Firestore update failed (network issue), using in-memory profile");
+          this.userProfile = {
+            ...existingProfile,
+            ...cleanedProfile,
+          };
+          return this.userProfile;
+        }
+        
+        // Handle permission errors gracefully
+        if (firestoreError.code === 'permission-denied' ||
+            firestoreError.message?.includes('permission') ||
+            firestoreError.message?.includes('Missing or insufficient permissions')) {
+          console.warn("⚠️ Firestore permission denied for update, using in-memory profile");
+          this.userProfile = {
+            ...existingProfile,
+            ...cleanedProfile,
+          };
+          return this.userProfile;
+        }
+        
+        // For other errors, log and use in-memory profile as fallback
+        console.warn("⚠️ Error updating profile in Firestore:", firestoreError.message || error);
+        this.userProfile = {
+          ...existingProfile,
+          ...cleanedProfile,
+        };
+        return this.userProfile;
+      }
+    } else {
+      // Create new profile with Google data priority
+      const newProfile: UserProfile = {
+        uid: user.uid,
+        email,
+        displayName,
+        photoURL,
+        plan: "free",
+        storageUsed: 0,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+
+      try {
+        await setDoc(userRef, newProfile);
+        
+        this.userProfile = newProfile;
+        console.log("📥 Profile created in Firestore");
+      } catch (error: unknown) {
+        const firestoreError = error as { code?: string; message?: string };
+        
+        // Handle offline/network errors gracefully
+        if (firestoreError.code === 'unavailable' || 
+            firestoreError.code === 'failed-precondition' ||
+            firestoreError.message?.includes('offline') ||
+            firestoreError.message?.includes('network')) {
+          console.warn("⚠️ Firestore create failed (network issue), using in-memory profile");
+          this.userProfile = newProfile;
+          return this.userProfile;
+        }
+        
+        // Handle permission errors gracefully
+        if (firestoreError.code === 'permission-denied' ||
+            firestoreError.message?.includes('permission') ||
+            firestoreError.message?.includes('Missing or insufficient permissions')) {
+          console.warn("⚠️ Firestore permission denied for create, using in-memory profile - check Firestore rules");
+          this.userProfile = newProfile;
+          return this.userProfile;
+        }
+        
+        // For other errors, log and use in-memory profile as fallback
+        console.warn("⚠️ Error creating profile in Firestore:", firestoreError.message || error);
+        this.userProfile = newProfile;
+        return this.userProfile;
+      }
+    }
+
+    return this.userProfile!;
+  }
+
+  // Update user profile
+  async updateProfile(data: Partial<UserProfile>): Promise<void> {
+    if (!db || !this.currentUser) {
+      throw new Error("Not authenticated");
+    }
+
+    const userRef = doc(db, "users", this.currentUser.uid);
+    await updateDoc(userRef, data);
+
+    if (this.userProfile) {
+      this.userProfile = { ...this.userProfile, ...data };
+    }
+  }
+
+  // Check if user is Pro
   isPro(): boolean {
     return this.userProfile?.plan === "pro" && 
            this.userProfile?.subscriptionStatus === "active";
   }
 
-  /**
-   * Get ID token for backend calls
-   */
+  // Get ID token for backend calls
   async getIdToken(forceRefresh: boolean = false): Promise<string | null> {
-    const user = auth?.currentUser || this.currentUser;
-    
-    if (!user) {
-      console.warn("getIdToken: No current user");
+    if (!this.currentUser) {
+      console.warn("getIdToken: No current user available");
       return null;
     }
     
-    if (user.isAnonymous) {
+    // For anonymous users, return null (they don't have valid ID tokens for backend)
+    if (this.currentUser.isAnonymous) {
       return null;
     }
     
     try {
-      return await user.getIdToken(forceRefresh);
+      console.log("getIdToken: Requesting token (forceRefresh:", forceRefresh, ")");
+      const token = await this.currentUser.getIdToken(forceRefresh);
+      
+      if (token) {
+        console.log("getIdToken: Token retrieved successfully, length:", token.length);
+        return token;
+      } else {
+        console.error("getIdToken: Token is null or empty");
+        return null;
+      }
     } catch (error) {
-      console.error("getIdToken error:", error);
+      const authError = error as { code?: string; message?: string };
+      
+      // Handle offline errors gracefully
+      if (authError.code === 'unavailable' || authError.message?.includes('offline')) {
+        console.warn("⚠️ Firebase Auth unavailable (offline), cannot get ID token");
+        return null;
+      }
+      
+      console.error("getIdToken: Error getting token:", error);
+      // Try to refresh if first attempt failed
+      if (!forceRefresh) {
+        console.log("getIdToken: Retrying with force refresh...");
+        return this.getIdToken(true);
+      }
       return null;
     }
   }
-
-  /**
-   * Update subscription (from Stripe webhook)
-   */
-  async updateSubscription(plan: "free" | "pro", status: "active" | "cancelled" | "past_due" | "none"): Promise<void> {
-    if (!db || !this.currentUser) return;
-
-    try {
-      const userDocRef = doc(db, 'users', this.currentUser.uid);
-      const nowStr = new Date().toISOString();
-      await updateDoc(userDocRef, {
-        plan,
-        subscriptionStatus: status,
-        updatedAt: nowStr,
-      });
-
-      if (this.userProfile) {
-        this.userProfile.plan = plan;
-        this.userProfile.subscriptionStatus = status;
-        this.userProfile.updatedAt = nowStr;
-      }
-    } catch (error) {
-      console.error("Error updating subscription:", error);
-    }
-  }
-
-  /**
-   * Update storage used
-   */
-  async updateStorageUsed(bytes: number): Promise<void> {
-    if (!db || !this.currentUser) return;
-
-    try {
-      const userDocRef = doc(db, 'users', this.currentUser.uid);
-      await updateDoc(userDocRef, {
-        storageUsed: bytes,
-        updatedAt: new Date(),
-      });
-
-      if (this.userProfile) {
-        this.userProfile.storageUsed = bytes;
-      }
-    } catch (error) {
-      console.error("Error updating storage:", error);
-    }
+  
+  // Refresh ID token
+  async refreshIdToken(): Promise<string | null> {
+    return this.getIdToken(true);
   }
 }
 
-// Export singleton instance
 export const firebaseService = new FirebaseService();
 
-// Export helper functions for compatibility
+// Dynamic getter for Firestore instance (to handle async initialization)
 export function getDb(): Firestore | null {
   return db;
 }
 
+// Dynamic getter for Auth instance
 export function getAuthInstance(): Auth | null {
   return auth;
 }
 
+// Dynamic getter for Firebase App instance
 export function getFirebaseApp(): FirebaseApp | null {
   return app;
 }
 
+// Wait for Firebase to be initialized
 export async function waitForFirebase(): Promise<{ app: FirebaseApp; auth: Auth; db: Firestore } | null> {
   await firebaseService.ensureInitialized();
   if (app && auth && db) {
@@ -896,3 +1023,4 @@ export async function waitForFirebase(): Promise<{ app: FirebaseApp; auth: Auth;
 }
 
 export { auth, db, app as firebaseApp };
+

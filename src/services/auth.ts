@@ -3,16 +3,15 @@
 
 export interface UserProfile {
   uid: string;
-  email: string | null;
-  displayName: string | null;
+  email: string;
+  displayName: string;
   photoURL: string | null;
   plan: "free" | "pro";
-  subscriptionStatus?: "active" | "cancelled" | "canceled" | "past_due" | "trialing" | "none" | null;
+  subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing" | null;
   storageUsed: number;
   createdAt: string;
-  updatedAt?: string;
-  lastLoginAt?: string;
-  isAnonymous?: boolean;
+  lastLoginAt: string;
+  isAnonymous?: boolean; // Indique si l'utilisateur est anonyme
 }
 
 export interface AuthTokens {

@@ -206,55 +206,55 @@ async function generateThumbnail(filePath: string, forceRegenerate = false, useF
     const timeOffsets = useFirstFrame ? ['00:00:00'] : ['00:00:02', '00:00:00'];
 
     for (const timeOffset of timeOffsets) {
-      try {
-        // Use -y to overwrite, -hide_banner for less output
+    try {
+      // Use -y to overwrite, -hide_banner for less output
         // -ss before -i is faster (seeks before decoding)
         // Use the ffmpeg path (static or system)
         await execAsync(`"${ffmpegPath}" -y -hide_banner -loglevel error -ss ${timeOffset} -i "${filePath}" -vframes 1 -vf "scale=320:-1" "${thumbnailPath}"`, {
-          timeout: 30000, // 30 second timeout
-        });
-        
-        // Check if thumbnail was created
-        try {
-          await fs.access(thumbnailPath);
-        } catch {
+        timeout: 30000, // 30 second timeout
+      });
+      
+      // Check if thumbnail was created
+      try {
+        await fs.access(thumbnailPath);
+      } catch {
           console.log(`Thumbnail not created for ${filePath} at ${timeOffset}`);
           continue; // Try next time offset
-        }
-        
-        // Read the generated thumbnail
-        const thumbnailData = await fs.readFile(thumbnailPath);
+      }
+      
+      // Read the generated thumbnail
+      const thumbnailData = await fs.readFile(thumbnailPath);
         
         // Verify it's not empty
         if (thumbnailData.length === 0) {
           console.log(`Empty thumbnail generated for ${filePath} at ${timeOffset}`);
           continue; // Try next time offset
         }
-        
-        // Save to storage
-        const savedUrl = await storage.saveThumbnail(thumbnailData, filePath);
-        
-        // Clean up temp file
-        try {
-          await fs.unlink(thumbnailPath);
-        } catch {
-          // Ignore cleanup errors
-        }
-        
+      
+      // Save to storage
+      const savedUrl = await storage.saveThumbnail(thumbnailData, filePath);
+      
+      // Clean up temp file
+      try {
+        await fs.unlink(thumbnailPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      
         const frameType = timeOffset === '00:00:00' ? 'first frame' : 'frame at 2s';
         console.log(`Generated thumbnail (${frameType}) for: ${path.basename(filePath)}`);
-        return savedUrl;
-      } catch (ffmpegError: any) {
+      return savedUrl;
+    } catch (ffmpegError: any) {
         // ffmpeg failed for this time offset, try next one
         console.log(`ffmpeg failed for ${path.basename(filePath)} at ${timeOffset}:`, ffmpegError.message);
-        
-        // Clean up temp file if it exists
-        try {
-          await fs.unlink(thumbnailPath);
-        } catch {
-          // Ignore cleanup errors
-        }
-        
+      
+      // Clean up temp file if it exists
+      try {
+        await fs.unlink(thumbnailPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      
         // Continue to next time offset
         continue;
       }
@@ -262,7 +262,7 @@ async function generateThumbnail(filePath: string, forceRegenerate = false, useF
     
     // All attempts failed
     console.log(`Failed to generate thumbnail for ${path.basename(filePath)} after trying all time offsets`);
-    return null;
+      return null;
   } catch (error) {
     console.error(`Error generating thumbnail for ${filePath}:`, error);
     return null;
