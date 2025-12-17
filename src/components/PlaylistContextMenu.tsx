@@ -47,14 +47,6 @@ export const PlaylistContextMenu = ({
   onUploadToNexus,
   canUploadToNexus = false,
 }: PlaylistContextMenuProps) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/2e112654-4948-45f5-a190-bde36d132582',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PlaylistContextMenu.tsx:36',message:'Function entry - props received',data:{hasOnUploadToCloudinary:typeof onUploadToCloudinary!=='undefined',hasCanUploadToCloudinary:typeof canUploadToCloudinary!=='undefined',hasOnUploadToNexus:typeof onUploadToNexus!=='undefined',hasCanUploadToNexus:typeof canUploadToNexus!=='undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/2e112654-4948-45f5-a190-bde36d132582',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PlaylistContextMenu.tsx:80',message:'Before conditional check',data:{onUploadToCloudinaryValue:onUploadToCloudinary,onUploadToNexusValue:onUploadToNexus,checkResult:!!(onUploadToCloudinary || onUploadToNexus)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -88,13 +80,6 @@ export const PlaylistContextMenu = ({
             Partager
           </ContextMenuItem>
         )}
-
-        {/* #region agent log */}
-        {(() => {
-          fetch('http://127.0.0.1:7242/ingest/2e112654-4948-45f5-a190-bde36d132582',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PlaylistContextMenu.tsx:95',message:'Before conditional check',data:{onUploadToCloudinaryValue:onUploadToCloudinary,onUploadToNexusValue:onUploadToNexus,checkResult:!!(onUploadToCloudinary || onUploadToNexus)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          return null;
-        })()}
-        {/* #endregion */}
 
         {(onUploadToCloudinary || onUploadToNexus) && (
           <>
