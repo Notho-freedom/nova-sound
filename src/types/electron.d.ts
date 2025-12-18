@@ -149,7 +149,7 @@ export interface ElectronAPI {
   
   // Stripe for checkout and portal
   openStripeWindow: (url: string) => Promise<void>;
-  onStripeCheckoutSuccess?: (callback: (data: { sessionId: string }) => void) => () => void;
+  onStripeCheckoutSuccess?: (callback: (data: { sessionId: string; url?: string }) => void) => () => void;
   onStripeCheckoutCanceled?: (callback: () => void) => () => void;
 }
 

@@ -391,12 +391,37 @@ class StripeService {
       return;
     }
 
+    // Remove existing listeners if any
+    if ((this as any).stripeUnsubscribe) {
+      (this as any).stripeUnsubscribe();
+    }
+
     // Listen for checkout success
-    const successUnsubscribe = window.electronAPI.onStripeCheckoutSuccess?.((data: { sessionId: string }) => {
+    const successUnsubscribe = window.electronAPI.onStripeCheckoutSuccess?.((data: { sessionId: string; url?: string }) => {
       console.log('💳 Stripe checkout success received from Electron:', data);
-      this.handleCheckoutSuccess(data.sessionId).catch((error) => {
-        console.error('Error handling Stripe checkout success:', error);
-      });
+      
+      // Extract session_id from URL if not provided directly
+      let sessionId = data.sessionId;
+      if (!sessionId && data.url) {
+        try {
+          const urlObj = new URL(data.url);
+          sessionId = urlObj.searchParams.get('session_id') || sessionId;
+        } catch (err) {
+          console.warn('Could not parse session_id from URL:', err);
+        }
+      }
+      
+      if (sessionId && sessionId !== 'unknown') {
+        this.handleCheckoutSuccess(sessionId).catch((error) => {
+          console.error('Error handling Stripe checkout success:', error);
+        });
+      } else {
+        console.warn('⚠️ Stripe checkout success but no session_id found');
+        // Still refresh subscription status
+        this.getSubscriptionStatus().catch((error) => {
+          console.error('Error refreshing subscription status:', error);
+        });
+      }
     });
 
     // Listen for checkout canceled
@@ -405,9 +430,8 @@ class StripeService {
       // Could show a toast or notification here if needed
     });
 
-    // Store unsubscribe functions (could be used to clean up if needed)
+    // Store unsubscribe functions
     if (successUnsubscribe || canceledUnsubscribe) {
-      // Store for potential cleanup
       (this as any).stripeUnsubscribe = () => {
         successUnsubscribe?.();
         canceledUnsubscribe?.();
