@@ -1,6 +1,8 @@
 // Service d'authentification manuel avec Google OAuth
 // Ne dépend pas de Firebase Auth
 
+import { isElectron } from '@/lib/electron-detector';
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -31,6 +33,9 @@ const STORAGE_KEYS = {
 const GOOGLE_OAUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";
+
+// Production URL for Electron redirect_uri (must match Google Cloud Console configuration)
+const PRODUCTION_URL = process.env.NEXT_PUBLIC_VERCEL_URL || 'https://nova-sound-nine.vercel.app';
 
 // Backend proxy endpoint (optional - if not set, will use Next.js API route)
 // Next.js: Use  prefix for client-side env vars
@@ -308,7 +313,14 @@ class AuthService {
       );
     }
 
-    const redirectUri = window.location.origin + window.location.pathname;
+    // For Electron, use the production URL as redirect_uri (must match Google Cloud Console)
+    // For web, use the current origin
+    const redirectUri = isElectron() 
+      ? PRODUCTION_URL 
+      : window.location.origin + window.location.pathname;
+    
+    console.log('🔐 OAuth redirect_uri:', redirectUri, isElectron() ? '(Electron)' : '(Web)');
+    
     const state = this.generateState();
     const { codeVerifier, codeChallenge } = await this.generatePKCE();
     
@@ -349,7 +361,12 @@ class AuthService {
       throw new Error("Code verifier not found. Please try signing in again.");
     }
 
-    const redirectUri = window.location.origin + window.location.pathname;
+    // Use the same redirect_uri as in buildAuthUrl (must match exactly)
+    const redirectUri = isElectron() 
+      ? PRODUCTION_URL 
+      : window.location.origin + window.location.pathname;
+
+    console.log('🔄 Token exchange redirect_uri:', redirectUri, isElectron() ? '(Electron)' : '(Web)');
 
     // Try using custom backend proxy if available (handles client_secret securely)
     if (OAUTH_PROXY_ENDPOINT) {
