@@ -414,18 +414,38 @@ ipcMain.handle('stripe:openWindow', async (_event, url) => {
         });
         // Intercept navigation to success/cancel URLs
         stripeWindow.webContents.on('will-redirect', (event, navigationUrl) => {
+            console.log('💳 Stripe window will-redirect to:', navigationUrl);
             handleStripeRedirect(navigationUrl);
         });
         stripeWindow.webContents.on('did-redirect-navigation', (event, navigationUrl) => {
+            console.log('💳 Stripe window did-redirect-navigation to:', navigationUrl);
             handleStripeRedirect(navigationUrl);
         });
         // Also check on navigation
         stripeWindow.webContents.on('did-navigate', (event, navigationUrl) => {
+            console.log('💳 Stripe window did-navigate to:', navigationUrl);
             handleStripeRedirect(navigationUrl);
         });
-        // Also check URL changes
-        stripeWindow.webContents.on('did-navigate-in-page', (event, navigationUrl) => {
-            handleStripeRedirect(navigationUrl);
+        // Also check URL changes (for single-page navigation)
+        stripeWindow.webContents.on('did-navigate-in-page', (event, navigationUrl, isMainFrame) => {
+            if (isMainFrame) {
+                console.log('💳 Stripe window did-navigate-in-page to:', navigationUrl);
+                handleStripeRedirect(navigationUrl);
+            }
+        });
+        // Monitor URL changes via webContents URL property
+        const checkUrl = () => {
+            if (stripeWindow && !stripeWindow.isDestroyed()) {
+                const currentUrl = stripeWindow.webContents.getURL();
+                if (currentUrl && currentUrl !== url) {
+                    handleStripeRedirect(currentUrl);
+                }
+            }
+        };
+        // Check URL periodically (as fallback)
+        const urlCheckInterval = setInterval(checkUrl, 500);
+        stripeWindow.on('closed', () => {
+            clearInterval(urlCheckInterval);
         });
         // Load Stripe URL
         await stripeWindow.loadURL(url);
@@ -489,25 +509,44 @@ function handleStripeRedirect(url) {
         return;
     try {
         const urlObj = new URL(url);
-        // Check if this is a Stripe success/cancel callback
-        // Success URL format: /settings?success=true or /settings?session_id=...
-        // Cancel URL format: /settings?canceled=true
-        const pathname = urlObj.pathname;
         const searchParams = urlObj.searchParams;
-        if (pathname.includes('/settings') || pathname.includes('/checkout')) {
-            const success = searchParams.get('success') === 'true' || searchParams.has('session_id');
-            const canceled = searchParams.get('canceled') === 'true';
-            const sessionId = searchParams.get('session_id');
-            if (success && sessionId) {
-                console.log('✅ Stripe checkout success, sending to renderer...');
+        // Check for Stripe success/cancel indicators in query parameters
+        // Stripe redirects to success_url or cancel_url after payment
+        const success = searchParams.get('success') === 'true';
+        const canceled = searchParams.get('canceled') === 'true';
+        let sessionId = searchParams.get('session_id');
+        // If session_id is not in URL but success=true, try to extract from Stripe session
+        // Sometimes Stripe includes it in the URL fragment or we need to get it from the session
+        if (!sessionId && success) {
+            // Try to extract from URL hash or other locations
+            const hashMatch = url.match(/session_id=([^&]+)/);
+            if (hashMatch) {
+                sessionId = hashMatch[1];
+            }
+        }
+        // Also check if URL contains stripe success/cancel indicators
+        const isStripeCallback = (success || canceled) &&
+            (url.includes('success=true') ||
+                url.includes('canceled=true') ||
+                url.includes('session_id=') ||
+                searchParams.has('session_id'));
+        if (isStripeCallback) {
+            if (success || sessionId) {
+                console.log('✅ Stripe checkout success detected, sending to renderer...', { url, sessionId });
                 // Send success event to renderer process
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('stripe:checkout-success', { sessionId });
+                    mainWindow.webContents.send('stripe:checkout-success', {
+                        sessionId: sessionId || 'unknown',
+                        url: url
+                    });
                 }
-                // Close Stripe window
-                if (stripeWindow && !stripeWindow.isDestroyed()) {
-                    stripeWindow.close();
-                }
+                // Close Stripe window after a short delay to allow the message to be sent
+                setTimeout(() => {
+                    if (stripeWindow && !stripeWindow.isDestroyed()) {
+                        stripeWindow.close();
+                    }
+                }, 500);
+                return;
             }
             else if (canceled) {
                 console.log('⚠️ Stripe checkout canceled');
@@ -516,15 +555,22 @@ function handleStripeRedirect(url) {
                     mainWindow.webContents.send('stripe:checkout-canceled');
                 }
                 // Close Stripe window
-                if (stripeWindow && !stripeWindow.isDestroyed()) {
-                    stripeWindow.close();
-                }
+                setTimeout(() => {
+                    if (stripeWindow && !stripeWindow.isDestroyed()) {
+                        stripeWindow.close();
+                    }
+                }, 500);
+                return;
             }
+        }
+        // Log navigation for debugging (but don't treat as error)
+        if (!url.includes('checkout.stripe.com') && !url.includes('stripe.com')) {
+            console.log('💳 Navigation in Stripe window:', url);
         }
     }
     catch (err) {
-        // Not a valid URL or not our callback, ignore
-        console.log('💳 Navigation to:', url, '(not Stripe callback)');
+        // Not a valid URL, ignore
+        console.log('💳 Invalid URL in Stripe window:', url);
     }
 }
 // File dialog handlers

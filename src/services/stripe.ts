@@ -201,7 +201,7 @@ class StripeService {
       },
       body: JSON.stringify({
         priceId,
-        successUrl: `${window.location.origin}/settings?success=true`,
+        successUrl: `${window.location.origin}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${window.location.origin}/settings?canceled=true`,
       }),
     });
@@ -411,14 +411,29 @@ class StripeService {
         }
       }
       
-      if (sessionId && sessionId !== 'unknown') {
+      if (sessionId && sessionId !== 'unknown' && sessionId !== null) {
         this.handleCheckoutSuccess(sessionId).catch((error) => {
           console.error('Error handling Stripe checkout success:', error);
         });
       } else {
-        console.warn('⚠️ Stripe checkout success but no session_id found');
-        // Still refresh subscription status
-        this.getSubscriptionStatus().catch((error) => {
+        console.warn('⚠️ Stripe checkout success but no session_id found, refreshing subscription status...');
+        // Still refresh subscription status even without session_id
+        // The webhook should have processed the payment, so we can just refresh
+        this.getSubscriptionStatus().then((status) => {
+          console.log('✅ Subscription status refreshed:', status);
+          // Update user profile if subscription is active
+          if (status.isActive && status.plan === 'pro') {
+            const user = authService.getCurrentUser();
+            if (user) {
+              authService.updateProfile({ 
+                plan: 'pro', 
+                subscriptionStatus: 'active' 
+              }).catch((error) => {
+                console.error('Error updating user profile:', error);
+              });
+            }
+          }
+        }).catch((error) => {
           console.error('Error refreshing subscription status:', error);
         });
       }

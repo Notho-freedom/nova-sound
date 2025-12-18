@@ -591,13 +591,14 @@ function handleStripeRedirect(url: string) {
                              searchParams.has('session_id');
 
     if (isStripeCallback) {
-      if (success || sessionId) {
+      if (success) {
         console.log('✅ Stripe checkout success detected, sending to renderer...', { url, sessionId });
         
         // Send success event to renderer process
+        // Even if sessionId is null, the renderer can refresh subscription status
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('stripe:checkout-success', { 
-            sessionId: sessionId || 'unknown',
+            sessionId: sessionId || null,
             url: url 
           });
         }

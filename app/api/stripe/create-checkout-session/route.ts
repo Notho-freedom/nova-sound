@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         userId: auth.userId,
       },
-      success_url: successUrl || `${FRONTEND_URL}/settings?success=true`,
+      success_url: successUrl || `${FRONTEND_URL}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${FRONTEND_URL}/settings?canceled=true`,
     });
 
