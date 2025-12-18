@@ -1,6 +1,12 @@
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { authService } from "./auth";
 
+// Helper function to detect Electron environment
+function isElectron(): boolean {
+  return typeof window !== 'undefined' && 
+         (window as any).electronAPI !== undefined;
+}
+
 // Stripe configuration - loaded from API route (server-side only)
 // Fallback to NEXT_PUBLIC_* for backward compatibility
 let stripeConfig: {
@@ -284,6 +290,20 @@ class StripeService {
     }
     
     const checkoutUrl = await this.createCheckoutSession(finalPriceId);
+    
+    // In Electron, open Stripe window in app
+    if (isElectron() && typeof window !== 'undefined' && window.electronAPI) {
+      if (window.electronAPI.openStripeWindow) {
+        // Setup Stripe callback listeners
+        this.setupStripeListeners();
+        
+        await window.electronAPI.openStripeWindow(checkoutUrl);
+        console.log('💳 Opened Stripe checkout window in app:', checkoutUrl);
+        return;
+      }
+    }
+    
+    // For web, use redirect
     window.location.href = checkoutUrl;
   }
 
@@ -351,7 +371,48 @@ class StripeService {
   // Redirect to billing portal
   async redirectToPortal(): Promise<void> {
     const portalUrl = await this.createPortalSession();
+    
+    // In Electron, open Stripe window in app
+    if (isElectron() && typeof window !== 'undefined' && window.electronAPI) {
+      if (window.electronAPI.openStripeWindow) {
+        await window.electronAPI.openStripeWindow(portalUrl);
+        console.log('💳 Opened Stripe portal window in app:', portalUrl);
+        return;
+      }
+    }
+    
+    // For web, use redirect
     window.location.href = portalUrl;
+  }
+  
+  // Setup listeners for Stripe callbacks from Electron main process
+  private setupStripeListeners(): void {
+    if (typeof window === 'undefined' || !window.electronAPI) {
+      return;
+    }
+
+    // Listen for checkout success
+    const successUnsubscribe = window.electronAPI.onStripeCheckoutSuccess?.((data: { sessionId: string }) => {
+      console.log('💳 Stripe checkout success received from Electron:', data);
+      this.handleCheckoutSuccess(data.sessionId).catch((error) => {
+        console.error('Error handling Stripe checkout success:', error);
+      });
+    });
+
+    // Listen for checkout canceled
+    const canceledUnsubscribe = window.electronAPI.onStripeCheckoutCanceled?.(() => {
+      console.log('⚠️ Stripe checkout canceled');
+      // Could show a toast or notification here if needed
+    });
+
+    // Store unsubscribe functions (could be used to clean up if needed)
+    if (successUnsubscribe || canceledUnsubscribe) {
+      // Store for potential cleanup
+      (this as any).stripeUnsubscribe = () => {
+        successUnsubscribe?.();
+        canceledUnsubscribe?.();
+      };
+    }
   }
 
   // Get subscription status

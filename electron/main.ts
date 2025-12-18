@@ -49,6 +49,7 @@ if (process.platform === 'win32') {
 
 let mainWindow: BrowserWindow | null = null;
 let oauthWindow: BrowserWindow | null = null;
+let stripeWindow: BrowserWindow | null = null;
 let oauthCallbackServer: Server | null = null;
 
 const isDev = !app.isPackaged;
@@ -415,6 +416,11 @@ ipcMain.handle('oauth:openWindow', async (_event, url: string) => {
     oauthWindow.webContents.on('did-navigate', (event, navigationUrl) => {
       handleOAuthRedirect(navigationUrl);
     });
+    
+    // Also check URL changes
+    oauthWindow.webContents.on('did-navigate-in-page', (event, navigationUrl) => {
+      handleOAuthRedirect(navigationUrl);
+    });
 
     // Load OAuth URL
     await oauthWindow.loadURL(url);
@@ -423,6 +429,72 @@ ipcMain.handle('oauth:openWindow', async (_event, url: string) => {
     console.error('Failed to open OAuth window:', error);
     if (oauthWindow && !oauthWindow.isDestroyed()) {
       oauthWindow.close();
+    }
+    throw error;
+  }
+});
+
+// Stripe handlers for checkout and portal
+ipcMain.handle('stripe:openWindow', async (_event, url: string) => {
+  try {
+    // Close existing Stripe window if any
+    if (stripeWindow && !stripeWindow.isDestroyed()) {
+      stripeWindow.close();
+    }
+
+    // Create Stripe window
+    stripeWindow = new BrowserWindow({
+      width: 800,
+      height: 900,
+      show: false,
+      frame: true,
+      title: 'Stripe Checkout',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+      },
+    });
+
+    // Show window when ready
+    stripeWindow.once('ready-to-show', () => {
+      if (stripeWindow && !stripeWindow.isDestroyed()) {
+        stripeWindow.show();
+        stripeWindow.focus();
+      }
+    });
+
+    // Handle window closed
+    stripeWindow.on('closed', () => {
+      stripeWindow = null;
+    });
+
+    // Intercept navigation to success/cancel URLs
+    stripeWindow.webContents.on('will-redirect', (event, navigationUrl) => {
+      handleStripeRedirect(navigationUrl);
+    });
+
+    stripeWindow.webContents.on('did-redirect-navigation', (event, navigationUrl) => {
+      handleStripeRedirect(navigationUrl);
+    });
+
+    // Also check on navigation
+    stripeWindow.webContents.on('did-navigate', (event, navigationUrl) => {
+      handleStripeRedirect(navigationUrl);
+    });
+    
+    // Also check URL changes
+    stripeWindow.webContents.on('did-navigate-in-page', (event, navigationUrl) => {
+      handleStripeRedirect(navigationUrl);
+    });
+
+    // Load Stripe URL
+    await stripeWindow.loadURL(url);
+    console.log('💳 Opened Stripe window in app:', url);
+  } catch (error) {
+    console.error('Failed to open Stripe window:', error);
+    if (stripeWindow && !stripeWindow.isDestroyed()) {
+      stripeWindow.close();
     }
     throw error;
   }
@@ -473,6 +545,56 @@ function handleOAuthRedirect(url: string) {
   } catch (err) {
     // Not a valid URL or not our callback, ignore
     console.log('🔐 Navigation to:', url, '(not OAuth callback)');
+  }
+}
+
+// Handle Stripe redirect in Stripe window
+function handleStripeRedirect(url: string) {
+  if (!url) return;
+
+  try {
+    const urlObj = new URL(url);
+    
+    // Check if this is a Stripe success/cancel callback
+    // Success URL format: /settings?success=true or /settings?session_id=...
+    // Cancel URL format: /settings?canceled=true
+    const pathname = urlObj.pathname;
+    const searchParams = urlObj.searchParams;
+    
+    if (pathname.includes('/settings') || pathname.includes('/checkout')) {
+      const success = searchParams.get('success') === 'true' || searchParams.has('session_id');
+      const canceled = searchParams.get('canceled') === 'true';
+      const sessionId = searchParams.get('session_id');
+
+      if (success && sessionId) {
+        console.log('✅ Stripe checkout success, sending to renderer...');
+        
+        // Send success event to renderer process
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('stripe:checkout-success', { sessionId });
+        }
+
+        // Close Stripe window
+        if (stripeWindow && !stripeWindow.isDestroyed()) {
+          stripeWindow.close();
+        }
+      } else if (canceled) {
+        console.log('⚠️ Stripe checkout canceled');
+        
+        // Send cancel event to renderer process
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('stripe:checkout-canceled');
+        }
+
+        // Close Stripe window
+        if (stripeWindow && !stripeWindow.isDestroyed()) {
+          stripeWindow.close();
+        }
+      }
+    }
+  } catch (err) {
+    // Not a valid URL or not our callback, ignore
+    console.log('💳 Navigation to:', url, '(not Stripe callback)');
   }
 }
 
@@ -1163,6 +1285,11 @@ app.on('window-all-closed', () => {
   // Close OAuth window if still open
   if (oauthWindow && !oauthWindow.isDestroyed()) {
     oauthWindow.close();
+  }
+  
+  // Close Stripe window if still open
+  if (stripeWindow && !stripeWindow.isDestroyed()) {
+    stripeWindow.close();
   }
   
   if (process.platform !== 'darwin') {

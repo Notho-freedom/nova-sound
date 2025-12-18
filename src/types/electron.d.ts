@@ -146,6 +146,11 @@ export interface ElectronAPI {
   openOAuthWindow: (url: string) => Promise<void>;
   onOAuthCallback?: (callback: (data: { code: string; state: string }) => void) => () => void;
   onOAuthError?: (callback: (data: { error: string }) => void) => () => void;
+  
+  // Stripe for checkout and portal
+  openStripeWindow: (url: string) => Promise<void>;
+  onStripeCheckoutSuccess?: (callback: (data: { sessionId: string }) => void) => () => void;
+  onStripeCheckoutCanceled?: (callback: () => void) => () => void;
 }
 
 declare global {

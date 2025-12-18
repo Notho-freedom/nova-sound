@@ -13,6 +13,9 @@ try {
 
   // OAuth - open window in app
   openOAuthWindow: (url) => ipcRenderer.invoke('oauth:openWindow', url),
+  
+  // Stripe - open window in app
+  openStripeWindow: (url) => ipcRenderer.invoke('stripe:openWindow', url),
 
   // File dialogs
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
@@ -173,6 +176,18 @@ try {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('oauth:error', listener);
     return () => ipcRenderer.removeListener('oauth:error', listener);
+  },
+  
+  // Stripe callbacks for checkout
+  onStripeCheckoutSuccess: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('stripe:checkout-success', listener);
+    return () => ipcRenderer.removeListener('stripe:checkout-success', listener);
+  },
+  onStripeCheckoutCanceled: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('stripe:checkout-canceled', listener);
+    return () => ipcRenderer.removeListener('stripe:checkout-canceled', listener);
   },
   });
   
