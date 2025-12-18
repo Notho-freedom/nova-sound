@@ -11,8 +11,8 @@ try {
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
 
-  // OAuth - open external browser
-  openExternal: (url) => ipcRenderer.invoke('oauth:openExternal', url),
+  // OAuth - open window in app
+  openOAuthWindow: (url) => ipcRenderer.invoke('oauth:openWindow', url),
 
   // File dialogs
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),

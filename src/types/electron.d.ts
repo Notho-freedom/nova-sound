@@ -143,7 +143,7 @@ export interface ElectronAPI {
   onRecognitionUpdated?: (callback: (updated: number) => void) => () => void;
 
   // OAuth for desktop app authentication
-  openExternal: (url: string) => Promise<void>;
+  openOAuthWindow: (url: string) => Promise<void>;
   onOAuthCallback?: (callback: (data: { code: string; state: string }) => void) => () => void;
   onOAuthError?: (callback: (data: { error: string }) => void) => () => void;
 }

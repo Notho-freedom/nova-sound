@@ -37,6 +37,7 @@ if (process.platform === 'win32') {
     app.setAppUserModelId('com.nexus.audio');
 }
 let mainWindow = null;
+let oauthWindow = null;
 let oauthCallbackServer = null;
 const isDev = !app.isPackaged;
 // Supported media file extensions
@@ -322,16 +323,103 @@ ipcMain.handle('window:isMaximized', () => {
     return mainWindow?.isMaximized() || false;
 });
 // OAuth handlers for desktop app authentication
-ipcMain.handle('oauth:openExternal', async (_event, url) => {
+ipcMain.handle('oauth:openWindow', async (_event, url) => {
     try {
-        await shell.openExternal(url);
-        console.log('🔐 Opened external browser for OAuth:', url);
+        // Close existing OAuth window if any
+        if (oauthWindow && !oauthWindow.isDestroyed()) {
+            oauthWindow.close();
+        }
+        // Create OAuth window
+        oauthWindow = new BrowserWindow({
+            width: 500,
+            height: 700,
+            show: false,
+            frame: true,
+            title: 'Authentification Google',
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: false,
+            },
+        });
+        // Show window when ready
+        oauthWindow.once('ready-to-show', () => {
+            if (oauthWindow && !oauthWindow.isDestroyed()) {
+                oauthWindow.show();
+                oauthWindow.focus();
+            }
+        });
+        // Handle window closed
+        oauthWindow.on('closed', () => {
+            oauthWindow = null;
+        });
+        // Intercept navigation to localhost:3001 (OAuth callback)
+        oauthWindow.webContents.on('will-redirect', (event, navigationUrl) => {
+            handleOAuthRedirect(navigationUrl);
+        });
+        oauthWindow.webContents.on('did-redirect-navigation', (event, navigationUrl) => {
+            handleOAuthRedirect(navigationUrl);
+        });
+        // Also check on navigation
+        oauthWindow.webContents.on('did-navigate', (event, navigationUrl) => {
+            handleOAuthRedirect(navigationUrl);
+        });
+        // Load OAuth URL
+        await oauthWindow.loadURL(url);
+        console.log('🔐 Opened OAuth window in app:', url);
     }
     catch (error) {
-        console.error('Failed to open external browser:', error);
+        console.error('Failed to open OAuth window:', error);
+        if (oauthWindow && !oauthWindow.isDestroyed()) {
+            oauthWindow.close();
+        }
         throw error;
     }
 });
+// Handle OAuth redirect in OAuth window
+function handleOAuthRedirect(url) {
+    if (!url)
+        return;
+    try {
+        const urlObj = new URL(url);
+        // Check if this is the OAuth callback (localhost:3001)
+        if (urlObj.hostname === 'localhost' && urlObj.port === '3001') {
+            const code = urlObj.searchParams.get('code');
+            const state = urlObj.searchParams.get('state');
+            const error = urlObj.searchParams.get('error');
+            if (error) {
+                console.error('❌ OAuth error in window:', error);
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('oauth:error', { error });
+                }
+                if (oauthWindow && !oauthWindow.isDestroyed()) {
+                    oauthWindow.close();
+                }
+                return;
+            }
+            if (code && state) {
+                console.log('✅ OAuth code received in window, sending to renderer...');
+                // Send code and state to renderer process
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('oauth:callback', { code, state });
+                }
+                else {
+                    // Window not ready yet, store callback for when window is ready
+                    app.pendingOAuthCallback = { code, state };
+                    console.log('Stored OAuth callback for when window is ready');
+                }
+                // Close OAuth window
+                if (oauthWindow && !oauthWindow.isDestroyed()) {
+                    oauthWindow.close();
+                }
+            }
+        }
+    }
+    catch (err) {
+        // Not a valid URL or not our callback, ignore
+        console.log('🔐 Navigation to:', url, '(not OAuth callback)');
+    }
+}
 // File dialog handlers
 ipcMain.handle('dialog:openDirectory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -953,6 +1041,10 @@ app.whenReady().then(async () => {
     });
 });
 app.on('window-all-closed', () => {
+    // Close OAuth window if still open
+    if (oauthWindow && !oauthWindow.isDestroyed()) {
+        oauthWindow.close();
+    }
     if (process.platform !== 'darwin') {
         cleanupOAuthServer();
         app.quit();

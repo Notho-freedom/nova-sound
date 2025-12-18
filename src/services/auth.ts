@@ -671,15 +671,15 @@ class AuthService {
 
     const authUrl = await this.buildAuthUrl();
     
-    // In Electron desktop app, open external browser and listen for callback
+    // In Electron desktop app, open OAuth window in app and listen for callback
     if (isElectron() && typeof window !== 'undefined' && window.electronAPI) {
       // Setup OAuth callback listener
       this.setupElectronOAuthListener();
-      
-      // Open external browser for OAuth using Electron API
-      if (window.electronAPI.openExternal) {
-        await window.electronAPI.openExternal(authUrl);
-        console.log('🔐 Opened external browser for OAuth:', authUrl);
+
+      // Open OAuth window in app using Electron API
+      if (window.electronAPI.openOAuthWindow) {
+        await window.electronAPI.openOAuthWindow(authUrl);
+        console.log('🔐 Opened OAuth window in app:', authUrl);
         return;
       }
     }
