@@ -245,16 +245,29 @@ function createWindow() {
   });
 
   // Load the app
-  if (isDev || cliOptions.dev) {
+  // Determine which URL to use:
+  // Priority order:
+  // 1. If FORCE_PROD env var is set → always use production (for npm run electron)
+  // 2. If --dev flag is explicitly set → use localhost
+  // 3. If app is packaged → use production
+  // 4. Default → use production
+  const forceProduction = process.env.FORCE_PROD === 'true' || process.env.FORCE_PROD === '1';
+  const useProduction = forceProduction || app.isPackaged || (!cliOptions.dev && !isDev);
+  
+  if (useProduction) {
+    // Production: Load from Vercel
+    const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
+    console.log('🌐 Loading production URL:', vercelUrl);
+    mainWindow.loadURL(vercelUrl);
+  } else {
+    // Development: Load from localhost (only if --dev flag is explicitly set)
     const port = cliOptions.port || 3000;
-    mainWindow.loadURL(`http://localhost:${port}`);
+    const localUrl = `http://localhost:${port}`;
+    console.log('🔧 Loading development URL:', localUrl);
+    mainWindow.loadURL(localUrl);
     if (cliOptions.debug || isDev) {
       mainWindow.webContents.openDevTools();
     }
-  } else {
-    // Production: Load from Vercel
-    const vercelUrl ='https://nova-sound-nine.vercel.app';
-    mainWindow.loadURL(vercelUrl);
   }
 
   // Ensure window is shown after loading

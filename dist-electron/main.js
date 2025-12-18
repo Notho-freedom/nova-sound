@@ -36,7 +36,7 @@ if (process.platform === 'win32') {
     app.setAppUserModelId('com.nexus.audio');
 }
 let mainWindow = null;
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = !app.isPackaged;
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
     'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'opus', 'wma', 'aiff', 'mp2', 'mp1',
@@ -120,6 +120,41 @@ function handleFileArgs() {
     }
 }
 function createWindow() {
+    // Resolve preload path - handle both dev and production builds
+    // In packaged apps, __dirname points to app.asar/dist-electron
+    // In dev, __dirname points to dist-electron
+    const preloadPath = path.join(__dirname, 'preload.cjs');
+    // Try multiple paths for production builds
+    const possiblePaths = [
+        preloadPath, // Standard path (dev and most production builds)
+        path.join(app.getAppPath(), 'dist-electron', 'preload.cjs'), // Packaged app path
+        path.join(process.resourcesPath || __dirname, 'preload.cjs'), // Resources path
+        path.join(process.resourcesPath || __dirname, 'app.asar', 'dist-electron', 'preload.cjs'), // ASAR path
+    ];
+    let finalPreloadPath = preloadPath;
+    let found = false;
+    for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+            finalPreloadPath = testPath;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        console.error('⚠️ Preload script not found! Tried paths:');
+        possiblePaths.forEach((p, i) => {
+            console.error(`   ${i + 1}. ${p} (exists: ${fs.existsSync(p)})`);
+        });
+        console.error('   __dirname:', __dirname);
+        console.error('   app.getAppPath():', app.getAppPath());
+        console.error('   process.resourcesPath:', process.resourcesPath);
+        // Use the first path anyway - Electron will show an error if it fails
+        finalPreloadPath = preloadPath;
+    }
+    console.log('📦 Loading preload from:', finalPreloadPath);
+    console.log('📦 Preload exists:', fs.existsSync(finalPreloadPath));
+    console.log('📦 App path:', app.getAppPath());
+    console.log('📦 __dirname:', __dirname);
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -131,25 +166,77 @@ function createWindow() {
         icon: path.join(__dirname, '../public/favicon.ico'),
         show: true, // Explicitly show the window
         webPreferences: {
-            preload: path.join(__dirname, 'preload.cjs'),
+            preload: finalPreloadPath,
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: false,
             webSecurity: false, // Allow loading local files
         },
     });
+    // Log when preload is loaded and verify electronAPI injection
+    mainWindow.webContents.on('did-finish-load', () => {
+        if (!mainWindow)
+            return;
+        console.log('✅ Page loaded, checking if electronAPI is available...');
+        // Wait a bit for preload to execute
+        setTimeout(() => {
+            if (!mainWindow)
+                return;
+            mainWindow.webContents.executeJavaScript(`
+        (function() {
+          const isAvailable = typeof window.electronAPI !== 'undefined';
+          console.log('[Renderer] window.electronAPI:', isAvailable ? '✅ Available' : '❌ Not available');
+          if (isAvailable) {
+            console.log('[Renderer] electronAPI methods:', Object.keys(window.electronAPI).join(', '));
+          }
+          return isAvailable;
+        })();
+      `).then((isAvailable) => {
+                if (isAvailable) {
+                    console.log('✅ electronAPI successfully injected!');
+                }
+                else {
+                    console.error('❌ electronAPI NOT injected! Preload may have failed.');
+                    console.error('   This can happen if:');
+                    console.error('   1. Preload script path is incorrect');
+                    console.error('   2. Preload script has errors');
+                    console.error('   3. Content Security Policy blocks the injection');
+                }
+            }).catch((err) => {
+                console.error('❌ Error checking electronAPI:', err);
+            });
+        }, 500);
+    });
+    // Also check on dom-ready (earlier event)
+    mainWindow.webContents.on('dom-ready', () => {
+        if (!mainWindow)
+            return;
+        console.log('📄 DOM ready, preload should be loaded by now');
+    });
     // Load the app
-    if (isDev || cliOptions.dev) {
+    // Determine which URL to use:
+    // Priority order:
+    // 1. If FORCE_PROD env var is set → always use production (for npm run electron)
+    // 2. If --dev flag is explicitly set → use localhost
+    // 3. If app is packaged → use production
+    // 4. Default → use production
+    const forceProduction = process.env.FORCE_PROD === 'true' || process.env.FORCE_PROD === '1';
+    const useProduction = forceProduction || app.isPackaged || (!cliOptions.dev && !isDev);
+    if (useProduction) {
+        // Production: Load from Vercel
+        const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
+        console.log('🌐 Loading production URL:', vercelUrl);
+        mainWindow.loadURL(vercelUrl);
+    }
+    else {
+        // Development: Load from localhost (only if --dev flag is explicitly set)
         const port = cliOptions.port || 3000;
-        mainWindow.loadURL(`http://localhost:${port}`);
+        const localUrl = `http://localhost:${port}`;
+        console.log('🔧 Loading development URL:', localUrl);
+        mainWindow.loadURL(localUrl);
         if (cliOptions.debug || isDev) {
             mainWindow.webContents.openDevTools();
         }
-    }
-    else {
-        // Production: Load from Vercel
-        const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
-        mainWindow.loadURL(vercelUrl);
     }
     // Ensure window is shown after loading
     mainWindow.once('ready-to-show', () => {
