@@ -36,8 +36,9 @@ const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 // Desktop App OAuth Configuration
 // For Electron desktop apps, Google Desktop App OAuth uses http://localhost as redirect_uri
-// We'll use a local HTTP server to intercept the callback
-const DESKTOP_REDIRECT_URI = 'http://localhost';
+// We use a local HTTP server (port 3001) to intercept the callback
+// IMPORTANT: The redirect_uri must include the port number: http://localhost:3001
+const DESKTOP_REDIRECT_URI = 'http://localhost:3001';
 const DESKTOP_REDIRECT_PORT = 3001; // Port for local OAuth callback server
 // Production URL for Web redirect_uri (must match Google Cloud Console configuration)
 const PRODUCTION_URL = process.env.NEXT_PUBLIC_VERCEL_URL || 'https://nova-sound-nine.vercel.app';
@@ -375,10 +376,10 @@ class AuthService {
     // Use the same redirect_uri as in buildAuthUrl (must match EXACTLY)
     // IMPORTANT: Must be identical to the redirect_uri used in buildAuthUrl
     const redirectUri = isElectron() 
-      ? DESKTOP_REDIRECT_URI  // http://localhost for desktop app
+      ? DESKTOP_REDIRECT_URI  // http://localhost:3001 for desktop app
       : window.location.origin; // Just origin for Web (no pathname)
 
-    console.log('🔄 Token exchange redirect_uri:', redirectUri, isElectron() ? '(Desktop App - localhost)' : '(Web)');
+    console.log('🔄 Token exchange redirect_uri:', redirectUri, isElectron() ? '(Desktop App - localhost:3001)' : '(Web)');
 
     // Try using custom backend proxy if available (handles client_secret securely)
     if (OAUTH_PROXY_ENDPOINT) {

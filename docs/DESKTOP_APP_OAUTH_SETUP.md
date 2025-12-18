@@ -24,18 +24,31 @@ L'application utilise maintenant le flow OAuth "Desktop App" de Google Cloud Pla
    - Cliquez sur **Create**
 5. Copiez le **Client ID** généré
 
-### 2. Redirect URI (Automatique)
+### 2. Configurer le Redirect URI
 
-Pour les applications Desktop App, Google génère automatiquement le redirect URI suivant :
+Pour les applications Desktop App, vous devez configurer le redirect URI suivant dans Google Cloud Console :
 
 ```
-http://localhost
+http://localhost:3001
 ```
+
+**Étapes de configuration** :
+1. Allez sur [Google Cloud Console](https://console.cloud.google.com)
+2. Sélectionnez votre projet
+3. Allez dans **APIs & Services** > **Credentials**
+4. Cliquez sur votre Client ID Desktop App (ou créez-en un si nécessaire)
+5. Cliquez sur **Edit** (ou **Configure OAuth client**)
+6. Dans la section **Authorized redirect URIs**, ajoutez :
+   ```
+   http://localhost:3001
+   ```
+7. Cliquez sur **Save**
 
 **Important** :
-- Ce redirect URI est **automatiquement généré** par Google Cloud Console
-- Vous **ne pouvez pas le modifier** pour les applications Desktop App
-- L'application utilise un serveur HTTP local (port 3001) pour intercepter le callback
+- Le redirect URI doit inclure le port : `http://localhost:3001`
+- Ce port (3001) correspond au serveur HTTP local dans Electron
+- Si Google génère automatiquement `http://localhost` sans port, vous devez le modifier manuellement
+- Le redirect URI dans le code doit correspondre EXACTEMENT à celui configuré dans Google Cloud Console
 
 ### 3. Vérifier les Authorized JavaScript Origins
 
@@ -49,14 +62,14 @@ Pour les applications desktop, vous pouvez laisser ce champ vide ou ajouter :
 1. **L'utilisateur clique sur "Se connecter avec Google"**
    - L'application détecte qu'elle s'exécute dans Electron
    - Utilise le Client ID Desktop App
-   - Construit l'URL OAuth avec `redirect_uri=com.nexus.audio://oauth/callback`
+   - Construit l'URL OAuth avec `redirect_uri=http://localhost:3001`
 
 2. **Ouverture du navigateur externe**
    - Electron ouvre le navigateur système par défaut
    - L'utilisateur s'authentifie avec Google
 
-3. **Redirection vers localhost**
-   - Après authentification, Google redirige vers `http://localhost?code=...&state=...`
+3. **Redirection vers localhost:3001**
+   - Après authentification, Google redirige vers `http://localhost:3001?code=...&state=...`
    - Un serveur HTTP local (port 3001) dans Electron intercepte cette requête
 
 4. **Récupération du code d'autorisation**
@@ -115,12 +128,12 @@ onOAuthCallback: (callback) => {
 ### Service d'Authentification (`src/services/auth.ts`)
 
 ```typescript
-// Utilisation de localhost pour Electron (standard Google Desktop App OAuth)
-const DESKTOP_REDIRECT_URI = 'http://localhost';
+// Utilisation de localhost:3001 pour Electron (avec port pour le serveur HTTP local)
+const DESKTOP_REDIRECT_URI = 'http://localhost:3001';
 
 // Dans buildAuthUrl()
 const redirectUri = isElectron() 
-  ? DESKTOP_REDIRECT_URI  // http://localhost for desktop app
+  ? DESKTOP_REDIRECT_URI  // http://localhost:3001 for desktop app
   : window.location.origin; // Just origin for Web
 ```
 
@@ -159,7 +172,7 @@ GOOGLE_CLIENT_SECRET=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
    - L'utilisateur devrait être authentifié
 
 3. **Vérifier les logs** :
-   - Console DevTools : `🔐 OAuth redirect_uri: http://localhost (Desktop App - localhost)`
+   - Console DevTools : `🔐 OAuth redirect_uri: http://localhost:3001 (Desktop App - localhost:3001)`
    - Console Electron : `🔐 OAuth callback server listening on http://localhost:3001`
    - Console Electron : `🔐 OAuth callback received on localhost: { code: 'present', state: 'present' }`
 
@@ -189,9 +202,16 @@ GOOGLE_CLIENT_SECRET=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
 ### Erreur "redirect_uri_mismatch"
 
 - Vérifiez que le Client ID utilisé est bien celui de type "Desktop app"
-- Google génère automatiquement `http://localhost` comme redirect URI
-- Vous ne pouvez pas modifier ce redirect URI pour les applications Desktop App
-- L'application utilise automatiquement `http://localhost` comme redirect_uri
+- Vérifiez que `http://localhost:3001` est bien configuré dans **Authorized redirect URIs** de Google Cloud Console
+- Le redirect URI dans le code (`http://localhost:3001`) doit correspondre EXACTEMENT à celui dans Google Cloud Console
+- Si vous voyez `ERR_CONNECTION_REFUSED` dans le navigateur, vérifiez que le serveur HTTP local (port 3001) est bien démarré dans Electron
+
+### Erreur "ERR_CONNECTION_REFUSED" dans le navigateur
+
+- Vérifiez que le serveur HTTP local (port 3001) est bien démarré dans Electron
+- Vérifiez les logs Electron : `🔐 OAuth callback server listening on http://localhost:3001`
+- Si le port 3001 est occupé, l'application affichera un avertissement dans les logs
+- Assurez-vous que le redirect_uri dans l'URL OAuth est `http://localhost:3001` (avec le port)
 
 ## Avantages du Flow Desktop App
 
