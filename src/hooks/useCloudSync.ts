@@ -139,12 +139,25 @@ export function useCloudSync(): UseCloudSyncReturn {
           // Try to find existing user in Firestore and sync (non-blocking)
           if (firebaseService.isInitialized()) {
             firebaseService.findUserByEmail(localGoogleUser.email)
-              .then((existingUser) => {
+              .then(async (existingUser) => {
                 if (existingUser) {
                   console.log("✅ Found existing Google user in Firestore, syncing...");
                   // Update with Firestore data (more complete)
                   setNexusUser(existingUser);
                   setNexusIsPro(existingUser.plan === 'pro');
+                  
+                  // Initialize Firebase sync for this user
+                  try {
+                    const { firebaseSyncService } = await import('@/services/firebase-sync');
+                    if (existingUser.uid) {
+                      await firebaseSyncService.initializeSync(existingUser.uid);
+                      console.log('✅ Firebase sync initialized for local Google user');
+                      syncInitializedRef.current = true;
+                      lastUserIdRef.current = existingUser.uid;
+                    }
+                  } catch (syncError) {
+                    console.error('Error initializing Firebase sync for local Google user:', syncError);
+                  }
                 }
               })
               .catch((error) => {
@@ -456,11 +469,11 @@ export function useCloudSync(): UseCloudSyncReturn {
       // Always update UI if user exists and Firebase user doesn't exist or is different
       if (user) {
         const firebaseUser = firebaseService.getCurrentUser();
-        
+
         // Update UI if no Firebase user or if Firebase user is different
         if (!firebaseUser || (firebaseUser.isAnonymous && !user.isAnonymous)) {
           console.log("useCloudSync: Manual auth state changed, user:", user.email || user.displayName || "Anonymous");
-          
+
           // Verify token is available (only for non-anonymous users)
           if (!user.isAnonymous) {
             try {
@@ -470,24 +483,46 @@ export function useCloudSync(): UseCloudSyncReturn {
               console.error("useCloudSync: Error getting token:", tokenError);
             }
           }
-          
+
           // Update UI immediately
           setNexusUser(user);
           setNexusAuthenticated(!user.isAnonymous);
           setNexusIsPro(authService.isPro());
-          
+
           // Try to sync with Firestore if Firebase is initialized
           if (firebaseService.isInitialized() && user.email && !user.isAnonymous) {
             firebaseService.findUserByEmail(user.email)
-              .then((existingUser) => {
+              .then(async (existingUser) => {
                 if (existingUser) {
                   console.log("✅ Syncing with Firestore user data");
                   setNexusUser(existingUser);
                   setNexusIsPro(existingUser.plan === 'pro');
+                  
+                  // Initialize Firebase sync for this user
+                  try {
+                    const { firebaseSyncService } = await import('@/services/firebase-sync');
+                    const firebaseUser = firebaseService.getCurrentUser();
+                    if (firebaseUser && !firebaseUser.isAnonymous) {
+                      // Use Firebase user UID for sync
+                      await firebaseSyncService.initializeSync(firebaseUser.uid);
+                      console.log('✅ Firebase sync initialized for manual OAuth user via Firestore');
+                      syncInitializedRef.current = true;
+                      lastUserIdRef.current = firebaseUser.uid;
+                    } else if (existingUser.uid) {
+                      // Fallback: use Firestore user ID directly
+                      await firebaseSyncService.initializeSync(existingUser.uid);
+                      console.log('✅ Firebase sync initialized using Firestore user ID');
+                      syncInitializedRef.current = true;
+                      lastUserIdRef.current = existingUser.uid;
+                    }
+                  } catch (syncError) {
+                    console.error('Error initializing Firebase sync for manual OAuth user:', syncError);
+                  }
                 }
               })
               .catch((error) => {
                 // Silent fail - local user data is already set
+                console.warn('Could not find Firestore user:', error);
               });
           }
 
@@ -523,6 +558,16 @@ export function useCloudSync(): UseCloudSyncReturn {
           tracksUploaded: 0,
           tracksDownloaded: 0,
         });
+        
+        // Cleanup sync
+        try {
+          const { firebaseSyncService } = await import('@/services/firebase-sync');
+          firebaseSyncService.cleanup();
+          syncInitializedRef.current = false;
+          lastUserIdRef.current = null;
+        } catch (error) {
+          // Silent fail
+        }
       }
     });
 

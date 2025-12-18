@@ -139,13 +139,23 @@ class FirebaseSyncService {
   private isInitialized: boolean = false;
   
   async initializeSync(userId: string): Promise<void> {
+    // Ensure Firebase is initialized first
+    const { firebaseService } = await import('./firebase');
+    await firebaseService.ensureInitialized();
+    
     const db = getFirestoreInstance();
     if (!db) {
-      console.warn('Firestore not initialized, cannot sync');
+      console.warn('🔄 Firestore not initialized, waiting for Firebase...');
       // Try to wait for Firebase to be ready
       const firebase = await waitForFirebase();
-      if (!firebase) {
-        console.warn('Firebase not available, sync disabled');
+      if (!firebase || !firebase.db) {
+        console.warn('⚠️ Firebase not available, sync disabled');
+        return;
+      }
+      // Retry getting Firestore instance after wait
+      const retryDb = getFirestoreInstance();
+      if (!retryDb) {
+        console.warn('⚠️ Firestore still not available after wait, sync disabled');
         return;
       }
     }
@@ -199,6 +209,13 @@ class FirebaseSyncService {
       }
       
       this.isInitialized = true;
+      
+      // Verify sync is working by checking listeners
+      if (this.syncListeners.size === 0) {
+        console.warn('⚠️ Firebase sync initialized but no listeners were set up');
+      } else {
+        console.log(`✅ Firebase sync active with ${this.syncListeners.size} listener(s):`, Array.from(this.syncListeners.keys()));
+      }
     } catch (error) {
       console.error('Error initializing sync:', error);
       this.cleanup();
@@ -241,10 +258,15 @@ class FirebaseSyncService {
     }
   }
 
-  // Set up real-time listeners for continuous sync (silent mode - no console logs)
+  // Set up real-time listeners for continuous sync
   private setupRealtimeListeners(userId: string): void {
     const db = getFirestoreInstance();
-    if (!db) return;
+    if (!db) {
+      console.warn('⚠️ Cannot setup real-time listeners: Firestore not initialized');
+      return;
+    }
+    
+    console.log(`🔄 Setting up real-time listeners for user: ${userId}`);
     
     // Reset reconnect attempts for this user
     this.reconnectAttempts.set('appData', 0);
@@ -260,13 +282,16 @@ class FirebaseSyncService {
         
         if (snapshot.exists() && !this.isSyncing) {
           const data = snapshot.data() as UserAppData;
+          console.log('📥 Firebase sync: Received app data update from Firestore');
           this.handleRemoteUpdate(data);
+        } else if (!snapshot.exists()) {
+          console.log('📥 Firebase sync: No app data in Firestore yet, will save local data on next sync');
         }
       },
       (error) => {
         // Only log actual errors, not normal connection issues
         if (error.code !== 'unavailable' && error.code !== 'cancelled') {
-          console.error('Error in app data listener:', error);
+          console.error('❌ Error in app data listener:', error);
         }
         this.handleListenerError('appData', userId, () => {
           // Retry setup
@@ -279,6 +304,7 @@ class FirebaseSyncService {
       }
     );
     this.syncListeners.set('appData', unsubscribeAppData);
+    console.log('✅ App data listener set up and active');
 
     // Playlists subcollection listener
     if (!this.syncListeners.has('playlists')) {
@@ -294,13 +320,14 @@ class FirebaseSyncService {
             snapshot.forEach((doc) => {
               playlists.push({ id: doc.id, ...doc.data() } as Playlist);
             });
+            console.log(`📥 Firebase sync: Received playlists update (${snapshot.docChanges().length} changes, ${playlists.length} total)`);
             this.handlePlaylistsUpdate(playlists);
           }
         },
         (error) => {
           // Only log actual errors, not normal connection issues
           if (error.code !== 'unavailable' && error.code !== 'cancelled') {
-            console.error('Error in playlists listener:', error);
+            console.error('❌ Error in playlists listener:', error);
           }
           this.handleListenerError('playlists', userId, () => {
             // Retry setup
@@ -314,6 +341,9 @@ class FirebaseSyncService {
         }
       );
       this.syncListeners.set('playlists', unsubscribePlaylists);
+      console.log('✅ Playlists listener set up and active');
+    } else {
+      console.log('ℹ️ Playlists listener already exists, skipping');
     }
   }
 
@@ -710,12 +740,17 @@ class FirebaseSyncService {
     // Clear existing interval if any
     if (this.periodicSyncInterval) {
       clearInterval(this.periodicSyncInterval);
+      console.log('🔄 Restarting periodic sync');
+    } else {
+      console.log('🔄 Starting periodic sync (every hour)');
     }
 
     this.periodicSyncInterval = setInterval(async () => {
       if (!this.currentUserId || this.isSyncing) {
         return;
       }
+      
+      console.log('🔄 Periodic sync triggered');
 
       try {
         // Silent periodic sync check
@@ -887,6 +922,7 @@ class FirebaseSyncService {
 
   // Cleanup listeners
   cleanup(): void {
+    console.log(`🔄 Cleaning up Firebase sync (${this.syncListeners.size} listeners)`);
     this.syncListeners.forEach((unsubscribe) => {
       try {
         unsubscribe();
@@ -897,6 +933,9 @@ class FirebaseSyncService {
     this.syncListeners.clear();
     this.reconnectAttempts.clear();
     this.stopPeriodicSync();
+    this.isInitialized = false;
+    this.currentUserId = null;
+    console.log('✅ Firebase sync cleanup complete');
     
     if (this.changeDetectionDebounce) {
       clearTimeout(this.changeDetectionDebounce);

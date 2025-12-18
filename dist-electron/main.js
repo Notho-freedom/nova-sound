@@ -512,31 +512,22 @@ function handleStripeRedirect(url) {
         const searchParams = urlObj.searchParams;
         // Check for Stripe success/cancel indicators in query parameters
         // Stripe redirects to success_url or cancel_url after payment
-        const success = searchParams.get('success') === 'true';
+        const success = searchParams.get('success') === 'true' || searchParams.has('session_id');
         const canceled = searchParams.get('canceled') === 'true';
-        let sessionId = searchParams.get('session_id');
-        // If session_id is not in URL but success=true, try to extract from Stripe session
-        // Sometimes Stripe includes it in the URL fragment or we need to get it from the session
-        if (!sessionId && success) {
-            // Try to extract from URL hash or other locations
-            const hashMatch = url.match(/session_id=([^&]+)/);
-            if (hashMatch) {
-                sessionId = hashMatch[1];
-            }
-        }
+        const sessionId = searchParams.get('session_id');
         // Also check if URL contains stripe success/cancel indicators
-        const isStripeCallback = (success || canceled) &&
-            (url.includes('success=true') ||
-                url.includes('canceled=true') ||
-                url.includes('session_id=') ||
-                searchParams.has('session_id'));
+        const isStripeCallback = url.includes('success=true') ||
+            url.includes('canceled=true') ||
+            url.includes('session_id=') ||
+            searchParams.has('session_id');
         if (isStripeCallback) {
-            if (success || sessionId) {
+            if (success) {
                 console.log('✅ Stripe checkout success detected, sending to renderer...', { url, sessionId });
                 // Send success event to renderer process
+                // Even if sessionId is null, the renderer can refresh subscription status
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('stripe:checkout-success', {
-                        sessionId: sessionId || 'unknown',
+                        sessionId: sessionId || null,
                         url: url
                     });
                 }
