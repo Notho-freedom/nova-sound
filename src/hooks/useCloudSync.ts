@@ -5,6 +5,7 @@ import { authService, UserProfile } from "@/services/auth";
 import { firebaseService } from "@/services/firebase";
 import { stripeService } from "@/services/stripe";
 import { notificationService } from "@/services/notification-service";
+import { isElectron } from "@/lib/electron-detector";
 import { toast } from "sonner";
 
 interface UseCloudSyncReturn {
@@ -568,7 +569,41 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   // Nexus methods - Google login
   const nexusLoginWithGoogle = useCallback(async () => {
-    // Check if Google OAuth Client ID is configured
+    const electronEnv = isElectron();
+    
+    // In Electron, use Desktop App OAuth flow (custom URI scheme)
+    // In Web, try Firebase Auth first, fallback to manual OAuth if needed
+    if (electronEnv) {
+      // Use Desktop App OAuth flow for Electron
+      try {
+        console.log('🔐 Using Desktop App OAuth for Google sign-in (Electron)');
+        await authService.signInWithGoogle();
+        toast.info("Authentification en cours...");
+        return;
+      } catch (error: any) {
+        console.error("Desktop App OAuth error:", error);
+        toast.error("Erreur d'authentification", {
+          description: error.message || "Impossible de se connecter avec Google.",
+        });
+        throw error;
+      }
+    }
+    
+    // For Web, try Firebase Auth first, fallback to manual OAuth
+    const firebaseReady = firebaseService.isInitialized();
+    if (firebaseReady) {
+      try {
+        console.log('🔐 Using Firebase Auth for Google sign-in (Web)');
+        await firebaseService.signInWithGoogle();
+        toast.info("Authentification en cours...");
+        return;
+      } catch (error: any) {
+        console.error("Firebase Auth error:", error);
+        console.log('⚠️ Firebase Auth failed, falling back to manual OAuth');
+      }
+    }
+    
+    // Fallback to manual OAuth for Web (if Firebase not available or failed)
     const clientId = await authService.getGoogleClientId();
     if (!clientId) {
       toast.error("Google OAuth non configuré", {

@@ -11,6 +11,9 @@ try {
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
 
+  // OAuth - open external browser
+  openExternal: (url) => ipcRenderer.invoke('oauth:openExternal', url),
+
   // File dialogs
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   openFile: (filters) =>
@@ -158,6 +161,18 @@ try {
     const listener = (_event, updated) => callback(updated);
     ipcRenderer.on('recognize:updated', listener);
     return () => ipcRenderer.removeListener('recognize:updated', listener);
+  },
+
+  // OAuth callbacks for desktop app authentication
+  onOAuthCallback: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('oauth:callback', listener);
+    return () => ipcRenderer.removeListener('oauth:callback', listener);
+  },
+  onOAuthError: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('oauth:error', listener);
+    return () => ipcRenderer.removeListener('oauth:error', listener);
   },
   });
   

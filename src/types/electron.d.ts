@@ -141,6 +141,11 @@ export interface ElectronAPI {
   applyDetectedGroup?: (group: DetectedGroup) => Promise<number>;
   recognizeTrack?: (trackId: string) => Promise<RecognitionResult | null>;
   onRecognitionUpdated?: (callback: (updated: number) => void) => () => void;
+
+  // OAuth for desktop app authentication
+  openExternal: (url: string) => Promise<void>;
+  onOAuthCallback?: (callback: (data: { code: string; state: string }) => void) => () => void;
+  onOAuthError?: (callback: (data: { error: string }) => void) => () => void;
 }
 
 declare global {

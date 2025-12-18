@@ -8,8 +8,12 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     // Récupérer uniquement le Client ID (pas le secret)
+    // Desktop app Client ID (from user): 925746643102-bknlkfarsfcrtmb8lvl11lnn0cprjvqv.apps.googleusercontent.com
+    // Fallback Client ID: 925746643102-12b1lokc63s21fjm3sq25dprc0embfbo.apps.googleusercontent.com
     const authConfig = {
-      googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID || '',
+      googleClientId: process.env.GOOGLE_CLIENT_ID || 
+                     process.env.GOOGLE_OAUTH_CLIENT_ID || 
+                     '925746643102-bknlkfarsfcrtmb8lvl11lnn0cprjvqv.apps.googleusercontent.com',
     };
 
     // Vérifier que le Client ID est présent

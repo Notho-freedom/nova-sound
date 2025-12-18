@@ -4,6 +4,8 @@ import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import { Readable } from 'stream';
+import { createServer, Server } from 'http';
+import { AddressInfo } from 'net';
 
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
@@ -46,6 +48,7 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let oauthCallbackServer: Server | null = null;
 
 const isDev = !app.isPackaged;
 
@@ -361,6 +364,17 @@ ipcMain.handle('window:close', () => {
 
 ipcMain.handle('window:isMaximized', () => {
   return mainWindow?.isMaximized() || false;
+});
+
+// OAuth handlers for desktop app authentication
+ipcMain.handle('oauth:openExternal', async (_event, url: string) => {
+  try {
+    await shell.openExternal(url);
+    console.log('🔐 Opened external browser for OAuth:', url);
+  } catch (error) {
+    console.error('Failed to open external browser:', error);
+    throw error;
+  }
 });
 
 // File dialog handlers
@@ -834,8 +848,129 @@ if (!gotTheLock) {
   });
 }
 
+// Register OAuth callback server for desktop app authentication
+// Google Desktop App OAuth uses http://localhost as redirect_uri
+function registerOAuthCallbackServer() {
+  const PORT = 3001;
+  
+  // Handler function for OAuth callbacks
+  const handleOAuthRequest = (req: any, res: any) => {
+    if (!req.url) {
+      res.writeHead(400);
+      res.end('Bad Request');
+      return;
+    }
+
+    try {
+      const urlObj = new URL(req.url, `http://localhost:${PORT}`);
+      const code = urlObj.searchParams.get('code');
+      const state = urlObj.searchParams.get('state');
+      const error = urlObj.searchParams.get('error');
+      
+      console.log('🔐 OAuth callback received on localhost:', { 
+        code: code ? 'present' : 'missing', 
+        state: state ? 'present' : 'missing', 
+        error: error || 'none' 
+      });
+      
+      if (error) {
+        console.error('❌ OAuth error:', error);
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`
+          <html>
+            <head><title>OAuth Error</title></head>
+            <body style="font-family: Arial; text-align: center; padding: 50px;">
+              <h1>❌ Erreur d'authentification</h1>
+              <p>${error}</p>
+              <p>Vous pouvez fermer cette fenêtre.</p>
+            </body>
+          </html>
+        `);
+        
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('oauth:error', { error });
+        }
+        return;
+      }
+      
+      if (code && state) {
+        console.log('✅ OAuth code received, sending to renderer...');
+        
+        // Send success response
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(`
+          <html>
+            <head><title>Authentification réussie</title></head>
+            <body style="font-family: Arial; text-align: center; padding: 50px;">
+              <h1>✅ Authentification réussie</h1>
+              <p>Vous pouvez fermer cette fenêtre et retourner à l'application.</p>
+              <script>setTimeout(() => window.close(), 2000);</script>
+            </body>
+          </html>
+        `);
+        
+        // Send code and state to renderer process
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('oauth:callback', { code, state });
+        } else {
+          // Window not ready yet, store callback for when window is ready
+          (app as any).pendingOAuthCallback = { code, state };
+          console.log('Stored OAuth callback for when window is ready');
+        }
+      } else {
+        console.warn('⚠️ OAuth callback missing code or state');
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end(`
+          <html>
+            <head><title>Erreur</title></head>
+            <body style="font-family: Arial; text-align: center; padding: 50px;">
+              <h1>⚠️ Paramètres manquants</h1>
+              <p>Le callback OAuth ne contient pas tous les paramètres requis.</p>
+            </body>
+          </html>
+        `);
+      }
+    } catch (err) {
+      console.error('❌ Error handling OAuth callback:', err);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Internal Server Error');
+    }
+  };
+  
+  // Create HTTP server to listen for OAuth callbacks
+  oauthCallbackServer = createServer(handleOAuthRequest);
+
+  // Start listening on localhost
+  oauthCallbackServer.listen(PORT, '127.0.0.1', () => {
+    const address = oauthCallbackServer?.address() as AddressInfo;
+    console.log(`🔐 OAuth callback server listening on http://localhost:${address?.port || PORT}`);
+  });
+
+  oauthCallbackServer.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use. Please close the application using this port or restart your computer.`);
+      console.error('   OAuth authentication may not work correctly.');
+    } else {
+      console.error('❌ OAuth callback server error:', err);
+    }
+  });
+}
+
+// Cleanup OAuth callback server on app quit
+function cleanupOAuthServer() {
+  if (oauthCallbackServer) {
+    oauthCallbackServer.close(() => {
+      console.log('🔐 OAuth callback server closed');
+    });
+    oauthCallbackServer = null;
+  }
+}
+
 // App lifecycle
 app.whenReady().then(async () => {
+  // Register OAuth callback server for desktop app authentication
+  registerOAuthCallbackServer();
+  
   // Register custom protocols
   registerLocalAudioProtocol();
   registerLocalVideoProtocol();
@@ -846,6 +981,15 @@ app.whenReady().then(async () => {
   await initServices();
   
   createWindow();
+  
+  // Handle pending OAuth callback if window was not ready
+  if ((app as any).pendingOAuthCallback) {
+    const { code, state } = (app as any).pendingOAuthCallback;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('oauth:callback', { code, state });
+      delete (app as any).pendingOAuthCallback;
+    }
+  }
   
   // Ensure window is visible and focused
   if (mainWindow) {
@@ -918,8 +1062,13 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    cleanupOAuthServer();
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  cleanupOAuthServer();
 });
 
 // Handle certificate errors (for development)

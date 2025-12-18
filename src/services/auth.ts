@@ -34,7 +34,12 @@ const GOOGLE_OAUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://www.googleapis.com/oauth2/v2/userinfo";
 
-// Production URL for Electron redirect_uri (must match Google Cloud Console configuration)
+// Desktop App OAuth Configuration
+// For Electron desktop apps, Google Desktop App OAuth uses http://localhost as redirect_uri
+// We'll use a local HTTP server to intercept the callback
+const DESKTOP_REDIRECT_URI = 'http://localhost';
+const DESKTOP_REDIRECT_PORT = 3001; // Port for local OAuth callback server
+// Production URL for Web redirect_uri (must match Google Cloud Console configuration)
 const PRODUCTION_URL = process.env.NEXT_PUBLIC_VERCEL_URL || 'https://nova-sound-nine.vercel.app';
 
 // Backend proxy endpoint (optional - if not set, will use Next.js API route)
@@ -62,6 +67,11 @@ class AuthService {
       this.loadGoogleClientId().catch((error) => {
         console.warn("Failed to preload Google Client ID:", error);
       });
+      
+      // Setup OAuth callback listener for Electron desktop app
+      if (isElectron() && window.electronAPI) {
+        this.setupElectronOAuthListener();
+      }
     }
     
     // Check if tokens are expired
@@ -313,13 +323,14 @@ class AuthService {
       );
     }
 
-    // For Electron, use the production URL as redirect_uri (must match Google Cloud Console)
-    // For web, use the current origin
+    // For Electron desktop app, use http://localhost (Google Desktop App OAuth standard)
+    // For web, use only the origin (no pathname) to match Google Console configuration
+    // IMPORTANT: Must match EXACTLY with authorized redirect URIs in Google Cloud Console
     const redirectUri = isElectron() 
-      ? PRODUCTION_URL 
-      : window.location.origin + window.location.pathname;
+      ? DESKTOP_REDIRECT_URI  // http://localhost for desktop app (handled by local HTTP server)
+      : window.location.origin; // Just origin for Web (no pathname)
     
-    console.log('🔐 OAuth redirect_uri:', redirectUri, isElectron() ? '(Electron)' : '(Web)');
+    console.log('🔐 OAuth redirect_uri:', redirectUri, isElectron() ? '(Desktop App - localhost)' : '(Web)');
     
     const state = this.generateState();
     const { codeVerifier, codeChallenge } = await this.generatePKCE();
@@ -361,12 +372,13 @@ class AuthService {
       throw new Error("Code verifier not found. Please try signing in again.");
     }
 
-    // Use the same redirect_uri as in buildAuthUrl (must match exactly)
+    // Use the same redirect_uri as in buildAuthUrl (must match EXACTLY)
+    // IMPORTANT: Must be identical to the redirect_uri used in buildAuthUrl
     const redirectUri = isElectron() 
-      ? PRODUCTION_URL 
-      : window.location.origin + window.location.pathname;
+      ? DESKTOP_REDIRECT_URI  // http://localhost for desktop app
+      : window.location.origin; // Just origin for Web (no pathname)
 
-    console.log('🔄 Token exchange redirect_uri:', redirectUri, isElectron() ? '(Electron)' : '(Web)');
+    console.log('🔄 Token exchange redirect_uri:', redirectUri, isElectron() ? '(Desktop App - localhost)' : '(Web)');
 
     // Try using custom backend proxy if available (handles client_secret securely)
     if (OAUTH_PROXY_ENDPOINT) {
@@ -657,7 +669,124 @@ class AuthService {
     }
 
     const authUrl = await this.buildAuthUrl();
+    
+    // In Electron desktop app, open external browser and listen for callback
+    if (isElectron() && typeof window !== 'undefined' && window.electronAPI) {
+      // Setup OAuth callback listener
+      this.setupElectronOAuthListener();
+      
+      // Open external browser for OAuth using Electron API
+      if (window.electronAPI.openExternal) {
+        await window.electronAPI.openExternal(authUrl);
+        console.log('🔐 Opened external browser for OAuth:', authUrl);
+        return;
+      }
+    }
+    
+    // For web, use redirect
     window.location.href = authUrl;
+  }
+
+  // Setup listener for OAuth callbacks from Electron main process
+  private setupElectronOAuthListener(): void {
+    if (typeof window === 'undefined' || !window.electronAPI) {
+      return;
+    }
+
+    // Remove existing listeners if any
+    if (this.electronOAuthUnsubscribe) {
+      this.electronOAuthUnsubscribe();
+    }
+
+    // Listen for OAuth callback
+    const callbackUnsubscribe = window.electronAPI.onOAuthCallback?.((data: { code: string; state: string }) => {
+      console.log('🔐 OAuth callback received from Electron:', data);
+      this.handleElectronCallback(data.code, data.state).catch((error) => {
+        console.error('Error handling Electron OAuth callback:', error);
+      });
+    });
+
+    // Listen for OAuth errors
+    const errorUnsubscribe = window.electronAPI.onOAuthError?.((data: { error: string }) => {
+      console.error('❌ OAuth error from Electron:', data.error);
+      throw new Error(`OAuth error: ${data.error}`);
+    });
+
+    // Store unsubscribe functions
+    this.electronOAuthUnsubscribe = () => {
+      callbackUnsubscribe?.();
+      errorUnsubscribe?.();
+    };
+  }
+
+  private electronOAuthUnsubscribe: (() => void) | null = null;
+
+  // Handle OAuth callback from Electron desktop app
+  private async handleElectronCallback(code: string, state: string): Promise<UserProfile> {
+    // Verify state
+    const savedState = sessionStorage.getItem("oauth_state");
+    if (!savedState || state !== savedState) {
+      throw new Error("Invalid OAuth state. Please try again.");
+    }
+    sessionStorage.removeItem("oauth_state");
+
+    try {
+      // Exchange code for tokens
+      const tokens = await this.exchangeCodeForTokens(code);
+      this.authTokens = tokens;
+      this.saveToStorage();
+      
+      // Setup automatic token refresh
+      this.setupTokenRefresh();
+
+      // Get user info
+      let userInfo: any;
+      try {
+        userInfo = await this.getUserInfo(tokens.accessToken);
+      } catch (error) {
+        console.error("Error getting user info from Google API:", error);
+        // If we have an idToken, decode it to get user info
+        if (tokens.idToken) {
+          try {
+            const parts = tokens.idToken.split(".");
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+              userInfo = {
+                id: payload.sub,
+                sub: payload.sub,
+                email: payload.email,
+                name: payload.name,
+                picture: payload.picture,
+              };
+            }
+          } catch (decodeError) {
+            console.error("Error decoding idToken:", decodeError);
+            throw new Error("Failed to get user information");
+          }
+        } else {
+          throw new Error("Failed to get user information");
+        }
+      }
+
+      // Create profile
+      const profile = this.createGoogleProfile(userInfo, tokens);
+      this.currentUser = profile;
+      this.saveToStorage();
+
+      // Notify listeners
+      this.authStateListeners.forEach((listener) => listener(profile));
+
+      // Cleanup listener
+      if (this.electronOAuthUnsubscribe) {
+        this.electronOAuthUnsubscribe();
+        this.electronOAuthUnsubscribe = null;
+      }
+
+      return profile;
+    } catch (error) {
+      console.error("Error handling Electron OAuth callback:", error);
+      throw error;
+    }
   }
 
   // Create new Google profile (manual OAuth, not Firebase)
