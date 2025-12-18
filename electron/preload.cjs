@@ -1,7 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Log that preload is loading
+console.log('[Preload] Preload script is loading...');
+
 // Expose protected methods for window controls
-contextBridge.exposeInMainWorld('electronAPI', {
+try {
+  contextBridge.exposeInMainWorld('electronAPI', {
   // Window controls
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
@@ -155,7 +159,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('recognize:updated', listener);
     return () => ipcRenderer.removeListener('recognize:updated', listener);
   },
-});
+  });
+  
+  console.log('[Preload] ✅ electronAPI successfully exposed to window');
+} catch (error) {
+  console.error('[Preload] ❌ Error exposing electronAPI:', error);
+  // Still expose a minimal API to prevent app crashes
+  contextBridge.exposeInMainWorld('electronAPI', {
+    minimize: () => console.warn('[Preload] electronAPI not fully initialized'),
+    maximize: () => console.warn('[Preload] electronAPI not fully initialized'),
+    close: () => console.warn('[Preload] electronAPI not fully initialized'),
+  });
+}
 
-console.log('Preload script loaded successfully');
+console.log('[Preload] ✅ Preload script loaded successfully');
 
