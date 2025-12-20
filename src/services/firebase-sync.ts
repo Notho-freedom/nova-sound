@@ -12,7 +12,8 @@ import {
   getDocs,
   Timestamp,
   serverTimestamp,
-  Firestore
+  Firestore,
+  writeBatch,
 } from 'firebase/firestore';
 import { getDb, getFirebaseApp, waitForFirebase } from './firebase';
 import type { 
@@ -631,7 +632,7 @@ class FirebaseSyncService {
     }
   }
 
-  // Save playlists to Firestore
+  // Save playlists to Firestore (optimisé avec batch writes)
   async savePlaylistsToFirestore(userId: string, playlists: Playlist[]): Promise<void> {
     const db = getFirestoreInstance();
     if (!db || !userId) {
@@ -642,26 +643,55 @@ class FirebaseSyncService {
     this.isSyncing = true;
 
     try {
-      // Delete all existing playlists first (or update them)
       const playlistsRef = collection(db, 'users', userId, 'playlists');
       const existingSnap = await getDocs(playlistsRef);
+      const existingIds = new Set(existingSnap.docs.map(doc => doc.id));
       
-      // Update or create playlists
+      // Utiliser batch writes pour performance maximale (max 500 opérations par batch)
+      const batch = writeBatch(db);
+      let batchCount = 0;
+      const MAX_BATCH_SIZE = 500;
+      
+      // Update or create playlists avec batch writes (performance maximale)
       for (const playlist of playlists) {
         const playlistRef = doc(db, 'users', userId, 'playlists', playlist.id);
-        await setDoc(playlistRef, {
+        batch.set(playlistRef, {
           ...playlist,
           updatedAt: serverTimestamp(),
         }, { merge: true });
+        batchCount++;
+        
+        // Commit batch si on atteint la limite (500 opérations max par batch)
+        if (batchCount >= MAX_BATCH_SIZE) {
+          await batch.commit();
+          // Créer un nouveau batch pour les opérations suivantes
+          const newBatch = writeBatch(db);
+          Object.assign(batch, newBatch);
+          batchCount = 0;
+        }
       }
 
-      // Delete playlists that no longer exist locally
+      // Delete playlists that no longer exist locally (avec batch)
       const localIds = new Set(playlists.map(p => p.id));
-      existingSnap.forEach((docSnap) => {
+      for (const docSnap of existingSnap.docs) {
         if (!localIds.has(docSnap.id)) {
-          deleteDoc(docSnap.ref);
+          batch.delete(docSnap.ref);
+          batchCount++;
+          
+          // Commit batch si on atteint la limite
+          if (batchCount >= MAX_BATCH_SIZE) {
+            await batch.commit();
+            const newBatch = writeBatch(db);
+            Object.assign(batch, newBatch);
+            batchCount = 0;
+          }
         }
-      });
+      }
+      
+      // Commit le batch final s'il reste des opérations
+      if (batchCount > 0) {
+        await batch.commit();
+      }
 
       // Silent - playlists saved
     } catch (error) {

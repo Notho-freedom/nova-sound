@@ -385,13 +385,31 @@ class YouTubeCacheService {
   private readonly TTL_CHANNEL = 24 * 60 * 60 * 1000; // 24h
 
   /**
-   * Hash une query pour l'utiliser comme clé de cache
+   * Hash une query pour l'utiliser comme clé de cache (optimisé avec crypto.subtle si disponible)
    */
-  private hashQuery(query: string): string {
-    // Simple hash (peut être amélioré avec crypto.subtle)
+  private async hashQuery(query: string): Promise<string> {
+    // Normaliser la query (lowercase, trim)
+    const normalized = query.toLowerCase().trim();
+    
+    // Utiliser crypto.subtle si disponible (plus performant et sécurisé)
+    if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(normalized);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return `search_${hashHex.substring(0, 16)}`; // Utiliser les 16 premiers caractères
+      } catch (error) {
+        // Fallback si crypto.subtle échoue
+        console.warn('[YouTubeCache] crypto.subtle failed, using simple hash:', error);
+      }
+    }
+    
+    // Fallback: Simple hash (compatible partout)
     let hash = 0;
-    for (let i = 0; i < query.length; i++) {
-      const char = query.charCodeAt(i);
+    for (let i = 0; i < normalized.length; i++) {
+      const char = normalized.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32bit integer
     }
@@ -444,7 +462,7 @@ class YouTubeCacheService {
    * Récupère une recherche depuis le cache
    */
   async getSearch(query: string): Promise<CachedYouTubeSearch | null> {
-    const queryHash = this.hashQuery(query);
+    const queryHash = await this.hashQuery(query);
     
     // L1
     const l1Result = this.l1Cache.getSearch(queryHash);
@@ -466,10 +484,22 @@ class YouTubeCacheService {
   }
 
   /**
-   * Met en cache une recherche
+   * Met en cache une recherche (optimisé: cache les vidéos individuellement aussi)
    */
   async setSearch(query: string, results: CachedYouTubeVideo[]): Promise<void> {
-    const queryHash = this.hashQuery(query);
+    const queryHash = await this.hashQuery(query);
+    
+    // Mettre en cache les vidéos individuellement aussi (pour réutilisation future)
+    // Cela permet de réutiliser les vidéos dans d'autres recherches sans appeler l'API
+    const videoPromises = results.map(video => 
+      this.setVideo(video).catch(err => {
+        console.warn(`[YouTubeCache] Failed to cache individual video ${video.videoId}:`, err);
+      })
+    );
+    // Ne pas attendre la fin pour continuer
+    Promise.all(videoPromises).catch(() => {
+      // Ignorer les erreurs individuelles
+    });
     const now = new Date();
     
     const cached: CachedYouTubeSearch = {

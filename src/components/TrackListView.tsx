@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Play, MoreHorizontal } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -5,6 +6,7 @@ import { getCoverUrl } from "@/lib/audio";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { UploadIndicator } from "@/components/UploadIndicator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -38,7 +40,7 @@ interface TrackListViewProps {
   getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
 }
 
-export const TrackListView = ({
+export const TrackListView = memo(({
   tracks,
   currentTrackIndex,
   isPlaying,
@@ -241,5 +243,7 @@ export const TrackListView = ({
       </div>
     </div>
   );
-};
+});
+
+TrackListView.displayName = 'TrackListView';
 

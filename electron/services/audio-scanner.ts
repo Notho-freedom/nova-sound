@@ -171,31 +171,43 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
 
     const total = allFiles.length;
     
-    // Phase 2: Extract metadata from each file
-    for (let i = 0; i < allFiles.length; i++) {
-      const filePath = allFiles[i];
+    // Phase 2: Extract metadata from each file (traitement parallèle pour performance maximale)
+    // Traiter par batch de 10 fichiers en parallèle pour optimiser les performances
+    const BATCH_SIZE = 10;
+    const filesToProcess = allFiles.filter(filePath => !existingPaths.has(filePath));
+    
+    for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
+      const batch = filesToProcess.slice(i, i + BATCH_SIZE);
       
+      // Traiter le batch en parallèle
+      const batchPromises = batch.map(async (filePath) => {
+        try {
+          const track = await processAudioFile(filePath);
+          if (track) {
+            // Notify renderer in real-time as each track is processed
+            const windows = BrowserWindow.getAllWindows();
+            windows.forEach(window => {
+              window.webContents.send('library:track-added', track);
+            });
+            return track;
+          }
+        } catch (error) {
+          console.error(`Error processing file ${filePath}:`, error);
+        }
+        return null;
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      const validTracks = batchResults.filter((track): track is ScannedTrack => track !== null);
+      newTracks.push(...validTracks);
+      
+      // Mettre à jour la progression
       sendProgress({
-        current: i + 1,
+        current: Math.min(i + BATCH_SIZE, total),
         total,
-        file: path.basename(filePath),
+        file: path.basename(batch[batch.length - 1] || ''),
         phase: 'extracting',
       });
-
-      // Skip if already exists
-      if (existingPaths.has(filePath)) {
-        continue;
-      }
-
-      const track = await processAudioFile(filePath);
-      if (track) {
-        newTracks.push(track);
-        // Notify renderer in real-time as each track is processed
-        const windows = BrowserWindow.getAllWindows();
-        windows.forEach(window => {
-          window.webContents.send('library:track-added', track);
-        });
-      }
     }
 
     // Phase 3: Merge with existing tracks and save to storage (duplicates removed in saveLibrary)

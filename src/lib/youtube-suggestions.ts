@@ -395,9 +395,26 @@ export async function fetchYouTubeSuggestionsFromHistory(
   const allSuggestions: YouTubeSuggestion[] = [];
   const seenVideoIds = new Set<string>();
 
-  // Rechercher basée sur les artistes/genres
-  for (const query of searchQueries.slice(0, 3)) { // Limiter à 3 requêtes pour éviter trop d'appels API
+  // Rechercher basée sur les artistes/genres (en parallèle pour performance maximale)
+  const searchPromises = searchQueries.slice(0, 3).map(async (query) => {
     try {
+      // Vérifier le cache d'abord
+      const { youtubeCacheService } = await import('@/services/youtube-cache');
+      const cached = await youtubeCacheService.getSearch(query);
+      if (cached && cached.results.length > 0) {
+        console.log(`[YouTube Suggestions] Cache HIT pour: ${query}`);
+        return cached.results.map(v => ({
+          videoId: v.videoId,
+          title: v.title,
+          description: v.description,
+          thumbnailUrl: v.thumbnailUrl,
+          channelTitle: v.channelTitle,
+          publishedAt: v.publishedAt,
+          duration: v.duration,
+          viewCount: v.viewCount,
+        }));
+      }
+
       const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
       searchUrl.searchParams.set("key", apiKey);
       searchUrl.searchParams.set("part", "snippet");
@@ -411,28 +428,67 @@ export async function fetchYouTubeSuggestionsFromHistory(
       
       if (response.ok) {
         const data = await response.json();
-        if (data.items) {
-          data.items.forEach((item: any) => {
-            const videoId = item.id.videoId;
-            if (!seenVideoIds.has(videoId) && !youtubeVideoIds.includes(videoId)) {
-              seenVideoIds.add(videoId);
+        if (data.items && data.items.length > 0) {
+          // Récupérer les IDs pour batch request
+          const videoIds = data.items.map((item: any) => item.id.videoId);
+          
+          // Utiliser batch service pour récupérer les détails (durée, vues) en une seule requête
+          try {
+            const { youtubeBatchService } = await import('@/services/youtube-batch');
+            const batchVideos = await youtubeBatchService.getVideosBatch(videoIds);
+            
+            // Mapper les résultats avec les détails complets
+            return data.items.map((item: any) => {
+              const videoId = item.id.videoId;
+              const batchVideo = batchVideos.find((v: any) => v.id === videoId || v.videoId === videoId);
               const thumbnails = item.snippet?.thumbnails || {};
-              allSuggestions.push({
+              
+              return {
                 videoId,
                 title: item.snippet?.title || "",
                 description: item.snippet?.description || "",
                 thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
                 channelTitle: item.snippet?.channelTitle || "",
                 publishedAt: item.snippet?.publishedAt || "",
-              });
-            }
-          });
+                duration: batchVideo?.duration || batchVideo?.contentDetails?.duration ? parseDuration(batchVideo.contentDetails.duration) : undefined,
+                viewCount: batchVideo?.viewCount || (batchVideo?.statistics?.viewCount ? parseInt(batchVideo.statistics.viewCount) : undefined),
+              };
+            });
+          } catch (batchError) {
+            // Fallback si batch échoue
+            console.warn(`[YouTube Suggestions] Batch failed for ${query}, using basic data:`, batchError);
+            return data.items.map((item: any) => {
+              const videoId = item.id.videoId;
+              const thumbnails = item.snippet?.thumbnails || {};
+              return {
+                videoId,
+                title: item.snippet?.title || "",
+                description: item.snippet?.description || "",
+                thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
+                channelTitle: item.snippet?.channelTitle || "",
+                publishedAt: item.snippet?.publishedAt || "",
+              };
+            });
+          }
         }
       }
+      return [];
     } catch (error) {
       console.error(`[YouTube Suggestions] Erreur lors de la recherche pour "${query}":`, error);
+      return [];
     }
-  }
+  });
+
+  // Exécuter toutes les recherches en parallèle pour performance maximale
+  const searchResults = await Promise.all(searchPromises);
+  
+  // Combiner les résultats
+  searchResults.flat().forEach((suggestion) => {
+    if (!seenVideoIds.has(suggestion.videoId) && !youtubeVideoIds.includes(suggestion.videoId)) {
+      seenVideoIds.add(suggestion.videoId);
+      allSuggestions.push(suggestion);
+    }
+  });
 
   // Si on a des vidéos YouTube dans l'historique, chercher des vidéos similaires
   if (youtubeVideoIds.length > 0 && allSuggestions.length < maxResults) {
@@ -466,6 +522,19 @@ export async function fetchYouTubeSuggestionsFromHistory(
   }
 
   return allSuggestions.slice(0, maxResults);
+}
+
+/**
+ * Parse la durée ISO 8601 en secondes
+ */
+function parseDuration(duration?: string): number | undefined {
+  if (!duration) return undefined;
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return undefined;
+  const hours = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 /**

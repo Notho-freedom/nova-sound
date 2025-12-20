@@ -12,11 +12,53 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
     })
   : null;
 
+// Cache pour les statuts d'abonnement (évite les appels API répétés)
+interface SubscriptionCacheEntry {
+  data: any;
+  timestamp: number;
+  userId: string;
+}
+
+const subscriptionCache = new Map<string, SubscriptionCacheEntry>();
+const CACHE_DURATION = 30 * 1000; // 30 secondes de cache
+
+function getCachedSubscription(userId: string): any | null {
+  const cached = subscriptionCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedSubscription(userId: string, data: any): void {
+  subscriptionCache.set(userId, {
+    data,
+    timestamp: Date.now(),
+    userId,
+  });
+  
+  // Nettoyer le cache toutes les 5 minutes (supprimer les entrées > 5 min)
+  if (subscriptionCache.size > 100) {
+    const now = Date.now();
+    for (const [key, entry] of subscriptionCache.entries()) {
+      if (now - entry.timestamp > 5 * 60 * 1000) {
+        subscriptionCache.delete(key);
+      }
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyAuth(request);
     if (!auth) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
+    // Vérifier le cache d'abord (performance maximale)
+    const cached = getCachedSubscription(auth.userId);
+    if (cached) {
+      return NextResponse.json(cached);
     }
 
     if (!stripe) {
@@ -154,6 +196,9 @@ export async function GET(request: NextRequest) {
       // Ne pas bloquer la réponse si la synchronisation échoue
       console.warn('⚠️ Erreur lors de la synchronisation Firestore (non-bloquant):', syncError);
     }
+
+    // Mettre en cache pour éviter les appels répétés
+    setCachedSubscription(auth.userId, subscriptionData);
 
     return NextResponse.json(subscriptionData);
   } catch (error: any) {

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, memo } from "react";
 import { ChevronLeft, ChevronRight, Play, Plus, Check, Star, Clock, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ const formatTime = (seconds: number) => {
   return `${mins} min`;
 };
 
-export const VideoCarousel = ({
+export const VideoCarousel = memo(({
   title,
   videos,
   onVideoSelect,
@@ -300,7 +300,9 @@ export const VideoCarousel = ({
       </div>
     </div>
   );
-};
+});
+
+VideoCarousel.displayName = 'VideoCarousel';
 
 export default VideoCarousel;
 
