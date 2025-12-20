@@ -97,30 +97,44 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
     }
   }, [isReady, autoPlay, isPlaying, play]);
 
-  // Callbacks
+  // Callbacks - utiliser useRef pour éviter les boucles infinies
+  const onReadyRef = useRef(onReady);
+  const onStateChangeRef = useRef(onStateChange);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onErrorRef = useRef(onError);
+
+  // Mettre à jour les refs quand les callbacks changent
   useEffect(() => {
-    if (isReady && onReady) {
-      onReady();
+    onReadyRef.current = onReady;
+    onStateChangeRef.current = onStateChange;
+    onTimeUpdateRef.current = onTimeUpdate;
+    onErrorRef.current = onError;
+  }, [onReady, onStateChange, onTimeUpdate, onError]);
+
+  // Appeler les callbacks sans créer de dépendances
+  useEffect(() => {
+    if (isReady && onReadyRef.current) {
+      onReadyRef.current();
     }
-  }, [isReady, onReady]);
+  }, [isReady]);
 
   useEffect(() => {
-    if (onStateChange) {
-      onStateChange(isPlaying);
+    if (onStateChangeRef.current) {
+      onStateChangeRef.current(isPlaying);
     }
-  }, [isPlaying, onStateChange]);
+  }, [isPlaying]);
 
   useEffect(() => {
-    if (onTimeUpdate) {
-      onTimeUpdate(currentTime);
+    if (onTimeUpdateRef.current) {
+      onTimeUpdateRef.current(currentTime);
     }
-  }, [currentTime, onTimeUpdate]);
+  }, [currentTime]);
 
   useEffect(() => {
-    if (error && onError) {
-      onError(error);
+    if (error && onErrorRef.current) {
+      onErrorRef.current(error);
     }
-  }, [error, onError]);
+  }, [error]);
 
 
   return (

@@ -52,6 +52,7 @@ import type { Settings, RecognitionResult, DetectedGroup, Track } from "@/types/
 import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 import { Skeleton } from "@/components/ui/skeleton";
+import { testYouTubeApiKey } from "@/lib/youtube-api-test";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -388,6 +389,8 @@ export const SettingsView = () => {
   const [showYouTubeKey, setShowYouTubeKey] = useState(false);
   const [youtubeApiKey, setYoutubeApiKey] = useState("");
   const [savingYouTube, setSavingYouTube] = useState(false);
+  const [testingYouTube, setTestingYouTube] = useState(false);
+  const [youtubeTestResult, setYoutubeTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [cloudinaryForm, setCloudinaryForm] = useState({
     cloudName: "",
     apiKey: "",
@@ -540,14 +543,47 @@ export const SettingsView = () => {
         });
       }
       
-      // Load YouTube API key from localStorage
-      const savedYouTubeKey = localStorage.getItem("nexus-youtube-api-key") || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || "";
+      // Load YouTube API key from Firebase, localStorage, or env
+      let savedYouTubeKey = "";
+      if (nexusAuthenticated) {
+        try {
+          const { firebaseSyncService } = await import('@/services/firebase-sync');
+          const firestoreData = await firebaseSyncService.loadFromFirestore();
+          if (firestoreData?.youtubeApiKey) {
+            savedYouTubeKey = firestoreData.youtubeApiKey;
+          }
+        } catch (err) {
+          console.warn("Failed to load YouTube API key from Firebase:", err);
+        }
+      }
+      // Fallback to localStorage
+      if (!savedYouTubeKey) {
+        savedYouTubeKey = localStorage.getItem("nexus-youtube-api-key") || "";
+      }
+      // Fallback to env
+      if (!savedYouTubeKey) {
+        savedYouTubeKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || "";
+      }
       setYoutubeApiKey(savedYouTubeKey);
       
       setLoading(false);
     };
     loadSettings();
-  }, [isElectron, cloudinaryConfig, nexusAuthenticated, theme]);
+    
+    // Écouter les mises à jour de la clé YouTube depuis Firebase
+    const handleYouTubeKeyUpdate = (event: CustomEvent) => {
+      const newKey = event.detail;
+      if (newKey !== youtubeApiKey) {
+        setYoutubeApiKey(newKey || "");
+      }
+    };
+    
+    window.addEventListener('youtube-api-key-updated', handleYouTubeKeyUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('youtube-api-key-updated', handleYouTubeKeyUpdate as EventListener);
+    };
+  }, [isElectron, cloudinaryConfig, nexusAuthenticated, theme, youtubeApiKey]);
 
   // Load subscription status
   useEffect(() => {
@@ -696,18 +732,63 @@ export const SettingsView = () => {
     }
   };
 
+  // Test YouTube API key
+  const handleTestYouTube = async () => {
+    if (!youtubeApiKey.trim()) {
+      notifyError("Veuillez entrer une clé API pour tester");
+      return;
+    }
+
+    setTestingYouTube(true);
+    setYoutubeTestResult(null);
+    
+    try {
+      const result = await testYouTubeApiKey(youtubeApiKey.trim());
+      setYoutubeTestResult(result);
+      
+      if (result.success) {
+        notifySuccess(result.message);
+      } else {
+        notifyError(result.message);
+      }
+    } catch (err: any) {
+      const errorResult = {
+        success: false,
+        message: err.message || "Erreur lors du test",
+      };
+      setYoutubeTestResult(errorResult);
+      notifyError(errorResult.message);
+    } finally {
+      setTestingYouTube(false);
+    }
+  };
+
   // Save YouTube API key
   const handleSaveYouTube = async () => {
     setSavingYouTube(true);
     try {
+      const keyToSave = youtubeApiKey.trim();
+      
       // Save to localStorage
-      if (youtubeApiKey.trim()) {
-        localStorage.setItem("nexus-youtube-api-key", youtubeApiKey.trim());
-        notifySuccess("Clé API YouTube sauvegardée");
+      if (keyToSave) {
+        localStorage.setItem("nexus-youtube-api-key", keyToSave);
       } else {
         localStorage.removeItem("nexus-youtube-api-key");
-        notifySuccess("Clé API YouTube supprimée");
       }
+      
+      // Save to Firebase if authenticated
+      if (nexusAuthenticated) {
+        try {
+          const { firebaseSyncService } = await import('@/services/firebase-sync');
+          await firebaseSyncService.queueSync('youtubeApiKey', keyToSave || null);
+        } catch (err) {
+          console.warn("Failed to sync YouTube API key to Firebase:", err);
+          // Continue anyway - localStorage is saved
+        }
+      }
+      
+      notifySuccess(keyToSave ? "Clé API YouTube sauvegardée" : "Clé API YouTube supprimée");
+      setYoutubeTestResult(null);
     } catch (err) {
       console.error("Failed to save YouTube API key:", err);
       notifyError("Erreur lors de la sauvegarde de la clé API YouTube");
@@ -1364,8 +1445,10 @@ export const SettingsView = () => {
                     </p>
                   </div>
                   
-                  {youtubeApiKey ? (
-                    <div className="space-y-3">
+                  {/* Toujours afficher le formulaire, même si une clé existe */}
+                  <div className="space-y-3">
+                    {/* Indicateur si clé déjà configurée */}
+                    {youtubeApiKey && (
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                         <p className="text-sm text-green-400 flex items-center gap-2">
                           <Check className="w-4 h-4" />
@@ -1375,61 +1458,92 @@ export const SettingsView = () => {
                           La recherche YouTube est activée
                         </p>
                       </div>
-                      <Button variant="outline" size="sm" className="w-full" onClick={() => {
-                        setYoutubeApiKey("");
-                        localStorage.removeItem("nexus-youtube-api-key");
-                        notifySuccess("Clé API YouTube supprimée");
-                      }}>
-                        <X className="w-4 h-4 mr-2" />
-                        Supprimer la clé
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-xs">Clé API YouTube Data v3 *</Label>
-                        <div className="relative mt-1">
-                          <Input
-                            type={showYouTubeKey ? "text" : "password"}
-                            value={youtubeApiKey}
-                            onChange={(e) => setYoutubeApiKey(e.target.value)}
-                            placeholder="AIzaSy..."
-                            className="font-mono text-sm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowYouTubeKey(!showYouTubeKey)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                          >
-                            {showYouTubeKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
+                    )}
+                    
+                    <div>
+                      <Label className="text-xs">Clé API YouTube Data v3 *</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          type={showYouTubeKey ? "text" : "password"}
+                          value={youtubeApiKey}
+                          onChange={(e) => {
+                            setYoutubeApiKey(e.target.value);
+                            setYoutubeTestResult(null); // Réinitialiser le résultat du test
+                          }}
+                          placeholder="AIzaSy..."
+                          className="font-mono text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowYouTubeKey(!showYouTubeKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showYouTubeKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Obtenez votre clé sur{" "}
+                        <a
+                          href="https://console.cloud.google.com/apis/credentials"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          Google Cloud Console
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </p>
+                      
+                      {/* Résultat du test */}
+                      {youtubeTestResult && (
+                        <div className={cn(
+                          "mt-2 p-2 rounded text-xs",
+                          youtubeTestResult.success
+                            ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                            : "bg-destructive/10 border border-destructive/20 text-destructive"
+                        )}>
+                          {youtubeTestResult.success ? (
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>{youtubeTestResult.message}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{youtubeTestResult.message}</span>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1.5">
-                          Obtenez votre clé sur{" "}
-                          <a
-                            href="https://console.cloud.google.com/apis/credentials"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline inline-flex items-center gap-1"
-                          >
-                            Google Cloud Console
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </p>
-                      </div>
-                      <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                        <p className="text-xs font-medium mb-2">Instructions :</p>
-                        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                          <li>Créez un projet sur Google Cloud</li>
-                          <li>Activez l'API YouTube Data v3</li>
-                          <li>Créez une clé API</li>
-                          <li>Collez-la ci-dessus</li>
-                        </ol>
-                      </div>
+                      )}
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <p className="text-xs font-medium mb-2">Instructions :</p>
+                      <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                        <li>Créez un projet sur Google Cloud</li>
+                        <li>Activez l'API YouTube Data v3</li>
+                        <li>Créez une clé API</li>
+                        <li>Collez-la ci-dessus</li>
+                      </ol>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1" 
+                        onClick={handleTestYouTube}
+                        disabled={testingYouTube || !youtubeApiKey.trim()}
+                      >
+                        {testingYouTube ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="w-4 h-4 mr-2" />
+                        )}
+                        Tester
+                      </Button>
                       <Button 
                         variant="default" 
                         size="sm" 
-                        className="w-full" 
+                        className="flex-1" 
                         onClick={handleSaveYouTube}
                         disabled={savingYouTube || !youtubeApiKey.trim()}
                       >
@@ -1441,7 +1555,34 @@ export const SettingsView = () => {
                         Sauvegarder
                       </Button>
                     </div>
-                  )}
+                    
+                    {/* Bouton pour supprimer si clé existe */}
+                    {youtubeApiKey && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full" 
+                        onClick={async () => {
+                          setYoutubeApiKey("");
+                          localStorage.removeItem("nexus-youtube-api-key");
+                          // Supprimer aussi de Firebase
+                          if (nexusAuthenticated) {
+                            try {
+                              const { firebaseSyncService } = await import('@/services/firebase-sync');
+                              await firebaseSyncService.queueSync('youtubeApiKey', null);
+                            } catch (err) {
+                              console.warn("Failed to remove YouTube API key from Firebase:", err);
+                            }
+                          }
+                          setYoutubeTestResult(null);
+                          notifySuccess("Clé API YouTube supprimée");
+                        }}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Supprimer la clé
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </SettingsCard>
 

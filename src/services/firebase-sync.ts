@@ -96,6 +96,9 @@ export interface UserAppData {
     uploadPreset: string;
   };
   
+  // YouTube API key (stored securely)
+  youtubeApiKey?: string;
+  
   // Scrobbler settings
   scrobblerSettings?: {
     lastFm?: {
@@ -445,6 +448,14 @@ class FirebaseSyncService {
       if (data.scrobblerSettings) {
         this.saveToLocalStorage('nexus-scrobbler-settings', data.scrobblerSettings);
       }
+      
+      if (data.youtubeApiKey !== undefined) {
+        this.saveToLocalStorage('nexus-youtube-api-key', data.youtubeApiKey);
+        // Émettre un événement pour notifier les composants
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('youtube-api-key-updated', { detail: data.youtubeApiKey }));
+        }
+      }
 
       // Update hash after remote update
       this.lastSyncedDataHash = this.calculateDataHash(data);
@@ -612,6 +623,9 @@ class FirebaseSyncService {
     if (data.scrobblerSettings) {
       this.saveToLocalStorage('nexus-scrobbler-settings', data.scrobblerSettings);
     }
+    if (data.youtubeApiKey !== undefined) {
+      this.saveToLocalStorage('nexus-youtube-api-key', data.youtubeApiKey);
+    }
   }
 
   // Save playlists to Firestore
@@ -716,6 +730,9 @@ class FirebaseSyncService {
 
     const scrobblerSettings = this.loadFromLocalStorage<any>('nexus-scrobbler-settings');
     if (scrobblerSettings) data.scrobblerSettings = scrobblerSettings;
+
+    const youtubeApiKey = this.loadFromLocalStorage<string>('nexus-youtube-api-key');
+    if (youtubeApiKey) data.youtubeApiKey = youtubeApiKey;
 
     return data;
   }

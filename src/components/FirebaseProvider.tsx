@@ -95,14 +95,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               // Try to create/get user in Firestore using the manual OAuth UID
               const firestoreUserId = manualUser.uid;
               
-              // Initialize sync with the manual OAuth UID
-              // The sync service will create the Firestore document if it doesn't exist
+              // IMPORTANT: Ensure user profile exists in Firestore BEFORE initializing sync
+              // This ensures the user document is available for sync operations
+              console.log('🔄 FirebaseProvider: Ensuring user profile exists in Firestore...');
+              await firebaseService.ensureUserProfileExists(manualUser);
+              console.log('✅ FirebaseProvider: User profile ensured in Firestore');
+              
+              // Now initialize sync with the manual OAuth UID
+              // The sync service will create the user data document if it doesn't exist
               console.log('🔄 FirebaseProvider: Initializing sync with manual OAuth UID:', firestoreUserId);
               await firebaseSyncService.initializeSync(firestoreUserId);
               console.log('✅ FirebaseProvider: Sync initialized for manual OAuth user');
-              
-              // Also ensure the user profile exists in Firestore
-              await firebaseService.ensureUserProfileExists(manualUser);
             } catch (syncError) {
               console.error('❌ FirebaseProvider: Failed to initialize sync for manual OAuth user:', syncError);
               if (checkAttempts < maxCheckAttempts) {

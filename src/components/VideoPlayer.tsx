@@ -114,25 +114,6 @@ export const VideoPlayer = ({
   const isMuted = isYouTube ? youtubeState.isMuted : localIsMuted;
   const isLoading = isYouTube ? youtubeState.isLoading : localIsLoading;
 
-  // Mettre à jour l'état YouTube depuis le ref
-  useEffect(() => {
-    if (isYouTube && youtubePlayerRef.current) {
-      const interval = setInterval(() => {
-        if (youtubePlayerRef.current) {
-          setYoutubeState(prev => ({
-            ...prev,
-            isPlaying: youtubePlayerRef.current!.isPlaying,
-            currentTime: youtubePlayerRef.current!.currentTime,
-            duration: youtubePlayerRef.current!.duration,
-            volume: youtubePlayerRef.current!.volume,
-            isMuted: youtubePlayerRef.current!.isMuted,
-          }));
-        }
-      }, 500);
-      return () => clearInterval(interval);
-    }
-  }, [isYouTube]);
-
   // Contrôles unifiés
   const togglePlayPause = () => {
     if (isYouTube && youtubePlayerRef.current) {
@@ -165,6 +146,56 @@ export const VideoPlayer = ({
       localToggleMute();
     }
   };
+
+  // Callbacks mémorisés pour YouTube Player (évite les boucles infinies)
+  const handleYouTubeStateChange = useCallback((playing: boolean) => {
+    setYoutubeState(prev => {
+      // Éviter les mises à jour inutiles
+      if (prev.isPlaying === playing) return prev;
+      return { ...prev, isPlaying: playing };
+    });
+  }, []);
+
+  const handleYouTubeTimeUpdate = useCallback((time: number) => {
+    setYoutubeState(prev => {
+      // Éviter les mises à jour inutiles (seulement si changement significatif)
+      if (Math.abs(prev.currentTime - time) < 0.5) return prev;
+      return { ...prev, currentTime: time };
+    });
+  }, []);
+
+  const handleYouTubeReady = useCallback(() => {
+    // Le player est prêt - initialiser l'état une seule fois
+    if (youtubePlayerRef.current) {
+      setYoutubeState(prev => {
+        const newState = {
+          ...prev,
+          volume: youtubePlayerRef.current!.volume,
+          isMuted: youtubePlayerRef.current!.isMuted,
+          duration: youtubePlayerRef.current!.duration,
+          isLoading: false,
+        };
+        // Ne mettre à jour que si quelque chose a changé
+        if (
+          prev.volume === newState.volume &&
+          prev.isMuted === newState.isMuted &&
+          prev.duration === newState.duration &&
+          prev.isLoading === newState.isLoading
+        ) {
+          return prev;
+        }
+        return newState;
+      });
+    }
+  }, []);
+
+  const handleYouTubeError = useCallback((error: string) => {
+    console.error('Erreur YouTube Player:', error);
+    setYoutubeState(prev => {
+      if (prev.isLoading === false) return prev;
+      return { ...prev, isLoading: false };
+    });
+  }, []);
 
   // Set the current video and auto-play if requested
   useEffect(() => {
@@ -310,27 +341,10 @@ export const VideoPlayer = ({
           startTime={video.watchProgress?.currentTime}
           className="w-full h-full"
           audioOnly={audioOnly}
-          onStateChange={(playing) => {
-            setYoutubeState(prev => ({ ...prev, isPlaying: playing }));
-          }}
-          onTimeUpdate={(time) => {
-            setYoutubeState(prev => ({ ...prev, currentTime: time }));
-          }}
-          onReady={() => {
-            // Le player est prêt
-            if (youtubePlayerRef.current) {
-              setYoutubeState(prev => ({
-                ...prev,
-                volume: youtubePlayerRef.current!.volume,
-                isMuted: youtubePlayerRef.current!.isMuted,
-                duration: youtubePlayerRef.current!.duration,
-              }));
-            }
-          }}
-          onError={(error) => {
-            console.error('Erreur YouTube Player:', error);
-            setYoutubeState(prev => ({ ...prev, isLoading: false }));
-          }}
+          onStateChange={handleYouTubeStateChange}
+          onTimeUpdate={handleYouTubeTimeUpdate}
+          onReady={handleYouTubeReady}
+          onError={handleYouTubeError}
         />
       ) : (
         <video
