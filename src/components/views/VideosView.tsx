@@ -146,6 +146,63 @@ export const VideosView = () => {
   // Suggestions YouTube basées sur l'historique
   const { trendingVideos, loadingTrending, loadTrendingFromHistory } = useYouTubeSuggestions();
 
+  // Charger l'historique de recherche
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("nexus-search-history");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setSearchHistory(parsed);
+        }
+      }
+    } catch (error) {
+      // Ignorer les erreurs de parsing
+    }
+  }, []);
+
+  // Écouter les événements pour ajouter les vidéos YouTube à l'historique vidéo
+  useEffect(() => {
+    const handleYouTubeVideoPlayed = (event: CustomEvent<{ videoId: string; trackId: string; title: string }>) => {
+      const { videoId, trackId } = event.detail;
+      
+      // Trouver la vidéo correspondante dans enhancedVideos
+      const video = enhancedVideos.find(v => 
+        v.youtubeVideoId === videoId || 
+        v.id === trackId ||
+        (v.mediaSource === 'youtube' && extractYouTubeVideoId(v.filePath || '') === videoId)
+      );
+      
+      if (video) {
+        // Ajouter à l'historique vidéo
+        addToWatchHistory(video.id);
+        console.log('[VideosView] Vidéo YouTube ajoutée à l\'historique:', video.title);
+      } else {
+        // Si la vidéo n'est pas dans enhancedVideos, créer une entrée temporaire
+        // et l'ajouter quand même à l'historique (sera synchronisé plus tard)
+        console.log('[VideosView] Vidéo YouTube non trouvée dans enhancedVideos, ajout direct à l\'historique');
+        // On peut créer une vidéo temporaire ou simplement utiliser le trackId
+        // Pour l'instant, on essaie d'ajouter avec le trackId
+        try {
+          const watchHistory = JSON.parse(localStorage.getItem("nexus-video-watch-history") || "[]");
+          const newEntry = { videoId: trackId, watchedAt: new Date().toISOString() };
+          const filtered = watchHistory.filter((h: any) => h.videoId !== trackId);
+          const updated = [newEntry, ...filtered].slice(0, 100);
+          localStorage.setItem("nexus-video-watch-history", JSON.stringify(updated));
+        } catch (error) {
+          console.error('[VideosView] Erreur lors de l\'ajout à l\'historique vidéo:', error);
+        }
+      }
+    };
+
+    window.addEventListener('youtube-video-played', handleYouTubeVideoPlayed as EventListener);
+    
+    return () => {
+      window.removeEventListener('youtube-video-played', handleYouTubeVideoPlayed as EventListener);
+    };
+  }, [enhancedVideos, addToWatchHistory]);
+
   // Charger les suggestions YouTube basées sur l'historique au montage et quand l'historique change
   useEffect(() => {
     // Vérifier si une clé API YouTube est configurée avant de charger
@@ -159,18 +216,18 @@ export const VideosView = () => {
     }
 
     // Attendre que les données soient chargées
-    if (audioTracks.length === 0 && enhancedVideos.length === 0 && audioHistory.length === 0) {
+    if (audioTracks.length === 0 && enhancedVideos.length === 0 && audioHistory.length === 0 && searchHistory.length === 0) {
       return; // Pas encore de données
     }
 
     // Filtrer les vidéos YouTube de l'historique
     const youtubeHistoryVideos = enhancedVideos.filter(v => v.mediaSource === 'youtube');
     
-    // Charger les suggestions basées sur l'historique
-    loadTrendingFromHistory(audioHistory, audioTracks, youtubeHistoryVideos).catch((error) => {
+    // Charger les suggestions basées sur l'historique (incluant les recherches)
+    loadTrendingFromHistory(audioHistory, audioTracks, youtubeHistoryVideos, searchHistory).catch((error) => {
       console.error('[VideosView] Erreur lors du chargement des suggestions basées sur l\'historique:', error);
     });
-  }, [loadTrendingFromHistory, audioHistory, audioTracks, enhancedVideos]);
+  }, [loadTrendingFromHistory, audioHistory, audioTracks, enhancedVideos, searchHistory]);
 
   const {
     uploadVideoToCloudinary,

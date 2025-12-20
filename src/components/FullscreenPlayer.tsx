@@ -181,7 +181,7 @@ export const FullscreenPlayer = ({
     }
   }, [isPlaying, currentTrack.duration, volume, isMuted]);
 
-  // Synchroniser les contrôles avec le player YouTube
+  // Synchroniser les contrôles avec le player YouTube et ajouter à l'historique vidéo
   useEffect(() => {
     if (isYouTube && youtubePlayerRef.current && youtubeVideoId) {
       const player = youtubePlayerRef.current;
@@ -196,6 +196,16 @@ export const FullscreenPlayer = ({
               player.play().catch((err) => {
                 console.error('[FullscreenPlayer] Erreur lors du play YouTube:', err);
               });
+              
+              // Ajouter la vidéo YouTube à l'historique vidéo quand elle commence à jouer
+              // Émettre un événement pour que DesktopApp puisse l'ajouter à l'historique
+              window.dispatchEvent(new CustomEvent('youtube-video-played', { 
+                detail: { 
+                  videoId: youtubeVideoId,
+                  trackId: currentTrack.id,
+                  title: currentTrack.title,
+                } 
+              }));
             }
           });
         } else if (!isPlaying && player.isPlaying) {
@@ -203,7 +213,7 @@ export const FullscreenPlayer = ({
         }
       }
     }
-  }, [isPlaying, isYouTube, youtubeVideoId]);
+  }, [isPlaying, isYouTube, youtubeVideoId, currentTrack.id, currentTrack.title]);
 
   useEffect(() => {
     if (isYouTube && youtubePlayerRef.current) {

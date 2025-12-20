@@ -306,12 +306,13 @@ export async function fetchYouTubeRelated(
 
 /**
  * Génère des suggestions YouTube basées sur l'historique de l'utilisateur
- * Combine l'historique audio local et l'historique vidéo YouTube
+ * Combine l'historique audio local, l'historique vidéo YouTube, et l'historique de recherche
  */
 export async function fetchYouTubeSuggestionsFromHistory(
   audioHistory: HistoryEntry[],
   audioTracks: Track[],
   youtubeVideos: Video[],
+  searchHistory: string[] = [],
   maxResults: number = 25
 ): Promise<YouTubeSuggestion[]> {
   const apiKey = getYouTubeApiKey();
@@ -368,6 +369,19 @@ export async function fetchYouTubeSuggestionsFromHistory(
     .slice(0, 2)
     .map(([genre]) => genre);
   topGenres.forEach(genre => searchQueries.push(genre));
+
+  // Ajouter les recherches précédentes (priorité aux plus récentes)
+  // Prendre les 3 recherches les plus récentes qui ne sont pas déjà dans les queries
+  const recentSearches = searchHistory
+    .filter(term => {
+      const termLower = term.toLowerCase();
+      // Exclure les termes qui sont déjà dans les artistes/genres
+      return !topArtists.some(a => a.toLowerCase() === termLower) &&
+             !topGenres.some(g => g.toLowerCase() === termLower) &&
+             term.trim().length > 0;
+    })
+    .slice(0, 3);
+  recentSearches.forEach(search => searchQueries.push(search));
 
   // Si pas assez de données, utiliser les tendances générales comme fallback
   if (searchQueries.length === 0 && youtubeVideoIds.length === 0) {

@@ -14,7 +14,7 @@ export interface UseYouTubeSuggestionsReturn {
   loadingTrending: boolean;
   errorTrending: string | null;
   loadTrending: () => Promise<void>;
-  loadTrendingFromHistory: (audioHistory: HistoryEntry[], audioTracks: Track[], youtubeVideos: Video[]) => Promise<void>;
+  loadTrendingFromHistory: (audioHistory: HistoryEntry[], audioTracks: Track[], youtubeVideos: Video[], searchHistory?: string[]) => Promise<void>;
   loadByCategory: (categoryId: string) => Promise<Video[]>;
   loadRelated: (videoId: string) => Promise<Video[]>;
 }
@@ -50,22 +50,41 @@ export function useYouTubeSuggestions(): UseYouTubeSuggestionsReturn {
   const loadTrendingFromHistory = useCallback(async (
     audioHistory: HistoryEntry[],
     audioTracks: Track[],
-    youtubeVideos: Video[]
+    youtubeVideos: Video[],
+    searchHistory: string[] = []
   ) => {
     setLoadingTrending(true);
     setErrorTrending(null);
     
     try {
+      // Charger l'historique de recherche depuis localStorage si non fourni
+      let finalSearchHistory = searchHistory;
+      if (finalSearchHistory.length === 0 && typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem("nexus-search-history");
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              finalSearchHistory = parsed;
+            }
+          }
+        } catch (error) {
+          // Ignorer les erreurs de parsing
+        }
+      }
+      
       console.log('[YouTube Suggestions] Chargement basé sur l\'historique:', {
         audioHistoryCount: audioHistory.length,
         audioTracksCount: audioTracks.length,
         youtubeVideosCount: youtubeVideos.length,
+        searchHistoryCount: finalSearchHistory.length,
       });
       
       const suggestions = await fetchYouTubeSuggestionsFromHistory(
         audioHistory,
         audioTracks,
         youtubeVideos,
+        finalSearchHistory,
         25
       );
       const videos = suggestions.map(youtubeSuggestionToVideo);
