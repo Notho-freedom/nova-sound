@@ -101,6 +101,80 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
     };
   }, []);
 
+  // Supprimer les erreurs CORS et postMessage de la console (normales dans Electron)
+  useEffect(() => {
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    // Filtrer les erreurs YouTube/Google Ads qui sont normales dans Electron
+    const errorFilter = (...args: any[]) => {
+      const message = args.join(' ');
+      // Ignorer les erreurs connues qui sont normales dans Electron
+      if (
+        message.includes('web-share') ||
+        (message.includes('postMessage') && message.includes('target origin')) ||
+        (message.includes('CORS policy') && message.includes('doubleclick.net')) ||
+        (message.includes('Access to fetch') && message.includes('doubleclick.net')) ||
+        (message.includes('Failed to execute \'postMessage\'') && message.includes('target origin'))
+      ) {
+        return; // Supprimer silencieusement
+      }
+      originalError.apply(console, args);
+    };
+    
+    const warnFilter = (...args: any[]) => {
+      const message = args.join(' ');
+      // Ignorer les avertissements connus
+      if (
+        message.includes('web-share') ||
+        (message.includes('postMessage') && message.includes('target origin')) ||
+        (message.includes('Unrecognized feature'))
+      ) {
+        return; // Supprimer silencieusement
+      }
+      originalWarn.apply(console, args);
+    };
+    
+    console.error = errorFilter;
+    console.warn = warnFilter;
+    
+    // Gérer les erreurs postMessage non capturées
+    const handleError = (event: ErrorEvent) => {
+      const message = event.message || '';
+      if (
+        message.includes('postMessage') ||
+        message.includes('target origin') ||
+        message.includes('web-share') ||
+        (message.includes('CORS') && message.includes('doubleclick'))
+      ) {
+        event.preventDefault(); // Empêcher l'affichage dans la console
+        return false;
+      }
+    };
+    
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const message = String(event.reason || '');
+      if (
+        message.includes('postMessage') ||
+        message.includes('target origin') ||
+        message.includes('web-share') ||
+        (message.includes('CORS') && message.includes('doubleclick'))
+      ) {
+        event.preventDefault(); // Empêcher l'affichage dans la console
+      }
+    };
+    
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      console.error = originalError;
+      console.warn = originalWarn;
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   // Initialiser le player YouTube
   useEffect(() => {
     if (!isReady || !playerRef.current) return;
@@ -121,6 +195,12 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
+          // Paramètres supplémentaires pour Electron
+          enablejsapi: 1,
+          origin: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+          // Désactiver certaines fonctionnalités qui causent des erreurs dans Electron
+          iv_load_policy: 3, // Masquer les annotations
+          fs: 0, // Désactiver le plein écran natif (on utilise notre propre implémentation)
         },
         events: {
           onReady: (event: YT.PlayerEvent) => {
