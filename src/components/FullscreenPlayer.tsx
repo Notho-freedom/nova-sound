@@ -171,7 +171,7 @@ export const FullscreenPlayer = ({
       if (isPlaying && !player.isPlaying) {
         // Attendre un peu pour s'assurer que tout est initialisé
         setTimeout(() => {
-          if (player && !player.isPlaying) {
+          if (player && typeof player.play === 'function' && !player.isPlaying) {
             player.play().catch((err) => {
               console.error('[FullscreenPlayer] Erreur lors du play automatique:', err);
             });
@@ -192,7 +192,7 @@ export const FullscreenPlayer = ({
         if (isPlaying && !player.isPlaying) {
           // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
           requestAnimationFrame(() => {
-            if (player && !player.isPlaying) {
+            if (player && typeof player.play === 'function' && !player.isPlaying) {
               player.play().catch((err) => {
                 console.error('[FullscreenPlayer] Erreur lors du play YouTube:', err);
               });

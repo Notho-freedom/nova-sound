@@ -274,6 +274,17 @@ export const DesktopApp = () => {
 
   // Handle play/pause
   useEffect(() => {
+    // Pour les tracks YouTube, ne pas utiliser l'audio HTML5
+    // Le player YouTube sera géré par FullscreenPlayer
+    if (currentTrack?.mediaSource === 'youtube') {
+      // S'assurer que l'audio HTML5 est arrêté si un track YouTube est sélectionné
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      return;
+    }
+
     if (!audioRef.current || !currentTrack?.filePath) return;
 
     if (isPlaying) {
@@ -302,7 +313,7 @@ export const DesktopApp = () => {
       }
       audioRef.current.pause();
     }
-  }, [isPlaying, currentTrack?.filePath, currentTrack?.id]);
+  }, [isPlaying, currentTrack?.filePath, currentTrack?.id, currentTrack?.mediaSource]);
 
   // Handle volume changes
   useEffect(() => {
