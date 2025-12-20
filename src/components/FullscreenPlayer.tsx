@@ -396,23 +396,19 @@ useEffect(() => {
       
       {/* Main Panel - Background with album cover and FFT */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Player YouTube en arrière-plan (masqué visuellement) pour les tracks YouTube */}
+        {/* Player YouTube - visible pour les vidéos, masqué pour l'audio */}
         {isYouTube && youtubeVideoId && (
           <div 
-            className="absolute inset-0 pointer-events-none" 
+            className="absolute inset-0" 
             style={{ 
               zIndex: 1,
-              opacity: 0,
-              width: '1px',
-              height: '1px',
-              overflow: 'hidden',
             }}
           >
             <YouTubePlayer
               ref={youtubePlayerRef}
               videoId={youtubeVideoId}
               autoPlay={isPlaying}
-              audioOnly={true}
+              audioOnly={false} // Mode vidéo visible pour fullscreen
               onStateChange={handleYouTubeStateChange}
               onTimeUpdate={handleYouTubeTimeUpdate}
               onReady={handleYouTubeReady}
@@ -421,16 +417,18 @@ useEffect(() => {
           </div>
         )}
         
-        {/* Album cover background - blurred and faded */}
-        <div 
-          className="absolute inset-0 opacity-20 blur-3xl scale-150 transition-opacity duration-500"
-          style={{
-            backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            zIndex: 2,
-          }}
-        />
+        {/* Album cover background - blurred and faded (seulement pour non-YouTube) */}
+        {!isYouTube && (
+          <div 
+            className="absolute inset-0 opacity-20 blur-3xl scale-150 transition-opacity duration-500"
+            style={{
+              backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              zIndex: 2,
+            }}
+          />
+        )}
         
         {/* FFT Visualizer - Full width, reduced height and opacity (seulement pour non-YouTube) */}
         {!isYouTube && (
@@ -446,8 +444,12 @@ useEffect(() => {
         )}
       </div>
 
+      {/* Overlay avec contrôles Nexus superposés sur YouTube */}
+      {/* L'iframe YouTube est en z-1, les contrôles Nexus sont en z-30+ */}
+      {/* Le YouTubePlayer gère déjà l'overlay pour permettre le clic droit */}
+
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between p-6">
+      <div className="relative z-30 flex items-center justify-between p-6">
         <button
           onClick={onClose}
           className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground backdrop-blur-sm bg-background/30"
@@ -473,7 +475,7 @@ useEffect(() => {
       </div>
 
       {/* Panneau latéral avec tous les éléments */}
-      <div className="absolute right-0 top-0 bottom-0 z-10 w-96 backdrop-blur-xl bg-background/20 border-l border-border/30 p-6 flex flex-col">
+      <div className="absolute right-0 top-0 bottom-0 z-30 w-96 backdrop-blur-xl bg-background/20 border-l border-border/30 p-6 flex flex-col">
         {/* Album Art */}
         <div className="flex items-center justify-center mb-6">
           <AlbumArt

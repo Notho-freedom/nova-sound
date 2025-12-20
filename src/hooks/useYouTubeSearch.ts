@@ -144,7 +144,6 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       // 3. Mettre en cache les résultats de recherche
       try {
         const { youtubeCacheService } = await import('@/services/youtube-cache');
-        const { youtubeQuotaManager } = await import('@/services/youtube-cache');
         
         // Convertir les résultats en format cache
         const cachedVideos = searchResults.map(result => ({

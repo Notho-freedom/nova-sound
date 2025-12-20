@@ -160,10 +160,12 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
       />
       
       {/* Overlay transparent pour domination totale - permet le clic droit pour le menu contextuel */}
+      {/* En mode vidéo, on laisse l'iframe visible mais on intercepte les clics pour nos contrôles */}
       {!audioOnly && (
         <div
-          className="absolute inset-0 z-10"
+          className="absolute inset-0"
           style={{
+            zIndex: 10,
             pointerEvents: 'auto',
             // Overlay transparent qui capture tous les événements sauf le clic droit
             // z-10 pour être au-dessus de l'iframe mais en dessous des contrôles (z-30)
