@@ -17,6 +17,10 @@ export interface Track {
   addedAt?: string;
   lastPlayedAt?: string;
   playCount?: number;
+  
+  // Media source (YouTube, local, cloud, etc.)
+  mediaSource?: 'local' | 'youtube' | 'cloudinary' | 'nexus' | 'bunny' | 'planethoster' | 'soundcloud' | 'vimeo' | 'unknown';
+  youtubeVideoId?: string; // ID vidéo YouTube si source = 'youtube'
 }
 
 export interface TrackMetadata {
@@ -377,6 +381,10 @@ export interface Video {
   // External IDs
   imdbId?: string;
   tmdbId?: string;
+  
+  // Media source (YouTube, local, cloud, etc.)
+  mediaSource?: 'local' | 'youtube' | 'cloudinary' | 'nexus' | 'bunny' | 'planethoster' | 'soundcloud' | 'vimeo' | 'unknown';
+  youtubeVideoId?: string; // ID vidéo YouTube si source = 'youtube'
 }
 
 // Music recognition types

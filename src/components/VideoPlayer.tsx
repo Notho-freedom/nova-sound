@@ -21,6 +21,8 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import type { Video } from "@/types/music";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
+import { YouTubePlayer, type YouTubePlayerRef } from "./YouTubePlayer";
+import { detectMediaSource, extractYouTubeVideoId } from "@/lib/youtube";
 
 interface VideoPlayerProps {
   video: Video;
@@ -62,21 +64,39 @@ export const VideoPlayer = ({
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Détecter si c'est une vidéo YouTube
+  const mediaSource = video.mediaSource || detectMediaSource(video.filePath);
+  const isYouTube = mediaSource === 'youtube';
+  const youtubeVideoId = video.youtubeVideoId || (isYouTube ? extractYouTubeVideoId(video.filePath) : null);
+  
+  // État pour YouTube Player
+  const [youtubeState, setYoutubeState] = useState({
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 70,
+    isMuted: false,
+    isLoading: false,
+  });
+  
+  const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
 
+  // Player pour vidéos locales/cloud
   const {
-    isPlaying,
-    currentTime,
-    duration,
-    volume,
-    isMuted,
+    isPlaying: localIsPlaying,
+    currentTime: localCurrentTime,
+    duration: localDuration,
+    volume: localVolume,
+    isMuted: localIsMuted,
     isFullscreen,
-    isLoading,
+    isLoading: localIsLoading,
     playbackRate,
     playVideo,
-    togglePlayPause,
-    seek,
-    setVolume,
-    toggleMute,
+    togglePlayPause: localTogglePlayPause,
+    seek: localSeek,
+    setVolume: localSetVolume,
+    toggleMute: localToggleMute,
     toggleFullscreen,
     setPlaybackRate,
     nextVideo,
@@ -84,12 +104,72 @@ export const VideoPlayer = ({
     videoRef,
   } = useVideoPlayer(videos);
 
+  // Utiliser l'état YouTube ou local selon la source
+  const isPlaying = isYouTube ? youtubeState.isPlaying : localIsPlaying;
+  const currentTime = isYouTube ? youtubeState.currentTime : localCurrentTime;
+  const duration = isYouTube ? youtubeState.duration : localDuration;
+  const volume = isYouTube ? youtubeState.volume : localVolume;
+  const isMuted = isYouTube ? youtubeState.isMuted : localIsMuted;
+  const isLoading = isYouTube ? youtubeState.isLoading : localIsLoading;
+
+  // Mettre à jour l'état YouTube depuis le ref
+  useEffect(() => {
+    if (isYouTube && youtubePlayerRef.current) {
+      const interval = setInterval(() => {
+        if (youtubePlayerRef.current) {
+          setYoutubeState(prev => ({
+            ...prev,
+            isPlaying: youtubePlayerRef.current!.isPlaying,
+            currentTime: youtubePlayerRef.current!.currentTime,
+            duration: youtubePlayerRef.current!.duration,
+            volume: youtubePlayerRef.current!.volume,
+            isMuted: youtubePlayerRef.current!.isMuted,
+          }));
+        }
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [isYouTube]);
+
+  // Contrôles unifiés
+  const togglePlayPause = () => {
+    if (isYouTube && youtubePlayerRef.current) {
+      youtubePlayerRef.current.togglePlayPause();
+    } else {
+      localTogglePlayPause();
+    }
+  };
+
+  const seek = (time: number) => {
+    if (isYouTube && youtubePlayerRef.current) {
+      youtubePlayerRef.current.seek(time);
+    } else {
+      localSeek(time);
+    }
+  };
+
+  const setVolume = (vol: number) => {
+    if (isYouTube && youtubePlayerRef.current) {
+      youtubePlayerRef.current.setVolume(vol);
+    } else {
+      localSetVolume(vol);
+    }
+  };
+
+  const toggleMute = () => {
+    if (isYouTube && youtubePlayerRef.current) {
+      youtubePlayerRef.current.toggleMute();
+    } else {
+      localToggleMute();
+    }
+  };
+
   // Set the current video and auto-play if requested
   useEffect(() => {
-    if (video) {
+    if (video && !isYouTube) {
       playVideo(video);
     }
-  }, [video, playVideo]);
+  }, [video, playVideo, isYouTube]);
 
   // Show/hide controls on mouse movement
   useEffect(() => {
@@ -219,14 +299,45 @@ export const VideoPlayer = ({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        className="w-full h-full object-cover"
-        playsInline
-        preload="metadata"
-        onClick={togglePlayPause}
-      />
+      {/* YouTube Player ou Video Element */}
+      {isYouTube && youtubeVideoId ? (
+        <YouTubePlayer
+          ref={youtubePlayerRef}
+          videoId={youtubeVideoId}
+          autoPlay={autoPlay}
+          startTime={video.watchProgress?.currentTime}
+          className="w-full h-full"
+          onStateChange={(playing) => {
+            setYoutubeState(prev => ({ ...prev, isPlaying: playing }));
+          }}
+          onTimeUpdate={(time) => {
+            setYoutubeState(prev => ({ ...prev, currentTime: time }));
+          }}
+          onReady={() => {
+            // Le player est prêt
+            if (youtubePlayerRef.current) {
+              setYoutubeState(prev => ({
+                ...prev,
+                volume: youtubePlayerRef.current!.volume,
+                isMuted: youtubePlayerRef.current!.isMuted,
+                duration: youtubePlayerRef.current!.duration,
+              }));
+            }
+          }}
+          onError={(error) => {
+            console.error('Erreur YouTube Player:', error);
+            setYoutubeState(prev => ({ ...prev, isLoading: false }));
+          }}
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          className="w-full h-full object-cover"
+          playsInline
+          preload="metadata"
+          onClick={togglePlayPause}
+        />
+      )}
 
       {/* Loading Indicator */}
       {isLoading && (

@@ -1,0 +1,336 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+
+// Types pour l'API YouTube IFrame
+declare global {
+  interface Window {
+    YT: {
+      Player: new (elementId: string, config: YT.PlayerOptions) => YT.Player;
+      PlayerState: {
+        UNSTARTED: -1;
+        ENDED: 0;
+        PLAYING: 1;
+        PAUSED: 2;
+        BUFFERING: 3;
+        CUED: 5;
+      };
+    };
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
+interface UseYouTubePlayerReturn {
+  isReady: boolean;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  isMuted: boolean;
+  isLoading: boolean;
+  error: string | null;
+  play: () => void;
+  pause: () => void;
+  togglePlayPause: () => void;
+  seek: (time: number) => void;
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
+  setPlaybackRate: (rate: number) => void;
+  loadVideo: (videoId: string, startSeconds?: number) => void;
+  playerRef: React.RefObject<HTMLDivElement>;
+}
+
+/**
+ * Hook pour gérer le player YouTube via l'API officielle IFrame
+ */
+export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
+  const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolumeState] = useState(70);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const playerRef = useRef<HTMLDivElement>(null);
+  const playerInstanceRef = useRef<YT.Player | null>(null);
+  const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const elementIdRef = useRef(`youtube-player-${Date.now()}-${Math.random()}`);
+
+  // Charger l'API YouTube IFrame
+  useEffect(() => {
+    // Vérifier si l'API est déjà chargée
+    if (window.YT && window.YT.Player) {
+      setIsReady(true);
+      return;
+    }
+
+    // Vérifier si le script est déjà en cours de chargement
+    const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]');
+    if (existingScript) {
+      // Attendre que l'API soit prête
+      const checkReady = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          setIsReady(true);
+          clearInterval(checkReady);
+        }
+      }, 100);
+      
+      return () => clearInterval(checkReady);
+    }
+
+    // Définir le callback global AVANT de charger le script
+    // (l'API YouTube l'appelle immédiatement après chargement)
+    const originalCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      setIsReady(true);
+      // Appeler le callback original s'il existe (pour compatibilité multi-instances)
+      if (originalCallback && typeof originalCallback === 'function') {
+        originalCallback();
+      }
+    };
+
+    // Charger le script
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    document.body.appendChild(script);
+    
+    return () => {
+      // Ne pas supprimer le callback si d'autres instances l'utilisent
+      // (géré par le système de multi-instances)
+    };
+  }, []);
+
+  // Initialiser le player YouTube
+  useEffect(() => {
+    if (!isReady || !playerRef.current) return;
+    
+    // S'assurer que l'élément a un ID unique
+    const elementId = elementIdRef.current;
+    if (!playerRef.current.id) {
+      playerRef.current.id = elementId;
+    }
+    
+    try {
+      const player = new window.YT.Player(elementId, {
+        height: '100%',
+        width: '100%',
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1,
+        },
+        events: {
+          onReady: (event: YT.PlayerEvent) => {
+            playerInstanceRef.current = event.target;
+            setIsLoading(false);
+            setError(null);
+            
+            // Charger la vidéo si un videoId est fourni
+            if (videoId) {
+              event.target.loadVideoById(videoId);
+            }
+          },
+          onStateChange: (event: YT.OnStateChangeEvent) => {
+            const state = event.data;
+            
+            if (state === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true);
+              setIsLoading(false);
+            } else if (state === window.YT.PlayerState.PAUSED) {
+              setIsPlaying(false);
+            } else if (state === window.YT.PlayerState.BUFFERING) {
+              setIsLoading(true);
+            } else if (state === window.YT.PlayerState.ENDED) {
+              setIsPlaying(false);
+              setCurrentTime(0);
+            }
+          },
+          onError: (event: YT.OnErrorEvent) => {
+            setIsLoading(false);
+            const errorMessages: Record<number, string> = {
+              2: 'URL invalide',
+              5: 'Erreur HTML5',
+              100: 'Vidéo introuvable',
+              101: 'Lecture non autorisée',
+              150: 'Lecture non autorisée',
+            };
+            setError(errorMessages[event.data] || 'Erreur de lecture');
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Erreur lors de l\'initialisation du player YouTube:', err);
+      setError('Impossible d\'initialiser le player YouTube');
+      setIsLoading(false);
+    }
+  }, [isReady, videoId]);
+
+  // Mettre à jour le temps et la durée
+  useEffect(() => {
+    if (!playerInstanceRef.current || !isReady) return;
+
+    const updateProgress = () => {
+      try {
+        const player = playerInstanceRef.current;
+        if (!player) return;
+
+        const current = player.getCurrentTime();
+        const total = player.getDuration();
+        
+        if (current !== undefined && !isNaN(current)) {
+          setCurrentTime(current);
+        }
+        if (total !== undefined && !isNaN(total) && total > 0) {
+          setDuration(total);
+        }
+      } catch (err) {
+        // Ignorer les erreurs silencieuses
+      }
+    };
+
+    // Mettre à jour toutes les secondes
+    updateIntervalRef.current = setInterval(updateProgress, 1000);
+    
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
+  }, [isReady, isPlaying]);
+
+  // Charger une nouvelle vidéo
+  const loadVideo = useCallback((newVideoId: string, startSeconds?: number) => {
+    if (!playerInstanceRef.current) {
+      setIsLoading(true);
+      // Le player sera initialisé avec cette vidéo
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      if (startSeconds !== undefined) {
+        playerInstanceRef.current.loadVideoById(newVideoId, startSeconds);
+      } else {
+        playerInstanceRef.current.loadVideoById(newVideoId);
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement de la vidéo:', err);
+      setError('Impossible de charger la vidéo');
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Contrôles de lecture
+  const play = useCallback(() => {
+    if (!playerInstanceRef.current) return;
+    try {
+      playerInstanceRef.current.playVideo();
+    } catch (err) {
+      console.error('Erreur lors de la lecture:', err);
+    }
+  }, []);
+
+  const pause = useCallback(() => {
+    if (!playerInstanceRef.current) return;
+    try {
+      playerInstanceRef.current.pauseVideo();
+    } catch (err) {
+      console.error('Erreur lors de la pause:', err);
+    }
+  }, []);
+
+  const togglePlayPause = useCallback(() => {
+    if (isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  }, [isPlaying, play, pause]);
+
+  const seek = useCallback((time: number) => {
+    if (!playerInstanceRef.current) return;
+    try {
+      playerInstanceRef.current.seekTo(time, true);
+      setCurrentTime(time);
+    } catch (err) {
+      console.error('Erreur lors du seek:', err);
+    }
+  }, []);
+
+  const setVolume = useCallback((vol: number) => {
+    const clampedVol = Math.max(0, Math.min(100, vol));
+    setVolumeState(clampedVol);
+    if (playerInstanceRef.current) {
+      try {
+        playerInstanceRef.current.setVolume(clampedVol);
+      } catch (err) {
+        console.error('Erreur lors du changement de volume:', err);
+      }
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    if (!playerInstanceRef.current) return;
+    try {
+      if (isMuted) {
+        playerInstanceRef.current.unMute();
+        setIsMuted(false);
+      } else {
+        playerInstanceRef.current.mute();
+        setIsMuted(true);
+      }
+    } catch (err) {
+      console.error('Erreur lors du mute/unmute:', err);
+    }
+  }, [isMuted]);
+
+  const setPlaybackRate = useCallback((rate: number) => {
+    if (!playerInstanceRef.current) return;
+    try {
+      const clampedRate = Math.max(0.25, Math.min(2, rate));
+      playerInstanceRef.current.setPlaybackRate(clampedRate);
+    } catch (err) {
+      console.error('Erreur lors du changement de vitesse:', err);
+    }
+  }, []);
+
+  // Nettoyer lors du démontage
+  useEffect(() => {
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+      if (playerInstanceRef.current) {
+        try {
+          playerInstanceRef.current.destroy();
+        } catch (err) {
+          // Ignorer les erreurs de destruction
+        }
+      }
+    };
+  }, []);
+
+  return {
+    isReady,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    isLoading,
+    error,
+    play,
+    pause,
+    togglePlayPause,
+    seek,
+    setVolume,
+    toggleMute,
+    setPlaybackRate,
+    loadVideo,
+    playerRef,
+  };
+}
