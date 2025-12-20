@@ -165,7 +165,9 @@ export async function fetchYouTubeByCategory(
     }
 
     const detailsData = await detailsResponse.json();
-    const detailsMap = new Map(detailsData.items.map((item: any) => [item.id, item]));
+    const detailsMap = new Map<string, { contentDetails?: { duration?: string }; statistics?: { viewCount?: string } }>(
+      detailsData.items.map((item: any) => [item.id, item])
+    );
 
     return searchData.items.map((item: any) => {
       const details = detailsMap.get(item.id.videoId);
@@ -475,22 +477,21 @@ export function youtubeSuggestionToVideo(suggestion: YouTubeSuggestion): Video {
   return {
     id: `youtube-${suggestion.videoId}`,
     title: suggestion.title || 'Vidéo YouTube sans titre',
+    description: suggestion.description || '',
     filePath: youtubeUrl,
     thumbnailUrl: suggestion.thumbnailUrl || '',
     duration: suggestion.duration || 0,
+    fileSize: 0,
     mediaSource: 'youtube',
     youtubeVideoId: suggestion.videoId,
-    // Métadonnées supplémentaires
-    metadata: {
-      description: suggestion.description || '',
-      channel: suggestion.channelTitle || '',
-      viewCount: suggestion.viewCount,
-      publishedAt: suggestion.publishedAt || '',
-    },
     addedAt: new Date().toISOString(),
     watchProgress: {
+      videoId: suggestion.videoId,
       currentTime: 0,
-      watched: false,
+      duration: suggestion.duration || 0,
+      percentage: 0,
+      lastWatchedAt: new Date().toISOString(),
+      completed: false,
     },
   };
 }

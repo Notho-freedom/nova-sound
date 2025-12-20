@@ -172,9 +172,11 @@ export const FullscreenPlayer = ({
         // Attendre un peu pour s'assurer que tout est initialisé
         setTimeout(() => {
           if (player && typeof player.play === 'function' && !player.isPlaying) {
-            player.play().catch((err) => {
+            try {
+              player.play();
+            } catch (err: unknown) {
               console.error('[FullscreenPlayer] Erreur lors du play automatique:', err);
-            });
+            }
           }
         }, 300);
       }
@@ -187,15 +189,17 @@ export const FullscreenPlayer = ({
       const player = youtubePlayerRef.current;
       
       // Vérifier si le player est prêt (a une durée > 0)
-      if (player.duration > 0) {
+        if (player.duration > 0) {
         // Synchroniser play/pause
         if (isPlaying && !player.isPlaying) {
           // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
           requestAnimationFrame(() => {
             if (player && typeof player.play === 'function' && !player.isPlaying) {
-              player.play().catch((err) => {
+              try {
+                player.play();
+              } catch (err: unknown) {
                 console.error('[FullscreenPlayer] Erreur lors du play YouTube:', err);
-              });
+              }
               
               // Ajouter la vidéo YouTube à l'historique vidéo quand elle commence à jouer
               // Émettre un événement pour que DesktopApp puisse l'ajouter à l'historique

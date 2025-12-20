@@ -82,12 +82,13 @@ export async function GET(request: NextRequest) {
 
     // Récupérer TOUTES les informations DIRECTEMENT depuis Stripe (source de vérité absolue)
     // Aucune simulation, toutes les données proviennent de l'API Stripe
+    const periodEnd = (subscription as any).current_period_end;
     const subscriptionData = {
       isActive: subscription.status === 'active',
       plan: isPro ? 'pro' : 'free',
       status: subscription.status, // Statut réel depuis Stripe: 'active', 'canceled', 'past_due', 'trialing', etc.
-      currentPeriodEnd: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
+      currentPeriodEnd: periodEnd
+        ? new Date(periodEnd * 1000).toISOString()
         : null,
       cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
     };
@@ -141,8 +142,8 @@ export async function GET(request: NextRequest) {
             updatedAt: admin.firestore.Timestamp.now(),
           };
           
-          if (subscription.current_period_end) {
-            updateData.subscriptionEndDate = new Date(subscription.current_period_end * 1000).toISOString();
+          if (periodEnd) {
+            updateData.subscriptionEndDate = new Date(periodEnd * 1000).toISOString();
           }
           
           await userRef.update(updateData);

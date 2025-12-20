@@ -123,7 +123,7 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       );
 
       const detailsData = await detailsResponse.json();
-      const detailsMap = new Map(
+      const detailsMap = new Map<string, { contentDetails?: { duration?: string }; statistics?: { viewCount?: string } }>(
         detailsData.items.map((item: any) => [item.id, item])
       );
 
@@ -141,12 +141,12 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
         };
       });
 
-      // 3. Mettre en cache les résultats de recherche
+      // 3. Mettre en cache les résultats de recherche (sans les propriétés de cache, le service les ajoute)
       try {
         const { youtubeCacheService } = await import('@/services/youtube-cache');
         
-        // Convertir les résultats en format cache
-        const cachedVideos = searchResults.map(result => ({
+        // Convertir les résultats en format pour setSearch (qui prend des videos partielles)
+        const videosForCache = searchResults.map(result => ({
           id: result.videoId,
           videoId: result.videoId,
           title: result.title,
@@ -160,7 +160,8 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
           thumbnailHighUrl: result.thumbnailUrl,
         }));
         
-        await youtubeCacheService.setSearch(query, cachedVideos);
+        // setSearch accepte des vidéos partielles et ajoute les métadonnées de cache
+        await youtubeCacheService.setSearch(query, videosForCache as any);
         
         // Consommer le quota (100 unités pour search.list)
         const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
