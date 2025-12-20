@@ -58,6 +58,7 @@ import { toast } from "sonner";
 import { VideoGridSkeleton, VideoCarouselSkeleton } from "@/components/ui/skeletons";
 import { YouTubeSearchView } from "@/components/YouTubeSearchView";
 import { Youtube } from "lucide-react";
+import { useYouTubeSuggestions } from "@/hooks/useYouTubeSuggestions";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -135,6 +136,9 @@ export const VideosView = () => {
     addVideoFiles,
     addVideoFromUrl,
   } = useVideoLibrary();
+
+  // Suggestions YouTube
+  const { trendingVideos, loadingTrending, loadTrending } = useYouTubeSuggestions();
 
   const {
     uploadVideoToCloudinary,
@@ -699,6 +703,20 @@ export const VideosView = () => {
                   isInWatchlist={isInWatchlist}
                   isFavorite={isFavorite}
                   showRank
+                />
+              )}
+
+              {/* YouTube Tendances */}
+              {trendingVideos.length > 0 && (
+                <VideoCarousel
+                  title="Tendances YouTube"
+                  videos={trendingVideos}
+                  onVideoSelect={handlePlayVideo}
+                  onViewDetails={handleViewDetails}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  onToggleFavorite={handleToggleFavorite}
+                  isInWatchlist={isInWatchlist}
+                  isFavorite={isFavorite}
                 />
               )}
 

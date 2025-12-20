@@ -165,15 +165,18 @@ class FirebaseSyncService {
 
     // Empêcher l'initialisation multiple
     if (this.isInitialized && this.currentUserId === userId) {
+      console.log('⏳ FirebaseSync: Déjà initialisé pour cet utilisateur, ignoré');
       return; // Déjà initialisé pour cet utilisateur
     }
 
     // Prevent concurrent initialization
     if (this.isInitializing) {
+      console.log('⏳ FirebaseSync: Initialisation déjà en cours, ignoré');
       return; // Silent - already initializing
     }
 
     if (this.currentUserId === userId && this.syncListeners.size > 0) {
+      console.log('⏳ FirebaseSync: Sync déjà active pour cet utilisateur, ignoré');
       return; // Silent - already initialized
     }
 

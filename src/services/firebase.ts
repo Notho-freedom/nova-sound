@@ -203,9 +203,20 @@ class FirebaseService {
     
     // Listen for auth state changes
     // This will automatically handle transitions from anonymous to Google user
+    let lastAuthUserId: string | null = null;
     if (auth) {
       onAuthStateChanged(auth, async (user) => {
         const previousUser = this.currentUser;
+        const previousUserId = previousUser?.uid || null;
+        const currentUserId = user?.uid || null;
+        
+        // Ne traiter que si l'utilisateur a vraiment changé (connexion, déconnexion, changement d'utilisateur)
+        if (previousUserId === currentUserId && currentUserId === lastAuthUserId) {
+          // Même utilisateur, ne rien faire (évite les réinitialisations inutiles)
+          return;
+        }
+        
+        lastAuthUserId = currentUserId;
         this.currentUser = user;
         
         if (user) {
@@ -229,12 +240,15 @@ class FirebaseService {
           }
           
           // Load profile - this will use Firebase user data (which includes Google data after merge)
-          await this.loadUserProfile(user.uid);
-          
-          // Force notify listeners with updated profile (so UI uses correct data from Firestore)
-          if (this.userProfile) {
-            // Notify with User object (for Firebase listeners)
-            this.authStateListeners.forEach((listener) => listener(user));
+          // Seulement si l'utilisateur a vraiment changé (évite les rechargements inutiles)
+          if (previousUserId !== currentUserId) {
+            await this.loadUserProfile(user.uid);
+            
+            // Force notify listeners with updated profile (so UI uses correct data from Firestore)
+            if (this.userProfile) {
+              // Notify with User object (for Firebase listeners)
+              this.authStateListeners.forEach((listener) => listener(user));
+            }
           }
         } else {
           console.log("Auth state changed: user signed out");
@@ -256,8 +270,10 @@ class FirebaseService {
           }
           
           this.userProfile = null;
-          // Notify listeners
-          this.authStateListeners.forEach((listener) => listener(null));
+          // Notify listeners seulement si l'utilisateur a vraiment changé
+          if (previousUserId !== null) {
+            this.authStateListeners.forEach((listener) => listener(null));
+          }
         }
         
         // Setup token refresh listener when user changes
@@ -379,10 +395,9 @@ class FirebaseService {
     }
     console.log("🔄 Forcing profile refresh from Firestore...");
     await this.loadUserProfile(this.currentUser.uid);
-    // Notify listeners to update UI
-    if (this.currentUser) {
-      this.authStateListeners.forEach((listener) => listener(this.currentUser));
-    }
+    // Ne pas notifier les listeners d'auth state ici - cela déclencherait une boucle
+    // Le listener Firestore mettra à jour l'UI automatiquement via onSnapshot
+    // Les listeners d'auth state doivent être notifiés uniquement lors de changements d'authentification réels
   }
 
   // Subscribe to auth state changes
@@ -767,35 +782,18 @@ class FirebaseService {
                 console.log(`✨ Plan/Status changed: ${previousPlan}/${previousStatus} → ${updatedProfile.plan}/${updatedProfile.subscriptionStatus}`);
               }
               
-              // Si le profil a été mis à jour par un webhook Stripe, vérifier qu'il est bien synchronisé
-              // Cette vérification se fait en arrière-plan et ne bloque pas l'UI
-              if (planChanged || statusChanged) {
-                try {
-                  // Vérifier avec Stripe pour s'assurer que Firestore est à jour
-                  // (le webhook devrait avoir déjà mis à jour, mais on vérifie au cas où)
-                  const { stripeService } = await import('./stripe');
-                  if (stripeService.isInitialized()) {
-                    const stripeStatus = await stripeService.getSubscriptionStatus();
-                    const needsSync = 
-                      stripeStatus.plan !== updatedProfile.plan ||
-                      stripeStatus.status !== updatedProfile.subscriptionStatus;
-                    
-                    if (needsSync) {
-                      console.log('🔄 Détection d\'incohérence après mise à jour Firestore, synchronisation avec Stripe...');
-                      // La synchronisation se fera automatiquement via l'endpoint subscription-status
-                      // qui détecte et corrige les incohérences
-                    }
-                  }
-                } catch (error) {
-                  // Ne pas bloquer si la vérification échoue
-                  console.warn('⚠️ Erreur lors de la vérification Stripe (non-bloquant):', error);
-                }
-              }
+              // Ne plus déclencher de synchronisation automatique ici pour éviter les boucles
+              // La synchronisation se fait maintenant :
+              // 1. Au démarrage (via FirebaseProvider)
+              // 2. Via le webhook Stripe (automatique)
+              // 3. Via le bouton de sync de la sidebar (manuel)
+              // 4. Via l'endpoint subscription-status qui détecte et corrige les incohérences
               
-              // Always notify listeners to ensure UI is updated with latest profile
-              if (this.currentUser) {
-                this.authStateListeners.forEach((listener) => listener(this.currentUser));
-              }
+              // Ne pas notifier les listeners d'auth state à chaque changement de profil
+              // Cela évite de déclencher des réinitialisations de sync inutiles
+              // Les listeners d'auth state doivent être notifiés uniquement lors de changements d'authentification réels
+              // (connexion, déconnexion, changement d'utilisateur)
+              // Les changements de profil sont gérés par les listeners spécifiques au profil
             }
           },
           (error) => {

@@ -140,13 +140,12 @@ export function useCloudSync(): UseCloudSyncReturn {
                   
                   if (syncResponse.ok) {
                     console.log('✅ useCloudSync: Profil synchronisé avec Stripe au démarrage');
-                    // Forcer le rafraîchissement du profil pour mettre à jour l'UI
-                    await firebaseService.refreshProfile();
-                    // Mettre à jour l'état avec le profil rafraîchi
-                    const refreshedProfile = firebaseService.getUserProfile();
-                    if (refreshedProfile) {
-                      setNexusUser(refreshedProfile);
-                      setNexusIsPro(refreshedProfile.plan === 'pro' && refreshedProfile.subscriptionStatus === 'active');
+                    // Ne pas appeler refreshProfile() ici - le listener Firestore mettra à jour l'UI automatiquement
+                    // Mettre à jour l'état avec le profil actuel
+                    const currentProfile = firebaseService.getUserProfile();
+                    if (currentProfile) {
+                      setNexusUser(currentProfile);
+                      setNexusIsPro(currentProfile.plan === 'pro' && currentProfile.subscriptionStatus === 'active');
                     }
                   } else {
                     console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation:', await syncResponse.text());
@@ -883,9 +882,8 @@ export function useCloudSync(): UseCloudSyncReturn {
               
               if (syncResponse.ok) {
                 console.log('✅ useCloudSync: Profil Stripe synchronisé');
-                // Forcer le rafraîchissement du profil pour mettre à jour l'UI
-                await firebaseService.refreshProfile();
-                // Mettre à jour l'état local
+                // Ne pas appeler refreshProfile() ici - le listener Firestore mettra à jour l'UI automatiquement
+                // Mettre à jour l'état local seulement
                 await refreshUser();
               } else {
                 console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation Stripe:', await syncResponse.text());

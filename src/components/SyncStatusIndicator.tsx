@@ -221,8 +221,8 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
             
             if (syncResponse.ok) {
               console.log('✅ SyncStatusIndicator: Profil Stripe synchronisé');
-              // Forcer le rafraîchissement du profil pour mettre à jour l'UI
-              await firebaseService.refreshProfile();
+              // Ne pas appeler refreshProfile() ici - le listener Firestore mettra à jour l'UI automatiquement
+              // Cela évite de déclencher une nouvelle synchronisation
             } else {
               console.warn('⚠️ SyncStatusIndicator: Erreur lors de la synchronisation Stripe:', await syncResponse.text());
             }
