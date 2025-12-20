@@ -667,7 +667,28 @@ export function useCloudSync(): UseCloudSyncReturn {
       if (profile) {
         setNexusUser(profile);
         setNexusAuthenticated(true);
-        setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");
+        // Vérifier le statut Pro depuis le profil (mis à jour par webhook Stripe)
+        const isProFromProfile = profile.plan === "pro" && profile.subscriptionStatus === "active";
+        setNexusIsPro(isProFromProfile);
+        
+        // Vérifier aussi directement avec Stripe pour confirmation (non-bloquant)
+        if (isProFromProfile) {
+          try {
+            const { stripeService } = await import('@/services/stripe');
+            if (stripeService.isInitialized()) {
+              const stripeStatus = await stripeService.getSubscriptionStatus();
+              // Utiliser les données Stripe réelles comme source de vérité finale
+              const isProFromStripe = stripeStatus.isActive && stripeStatus.plan === 'pro';
+              if (isProFromStripe !== isProFromProfile) {
+                console.warn('⚠️ Incohérence détectée: Profil indique Pro mais Stripe indique autre chose. Utilisation des données Stripe.');
+                setNexusIsPro(isProFromStripe);
+              }
+            }
+          } catch (error) {
+            // En cas d'erreur, utiliser les données du profil (mises à jour par webhook)
+            console.warn('Could not verify Pro status with Stripe, using profile data:', error);
+          }
+        }
         notificationService.loginSuccess(profile.email || profile.displayName || "Utilisateur");
       } else {
         // Redirect is happening, show info message
@@ -765,7 +786,28 @@ export function useCloudSync(): UseCloudSyncReturn {
       const profile = firebaseService.getUserProfile();
       if (profile) {
         setNexusUser(profile);
-        setNexusIsPro(profile.plan === "pro" && profile.subscriptionStatus === "active");
+        // Vérifier le statut Pro depuis le profil Firestore (mis à jour par webhook Stripe)
+        const isProFromProfile = profile.plan === "pro" && profile.subscriptionStatus === "active";
+        setNexusIsPro(isProFromProfile);
+        
+        // Vérifier aussi directement avec Stripe pour confirmation (non-bloquant)
+        if (isProFromProfile) {
+          try {
+            const { stripeService } = await import('@/services/stripe');
+            if (stripeService.isInitialized()) {
+              const stripeStatus = await stripeService.getSubscriptionStatus();
+              // Utiliser les données Stripe réelles comme source de vérité finale
+              const isProFromStripe = stripeStatus.isActive && stripeStatus.plan === 'pro';
+              if (isProFromStripe !== isProFromProfile) {
+                console.warn('⚠️ Incohérence détectée: Firestore indique Pro mais Stripe indique autre chose. Utilisation des données Stripe.');
+                setNexusIsPro(isProFromStripe);
+              }
+            }
+          } catch (error) {
+            // En cas d'erreur, utiliser les données Firestore (mises à jour par webhook)
+            console.warn('Could not verify Pro status with Stripe, using Firestore data:', error);
+          }
+        }
       }
     } else {
       const profile = authService.getUserProfile();

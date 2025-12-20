@@ -204,13 +204,26 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
         },
         events: {
           onReady: (event: YT.PlayerEvent) => {
-            playerInstanceRef.current = event.target;
+            const player = event.target;
+            playerInstanceRef.current = player;
             setIsLoading(false);
             setError(null);
             
+            // Synchroniser le volume et le mute depuis le player
+            try {
+              const playerVolume = player.getVolume();
+              const playerMuted = player.isMuted();
+              if (playerVolume !== undefined && !isNaN(playerVolume)) {
+                setVolumeState(playerVolume);
+              }
+              setIsMuted(playerMuted);
+            } catch (err) {
+              // Ignorer les erreurs silencieuses
+            }
+            
             // Charger la vidéo si un videoId est fourni
             if (videoId) {
-              event.target.loadVideoById(videoId);
+              player.loadVideoById(videoId);
             }
           },
           onStateChange: (event: YT.OnStateChangeEvent) => {
@@ -248,7 +261,7 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
     }
   }, [isReady, videoId]);
 
-  // Mettre à jour le temps et la durée
+  // Mettre à jour le temps, la durée, le volume et le mute
   useEffect(() => {
     if (!playerInstanceRef.current || !isReady) return;
 
@@ -257,14 +270,34 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
         const player = playerInstanceRef.current;
         if (!player) return;
 
+        // Mettre à jour le temps actuel
         const current = player.getCurrentTime();
-        const total = player.getDuration();
-        
         if (current !== undefined && !isNaN(current)) {
           setCurrentTime(current);
         }
+        
+        // Mettre à jour la durée
+        const total = player.getDuration();
         if (total !== undefined && !isNaN(total) && total > 0) {
           setDuration(total);
+        }
+        
+        // Synchroniser le volume depuis le player (au cas où il change ailleurs)
+        try {
+          const playerVolume = player.getVolume();
+          const playerMuted = player.isMuted();
+          if (playerVolume !== undefined && !isNaN(playerVolume)) {
+            setVolumeState(prev => {
+              // Ne mettre à jour que si la différence est significative (évite les boucles)
+              if (Math.abs(prev - playerVolume) > 1) {
+                return playerVolume;
+              }
+              return prev;
+            });
+          }
+          setIsMuted(playerMuted);
+        } catch (err) {
+          // Ignorer les erreurs silencieuses
         }
       } catch (err) {
         // Ignorer les erreurs silencieuses
@@ -272,6 +305,7 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
     };
 
     // Mettre à jour toutes les secondes
+    updateProgress(); // Appel immédiat
     updateIntervalRef.current = setInterval(updateProgress, 1000);
     
     return () => {
@@ -343,26 +377,29 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
 
   const setVolume = useCallback((vol: number) => {
     const clampedVol = Math.max(0, Math.min(100, vol));
-    setVolumeState(clampedVol);
     if (playerInstanceRef.current) {
       try {
         playerInstanceRef.current.setVolume(clampedVol);
+        setVolumeState(clampedVol);
       } catch (err) {
         console.error('Erreur lors du changement de volume:', err);
       }
+    } else {
+      // Si le player n'est pas encore prêt, sauvegarder la valeur
+      setVolumeState(clampedVol);
     }
   }, []);
 
   const toggleMute = useCallback(() => {
     if (!playerInstanceRef.current) return;
     try {
-      if (isMuted) {
-        playerInstanceRef.current.unMute();
-        setIsMuted(false);
-      } else {
+      const newMutedState = !isMuted;
+      if (newMutedState) {
         playerInstanceRef.current.mute();
-        setIsMuted(true);
+      } else {
+        playerInstanceRef.current.unMute();
       }
+      setIsMuted(newMutedState);
     } catch (err) {
       console.error('Erreur lors du mute/unmute:', err);
     }

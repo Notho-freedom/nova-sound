@@ -86,7 +86,11 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
   // Charger la vidéo avec startTime si fourni
   useEffect(() => {
     if (isReady && extractedVideoId) {
-      loadVideo(extractedVideoId, startTime);
+      // Utiliser setTimeout pour s'assurer que le player est complètement initialisé
+      const timer = setTimeout(() => {
+        loadVideo(extractedVideoId, startTime);
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isReady, extractedVideoId, startTime, loadVideo]);
 

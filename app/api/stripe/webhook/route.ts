@@ -20,7 +20,12 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
 /**
  * Update user profile in Firestore to Pro
  */
-async function updateUserToPro(userId: string, subscriptionEndDate?: Date): Promise<void> {
+async function updateUserToPro(
+  userId: string, 
+  subscriptionEndDate?: Date,
+  subscriptionId?: string,
+  stripeCustomerId?: string
+): Promise<void> {
   try {
     const admin = getFirebaseAdmin();
     const db = admin.firestore();
@@ -42,9 +47,21 @@ async function updateUserToPro(userId: string, subscriptionEndDate?: Date): Prom
     if (subscriptionEndDate) {
       updateData.subscriptionEndDate = subscriptionEndDate.toISOString();
     }
+    
+    if (subscriptionId) {
+      updateData.subscriptionId = subscriptionId;
+    }
+    
+    if (stripeCustomerId) {
+      updateData.stripeCustomerId = stripeCustomerId;
+    }
 
     await userRef.update(updateData);
-    console.log(`✅ Updated user ${userId} to Pro plan`);
+    console.log(`✅ Updated user ${userId} to Pro plan in Firestore`, {
+      subscriptionId,
+      stripeCustomerId,
+      subscriptionEndDate: subscriptionEndDate?.toISOString(),
+    });
   } catch (error) {
     console.error(`❌ Error updating user ${userId} to Pro:`, error);
     throw error;
@@ -176,17 +193,19 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ Processing checkout.session.completed for userId: ${userId}`);
 
-        // Get subscription end date from subscription if available
+        // Get subscription details if available
         let subscriptionEndDate: Date | undefined;
+        let subscriptionId: string | undefined;
+        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        
         if (session.subscription) {
-          const subscription = await stripe.subscriptions.retrieve(
-            typeof session.subscription === 'string' ? session.subscription : session.subscription.id
-          );
+          subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
           console.log(`📅 Subscription end date: ${subscriptionEndDate.toISOString()}`);
         }
 
-        await updateUserToPro(userId, subscriptionEndDate);
+        await updateUserToPro(userId, subscriptionEndDate, subscriptionId, customerId);
         console.log(`✅ Successfully updated user ${userId} to Pro plan`);
         break;
       }
@@ -209,10 +228,34 @@ export async function POST(request: NextRequest) {
         const priceId = subscription.items.data[0]?.price.id;
         const isPro = priceId === PRICE_PRO_MONTHLY || priceId === PRICE_PRO_YEARLY;
 
-        if (isPro && subscription.status === 'active') {
+        if (isPro) {
           const subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
-          await updateUserToPro(userId, subscriptionEndDate);
-        } else if (subscription.status === 'canceled' || subscription.status === 'past_due') {
+          const subscriptionId = subscription.id;
+          
+          if (subscription.status === 'active') {
+            await updateUserToPro(userId, subscriptionEndDate, subscriptionId, customerId);
+          } else {
+            // Update status but keep subscription info for other statuses (trialing, past_due, etc.)
+            try {
+              const admin = getFirebaseAdmin();
+              const db = admin.firestore();
+              const userRef = db.collection('users').doc(userId);
+              
+              // Keep plan as 'pro' but update status
+              await userRef.update({
+                subscriptionStatus: subscription.status,
+                subscriptionEndDate: subscriptionEndDate.toISOString(),
+                subscriptionId: subscriptionId,
+                stripeCustomerId: customerId,
+                updatedAt: admin.firestore.Timestamp.now(),
+              });
+              console.log(`✅ Updated user ${userId} subscription status to ${subscription.status}`);
+            } catch (error) {
+              console.error(`❌ Error updating subscription status:`, error);
+            }
+          }
+        } else if (subscription.status === 'canceled') {
+          // Subscription canceled - downgrade to free
           await updateUserToFree(userId);
         }
         break;
@@ -248,7 +291,8 @@ export async function POST(request: NextRequest) {
 
         if (isPro && subscription.status === 'active') {
           const subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
-          await updateUserToPro(userId, subscriptionEndDate);
+          const subscriptionId = subscription.id;
+          await updateUserToPro(userId, subscriptionEndDate, subscriptionId, customerId);
         }
         break;
       }

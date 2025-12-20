@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useVideos } from "@/hooks/useVideos";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { firebaseService } from "@/services/firebase";
 import { authService } from "@/services/auth";
 import { useTheme, type Theme } from "@/hooks/useTheme";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -590,22 +591,72 @@ export const SettingsView = () => {
     };
   }, [isElectron, cloudinaryConfig, nexusAuthenticated, theme, youtubeApiKey]);
 
-  // Load subscription status
+  // Load subscription status - TOUJOURS depuis Stripe (source de vérité)
   useEffect(() => {
     const loadSubscriptionStatus = async () => {
       if (nexusAuthenticated && stripeInitialized) {
         setSubscriptionLoading(true);
         try {
+          console.log('🔄 SettingsView: Chargement du statut d\'abonnement depuis Stripe...');
+          // Récupérer les VRAIES données depuis Stripe (pas de simulation)
           const status = await stripeService.getSubscriptionStatus();
+          console.log('✅ SettingsView: Statut d\'abonnement récupéré depuis Stripe:', status);
           setSubscriptionStatus(status);
         } catch (error) {
-          console.error("Error loading subscription status:", error);
+          console.error("❌ SettingsView: Erreur lors du chargement du statut depuis Stripe:", error);
+          // En cas d'erreur, ne pas utiliser de données simulées
+          setSubscriptionStatus(null);
         } finally {
           setSubscriptionLoading(false);
         }
       }
     };
     loadSubscriptionStatus();
+  }, [nexusAuthenticated, stripeInitialized]);
+
+  // Écouter les changements du profil utilisateur en temps réel et récupérer les VRAIES données depuis Stripe
+  useEffect(() => {
+    if (!nexusAuthenticated || !stripeInitialized) return;
+
+    // Fonction pour charger les données réelles depuis Stripe
+    const loadRealStripeData = async () => {
+      try {
+        console.log('🔄 SettingsView: Chargement des données réelles depuis Stripe...');
+        const stripeStatus = await stripeService.getSubscriptionStatus();
+        console.log('✅ SettingsView: Données Stripe récupérées:', stripeStatus);
+        
+        // Utiliser UNIQUEMENT les données Stripe (source de vérité)
+        setSubscriptionStatus(stripeStatus);
+      } catch (error) {
+        console.error('❌ SettingsView: Erreur lors du chargement des données Stripe:', error);
+        // En cas d'erreur, ne pas utiliser de données simulées
+      }
+    };
+
+    // Charger immédiatement
+    loadRealStripeData();
+
+    // Écouter les changements du profil Firebase (pour déclencher un rechargement depuis Stripe)
+    // Le webhook Stripe met à jour Firestore, ce qui déclenche ce listener
+    const unsubscribe = firebaseService.onAuthStateChange(async (user) => {
+      if (user && !user.isAnonymous) {
+        const profile = firebaseService.getUserProfile();
+        if (profile) {
+          console.log('🔄 SettingsView: Profil Firestore mis à jour (webhook Stripe), rechargement depuis Stripe...', {
+            plan: profile.plan,
+            subscriptionStatus: profile.subscriptionStatus,
+          });
+          
+          // Recharger TOUJOURS depuis Stripe pour obtenir les VRAIES données
+          // Firestore est juste un indicateur qu'il y a eu un changement
+          await loadRealStripeData();
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [nexusAuthenticated, stripeInitialized]);
 
   // Handle URL params for Stripe success/cancel

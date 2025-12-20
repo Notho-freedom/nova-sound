@@ -16,7 +16,12 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
 /**
  * Update user profile in Firestore to Pro
  */
-async function updateUserToPro(userId: string, subscriptionEndDate?: Date): Promise<void> {
+async function updateUserToPro(
+  userId: string, 
+  subscriptionEndDate?: Date,
+  subscriptionId?: string,
+  stripeCustomerId?: string
+): Promise<void> {
   try {
     const admin = getFirebaseAdmin();
     const db = admin.firestore();
@@ -38,9 +43,21 @@ async function updateUserToPro(userId: string, subscriptionEndDate?: Date): Prom
     if (subscriptionEndDate) {
       updateData.subscriptionEndDate = subscriptionEndDate.toISOString();
     }
+    
+    if (subscriptionId) {
+      updateData.subscriptionId = subscriptionId;
+    }
+    
+    if (stripeCustomerId) {
+      updateData.stripeCustomerId = stripeCustomerId;
+    }
 
     await userRef.update(updateData);
-    console.log(`✅ Updated user ${userId} to Pro plan`);
+    console.log(`✅ Updated user ${userId} to Pro plan in Firestore`, {
+      subscriptionId,
+      stripeCustomerId,
+      subscriptionEndDate: subscriptionEndDate?.toISOString(),
+    });
   } catch (error) {
     console.error(`❌ Error updating user ${userId} to Pro:`, error);
     throw error;
@@ -138,8 +155,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update user profile in Firestore to Pro
-    await updateUserToPro(userId, subscriptionEndDate);
+    // Update user profile in Firestore to Pro with all subscription details
+    await updateUserToPro(userId, subscriptionEndDate, subscriptionId, customerId);
 
     return NextResponse.json({
       success: true,

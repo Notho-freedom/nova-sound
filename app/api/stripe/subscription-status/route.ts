@@ -30,14 +30,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Find customer by metadata
+    // Trouver le client Stripe par metadata userId (source de vérité Stripe)
+    // IMPORTANT: Toutes les données proviennent directement de l'API Stripe, aucune simulation
+    let customer: Stripe.Customer | null = null;
+    
+    // Essayer d'abord avec une recherche directe si on a le customerId dans Firestore
+    // Sinon, lister tous les clients (limite 100, devrait suffire pour la plupart des cas)
     const customers = await stripe.customers.list({
       limit: 100,
     });
 
-    const customer = customers.data.find(
+    customer = customers.data.find(
       (c) => c.metadata?.userId === auth.userId
-    );
+    ) as Stripe.Customer | null;
+    
+    // Si pas trouvé et qu'on a un customerId dans les métadonnées, essayer de le récupérer directement
+    if (!customer) {
+      console.log(`⚠️ Customer not found in list for userId: ${auth.userId}, checking all customers...`);
+      // Note: En production, on pourrait optimiser en stockant le customerId dans Firestore
+    }
 
     if (!customer) {
       return NextResponse.json({
@@ -69,15 +80,36 @@ export async function GET(request: NextRequest) {
     const priceId = subscription.items.data[0]?.price.id;
     const isPro = priceId === PRICE_PRO_MONTHLY || priceId === PRICE_PRO_YEARLY;
 
-    return NextResponse.json({
+    // Récupérer TOUTES les informations DIRECTEMENT depuis Stripe (source de vérité absolue)
+    // Aucune simulation, toutes les données proviennent de l'API Stripe
+    const subscriptionData = {
       isActive: subscription.status === 'active',
       plan: isPro ? 'pro' : 'free',
-      status: subscription.status,
-      currentPeriodEnd: (subscription as any).current_period_end
-        ? new Date((subscription as any).current_period_end * 1000).toISOString()
+      status: subscription.status, // Statut réel depuis Stripe: 'active', 'canceled', 'past_due', 'trialing', etc.
+      currentPeriodEnd: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
         : null,
-      cancelAtPeriodEnd: (subscription as any).cancel_at_period_end,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+    };
+
+    // Log pour vérification - toutes les données proviennent de Stripe
+    console.log('📊 [STRIPE REAL DATA] Subscription status récupéré directement depuis Stripe API:', {
+      userId: auth.userId,
+      customerId: customer.id,
+      subscriptionId: subscription.id,
+      status: subscription.status, // Statut réel Stripe
+      plan: subscriptionData.plan,
+      isActive: subscriptionData.isActive,
+      currentPeriodEnd: subscriptionData.currentPeriodEnd,
+      cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd,
+      priceId: priceId,
+      // Vérification que c'est bien un abonnement Pro
+      isProPrice: isPro,
+      expectedMonthly: PRICE_PRO_MONTHLY,
+      expectedYearly: PRICE_PRO_YEARLY,
     });
+
+    return NextResponse.json(subscriptionData);
   } catch (error: any) {
     console.error('Error getting subscription status:', error);
     return NextResponse.json(

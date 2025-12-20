@@ -23,6 +23,7 @@ import type { Video } from "@/types/music";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
 import { YouTubePlayer, type YouTubePlayerRef } from "./YouTubePlayer";
 import { detectMediaSource, extractYouTubeVideoId } from "@/lib/youtube";
+import { fetchYouTubeVideoMetadata } from "@/lib/youtube-metadata";
 
 interface VideoPlayerProps {
   video: Video;
@@ -114,38 +115,38 @@ export const VideoPlayer = ({
   const isMuted = isYouTube ? youtubeState.isMuted : localIsMuted;
   const isLoading = isYouTube ? youtubeState.isLoading : localIsLoading;
 
-  // Contrôles unifiés
-  const togglePlayPause = () => {
+  // Contrôles unifiés (mémorisés pour éviter les re-renders)
+  const togglePlayPause = useCallback(() => {
     if (isYouTube && youtubePlayerRef.current) {
       youtubePlayerRef.current.togglePlayPause();
     } else {
       localTogglePlayPause();
     }
-  };
+  }, [isYouTube, localTogglePlayPause]);
 
-  const seek = (time: number) => {
+  const seek = useCallback((time: number) => {
     if (isYouTube && youtubePlayerRef.current) {
       youtubePlayerRef.current.seek(time);
     } else {
       localSeek(time);
     }
-  };
+  }, [isYouTube, localSeek]);
 
-  const setVolume = (vol: number) => {
+  const setVolume = useCallback((vol: number) => {
     if (isYouTube && youtubePlayerRef.current) {
       youtubePlayerRef.current.setVolume(vol);
     } else {
       localSetVolume(vol);
     }
-  };
+  }, [isYouTube, localSetVolume]);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (isYouTube && youtubePlayerRef.current) {
       youtubePlayerRef.current.toggleMute();
     } else {
       localToggleMute();
     }
-  };
+  }, [isYouTube, localToggleMute]);
 
   // Callbacks mémorisés pour YouTube Player (évite les boucles infinies)
   const handleYouTubeStateChange = useCallback((playing: boolean) => {
@@ -165,27 +166,20 @@ export const VideoPlayer = ({
   }, []);
 
   const handleYouTubeReady = useCallback(() => {
-    // Le player est prêt - initialiser l'état une seule fois
+    // Le player est prêt - synchroniser l'état
     if (youtubePlayerRef.current) {
-      setYoutubeState(prev => {
-        const newState = {
-          ...prev,
-          volume: youtubePlayerRef.current!.volume,
-          isMuted: youtubePlayerRef.current!.isMuted,
-          duration: youtubePlayerRef.current!.duration,
-          isLoading: false,
-        };
-        // Ne mettre à jour que si quelque chose a changé
-        if (
-          prev.volume === newState.volume &&
-          prev.isMuted === newState.isMuted &&
-          prev.duration === newState.duration &&
-          prev.isLoading === newState.isLoading
-        ) {
-          return prev;
+      // Utiliser setTimeout pour s'assurer que le player est complètement initialisé
+      setTimeout(() => {
+        if (youtubePlayerRef.current) {
+          setYoutubeState(prev => ({
+            ...prev,
+            volume: youtubePlayerRef.current!.volume,
+            isMuted: youtubePlayerRef.current!.isMuted,
+            duration: youtubePlayerRef.current!.duration,
+            isLoading: false,
+          }));
         }
-        return newState;
-      });
+      }, 100);
     }
   }, []);
 
@@ -203,6 +197,29 @@ export const VideoPlayer = ({
       playVideo(video);
     }
   }, [video, playVideo, isYouTube]);
+
+  // Récupérer les métadonnées YouTube quand une vidéo YouTube est chargée
+  useEffect(() => {
+    if (isYouTube && youtubeVideoId) {
+      // Récupérer les métadonnées YouTube (résolutions, titre, description, etc.)
+      fetchYouTubeVideoMetadata(youtubeVideoId)
+        .then((result) => {
+          if (result.success && result.metadata) {
+            // Les métadonnées sont disponibles, on peut les utiliser pour enrichir l'UI
+            // Note: Les résolutions disponibles ne sont pas directement fournies par l'API Data v3
+            // mais sont gérées dynamiquement par le player IFrame
+            console.log('Métadonnées YouTube récupérées:', {
+              title: result.metadata.title,
+              duration: result.metadata.duration,
+              viewCount: result.metadata.viewCount,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('Erreur lors de la récupération des métadonnées YouTube:', err);
+        });
+    }
+  }, [isYouTube, youtubeVideoId]);
 
   // Show/hide controls on mouse movement
   useEffect(() => {
@@ -289,7 +306,13 @@ export const VideoPlayer = ({
   }, [togglePlayPause, seek, currentTime, duration, setVolume, volume, toggleMute, toggleFullscreen, isFullscreen]);
 
   const handleSeek = (value: number[]) => {
-    seek(value[0]);
+    const newTime = value[0];
+    if (isYouTube && youtubePlayerRef.current) {
+      // Pour YouTube, utiliser seek directement
+      youtubePlayerRef.current.seek(newTime);
+    } else {
+      seek(newTime);
+    }
   };
 
   const handleVolumeChange = (value: number[]) => {
