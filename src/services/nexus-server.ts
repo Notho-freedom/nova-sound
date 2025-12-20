@@ -161,10 +161,15 @@ class NexusServerService {
                 const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
                 
                 // Determine provider from API response
-                const provider = result.provider === 'bunny' ? 'bunny' as const : 
+                // Free users: cloudinary (serveur 0)
+                // Pro users: bunny (serveur 1) or planethoster (serveur 2)
+                const provider = result.provider === 'cloudinary' ? 'cloudinary' as const :
+                                result.provider === 'bunny' ? 'bunny' as const : 
                                 result.provider === 'planethoster' ? 'planethoster' as const :
                                 result.provider === 'local' ? 'nexus' as const : 
                                 'nexus' as const;
+                
+                console.log(`[NexusServer] Upload successful - Provider: ${provider}, Server: ${result.server || 'N/A'}`);
                 
                 const newEntry = {
                   id: result.id,

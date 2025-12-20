@@ -60,9 +60,10 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       return;
     }
 
+    // Bunny is only for Pro users (serveur 1)
     if (!isPro) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser Bunny Storage (serveur 1). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }
@@ -244,7 +245,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
         return updated;
       });
 
-      notificationService.uploadCompleted(track.title, 'Bunny Storage');
+      notificationService.uploadCompleted(track.title, 'Bunny Storage (Serveur 1)');
 
       // Remove progress after 3 seconds
       setTimeout(() => {
@@ -291,7 +292,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
     
     if (!isAuthenticated || !isPro) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser Bunny Storage (serveur 1). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }
@@ -305,7 +306,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       return;
     }
 
-    toast.info(`Upload de l'album vers Bunny en cours...`, {
+    toast.info(`Upload de l'album vers Bunny (serveur 1) en cours...`, {
       description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
     });
 
@@ -343,7 +344,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
     
     if (!isAuthenticated || !isPro) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser Bunny Storage (serveur 1). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }
@@ -357,7 +358,7 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       return;
     }
 
-    toast.info(`Upload de la playlist vers Bunny en cours...`, {
+    toast.info(`Upload de la playlist vers Bunny (serveur 1) en cours...`, {
       description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
     });
 

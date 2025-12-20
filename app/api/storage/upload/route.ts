@@ -4,6 +4,7 @@ import path from 'path';
 import { verifyAuthAndPro } from '~/lib/stripe-utils';
 import { uploadToBunny, isBunnyConfigured } from '~/lib/bunny';
 import { uploadToPlanetHoster, isPlanetHosterConfigured } from '~/lib/planethoster-sftp';
+import { uploadToCloudinary, isCloudinaryConfigured } from '~/lib/cloudinary-server';
 import { createErrorResponse, ErrorCodes } from '~/lib/validation';
 import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
 
@@ -85,9 +86,10 @@ export async function POST(request: NextRequest) {
       
       let lastError: Error | null = null;
       
-      // Try Bunny first (if configured)
+      // Pro users: Try Bunny first (serveur 1), then PlanetHoster (serveur 2)
+      // Try Bunny first (serveur 1) - if configured
       if (isBunnyConfigured()) {
-        console.log('[Upload] Bunny Storage is configured, attempting upload...');
+        console.log('[Upload] Bunny Storage is configured (serveur 1), attempting upload...');
         try {
           const fileName = `${fileId}${fileExtension}`;
           const bunnyPath = `nexus/${auth.userId}/${fileName}`;
@@ -96,9 +98,9 @@ export async function POST(request: NextRequest) {
           const buffer = Buffer.from(bytes);
           const contentType = file.type || 'application/octet-stream';
           
-          console.log(`[Upload] Uploading to Bunny: ${bunnyPath} (${contentType})`);
+          console.log(`[Upload] Uploading to Bunny (serveur 1): ${bunnyPath} (${contentType})`);
           const result = await uploadToBunny(bunnyPath, buffer, contentType);
-          console.log(`[Upload] ✅ Bunny upload successful: ${result.url}`);
+          console.log(`[Upload] ✅ Bunny upload successful (serveur 1): ${result.url}`);
 
           return NextResponse.json({
             id: fileId,
@@ -106,18 +108,19 @@ export async function POST(request: NextRequest) {
             size: file.size,
             filename: file.name,
             provider: 'bunny',
+            server: 1, // Serveur 1
           });
         } catch (bunnyError: any) {
-          console.error('[Upload] ❌ Bunny upload failed:', bunnyError.message || bunnyError);
+          console.error('[Upload] ❌ Bunny upload failed (serveur 1):', bunnyError.message || bunnyError);
           lastError = bunnyError instanceof Error ? bunnyError : new Error(bunnyError.message || 'Bunny upload failed');
-          console.log('[Upload] Falling back to PlanetHoster...');
+          console.log('[Upload] Falling back to PlanetHoster (serveur 2)...');
           // Continue to try PlanetHoster
         }
       } else {
-        console.warn('[Upload] ⚠️ Bunny Storage not configured for Pro user');
+        console.warn('[Upload] ⚠️ Bunny Storage (serveur 1) not configured for Pro user');
       }
 
-      // Try PlanetHoster SFTP (if configured)
+      // Try PlanetHoster SFTP (serveur 2) - if configured
       if (isPlanetHosterConfigured()) {
         try {
           const fileName = `${fileId}${fileExtension}`;
@@ -165,7 +168,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Free users or Bunny fallback: use local storage
+    // Free users: upload to Cloudinary (serveur 0)
+    console.log(`[Upload] Free user ${auth.userId} uploading file: ${file.name} (${file.size} bytes)`);
+    
+    if (isCloudinaryConfigured()) {
+      try {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const contentType = file.type || 'application/octet-stream';
+        const fileName = `${fileId}${fileExtension}`;
+        const publicId = `nexus/free/${auth.userId}/${fileId}`;
+        
+        console.log(`[Upload] Uploading to Cloudinary (serveur 0): ${publicId} (${contentType})`);
+        const result = await uploadToCloudinary(buffer, fileName, contentType, publicId);
+        console.log(`[Upload] ✅ Cloudinary upload successful (serveur 0): ${result.secure_url}`);
+
+        return NextResponse.json({
+          id: fileId,
+          url: result.secure_url,
+          size: file.size,
+          filename: file.name,
+          provider: 'cloudinary',
+          server: 0, // Serveur 0
+        });
+      } catch (cloudinaryError: any) {
+        console.error('[Upload] ❌ Cloudinary upload failed:', cloudinaryError.message || cloudinaryError);
+        // Fallback to local storage if Cloudinary fails
+        console.log('[Upload] Falling back to local storage...');
+      }
+    } else {
+      console.warn('[Upload] ⚠️ Cloudinary not configured for Free user, using local storage fallback');
+    }
+
+    // Fallback: use local storage if Cloudinary is not configured or upload failed
     const userDir = path.join(STORAGE_DIR, 'users', auth.userId);
     await mkdir(userDir, { recursive: true });
 

@@ -254,18 +254,18 @@ export function youtubeSuggestionToVideo(suggestion: YouTubeSuggestion): Video {
   
   return {
     id: `youtube-${suggestion.videoId}`,
-    title: suggestion.title,
+    title: suggestion.title || 'Vidéo YouTube sans titre',
     filePath: youtubeUrl,
-    thumbnailUrl: suggestion.thumbnailUrl,
+    thumbnailUrl: suggestion.thumbnailUrl || '',
     duration: suggestion.duration || 0,
     mediaSource: 'youtube',
     youtubeVideoId: suggestion.videoId,
     // Métadonnées supplémentaires
     metadata: {
-      description: suggestion.description,
-      channel: suggestion.channelTitle,
+      description: suggestion.description || '',
+      channel: suggestion.channelTitle || '',
       viewCount: suggestion.viewCount,
-      publishedAt: suggestion.publishedAt,
+      publishedAt: suggestion.publishedAt || '',
     },
     addedAt: new Date().toISOString(),
     watchProgress: {

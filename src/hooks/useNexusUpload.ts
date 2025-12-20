@@ -62,9 +62,10 @@ export function useNexusUpload(): UseNexusUploadReturn {
       return;
     }
 
+    // Nexus/PlanetHoster is only for Pro users (serveur 2)
     if (!isPro) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser PlanetHoster/Nexus (serveur 2). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }
@@ -155,7 +156,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
         return updated;
       });
 
-      notificationService.uploadCompleted(track.title, 'Bunny Storage');
+      notificationService.uploadCompleted(track.title, 'PlanetHoster/Nexus (Serveur 2)');
 
       // Remove progress after 3 seconds
       setTimeout(() => {
@@ -215,7 +216,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
     
     if (!isAuthenticated || !isPro) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser PlanetHoster/Nexus (serveur 2). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }
@@ -273,7 +274,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
     
     if (!isAuthenticated || !isPro) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser PlanetHoster/Nexus (serveur 2). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }
@@ -288,7 +289,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
       return;
     }
 
-    toast.info(`Upload de la playlist vers Nexus/Bunny en cours...`, {
+    toast.info(`Upload de la playlist vers PlanetHoster/Nexus (serveur 2) en cours...`, {
       description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} à uploader.`,
     });
 

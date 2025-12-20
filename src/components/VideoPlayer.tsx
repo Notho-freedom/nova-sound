@@ -357,18 +357,20 @@ export const VideoPlayer = ({
     >
       {/* YouTube Player ou Video Element */}
       {isYouTube && youtubeVideoId ? (
-        <YouTubePlayer
-          ref={youtubePlayerRef}
-          videoId={youtubeVideoId}
-          autoPlay={autoPlay}
-          startTime={video.watchProgress?.currentTime}
-          className="w-full h-full"
-          audioOnly={audioOnly}
-          onStateChange={handleYouTubeStateChange}
-          onTimeUpdate={handleYouTubeTimeUpdate}
-          onReady={handleYouTubeReady}
-          onError={handleYouTubeError}
-        />
+        <div className="absolute inset-0 w-full h-full">
+          <YouTubePlayer
+            ref={youtubePlayerRef}
+            videoId={youtubeVideoId}
+            autoPlay={autoPlay}
+            startTime={video.watchProgress?.currentTime}
+            className="w-full h-full"
+            audioOnly={audioOnly}
+            onStateChange={handleYouTubeStateChange}
+            onTimeUpdate={handleYouTubeTimeUpdate}
+            onReady={handleYouTubeReady}
+            onError={handleYouTubeError}
+          />
+        </div>
       ) : (
         <video
           ref={videoRef}
@@ -386,11 +388,11 @@ export const VideoPlayer = ({
         </div>
       )}
 
-      {/* Controls Overlay */}
+      {/* Controls Overlay - Superposé sur YouTube avec z-index élevé */}
       {showControls && (showControlsOverlay || isHovering || !isPlaying) && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-between p-4 transition-opacity">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-between p-4 transition-opacity z-30 pointer-events-none">
           {/* Top Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pointer-events-auto">
             {onClose && (
               <Button
                 variant="ghost"
@@ -466,7 +468,7 @@ export const VideoPlayer = ({
           </div>
 
           {/* Bottom Controls */}
-          <div className="space-y-3">
+          <div className="space-y-3 pointer-events-auto">
             {/* Progress Bar */}
             <div className="flex items-center gap-3">
               <span className="text-white text-sm font-mono min-w-[60px] text-right">

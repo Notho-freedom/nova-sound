@@ -262,7 +262,7 @@ export function useVideoUpload(): UseVideoUploadReturn {
   const uploadVideoToBunny = useCallback(async (video: Video) => {
     if (!nexusIsPro || !nexusAuthenticated) {
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser Bunny Storage.',
+        description: 'Passez au plan Pro pour utiliser Bunny Storage (serveur 1). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
       return;
     }

@@ -175,7 +175,7 @@ export const TrackContextMenu = ({
                 ) : (
                   <>
                     <Cloud className="w-4 h-4 mr-2" />
-                    Uploader vers Cloudinary (Free)
+                    Uploader vers Cloudinary (Free - Serveur 0)
                   </>
                 )}
               </ContextMenuItem>
@@ -193,7 +193,7 @@ export const TrackContextMenu = ({
                 ) : (
                   <>
                     <Zap className="w-4 h-4 mr-2" />
-                    Uploader vers Bunny (Pro)
+                    Uploader vers Bunny (Pro - Serveur 1)
                   </>
                 )}
               </ContextMenuItem>
@@ -211,7 +211,7 @@ export const TrackContextMenu = ({
                 ) : (
                   <>
                     <Server className="w-4 h-4 mr-2" />
-                    Uploader vers Nexus (Pro)
+                    Uploader vers PlanetHoster (Pro - Serveur 2)
                   </>
                 )}
               </ContextMenuItem>

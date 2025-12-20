@@ -191,7 +191,7 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
         width: '100%',
         playerVars: {
           autoplay: 0,
-          controls: 0,
+          controls: 0, // Masquer les contrôles natifs YouTube
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
@@ -201,6 +201,8 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
           // Désactiver certaines fonctionnalités qui causent des erreurs dans Electron
           iv_load_policy: 3, // Masquer les annotations
           fs: 0, // Désactiver le plein écran natif (on utilise notre propre implémentation)
+          disablekb: 1, // Désactiver les raccourcis clavier YouTube (on utilise les nôtres)
+          cc_load_policy: 0, // Ne pas charger les sous-titres par défaut
         },
         events: {
           onReady: (event: YT.PlayerEvent) => {

@@ -159,6 +159,69 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
         style={audioOnly ? { transform: 'scale(0.1)', transformOrigin: 'top left' } : undefined}
       />
       
+      {/* Overlay transparent pour domination totale - permet le clic droit pour le menu contextuel */}
+      {!audioOnly && (
+        <div
+          className="absolute inset-0 z-10"
+          style={{
+            pointerEvents: 'auto',
+            // Overlay transparent qui capture tous les événements sauf le clic droit
+            // z-10 pour être au-dessus de l'iframe mais en dessous des contrôles (z-30)
+          }}
+          onContextMenu={(e) => {
+            // Permettre le menu contextuel YouTube
+            // Ne pas empêcher le comportement par défaut pour que le menu contextuel s'affiche
+            // L'événement passera à l'iframe en dessous grâce à pointer-events
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            // Intercepter les clics gauche pour notre contrôle
+            // Mais seulement si on ne clique pas sur un élément interactif
+            const target = e.target as HTMLElement;
+            if (!target.closest('button, a, input, select, textarea, [role="button"]')) {
+              e.preventDefault();
+              e.stopPropagation();
+              togglePlayPause();
+            }
+          }}
+          onDoubleClick={(e) => {
+            // Empêcher le double-clic de passer à YouTube
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            // Intercepter les clics sauf le clic droit (button 2)
+            // Et sauf si on clique sur un élément interactif
+            if (e.button !== 2) {
+              const target = e.target as HTMLElement;
+              if (!target.closest('button, a, input, select, textarea, [role="button"]')) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }
+          }}
+          onMouseUp={(e) => {
+            // Intercepter les relâchements sauf le clic droit
+            if (e.button !== 2) {
+              const target = e.target as HTMLElement;
+              if (!target.closest('button, a, input, select, textarea, [role="button"]')) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }
+          }}
+          onWheel={(e) => {
+            // Empêcher le scroll de passer à YouTube
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          // Intercepter tous les autres événements
+          onMouseMove={(e) => e.stopPropagation()}
+          onMouseEnter={(e) => e.stopPropagation()}
+          onMouseLeave={(e) => e.stopPropagation()}
+        />
+      )}
+      
       {/* Overlay audio-only (visualizer, etc.) */}
       {audioOnly && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-background/90 to-background/80">
@@ -178,7 +241,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
       
       {/* Loading overlay */}
       {!audioOnly && isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 pointer-events-none">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Chargement...</p>
@@ -188,7 +251,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
       
       {/* Error overlay */}
       {!audioOnly && error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-30 pointer-events-none">
           <div className="text-center p-4">
             <p className="text-sm text-destructive">{error}</p>
           </div>

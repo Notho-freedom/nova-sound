@@ -219,10 +219,10 @@ export const VideosView = () => {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (v) =>
-          v.title.toLowerCase().includes(query) ||
-          v.description?.toLowerCase().includes(query) ||
-          v.director?.toLowerCase().includes(query) ||
-          v.cast?.some((c) => c.toLowerCase().includes(query))
+          (v.title?.toLowerCase() || '').includes(query) ||
+          (v.description?.toLowerCase() || '').includes(query) ||
+          (v.director?.toLowerCase() || '').includes(query) ||
+          (v.cast?.some((c) => (c?.toLowerCase() || '').includes(query)) || false)
       );
     }
 
@@ -429,8 +429,8 @@ export const VideosView = () => {
         onUploadToNexus={() => uploadVideoToNexus(detailVideo)}
         isInWatchlist={isInWatchlist(detailVideo.id)}
         isFavorite={isFavorite(detailVideo.id)}
-        canUploadToCloudinary={cloudinaryConfigured || nexusIsPro}
-        canUploadToNexus={nexusIsPro && nexusAuthenticated}
+        canUploadToCloudinary={cloudinaryConfigured && !nexusIsPro} // Free only (serveur 0)
+        canUploadToNexus={nexusIsPro && nexusAuthenticated} // Pro only (serveur 2)
         isUploadingToCloudinary={isUploadingToCloudinary}
         isUploadingToNexus={isUploadingToNexus}
       />
@@ -881,9 +881,9 @@ export const VideosView = () => {
                     onUploadToCloudinary={() => uploadVideoToCloudinary(video)}
                     onUploadToBunny={() => uploadVideoToBunny(video)}
                     onUploadToNexus={() => uploadVideoToNexus(video)}
-                    canUploadToCloudinary={cloudinaryConfigured || nexusIsPro}
-                    canUploadToBunny={nexusIsPro && nexusAuthenticated}
-                    canUploadToNexus={nexusIsPro && nexusAuthenticated}
+                    canUploadToCloudinary={cloudinaryConfigured && !nexusIsPro} // Free only (serveur 0)
+                    canUploadToBunny={nexusIsPro && nexusAuthenticated} // Pro only (serveur 1)
+                    canUploadToNexus={nexusIsPro && nexusAuthenticated} // Pro only (serveur 2)
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
                     <div
@@ -1229,9 +1229,9 @@ export const VideosView = () => {
                     onUploadToCloudinary={() => uploadVideoToCloudinary(video)}
                     onUploadToBunny={() => uploadVideoToBunny(video)}
                     onUploadToNexus={() => uploadVideoToNexus(video)}
-                    canUploadToCloudinary={cloudinaryConfigured || nexusIsPro}
-                    canUploadToBunny={nexusIsPro && nexusAuthenticated}
-                    canUploadToNexus={nexusIsPro && nexusAuthenticated}
+                    canUploadToCloudinary={cloudinaryConfigured && !nexusIsPro} // Free only (serveur 0)
+                    canUploadToBunny={nexusIsPro && nexusAuthenticated} // Pro only (serveur 1)
+                    canUploadToNexus={nexusIsPro && nexusAuthenticated} // Pro only (serveur 2)
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
                     <div

@@ -72,9 +72,11 @@ export const PlaylistView = ({
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   
-  const canUploadToCloudinary = cloudinaryConfigured || nexusIsPro;
-  const canUploadToBunny = nexusIsPro && nexusAuthenticated;
-  const canUploadToNexus = nexusIsPro && nexusAuthenticated;
+  // Free users: Cloudinary only (serveur 0)
+  // Pro users: Bunny (serveur 1) and PlanetHoster/Nexus (serveur 2)
+  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro; // Free only
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated; // Pro only (serveur 1)
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated; // Pro only (serveur 2)
   
   // Table state for create/edit pages
   const [tableSearchQuery, setTableSearchQuery] = useState("");

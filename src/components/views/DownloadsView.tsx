@@ -485,12 +485,12 @@ export const DownloadsView = () => {
 
   const getProviderName = (provider?: string) => {
     switch (provider) {
-      case "bunny":
-        return "Bunny CDN";
       case "cloudinary":
-        return "Cloudinary";
+        return "Cloudinary (Free - Serveur 0)";
+      case "bunny":
+        return "Bunny CDN (Pro - Serveur 1)";
       case "planethoster":
-        return "PlanetHoster SFTP";
+        return "PlanetHoster SFTP (Pro - Serveur 2)";
       case "nexus":
         return "Nexus Local";
       default:
@@ -519,7 +519,8 @@ export const DownloadsView = () => {
     count: filesByProvider[key].length
   })));
 
-  const providerOrder = ["bunny", "cloudinary", "nexus", "planethoster", "local"];
+  // Provider order: Free users (Cloudinary - serveur 0), Pro users (Bunny - serveur 1, PlanetHoster - serveur 2)
+  const providerOrder = ["cloudinary", "bunny", "planethoster", "nexus", "local"];
 
   const activeDownloads = downloads.filter(
     (d) => d.status === "downloading" || d.status === "paused"
