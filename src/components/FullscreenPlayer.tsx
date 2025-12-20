@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
   X, 
   Play, 
@@ -28,6 +28,8 @@ import { useAudioVibes } from "@/hooks/useAudioVibes";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
+import { YouTubePlayer, type YouTubePlayerRef } from "./YouTubePlayer";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 interface FullscreenPlayerProps {
   currentTrack: Track;
@@ -94,11 +96,144 @@ export const FullscreenPlayer = ({
   const [showLyrics, setShowLyrics] = useState(false);
   const [lyrics, setLyrics] = useState<string | null>(null);
   
-  // Use FFT data for visualization
-  const vibesData = useAudioVibes(audioElement ?? null, {
+  // Détecter si c'est un track YouTube
+  const isYouTube = currentTrack.mediaSource === 'youtube';
+  const youtubeVideoId = currentTrack.youtubeVideoId || (isYouTube && currentTrack.filePath ? extractYouTubeVideoId(currentTrack.filePath) : null);
+  const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+  
+  // État pour le player YouTube
+  const [youtubeState, setYoutubeState] = useState({
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 70,
+    isMuted: false,
+  });
+
+  // Use FFT data for visualization (seulement pour les tracks non-YouTube)
+  const vibesData = useAudioVibes(isYouTube ? null : (audioElement ?? null), {
     fftSize: 1024, // Reduced from 2048 for better performance
     enableBassFilter: false,
   });
+
+  // Callbacks pour le player YouTube
+  const handleYouTubeStateChange = useCallback((playing: boolean) => {
+    setYoutubeState(prev => ({ ...prev, isPlaying: playing }));
+    // Ne pas appeler onPlayPause ici pour éviter les boucles infinies
+    // L'état sera synchronisé via les useEffect
+  }, []);
+
+  const handleYouTubeTimeUpdate = useCallback((time: number) => {
+    setYoutubeState(prev => {
+      // Mettre à jour l'état local
+      const newState = { ...prev, currentTime: time };
+      
+      // Mettre à jour le currentTime dans DesktopApp via onSeek
+      // Mais seulement si la différence est significative pour éviter trop d'appels
+      const timeDiff = Math.abs(time - (prev.currentTime || 0));
+      if (timeDiff > 0.5) {
+        // Utiliser requestAnimationFrame pour éviter les conflits
+        requestAnimationFrame(() => {
+          onSeek([time]);
+        });
+      }
+      
+      return newState;
+    });
+  }, [onSeek]);
+
+  const handleYouTubeReady = useCallback(() => {
+    if (youtubePlayerRef.current) {
+      const player = youtubePlayerRef.current;
+      
+      // Mettre à jour l'état avec les valeurs du player
+      setYoutubeState(prev => ({
+        ...prev,
+        volume: player.volume,
+        isMuted: player.isMuted,
+        duration: player.duration || currentTrack.duration,
+      }));
+      
+      // Synchroniser le volume et mute avec les valeurs actuelles
+      const currentVol = isMuted ? 0 : volume;
+      if (Math.abs(player.volume - currentVol) > 1) {
+        player.setVolume(currentVol);
+      }
+      if (player.isMuted !== isMuted) {
+        if (isMuted && !player.isMuted) {
+          player.toggleMute();
+        } else if (!isMuted && player.isMuted) {
+          player.toggleMute();
+        }
+      }
+      
+      // Démarrer la lecture si isPlaying est true
+      if (isPlaying && !player.isPlaying) {
+        // Attendre un peu pour s'assurer que tout est initialisé
+        setTimeout(() => {
+          if (player && !player.isPlaying) {
+            player.play().catch((err) => {
+              console.error('[FullscreenPlayer] Erreur lors du play automatique:', err);
+            });
+          }
+        }, 300);
+      }
+    }
+  }, [isPlaying, currentTrack.duration, volume, isMuted]);
+
+  // Synchroniser les contrôles avec le player YouTube
+  useEffect(() => {
+    if (isYouTube && youtubePlayerRef.current && youtubeVideoId) {
+      const player = youtubePlayerRef.current;
+      
+      // Vérifier si le player est prêt (a une durée > 0)
+      if (player.duration > 0) {
+        // Synchroniser play/pause
+        if (isPlaying && !player.isPlaying) {
+          // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
+          requestAnimationFrame(() => {
+            if (player && !player.isPlaying) {
+              player.play().catch((err) => {
+                console.error('[FullscreenPlayer] Erreur lors du play YouTube:', err);
+              });
+            }
+          });
+        } else if (!isPlaying && player.isPlaying) {
+          player.pause();
+        }
+      }
+    }
+  }, [isPlaying, isYouTube, youtubeVideoId]);
+
+  useEffect(() => {
+    if (isYouTube && youtubePlayerRef.current) {
+      // Synchroniser le volume
+      const currentVol = isMuted ? 0 : volume;
+      const youtubeVol = youtubePlayerRef.current.volume;
+      if (Math.abs(youtubeVol - currentVol) > 1) {
+        youtubePlayerRef.current.setVolume(currentVol);
+      }
+      
+      // Synchroniser le mute
+      const youtubeMuted = youtubePlayerRef.current.isMuted;
+      if (youtubeMuted !== isMuted) {
+        if (isMuted) {
+          youtubePlayerRef.current.toggleMute();
+        } else {
+          youtubePlayerRef.current.toggleMute();
+        }
+      }
+    }
+  }, [volume, isMuted, isYouTube]);
+
+  // Gérer le seek pour YouTube
+  const handleSeekYouTube = useCallback((value: number[]) => {
+    if (isYouTube && youtubePlayerRef.current) {
+      youtubePlayerRef.current.seek(value[0]);
+    } else {
+      onSeek(value);
+    }
+  }, [isYouTube, onSeek]);
   
 // Inside your component
 const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -182,8 +317,33 @@ useEffect(() => {
   // Inline mode - embedded in main content area
   if (isInline) {
     return (
-      <div className="h-full w-full flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300">
-        <div className="flex flex-col items-center justify-center w-full">
+      <div className="h-full w-full flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
+        {/* Player YouTube en arrière-plan (masqué visuellement) pour les tracks YouTube en mode inline */}
+        {isYouTube && youtubeVideoId && (
+          <div 
+            className="absolute inset-0 pointer-events-none" 
+            style={{ 
+              zIndex: 1,
+              opacity: 0,
+              width: '1px',
+              height: '1px',
+              overflow: 'hidden',
+            }}
+          >
+            <YouTubePlayer
+              ref={youtubePlayerRef}
+              videoId={youtubeVideoId}
+              autoPlay={isPlaying}
+              audioOnly={true}
+              onStateChange={handleYouTubeStateChange}
+              onTimeUpdate={handleYouTubeTimeUpdate}
+              onReady={handleYouTubeReady}
+              className="w-full h-full"
+            />
+          </div>
+        )}
+        
+        <div className="flex flex-col items-center justify-center w-full relative z-10">
           {/* Album Art with glow effect */}
           <div className="relative mb-6 flex items-center justify-center">
             <div 
@@ -197,7 +357,7 @@ useEffect(() => {
             <AlbumArt
               src={getCoverUrl(currentTrack.coverUrl)}
               alt={currentTrack.album}
-              isPlaying={isPlaying}
+              isPlaying={isYouTube ? youtubeState.isPlaying : isPlaying}
               className="w-64 h-64 relative z-10"
             />
           </div>
@@ -226,6 +386,31 @@ useEffect(() => {
       
       {/* Main Panel - Background with album cover and FFT */}
       <div className="absolute inset-0 overflow-hidden">
+        {/* Player YouTube en arrière-plan (masqué visuellement) pour les tracks YouTube */}
+        {isYouTube && youtubeVideoId && (
+          <div 
+            className="absolute inset-0 pointer-events-none" 
+            style={{ 
+              zIndex: 1,
+              opacity: 0,
+              width: '1px',
+              height: '1px',
+              overflow: 'hidden',
+            }}
+          >
+            <YouTubePlayer
+              ref={youtubePlayerRef}
+              videoId={youtubeVideoId}
+              autoPlay={isPlaying}
+              audioOnly={true}
+              onStateChange={handleYouTubeStateChange}
+              onTimeUpdate={handleYouTubeTimeUpdate}
+              onReady={handleYouTubeReady}
+              className="w-full h-full"
+            />
+          </div>
+        )}
+        
         {/* Album cover background - blurred and faded */}
         <div 
           className="absolute inset-0 opacity-20 blur-3xl scale-150 transition-opacity duration-500"
@@ -233,18 +418,22 @@ useEffect(() => {
             backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
+            zIndex: 2,
           }}
         />
         
-        {/* FFT Visualizer - Full width, reduced height and opacity */}
-        <canvas
-          ref={canvasRef}
-          className="absolute bottom-0 left-0 right-0 w-full opacity-20"
-          style={{ 
-            height: '20%',
-            imageRendering: 'pixelated' 
-          }}
-        />
+        {/* FFT Visualizer - Full width, reduced height and opacity (seulement pour non-YouTube) */}
+        {!isYouTube && (
+          <canvas
+            ref={canvasRef}
+            className="absolute bottom-0 left-0 right-0 w-full opacity-20"
+            style={{ 
+              height: '20%',
+              imageRendering: 'pixelated',
+              zIndex: 2,
+            }}
+          />
+        )}
       </div>
 
       {/* Header */}
@@ -305,13 +494,13 @@ useEffect(() => {
           <div className="w-full mb-2">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs text-muted-foreground w-10 text-right font-mono">
-                {formatTime(currentTime)}
+                {formatTime(isYouTube ? youtubeState.currentTime : currentTime)}
               </span>
               <Slider
-                value={[currentTime]}
-                max={currentTrack.duration}
+                value={[isYouTube ? youtubeState.currentTime : currentTime]}
+                max={isYouTube ? youtubeState.duration || currentTrack.duration : currentTrack.duration}
                 step={1}
-                onValueChange={onSeek}
+                onValueChange={handleSeekYouTube}
                 className="flex-1"
               />
               <span className="text-xs text-muted-foreground w-10 font-mono">
@@ -345,7 +534,7 @@ useEffect(() => {
               onClick={onPlayPause}
               className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 shadow-lg transition-all duration-200 backdrop-blur-sm"
             >
-              {isPlaying ? (
+              {(isYouTube ? (youtubeState.isPlaying || false) : isPlaying) ? (
                 <Pause className="w-6 h-6 fill-current" />
               ) : (
                 <Play className="w-6 h-6 fill-current ml-0.5" />

@@ -8,17 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useYouTubeSearch, type YouTubeSearchResult } from "@/hooks/useYouTubeSearch";
 import { useYouTubeAutocomplete } from "@/hooks/useYouTubeAutocomplete";
-import type { Video } from "@/types/music";
+import type { Video, Track } from "@/types/music";
+import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 
 interface YouTubeSearchViewProps {
   onPlayVideo: (video: Video, audioOnly?: boolean) => void;
   onAddToQueue?: (video: Video) => void;
+  onPlayAsAudio?: (track: Track) => void; // Callback pour jouer comme audio et naviguer vers inline player
 }
 
 /**
  * Composant de recherche YouTube intégré dans Nexus
  */
-export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue }: YouTubeSearchViewProps) => {
+export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: YouTubeSearchViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [playbackMode, setPlaybackMode] = useState<"video" | "audio">("video");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -113,9 +115,16 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue }: YouTubeSearchVi
   }, [search, clearSuggestions]);
 
   const handlePlay = useCallback((result: YouTubeSearchResult) => {
-    const video = convertToVideo(result);
-    onPlayVideo(video, playbackMode === "audio");
-  }, [convertToVideo, onPlayVideo, playbackMode]);
+    if (playbackMode === "audio" && onPlayAsAudio) {
+      // Mode audio : convertir en Track et jouer dans le système audio
+      const track = youtubeVideoToTrack(result);
+      onPlayAsAudio(track);
+    } else {
+      // Mode vidéo : jouer comme vidéo
+      const video = convertToVideo(result);
+      onPlayVideo(video, playbackMode === "audio");
+    }
+  }, [convertToVideo, onPlayVideo, playbackMode, onPlayAsAudio]);
 
   const handleAddToQueue = useCallback((result: YouTubeSearchResult) => {
     if (onAddToQueue) {

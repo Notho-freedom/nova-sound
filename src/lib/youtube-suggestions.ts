@@ -1,9 +1,11 @@
 /**
  * Fonctions pour récupérer des suggestions YouTube (tendances, vidéos populaires, etc.)
+ * Basées sur l'historique de l'utilisateur (audio local et vidéos YouTube)
  */
 
-import type { Video } from "@/types/music";
+import type { Video, Track } from "@/types/music";
 import { extractYouTubeVideoId } from "./youtube";
+import type { HistoryEntry } from "@/hooks/usePlayHistory";
 
 export interface YouTubeSuggestion {
   videoId: string;
@@ -56,7 +58,10 @@ export async function fetchYouTubeTrending(
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Erreur API YouTube tendances:', errorData);
+      console.error('[YouTube Suggestions] Erreur API tendances:', response.status, errorData);
+      if (errorData.error?.message) {
+        console.error('[YouTube Suggestions] Message d\'erreur:', errorData.error.message);
+      }
       return [];
     }
 
@@ -197,6 +202,7 @@ export async function fetchYouTubeByCategory(
 
 /**
  * Récupère des vidéos similaires à une vidéo YouTube donnée
+ * Note: relatedToVideoId est déprécié depuis 2015, on utilise une approche alternative
  */
 export async function fetchYouTubeRelated(
   videoId: string,
@@ -209,41 +215,241 @@ export async function fetchYouTubeRelated(
   }
 
   try {
-    const url = new URL("https://www.googleapis.com/youtube/v3/search");
-    url.searchParams.set("key", apiKey);
-    url.searchParams.set("part", "snippet");
-    url.searchParams.set("type", "video");
-    url.searchParams.set("relatedToVideoId", videoId);
-    url.searchParams.set("maxResults", maxResults.toString());
-    url.searchParams.set("fields", "items(id(videoId),snippet(title,description,channelTitle,publishedAt,thumbnails))");
+    // Étape 1: Récupérer les détails de la vidéo pour obtenir le titre, la chaîne, et les tags
+    const videoDetailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+    videoDetailsUrl.searchParams.set("key", apiKey);
+    videoDetailsUrl.searchParams.set("part", "snippet");
+    videoDetailsUrl.searchParams.set("id", videoId);
+    videoDetailsUrl.searchParams.set("fields", "items(snippet(title,channelTitle,tags))");
 
-    const response = await fetch(url.toString());
+    const videoDetailsResponse = await fetch(videoDetailsUrl.toString());
     
-    if (!response.ok) {
+    if (!videoDetailsResponse.ok) {
       return [];
     }
 
-    const data = await response.json();
-
-    if (!data.items || data.items.length === 0) {
+    const videoDetailsData = await videoDetailsResponse.json();
+    
+    if (!videoDetailsData.items || videoDetailsData.items.length === 0) {
       return [];
     }
 
-    return data.items.map((item: any) => {
-      const thumbnails = item.snippet?.thumbnails || {};
-      return {
-        videoId: item.id.videoId,
-        title: item.snippet?.title || "",
-        description: item.snippet?.description || "",
-        thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
-        channelTitle: item.snippet?.channelTitle || "",
-        publishedAt: item.snippet?.publishedAt || "",
-      };
-    });
+    const videoSnippet = videoDetailsData.items[0].snippet;
+    const channelTitle = videoSnippet.channelTitle || '';
+    const tags = videoSnippet.tags || [];
+    
+    // Étape 2: Utiliser le titre et les tags pour rechercher des vidéos similaires
+    // Prendre les 2-3 premiers mots du titre ou les premiers tags
+    let searchQuery = '';
+    if (tags.length > 0) {
+      // Utiliser les premiers tags
+      searchQuery = tags.slice(0, 2).join(' ');
+    } else if (videoSnippet.title) {
+      // Utiliser les premiers mots du titre
+      const titleWords = videoSnippet.title.split(' ').slice(0, 3);
+      searchQuery = titleWords.join(' ');
+    }
+
+    if (!searchQuery) {
+      // Fallback: utiliser le nom de la chaîne
+      searchQuery = channelTitle;
+    }
+
+    if (!searchQuery) {
+      return [];
+    }
+
+    // Étape 3: Rechercher des vidéos avec cette requête, en excluant la vidéo originale
+    const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+    searchUrl.searchParams.set("key", apiKey);
+    searchUrl.searchParams.set("part", "snippet");
+    searchUrl.searchParams.set("type", "video");
+    searchUrl.searchParams.set("q", searchQuery);
+    searchUrl.searchParams.set("maxResults", (maxResults + 1).toString()); // +1 pour exclure l'original
+    searchUrl.searchParams.set("order", "relevance");
+    searchUrl.searchParams.set("fields", "items(id(videoId),snippet(title,description,channelTitle,publishedAt,thumbnails))");
+
+    const searchResponse = await fetch(searchUrl.toString());
+    
+    if (!searchResponse.ok) {
+      return [];
+    }
+
+    const searchData = await searchResponse.json();
+
+    if (!searchData.items || searchData.items.length === 0) {
+      return [];
+    }
+
+    // Filtrer la vidéo originale et limiter les résultats
+    const relatedVideos = searchData.items
+      .filter((item: any) => item.id.videoId !== videoId)
+      .slice(0, maxResults)
+      .map((item: any) => {
+        const thumbnails = item.snippet?.thumbnails || {};
+        return {
+          videoId: item.id.videoId,
+          title: item.snippet?.title || "",
+          description: item.snippet?.description || "",
+          thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
+          channelTitle: item.snippet?.channelTitle || "",
+          publishedAt: item.snippet?.publishedAt || "",
+        };
+      });
+
+    return relatedVideos;
   } catch (error) {
     console.error("Erreur lors de la récupération des vidéos similaires:", error);
     return [];
   }
+}
+
+/**
+ * Génère des suggestions YouTube basées sur l'historique de l'utilisateur
+ * Combine l'historique audio local et l'historique vidéo YouTube
+ */
+export async function fetchYouTubeSuggestionsFromHistory(
+  audioHistory: HistoryEntry[],
+  audioTracks: Track[],
+  youtubeVideos: Video[],
+  maxResults: number = 25
+): Promise<YouTubeSuggestion[]> {
+  const apiKey = getYouTubeApiKey();
+  
+  if (!apiKey) {
+    console.warn('[YouTube Suggestions] Clé API YouTube non configurée');
+    return [];
+  }
+
+  // Extraire les artistes et genres les plus écoutés de l'historique audio
+  const artistCounts = new Map<string, number>();
+  const genreCounts = new Map<string, number>();
+  const trackTitles = new Set<string>();
+
+  audioHistory.forEach((entry) => {
+    const track = audioTracks.find(t => t.id === entry.trackId);
+    if (track) {
+      // Compter les artistes (pondéré par le nombre de fois écouté)
+      const count = artistCounts.get(track.artist) || 0;
+      artistCounts.set(track.artist, count + (entry.playCount || 1));
+      
+      // Compter les genres
+      if (track.genre) {
+        const genreCount = genreCounts.get(track.genre) || 0;
+        genreCounts.set(track.genre, genreCount + (entry.playCount || 1));
+      }
+      
+      // Collecter les titres
+      trackTitles.add(track.title);
+    }
+  });
+
+  // Extraire les vidéos YouTube de l'historique
+  const youtubeVideoIds: string[] = [];
+  youtubeVideos.forEach((video) => {
+    if (video.youtubeVideoId) {
+      youtubeVideoIds.push(video.youtubeVideoId);
+    }
+  });
+
+  // Créer des requêtes de recherche basées sur les préférences
+  const searchQueries: string[] = [];
+  
+  // Top 3 artistes les plus écoutés
+  const topArtists = Array.from(artistCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([artist]) => artist);
+  topArtists.forEach(artist => searchQueries.push(artist));
+
+  // Top 2 genres les plus écoutés
+  const topGenres = Array.from(genreCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([genre]) => genre);
+  topGenres.forEach(genre => searchQueries.push(genre));
+
+  // Si pas assez de données, utiliser les tendances générales comme fallback
+  if (searchQueries.length === 0 && youtubeVideoIds.length === 0) {
+    console.log('[YouTube Suggestions] Pas assez d\'historique, utilisation des tendances générales');
+    return fetchYouTubeTrending(maxResults);
+  }
+
+  // Rechercher des vidéos pour chaque requête
+  const allSuggestions: YouTubeSuggestion[] = [];
+  const seenVideoIds = new Set<string>();
+
+  // Rechercher basée sur les artistes/genres
+  for (const query of searchQueries.slice(0, 3)) { // Limiter à 3 requêtes pour éviter trop d'appels API
+    try {
+      const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+      searchUrl.searchParams.set("key", apiKey);
+      searchUrl.searchParams.set("part", "snippet");
+      searchUrl.searchParams.set("type", "video");
+      searchUrl.searchParams.set("q", query);
+      searchUrl.searchParams.set("maxResults", Math.ceil(maxResults / searchQueries.length).toString());
+      searchUrl.searchParams.set("order", "relevance");
+      searchUrl.searchParams.set("fields", "items(id(videoId),snippet(title,description,channelTitle,publishedAt,thumbnails))");
+
+      const response = await fetch(searchUrl.toString());
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.items) {
+          data.items.forEach((item: any) => {
+            const videoId = item.id.videoId;
+            if (!seenVideoIds.has(videoId) && !youtubeVideoIds.includes(videoId)) {
+              seenVideoIds.add(videoId);
+              const thumbnails = item.snippet?.thumbnails || {};
+              allSuggestions.push({
+                videoId,
+                title: item.snippet?.title || "",
+                description: item.snippet?.description || "",
+                thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
+                channelTitle: item.snippet?.channelTitle || "",
+                publishedAt: item.snippet?.publishedAt || "",
+              });
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[YouTube Suggestions] Erreur lors de la recherche pour "${query}":`, error);
+    }
+  }
+
+  // Si on a des vidéos YouTube dans l'historique, chercher des vidéos similaires
+  if (youtubeVideoIds.length > 0 && allSuggestions.length < maxResults) {
+    const videoIdToUse = youtubeVideoIds[0]; // Utiliser la vidéo la plus récente
+    try {
+      const related = await fetchYouTubeRelated(videoIdToUse, maxResults - allSuggestions.length);
+      related.forEach(suggestion => {
+        if (!seenVideoIds.has(suggestion.videoId) && !youtubeVideoIds.includes(suggestion.videoId)) {
+          seenVideoIds.add(suggestion.videoId);
+          allSuggestions.push(suggestion);
+        }
+      });
+    } catch (error) {
+      console.error('[YouTube Suggestions] Erreur lors de la récupération des vidéos similaires:', error);
+    }
+  }
+
+  // Si on n'a toujours pas assez de suggestions, compléter avec des tendances
+  if (allSuggestions.length < maxResults) {
+    try {
+      const trending = await fetchYouTubeTrending(maxResults - allSuggestions.length);
+      trending.forEach(suggestion => {
+        if (!seenVideoIds.has(suggestion.videoId)) {
+          seenVideoIds.add(suggestion.videoId);
+          allSuggestions.push(suggestion);
+        }
+      });
+    } catch (error) {
+      console.error('[YouTube Suggestions] Erreur lors du complément avec tendances:', error);
+    }
+  }
+
+  return allSuggestions.slice(0, maxResults);
 }
 
 /**

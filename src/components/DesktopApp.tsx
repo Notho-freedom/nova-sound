@@ -168,6 +168,14 @@ export const DesktopApp = () => {
   useEffect(() => {
     if (!audioRef.current || !currentTrack) return;
 
+    // Pour les tracks YouTube, on ne peut pas utiliser l'élément audio HTML
+    // Le player YouTube sera géré séparément via le composant YouTubePlayer
+    if (currentTrack.mediaSource === 'youtube') {
+      console.log('Track YouTube détecté, le player YouTube sera utilisé');
+      // Ne pas charger dans l'élément audio HTML
+      return;
+    }
+
     // Check if we have a real file path (Electron mode)
     if (currentTrack.filePath) {
       const audioSrc = getAudioSrc(currentTrack.filePath);
@@ -298,6 +306,11 @@ export const DesktopApp = () => {
 
   // Handle volume changes
   useEffect(() => {
+    // Pour les tracks YouTube, le volume est géré par le player YouTube dans FullscreenPlayer
+    if (currentTrack?.mediaSource === 'youtube') {
+      return;
+    }
+    
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
@@ -615,10 +628,14 @@ export const DesktopApp = () => {
   const handleSeek = useCallback((value: number[]) => {
     const newTime = value[0];
     setCurrentTime(newTime);
+    // Pour les tracks YouTube, le seek est géré par le player YouTube dans FullscreenPlayer
+    if (currentTrack?.mediaSource === 'youtube') {
+      return;
+    }
     if (audioRef.current) {
       audioRef.current.currentTime = newTime;
     }
-  }, []);
+  }, [currentTrack?.mediaSource]);
 
   const handleVolumeChange = useCallback((value: number[]) => {
     setVolume(value[0]);
@@ -838,6 +855,45 @@ export const DesktopApp = () => {
       setCurrentView("player");
     }
   }, [showInlinePlayer, currentView, previousView]);
+
+  // Écouter les événements pour jouer des vidéos YouTube comme audio
+  useEffect(() => {
+    const handleYouTubeAudioPlay = async (event: CustomEvent<Track>) => {
+      const track = event.detail;
+      
+      // Ajouter le track à la queue s'il n'y est pas déjà
+      const existingIndex = tracks.findIndex(t => t.id === track.id);
+      if (existingIndex >= 0) {
+        // Track déjà dans la queue, le jouer
+        handleTrackSelect(existingIndex);
+      } else {
+        // Ajouter à la queue et jouer
+        addToQueueNext(track);
+        const newIndex = queue.tracks.length;
+        // Attendre un peu plus pour s'assurer que le track est bien ajouté
+        setTimeout(() => {
+          setCurrentIndex(newIndex);
+          // Démarrer la lecture automatiquement
+          setIsPlaying(true);
+        }, 200);
+      }
+      
+      // Naviguer vers le player inline
+      if (!showInlinePlayer) {
+        setPreviousView(currentView);
+        setShowInlinePlayer(true);
+        setCurrentView("player");
+      }
+      
+      toast.success(`Lecture de "${track.title}" en mode audio`);
+    };
+
+    window.addEventListener('youtube-audio-play', handleYouTubeAudioPlay as EventListener);
+    
+    return () => {
+      window.removeEventListener('youtube-audio-play', handleYouTubeAudioPlay as EventListener);
+    };
+  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect, showInlinePlayer, currentView, previousView]);
 
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");

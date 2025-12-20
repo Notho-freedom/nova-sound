@@ -59,6 +59,8 @@ import { VideoGridSkeleton, VideoCarouselSkeleton } from "@/components/ui/skelet
 import { YouTubeSearchView } from "@/components/YouTubeSearchView";
 import { Youtube } from "lucide-react";
 import { useYouTubeSuggestions } from "@/hooks/useYouTubeSuggestions";
+import { useLibrary } from "@/hooks/useLibrary";
+import { usePlayHistory } from "@/hooks/usePlayHistory";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -137,8 +139,38 @@ export const VideosView = () => {
     addVideoFromUrl,
   } = useVideoLibrary();
 
-  // Suggestions YouTube
-  const { trendingVideos, loadingTrending, loadTrending } = useYouTubeSuggestions();
+  // Historique audio et pistes pour les suggestions personnalisées
+  const { tracks: audioTracks } = useLibrary();
+  const { history: audioHistory } = usePlayHistory();
+
+  // Suggestions YouTube basées sur l'historique
+  const { trendingVideos, loadingTrending, loadTrendingFromHistory } = useYouTubeSuggestions();
+
+  // Charger les suggestions YouTube basées sur l'historique au montage et quand l'historique change
+  useEffect(() => {
+    // Vérifier si une clé API YouTube est configurée avant de charger
+    const apiKey = typeof window !== 'undefined' 
+      ? localStorage.getItem("nexus-youtube-api-key") || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
+      : null;
+    
+    if (!apiKey) {
+      console.warn('[VideosView] Clé API YouTube non configurée, les suggestions ne seront pas chargées');
+      return;
+    }
+
+    // Attendre que les données soient chargées
+    if (audioTracks.length === 0 && enhancedVideos.length === 0 && audioHistory.length === 0) {
+      return; // Pas encore de données
+    }
+
+    // Filtrer les vidéos YouTube de l'historique
+    const youtubeHistoryVideos = enhancedVideos.filter(v => v.mediaSource === 'youtube');
+    
+    // Charger les suggestions basées sur l'historique
+    loadTrendingFromHistory(audioHistory, audioTracks, youtubeHistoryVideos).catch((error) => {
+      console.error('[VideosView] Erreur lors du chargement des suggestions basées sur l\'historique:', error);
+    });
+  }, [loadTrendingFromHistory, audioHistory, audioTracks, enhancedVideos]);
 
   const {
     uploadVideoToCloudinary,
@@ -706,10 +738,15 @@ export const VideosView = () => {
                 />
               )}
 
-              {/* YouTube Tendances */}
-              {trendingVideos.length > 0 && (
+              {/* Suggestions YouTube basées sur votre historique */}
+              {loadingTrending ? (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Suggestions pour vous</h3>
+                  <VideoCarouselSkeleton />
+                </div>
+              ) : trendingVideos.length > 0 ? (
                 <VideoCarousel
-                  title="Tendances YouTube"
+                  title="Suggestions pour vous"
                   videos={trendingVideos}
                   onVideoSelect={handlePlayVideo}
                   onViewDetails={handleViewDetails}
@@ -718,7 +755,7 @@ export const VideosView = () => {
                   isInWatchlist={isInWatchlist}
                   isFavorite={isFavorite}
                 />
-              )}
+              ) : null}
 
               {/* By Genre */}
               {availableGenres.slice(0, 5).map((genre) => {
@@ -1174,6 +1211,13 @@ export const VideosView = () => {
             onAddToQueue={(video) => {
               // Ajouter à la file d'attente si nécessaire
               toast.success("Vidéo ajoutée à la file");
+            }}
+            onPlayAsAudio={(track) => {
+              // Jouer comme audio et naviguer vers inline player
+              // Ce callback sera passé depuis DesktopApp
+              if (window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('youtube-audio-play', { detail: track }));
+              }
             }}
           />
         )}

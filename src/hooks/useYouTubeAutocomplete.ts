@@ -35,17 +35,38 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
     return null;
   };
 
-  // Recherche de suggestions via YouTube Data API
+  // Recherche de suggestions via YouTube Data API et historique de recherche
   const fetchSuggestions = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
       setSuggestions([]);
       return;
     }
 
+    // D'abord, charger l'historique de recherche pour les suggestions locales
+    const searchHistory: string[] = [];
+    try {
+      const saved = localStorage.getItem("nexus-search-history");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          searchHistory.push(...parsed);
+        }
+      }
+    } catch (error) {
+      // Ignorer les erreurs de parsing
+    }
+
+    // Filtrer l'historique pour les correspondances avec la requête
+    const historyMatches = searchHistory
+      .filter(term => term.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 3)
+      .map(term => ({ query: term, type: 'search' as const }));
+
     const apiKey = getYouTubeApiKey();
     if (!apiKey) {
-      // Pas de clé API, pas d'autocomplétion
-      setSuggestions([]);
+      // Si pas de clé API, utiliser uniquement l'historique
+      setSuggestions(historyMatches);
+      setError('Clé API YouTube non configurée. Configurez-la dans les paramètres.');
       return;
     }
 
@@ -74,21 +95,61 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
       );
 
       if (!response.ok) {
-        throw new Error(`Erreur API: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[YouTube Autocomplete] Erreur API:', response.status, errorData);
+        throw new Error(`Erreur API YouTube: ${response.status} - ${errorData.error?.message || 'Erreur inconnue'}`);
       }
 
       const data = await response.json();
+      
+      if (!data.items || data.items.length === 0) {
+        console.log('[YouTube Autocomplete] Aucune suggestion YouTube trouvée pour:', query);
+        // Si pas de résultats YouTube, retourner au moins l'historique et la requête
+        const fallback: AutocompleteSuggestion[] = [];
+        historyMatches.forEach(suggestion => fallback.push(suggestion));
+        if (!fallback.some(s => s.query.toLowerCase() === query.toLowerCase())) {
+          fallback.push({ query: query, type: 'search' });
+        }
+        setSuggestions(fallback);
+        return;
+      }
       
       const searchSuggestions: AutocompleteSuggestion[] = data.items.map((item: any) => ({
         query: item.snippet.title,
         type: 'video' as const,
       }));
 
-      // Ajouter aussi la requête originale comme première suggestion
-      setSuggestions([
-        { query: query, type: 'search' },
-        ...searchSuggestions,
-      ]);
+      // Combiner l'historique, la requête originale, et les suggestions YouTube
+      // Éviter les doublons
+      const seen = new Set<string>();
+      const combined: AutocompleteSuggestion[] = [];
+      
+      // D'abord l'historique (priorité)
+      historyMatches.forEach(suggestion => {
+        const key = suggestion.query.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          combined.push(suggestion);
+        }
+      });
+      
+      // Ensuite la requête originale
+      const queryKey = query.toLowerCase();
+      if (!seen.has(queryKey)) {
+        seen.add(queryKey);
+        combined.push({ query: query, type: 'search' });
+      }
+      
+      // Enfin les suggestions YouTube
+      searchSuggestions.forEach(suggestion => {
+        const key = suggestion.query.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          combined.push(suggestion);
+        }
+      });
+
+      setSuggestions(combined);
     } catch (err: any) {
       if (err.name === 'AbortError') {
         // Requête annulée, ignorer
