@@ -391,6 +391,7 @@ export const SettingsView = () => {
   const [savingYouTube, setSavingYouTube] = useState(false);
   const [testingYouTube, setTestingYouTube] = useState(false);
   const [youtubeTestResult, setYoutubeTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showYouTubeConfig, setShowYouTubeConfig] = useState(false);
   const [cloudinaryForm, setCloudinaryForm] = useState({
     cloudName: "",
     apiKey: "",
@@ -565,6 +566,8 @@ export const SettingsView = () => {
         savedYouTubeKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || "";
       }
       setYoutubeApiKey(savedYouTubeKey);
+      // Cacher la config si une clé existe déjà
+      setShowYouTubeConfig(!savedYouTubeKey);
       
       setLoading(false);
     };
@@ -575,6 +578,8 @@ export const SettingsView = () => {
       const newKey = event.detail;
       if (newKey !== youtubeApiKey) {
         setYoutubeApiKey(newKey || "");
+        // Cacher la config si une clé existe, l'afficher sinon
+        setShowYouTubeConfig(!newKey);
       }
     };
     
@@ -789,6 +794,12 @@ export const SettingsView = () => {
       
       notifySuccess(keyToSave ? "Clé API YouTube sauvegardée" : "Clé API YouTube supprimée");
       setYoutubeTestResult(null);
+      // Cacher la zone de config après sauvegarde réussie
+      if (keyToSave) {
+        setShowYouTubeConfig(false);
+      } else {
+        setShowYouTubeConfig(true);
+      }
     } catch (err) {
       console.error("Failed to save YouTube API key:", err);
       notifyError("Erreur lors de la sauvegarde de la clé API YouTube");
@@ -1435,18 +1446,42 @@ export const SettingsView = () => {
               {/* YouTube API */}
               <SettingsCard title="YouTube API" icon={Youtube}>
                 <div className="space-y-4">
-                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <p className="text-sm text-red-400 flex items-center gap-2">
-                      <Info className="w-4 h-4" />
-                      Gratuit - 10 000 requêtes/jour
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Requis pour la recherche YouTube dans Nexus
-                    </p>
-                  </div>
-                  
-                  {/* Toujours afficher le formulaire, même si une clé existe */}
-                  <div className="space-y-3">
+                  {youtubeApiKey && !showYouTubeConfig ? (
+                    // Affichage compact quand la clé est configurée
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <p className="text-sm text-green-400 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Clé API YouTube configurée
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          La recherche YouTube est activée
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setShowYouTubeConfig(true)}
+                      >
+                        <Youtube className="w-4 h-4 mr-2" />
+                        Modifier la clé API
+                      </Button>
+                    </div>
+                  ) : (
+                    // Formulaire complet de configuration
+                    <>
+                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <p className="text-sm text-red-400 flex items-center gap-2">
+                          <Info className="w-4 h-4" />
+                          Gratuit - 10 000 requêtes/jour
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Requis pour la recherche YouTube dans Nexus
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
                     {/* Indicateur si clé déjà configurée */}
                     {youtubeApiKey && (
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -1557,32 +1592,35 @@ export const SettingsView = () => {
                     </div>
                     
                     {/* Bouton pour supprimer si clé existe */}
-                    {youtubeApiKey && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full" 
-                        onClick={async () => {
-                          setYoutubeApiKey("");
-                          localStorage.removeItem("nexus-youtube-api-key");
-                          // Supprimer aussi de Firebase
-                          if (nexusAuthenticated) {
-                            try {
-                              const { firebaseSyncService } = await import('@/services/firebase-sync');
-                              await firebaseSyncService.queueSync('youtubeApiKey', null);
-                            } catch (err) {
-                              console.warn("Failed to remove YouTube API key from Firebase:", err);
-                            }
-                          }
-                          setYoutubeTestResult(null);
-                          notifySuccess("Clé API YouTube supprimée");
-                        }}
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Supprimer la clé
-                      </Button>
-                    )}
-                  </div>
+                        {youtubeApiKey && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={async () => {
+                              setYoutubeApiKey("");
+                              localStorage.removeItem("nexus-youtube-api-key");
+                              // Supprimer aussi de Firebase
+                              if (nexusAuthenticated) {
+                                try {
+                                  const { firebaseSyncService } = await import('@/services/firebase-sync');
+                                  await firebaseSyncService.queueSync('youtubeApiKey', null);
+                                } catch (err) {
+                                  console.warn("Failed to remove YouTube API key from Firebase:", err);
+                                }
+                              }
+                              setYoutubeTestResult(null);
+                              setShowYouTubeConfig(true);
+                              notifySuccess("Clé API YouTube supprimée");
+                            }}
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Supprimer la clé
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </SettingsCard>
 
