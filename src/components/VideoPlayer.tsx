@@ -36,6 +36,7 @@ interface VideoPlayerProps {
   onFullApp?: () => void;
   onCinemaMode?: () => void;
   isFullApp?: boolean;
+  audioOnly?: boolean; // Mode audio-only pour YouTube
 }
 
 const formatTime = (seconds: number) => {
@@ -60,6 +61,7 @@ export const VideoPlayer = ({
   onFullApp,
   onCinemaMode,
   isFullApp = false,
+  audioOnly = false,
 }: VideoPlayerProps) => {
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
@@ -307,6 +309,7 @@ export const VideoPlayer = ({
           autoPlay={autoPlay}
           startTime={video.watchProgress?.currentTime}
           className="w-full h-full"
+          audioOnly={audioOnly}
           onStateChange={(playing) => {
             setYoutubeState(prev => ({ ...prev, isPlaying: playing }));
           }}

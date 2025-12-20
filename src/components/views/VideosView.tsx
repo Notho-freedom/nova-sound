@@ -54,6 +54,8 @@ import type { Video, VideoGenre } from "@/types/music";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { VideoGridSkeleton, VideoCarouselSkeleton } from "@/components/ui/skeletons";
+import { YouTubeSearchView } from "@/components/YouTubeSearchView";
+import { Youtube } from "lucide-react";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -102,7 +104,7 @@ const genreLabels: Record<VideoGenre, string> = {
 };
 
 type SortOption = "recent" | "title" | "duration" | "size" | "rating" | "added";
-type ViewMode = "home" | "browse" | "watchlist" | "favorites" | "history";
+type ViewMode = "home" | "browse" | "watchlist" | "favorites" | "history" | "youtube";
 
 export const VideosView = () => {
   const {
@@ -162,6 +164,7 @@ export const VideosView = () => {
   const [urlTitle, setUrlTitle] = useState("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
+  const [youtubeAudioOnly, setYoutubeAudioOnly] = useState(false);
 
   // Get featured videos for hero rotation
   const featuredVideos = useMemo(() => {
@@ -268,7 +271,13 @@ export const VideosView = () => {
   }, [viewMode, watchlistVideos, favoriteVideos, recentlyWatched, filteredVideos, enhancedVideos]);
 
   // Handlers
-  const handlePlayVideo = useCallback((video: Video) => {
+  const handlePlayVideo = useCallback((video: Video, audioOnly?: boolean) => {
+    // Si c'est une vidéo YouTube et mode audio, utiliser audioOnly
+    if (video.mediaSource === 'youtube' && audioOnly) {
+      setYoutubeAudioOnly(true);
+    } else {
+      setYoutubeAudioOnly(false);
+    }
     setSelectedVideo(video);
     addToWatchHistory(video.id);
   }, [addToWatchHistory]);
@@ -348,6 +357,7 @@ export const VideosView = () => {
           onClose={() => {
             setIsFullApp(false);
             setSelectedVideo(null);
+            setYoutubeAudioOnly(false);
           }}
           onNext={handleNext}
           onPrevious={handlePrevious}
@@ -357,6 +367,7 @@ export const VideosView = () => {
           onFullApp={() => setIsFullApp(!isFullApp)}
           onCinemaMode={() => setIsCinemaMode(true)}
           isFullApp={isFullApp}
+          audioOnly={youtubeAudioOnly}
         />
       </div>
     );
@@ -451,6 +462,16 @@ export const VideosView = () => {
             >
               <History className="w-4 h-4 inline mr-2" />
               Historique
+            </button>
+            <button
+              onClick={() => setViewMode("youtube")}
+              className={cn(
+                "text-sm font-medium transition-colors",
+                viewMode === "youtube" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Youtube className="w-4 h-4 inline mr-2" />
+              YouTube
             </button>
           </div>
 
@@ -1097,6 +1118,17 @@ export const VideosView = () => {
         )}
 
         {/* Watchlist / Favorites / History Views */}
+        {/* YouTube Search View */}
+        {viewMode === "youtube" && (
+          <YouTubeSearchView
+            onPlayVideo={handlePlayVideo}
+            onAddToQueue={(video) => {
+              // Ajouter à la file d'attente si nécessaire
+              toast.success("Vidéo ajoutée à la file");
+            }}
+          />
+        )}
+
         {!loading && !error && (viewMode === "watchlist" || viewMode === "favorites" || viewMode === "history") && (
           <div className="p-6">
             <PageHeader

@@ -58,6 +58,32 @@ Détection automatique et intégration transparente :
 
 ---
 
+## 🔑 Configuration de la clé API YouTube (pour la recherche)
+
+Pour utiliser la fonctionnalité de recherche YouTube, vous devez configurer une clé API YouTube Data v3 :
+
+1. **Créer un projet Google Cloud** :
+   - Allez sur https://console.cloud.google.com/
+   - Créez un nouveau projet ou sélectionnez un projet existant
+
+2. **Activer l'API YouTube Data v3** :
+   - Dans le menu, allez dans "APIs & Services" > "Library"
+   - Recherchez "YouTube Data API v3"
+   - Cliquez sur "Enable"
+
+3. **Créer une clé API** :
+   - Allez dans "APIs & Services" > "Credentials"
+   - Cliquez sur "Create Credentials" > "API Key"
+   - Copiez la clé générée
+
+4. **Configurer dans Nexus** :
+   - Ajoutez la variable d'environnement `NEXT_PUBLIC_YOUTUBE_API_KEY` dans votre fichier `.env.local`
+   - Ou configurez-la dans les paramètres de l'application (si implémenté)
+
+**Note** : L'API YouTube Data v3 est gratuite jusqu'à 10 000 unités/jour, ce qui est largement suffisant pour un usage personnel.
+
+---
+
 ## 🚀 Utilisation
 
 ### Ajouter une vidéo YouTube
