@@ -190,10 +190,16 @@ class FirebaseSyncService {
         console.error('Failed to migrate to user-isolated storage:', error);
       }
       
-      // Load initial data from Firestore
-      await this.loadFromFirestore(userId);
+      // Load initial data from Firestore (or create if doesn't exist)
+      const loadedData = await this.loadFromFirestore(userId);
       
-      // Set up real-time listeners (silent - no logs)
+      // If no data exists, save local data to Firestore to create the document
+      if (!loadedData) {
+        console.log('📝 No Firestore data found, creating initial sync document');
+        await this.saveToFirestore(userId);
+      }
+      
+      // Set up real-time listeners
       this.setupRealtimeListeners(userId);
       
       // Start periodic sync (every hour)

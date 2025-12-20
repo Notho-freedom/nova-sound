@@ -1076,6 +1076,73 @@ class FirebaseService {
   async refreshIdToken(): Promise<string | null> {
     return this.getIdToken(true);
   }
+  
+  // Ensure user profile exists in Firestore (for manual OAuth users)
+  // Note: This requires Firestore rules to allow writes with matching UID
+  async ensureUserProfileExists(manualUser: { uid: string; email: string; displayName: string; photoURL?: string | null }): Promise<void> {
+    if (!db) {
+      console.warn('⚠️ Firestore not initialized, cannot ensure user profile');
+      return;
+    }
+    
+    try {
+      const userRef = doc(db, 'users', manualUser.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (!userSnap.exists()) {
+        // Create user profile in Firestore
+        // Note: This will only work if Firestore rules allow writes when request.resource.data.uid == userId
+        const profile: UserProfile = {
+          uid: manualUser.uid,
+          email: manualUser.email,
+          displayName: manualUser.displayName,
+          photoURL: manualUser.photoURL || null,
+          plan: 'free',
+          storageUsed: 0,
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
+        
+        try {
+          await setDoc(userRef, profile);
+          console.log('✅ Created Firestore user profile for manual OAuth user:', manualUser.email);
+        } catch (writeError: unknown) {
+          const writeFirestoreError = writeError as { code?: string; message?: string };
+          if (writeFirestoreError.code === 'permission-denied') {
+            console.warn('⚠️ Firestore permission denied when creating user profile. Rules may need to allow writes for manual OAuth users.');
+            console.warn('   User profile will be created when user authenticates with Firebase Auth or when rules are updated.');
+          } else {
+            throw writeError;
+          }
+        }
+      } else {
+        // Update last login
+        try {
+          await updateDoc(userRef, {
+            lastLoginAt: new Date().toISOString(),
+          });
+          console.log('✅ Updated Firestore user profile for manual OAuth user:', manualUser.email);
+        } catch (updateError: unknown) {
+          const updateFirestoreError = updateError as { code?: string; message?: string };
+          if (updateFirestoreError.code === 'permission-denied') {
+            console.warn('⚠️ Firestore permission denied when updating user profile');
+          } else {
+            throw updateError;
+          }
+        }
+      }
+    } catch (error: unknown) {
+      const firestoreError = error as { code?: string; message?: string };
+      
+      // Handle permission errors gracefully
+      if (firestoreError.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied - user may need to authenticate with Firebase first');
+        console.warn('   The sync will still work with the manual OAuth UID, but Firestore profile creation may be delayed');
+      } else {
+        console.error('❌ Error ensuring user profile exists:', error);
+      }
+    }
+  }
 }
 
 export const firebaseService = new FirebaseService();

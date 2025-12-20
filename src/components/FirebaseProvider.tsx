@@ -52,7 +52,18 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     
     // Also check for manual OAuth users (Electron) and initialize sync if needed
     // This ensures sync works even when using Desktop App OAuth instead of Firebase Auth
+    let checkAttempts = 0;
+    const maxCheckAttempts = 3;
+    
     const checkManualAuthUser = async () => {
+      // Prevent infinite retry loop
+      if (checkAttempts >= maxCheckAttempts) {
+        console.log('ℹ️ FirebaseProvider: Max check attempts reached, stopping manual auth user check');
+        return;
+      }
+      
+      checkAttempts++;
+      
       try {
         // Wait a bit for services to initialize
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -62,8 +73,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         
         if (!firebaseService.isInitialized()) {
           console.log('⚠️ FirebaseProvider: Firebase not initialized, will retry sync initialization later');
-          // Retry after another delay
-          setTimeout(checkManualAuthUser, 3000);
+          if (checkAttempts < maxCheckAttempts) {
+            setTimeout(checkManualAuthUser, 3000);
+          }
           return;
         }
         
@@ -74,23 +86,28 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (manualUser && !manualUser.isAnonymous && manualUser.email) {
           const firebaseUser = firebaseService.getCurrentUser();
           
-          // If no Firebase Auth user or anonymous, try to find/create Firestore user
+          // If no Firebase Auth user or anonymous, create Firestore user and initialize sync
           if (!firebaseUser || firebaseUser.isAnonymous) {
-            console.log('🔄 FirebaseProvider: Checking Firestore for manual OAuth user:', manualUser.email);
+            console.log('🔄 FirebaseProvider: Manual OAuth user detected, creating Firestore user:', manualUser.email);
             
-            // Try to find existing user in Firestore by email
-            let firestoreUser = await firebaseService.findUserByEmail(manualUser.email);
-            
-            if (firestoreUser && firestoreUser.uid) {
-              console.log('✅ FirebaseProvider: Found Firestore user, initializing sync with UID:', firestoreUser.uid);
-              // Initialize sync with the Firestore user ID
-              await firebaseSyncService.initializeSync(firestoreUser.uid);
+            // Create or get Firestore user for manual OAuth user
+            try {
+              // Try to create/get user in Firestore using the manual OAuth UID
+              const firestoreUserId = manualUser.uid;
+              
+              // Initialize sync with the manual OAuth UID
+              // The sync service will create the Firestore document if it doesn't exist
+              console.log('🔄 FirebaseProvider: Initializing sync with manual OAuth UID:', firestoreUserId);
+              await firebaseSyncService.initializeSync(firestoreUserId);
               console.log('✅ FirebaseProvider: Sync initialized for manual OAuth user');
-            } else {
-              console.log('⚠️ FirebaseProvider: No Firestore user found for', manualUser.email);
-              console.log('   Sync will be initialized when user data is created in Firestore');
-              // Retry later in case user data is being created
-              setTimeout(checkManualAuthUser, 5000);
+              
+              // Also ensure the user profile exists in Firestore
+              await firebaseService.ensureUserProfileExists(manualUser);
+            } catch (syncError) {
+              console.error('❌ FirebaseProvider: Failed to initialize sync for manual OAuth user:', syncError);
+              if (checkAttempts < maxCheckAttempts) {
+                setTimeout(checkManualAuthUser, 5000);
+              }
             }
           } else if (firebaseUser && !firebaseUser.isAnonymous) {
             // Firebase user exists, initialize sync
@@ -103,8 +120,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.warn('FirebaseProvider: Error checking manual auth user:', error);
-        // Retry after delay
-        setTimeout(checkManualAuthUser, 5000);
+        if (checkAttempts < maxCheckAttempts) {
+          setTimeout(checkManualAuthUser, 5000);
+        }
       }
     };
     

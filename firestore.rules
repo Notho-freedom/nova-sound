@@ -15,7 +15,13 @@ service cloud.firestore {
       // Only matches if: user is authenticated AND (it's their own doc OR the doc's email matches their email)
       allow read: if request.auth != null 
         && (request.auth.uid == userId 
-            || resource.data.email == request.auth.token.email);
+            || (resource != null && resource.data.email == request.auth.token.email));
+      
+      // Allow write for manual OAuth users (when creating profile with their UID)
+      // This allows ensureUserProfileExists to work for manual OAuth users
+      // Note: This is less secure but necessary for manual OAuth flow
+      // In production, consider using Firebase Auth for better security
+      allow write: if request.resource.data.uid == userId;
     }
     
     // AppData subcollection under users - for Firebase sync

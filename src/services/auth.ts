@@ -770,7 +770,7 @@ class AuthService {
       }
 
       // Create profile
-      const profile = this.createGoogleProfile(userInfo, tokens);
+      const profile = await this.createGoogleProfile(userInfo, tokens);
       this.currentUser = profile;
       this.saveToStorage();
 
@@ -791,7 +791,7 @@ class AuthService {
   }
 
   // Create new Google profile (manual OAuth, not Firebase)
-  private createGoogleProfile(userInfo: any, tokens: AuthTokens): UserProfile {
+  private async createGoogleProfile(userInfo: any, tokens: AuthTokens): Promise<UserProfile> {
     const profile: UserProfile = {
       uid: userInfo.id || userInfo.sub || `user_${Date.now()}`,
       email: userInfo.email || "",
@@ -809,6 +809,16 @@ class AuthService {
     
     // Setup automatic token refresh
     this.setupTokenRefresh();
+
+    // Try to create/update user in Firestore (non-blocking)
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized()) {
+        await firebaseService.ensureUserProfileExists(profile);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not create Firestore user profile (non-blocking):', error);
+    }
 
     // Notify listeners
     this.authStateListeners.forEach((listener) => listener(profile));
