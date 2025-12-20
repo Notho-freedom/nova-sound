@@ -977,16 +977,26 @@ export const DesktopApp = () => {
   }, [libraryTracks, getUniqueTracks]);
 
   // Get album tracks for current track - without duplicates
+  // Se met à jour automatiquement quand currentTrack change
   const albumTracks = useMemo(() => {
     if (!currentTrack) return [];
+    // Pour les tracks YouTube, pas d'album réel
+    if (currentTrack.mediaSource === 'youtube') return [];
     const filtered = libraryTracks.filter(t => t.album === currentTrack.album && t.artist === currentTrack.artist);
     const unique = getUniqueTracks(filtered);
     return unique.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
-  }, [currentTrack, libraryTracks, getUniqueTracks]);
+  }, [currentTrack?.id, currentTrack?.album, currentTrack?.artist, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
   // Get similar tracks (same artist or genre, random selection) - without duplicates
+  // Se met à jour automatiquement quand currentTrack change
+  // Note: Pour les tracks YouTube, les tracks similaires sont chargés directement dans QueuePanel
   const similarTracks = useMemo(() => {
     if (!currentTrack) return [];
+    
+    // Pour les tracks YouTube, retourner un tableau vide (sera géré par QueuePanel)
+    if (currentTrack.mediaSource === 'youtube') {
+      return [];
+    }
     
     // Find tracks with same artist or genre
     const candidates = libraryTracks.filter(t => 
@@ -999,7 +1009,7 @@ export const DesktopApp = () => {
     const unique = getUniqueTracks(candidates);
     const shuffled = [...unique].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 20);
-  }, [currentTrack, libraryTracks, getUniqueTracks]);
+  }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
   const handlePlayTrack = useCallback((track: Track) => {
     const trackIndex = tracks.findIndex(t => t.id === track.id);
@@ -1417,6 +1427,7 @@ export const DesktopApp = () => {
                   similarTracks={similarTracks}
                   historyTracks={historyTracks}
                   onPlayTrack={handlePlayTrack}
+                  currentTrack={currentTrack}
                 />
               </div>
             )}

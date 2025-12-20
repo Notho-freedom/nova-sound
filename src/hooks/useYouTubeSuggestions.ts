@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Hook pour gérer les suggestions YouTube
  * Basé sur l'historique de l'utilisateur (audio local et vidéos YouTube)
@@ -140,3 +142,6 @@ export function useYouTubeSuggestions(): UseYouTubeSuggestionsReturn {
     loadRelated,
   };
 }
+
+// Export par défaut pour compatibilité
+export default useYouTubeSuggestions;

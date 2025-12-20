@@ -1,10 +1,12 @@
-import { X, GripVertical, Play, Pause, Disc3, Radio, Clock } from "lucide-react";
+import { X, GripVertical, Play, Pause, Disc3, Radio, Clock, Loader2 } from "lucide-react";
+import { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useYouTubeSimilarTracks } from "@/hooks/useYouTubeSimilarTracks";
 
 interface QueuePanelProps {
   tracks: Track[];
@@ -16,6 +18,7 @@ interface QueuePanelProps {
   similarTracks?: Track[];
   historyTracks?: Track[];
   onPlayTrack?: (track: Track) => void;
+  currentTrack?: Track | null; // Track actuellement en lecture
 }
 
 const formatTime = (seconds: number) => {
@@ -82,11 +85,26 @@ export const QueuePanel = ({
   onTrackSelect,
   onClose,
   albumTracks = [],
-  similarTracks = [],
+  similarTracks: propSimilarTracks = [],
   historyTracks = [],
   onPlayTrack,
+  currentTrack: propCurrentTrack,
 }: QueuePanelProps) => {
-  const currentTrack = tracks[currentTrackIndex];
+  const currentTrack = propCurrentTrack || tracks[currentTrackIndex];
+
+  // Hook pour charger les tracks YouTube similaires
+  const { 
+    similarTracks: youtubeSimilarTracks, 
+    loading: loadingYouTubeSimilar,
+    loadSimilar: loadYouTubeSimilar 
+  } = useYouTubeSimilarTracks();
+
+  // Charger les tracks YouTube similaires quand le track actuel change
+  useEffect(() => {
+    if (currentTrack && currentTrack.mediaSource === 'youtube') {
+      loadYouTubeSimilar(currentTrack);
+    }
+  }, [currentTrack?.id, currentTrack?.mediaSource, currentTrack?.artist, currentTrack?.youtubeVideoId, loadYouTubeSimilar]);
 
   // File: Tous les tracks de l'album (flux de l'album complet)
   const albumTracksForFile = albumTracks.length > 0 && currentTrack
@@ -101,6 +119,11 @@ export const QueuePanel = ({
       })()
     : [];
 
+  // Similaire: Utiliser les tracks YouTube si c'est un track YouTube, sinon les tracks locaux
+  const similarTracksForDisplay = currentTrack?.mediaSource === 'youtube' 
+    ? youtubeSimilarTracks 
+    : propSimilarTracks;
+
   return (
     <div className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl">
       {/* Header */}
@@ -110,6 +133,7 @@ export const QueuePanel = ({
         </h2>
         <button
           onClick={onClose}
+          title="Fermer la file d'attente"
           className="p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
         >
           <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
@@ -167,7 +191,7 @@ export const QueuePanel = ({
               className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
             >
               <Radio className="w-3 h-3 mr-1" />
-              Similaire ({similarTracks.length})
+              Similaire ({similarTracksForDisplay.length})
             </TabsTrigger>
             <TabsTrigger 
               value="history" 
@@ -216,7 +240,12 @@ export const QueuePanel = ({
 
           {/* Similaire: Flux YouTube pour tracks YouTube, tracks locaux pour tracks locaux */}
           <TabsContent value="similar" className="p-4 mt-0">
-            {similarTracks.length > 0 ? (
+            {loadingYouTubeSimilar && currentTrack?.mediaSource === 'youtube' ? (
+              <div className="text-center py-8 text-muted-foreground text-sm flex flex-col items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Chargement du flux YouTube...</span>
+              </div>
+            ) : similarTracksForDisplay.length > 0 ? (
               <div>
                 {currentTrack && (
                   <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
@@ -234,7 +263,7 @@ export const QueuePanel = ({
                   </div>
                 )}
                 <div className="space-y-0.5">
-                  {similarTracks.map((track) => (
+                  {similarTracksForDisplay.map((track) => (
                     <TrackItem
                       key={track.id}
                       track={track}
@@ -246,7 +275,7 @@ export const QueuePanel = ({
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 {currentTrack?.mediaSource === 'youtube' 
-                  ? "Chargement du flux YouTube..."
+                  ? "Aucune vidéo YouTube similaire trouvée"
                   : "Aucune piste similaire trouvée"}
               </div>
             )}
