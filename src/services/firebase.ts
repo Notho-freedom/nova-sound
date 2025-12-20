@@ -745,7 +745,7 @@ class FirebaseService {
         console.log("👂 Setting up real-time profile listener for user:", uid);
         this.profileSnapshotUnsubscribe = onSnapshot(
           userRef,
-          (snapshot) => {
+          async (snapshot) => {
             if (snapshot.exists()) {
               const updatedProfile = snapshot.data() as UserProfile;
               const previousPlan = this.userProfile?.plan;
@@ -765,6 +765,31 @@ class FirebaseService {
               
               if (planChanged || statusChanged) {
                 console.log(`✨ Plan/Status changed: ${previousPlan}/${previousStatus} → ${updatedProfile.plan}/${updatedProfile.subscriptionStatus}`);
+              }
+              
+              // Si le profil a été mis à jour par un webhook Stripe, vérifier qu'il est bien synchronisé
+              // Cette vérification se fait en arrière-plan et ne bloque pas l'UI
+              if (planChanged || statusChanged) {
+                try {
+                  // Vérifier avec Stripe pour s'assurer que Firestore est à jour
+                  // (le webhook devrait avoir déjà mis à jour, mais on vérifie au cas où)
+                  const { stripeService } = await import('./stripe');
+                  if (stripeService.isInitialized()) {
+                    const stripeStatus = await stripeService.getSubscriptionStatus();
+                    const needsSync = 
+                      stripeStatus.plan !== updatedProfile.plan ||
+                      stripeStatus.status !== updatedProfile.subscriptionStatus;
+                    
+                    if (needsSync) {
+                      console.log('🔄 Détection d\'incohérence après mise à jour Firestore, synchronisation avec Stripe...');
+                      // La synchronisation se fera automatiquement via l'endpoint subscription-status
+                      // qui détecte et corrige les incohérences
+                    }
+                  }
+                } catch (error) {
+                  // Ne pas bloquer si la vérification échoue
+                  console.warn('⚠️ Erreur lors de la vérification Stripe (non-bloquant):', error);
+                }
               }
               
               // Always notify listeners to ensure UI is updated with latest profile

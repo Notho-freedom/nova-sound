@@ -44,6 +44,8 @@ import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { YouTubePlayer } from "@/components/YouTubePlayer";
+import { detectMediaSource, extractYouTubeVideoId } from "@/lib/youtube";
 import { CinemaMode } from "@/components/CinemaMode";
 import { VideoHero } from "@/components/VideoHero";
 import { VideoCarousel } from "@/components/VideoCarousel";
@@ -344,6 +346,11 @@ export const VideosView = () => {
       }
     };
 
+    // Détecter si c'est une vidéo YouTube
+    const mediaSource = selectedVideo.mediaSource || detectMediaSource(selectedVideo.filePath);
+    const isYouTube = mediaSource === 'youtube';
+    const youtubeVideoId = selectedVideo.youtubeVideoId || (isYouTube ? extractYouTubeVideoId(selectedVideo.filePath) : null);
+
     return (
       <div
         className={cn(
@@ -351,24 +358,48 @@ export const VideosView = () => {
           isFullApp ? "fixed inset-0 z-[9998]" : "absolute inset-0"
         )}
       >
-        <VideoPlayer
-          video={selectedVideo}
-          videos={displayVideos}
-          onClose={() => {
-            setIsFullApp(false);
-            setSelectedVideo(null);
-            setYoutubeAudioOnly(false);
-          }}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-          className="w-full h-full"
-          showControls={true}
-          autoPlay={true}
-          onFullApp={() => setIsFullApp(!isFullApp)}
-          onCinemaMode={() => setIsCinemaMode(true)}
-          isFullApp={isFullApp}
-          audioOnly={youtubeAudioOnly}
-        />
+        {/* TEMPORAIRE: Utiliser YouTubePlayer directement pour les vidéos YouTube */}
+        {isYouTube && youtubeVideoId ? (
+          <div className="relative w-full h-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setIsFullApp(false);
+                setSelectedVideo(null);
+                setYoutubeAudioOnly(false);
+              }}
+              className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+            <YouTubePlayer
+              videoId={youtubeVideoId}
+              autoPlay={true}
+              audioOnly={youtubeAudioOnly}
+              className="w-full h-full"
+            />
+          </div>
+        ) : (
+          <VideoPlayer
+            video={selectedVideo}
+            videos={displayVideos}
+            onClose={() => {
+              setIsFullApp(false);
+              setSelectedVideo(null);
+              setYoutubeAudioOnly(false);
+            }}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            className="w-full h-full"
+            showControls={true}
+            autoPlay={true}
+            onFullApp={() => setIsFullApp(!isFullApp)}
+            onCinemaMode={() => setIsCinemaMode(true)}
+            isFullApp={isFullApp}
+            audioOnly={youtubeAudioOnly}
+          />
+        )}
       </div>
     );
   }

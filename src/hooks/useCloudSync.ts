@@ -121,6 +121,42 @@ export function useCloudSync(): UseCloudSyncReturn {
             setNexusIsPro(firebaseService.isPro());
             anonymousUserInitRef.current = true;
             console.log("✅ Using existing Firebase Google user:", firebaseUser.email);
+            
+            // Synchroniser automatiquement le profil Firestore avec Stripe au démarrage
+            // Cela garantit que Firestore est toujours à jour avec les données Stripe réelles
+            try {
+              const { stripeService } = await import('@/services/stripe');
+              if (stripeService.isInitialized()) {
+                const idToken = await firebaseService.getIdToken();
+                if (idToken) {
+                  console.log('🔄 useCloudSync: Synchronisation automatique Firestore ↔ Stripe au démarrage...');
+                  const syncResponse = await fetch('/api/stripe/sync-profile', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${idToken}`,
+                    },
+                  });
+                  
+                  if (syncResponse.ok) {
+                    console.log('✅ useCloudSync: Profil synchronisé avec Stripe au démarrage');
+                    // Forcer le rafraîchissement du profil pour mettre à jour l'UI
+                    await firebaseService.refreshProfile();
+                    // Mettre à jour l'état avec le profil rafraîchi
+                    const refreshedProfile = firebaseService.getUserProfile();
+                    if (refreshedProfile) {
+                      setNexusUser(refreshedProfile);
+                      setNexusIsPro(refreshedProfile.plan === 'pro' && refreshedProfile.subscriptionStatus === 'active');
+                    }
+                  } else {
+                    console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation:', await syncResponse.text());
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation Stripe (non-bloquant):', error);
+            }
+            
             return;
           }
         }
@@ -825,7 +861,42 @@ export function useCloudSync(): UseCloudSyncReturn {
 
     setSyncLoading(true);
     try {
+      // Synchroniser Firebase d'abord
       await nexusServerService.startSync();
+
+      // Ensuite, synchroniser Stripe avec Firestore si l'utilisateur est authentifié
+      if (nexusAuthenticated) {
+        try {
+          const { firebaseService } = await import('@/services/firebase');
+          const currentUser = firebaseService.getCurrentUser();
+          if (currentUser && !currentUser.isAnonymous) {
+            const idToken = await firebaseService.getIdToken();
+            if (idToken) {
+              console.log('🔄 useCloudSync: Synchronisation Stripe ↔ Firestore...');
+              const syncResponse = await fetch('/api/stripe/sync-profile', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${idToken}`,
+                },
+              });
+              
+              if (syncResponse.ok) {
+                console.log('✅ useCloudSync: Profil Stripe synchronisé');
+                // Forcer le rafraîchissement du profil pour mettre à jour l'UI
+                await firebaseService.refreshProfile();
+                // Mettre à jour l'état local
+                await refreshUser();
+              } else {
+                console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation Stripe:', await syncResponse.text());
+              }
+            }
+          }
+        } catch (stripeError) {
+          // Ne pas bloquer la synchronisation Firebase si Stripe échoue
+          console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation Stripe (non-bloquant):', stripeError);
+        }
+      }
 
       // Update sync status
       const status = await nexusServerService.getSyncStatus();
@@ -844,7 +915,7 @@ export function useCloudSync(): UseCloudSyncReturn {
     } finally {
       setSyncLoading(false);
     }
-  }, [nexusAuthenticated, cloudinaryConfigured]);
+  }, [nexusAuthenticated, cloudinaryConfigured, refreshUser]);
 
   const isUploading =
     uploadProgress.size > 0 &&

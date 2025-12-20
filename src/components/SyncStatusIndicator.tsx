@@ -201,7 +201,38 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     window.dispatchEvent(new CustomEvent("nexus-sync-start"));
     
     try {
+      // Synchroniser Firebase d'abord
       await firebaseSyncService.forceSyncNow();
+      
+      // Ensuite, synchroniser Stripe avec Firestore
+      try {
+        const currentUser = firebaseService.getCurrentUser();
+        if (currentUser && !currentUser.isAnonymous) {
+          const idToken = await firebaseService.getIdToken();
+          if (idToken) {
+            console.log('🔄 SyncStatusIndicator: Synchronisation Stripe ↔ Firestore...');
+            const syncResponse = await fetch('/api/stripe/sync-profile', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${idToken}`,
+              },
+            });
+            
+            if (syncResponse.ok) {
+              console.log('✅ SyncStatusIndicator: Profil Stripe synchronisé');
+              // Forcer le rafraîchissement du profil pour mettre à jour l'UI
+              await firebaseService.refreshProfile();
+            } else {
+              console.warn('⚠️ SyncStatusIndicator: Erreur lors de la synchronisation Stripe:', await syncResponse.text());
+            }
+          }
+        }
+      } catch (stripeError) {
+        // Ne pas bloquer la synchronisation Firebase si Stripe échoue
+        console.warn('⚠️ SyncStatusIndicator: Erreur lors de la synchronisation Stripe (non-bloquant):', stripeError);
+      }
+      
       window.dispatchEvent(new CustomEvent("nexus-sync-complete"));
     } catch (error) {
       console.error("Manual sync failed:", error);

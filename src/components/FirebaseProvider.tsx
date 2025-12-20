@@ -30,6 +30,39 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setInitialized(true); // Continuer même en cas d'erreur
     });
 
+    // Fonction pour synchroniser le profil Firestore avec Stripe
+    const syncProfileWithStripe = async (userId: string) => {
+      try {
+        const { firebaseService: fbService } = await import('@/services/firebase');
+        const currentUser = fbService.getCurrentUser();
+        if (!currentUser || currentUser.isAnonymous) return;
+        
+        const idToken = await fbService.getIdToken();
+        if (!idToken) return;
+        
+        console.log('🔄 FirebaseProvider: Synchronisation automatique Firestore ↔ Stripe...');
+        const syncResponse = await fetch('/api/stripe/sync-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+        
+        if (syncResponse.ok) {
+          console.log('✅ FirebaseProvider: Profil synchronisé avec Stripe');
+          // Forcer le rafraîchissement du profil pour mettre à jour l'UI
+          await fbService.refreshProfile();
+        } else {
+          const errorText = await syncResponse.text();
+          console.warn('⚠️ FirebaseProvider: Erreur lors de la synchronisation:', errorText);
+        }
+      } catch (error) {
+        console.warn('⚠️ FirebaseProvider: Erreur lors de la synchronisation Stripe (non-bloquant):', error);
+      }
+    };
+    
+
     // S'abonner aux changements d'authentification Firebase
     const unsubscribe = firebaseService.onAuthStateChange(async (user) => {
       if (user && !user.isAnonymous) {
@@ -38,6 +71,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           console.log('🔄 FirebaseProvider: Initializing sync for Firebase user:', user.uid);
           await firebaseSyncService.initializeSync(user.uid);
           console.log('✅ FirebaseProvider: Sync initialized successfully for Firebase user');
+          
+          // Synchroniser automatiquement le profil Firestore avec Stripe au démarrage
+          // Cela garantit que Firestore est toujours à jour avec les données Stripe réelles
+          await syncProfileWithStripe(user.uid);
+          
+          // Le polling périodique a été retiré - la synchronisation se fait maintenant via le système de sync de la sidebar
+          // Le webhook Stripe met à jour Firestore automatiquement, et l'utilisateur peut forcer une sync via le bouton de la sidebar
         } catch (error) {
           console.error('❌ FirebaseProvider: Failed to initialize sync:', error);
         }
@@ -106,6 +146,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               console.log('🔄 FirebaseProvider: Initializing sync with manual OAuth UID:', firestoreUserId);
               await firebaseSyncService.initializeSync(firestoreUserId);
               console.log('✅ FirebaseProvider: Sync initialized for manual OAuth user');
+              
+              // Synchroniser automatiquement le profil Firestore avec Stripe
+              await syncProfileWithStripe(firestoreUserId);
             } catch (syncError) {
               console.error('❌ FirebaseProvider: Failed to initialize sync for manual OAuth user:', syncError);
               if (checkAttempts < maxCheckAttempts) {
@@ -117,6 +160,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
             console.log('🔄 FirebaseProvider: Firebase user exists, initializing sync');
             await firebaseSyncService.initializeSync(firebaseUser.uid);
             console.log('✅ FirebaseProvider: Sync initialized for Firebase user');
+            
+            // Synchroniser automatiquement le profil Firestore avec Stripe
+            await syncProfileWithStripe(firebaseUser.uid);
           }
         } else {
           console.log('ℹ️ FirebaseProvider: No manual OAuth user found');

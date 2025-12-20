@@ -316,6 +316,53 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        
+        // Only process if it's a subscription invoice
+        if (!(invoice as any).subscription || !invoice.customer) {
+          break;
+        }
+        
+        const customerId = typeof invoice.customer === 'string' 
+          ? invoice.customer 
+          : invoice.customer.id;
+
+        const userId = await getUserIdFromStripe(customerId, invoice.metadata || undefined);
+        
+        if (!userId) {
+          console.warn(`⚠️ Could not find userId for customer ${customerId} (payment failed)`);
+          break;
+        }
+
+        // Get subscription to check status
+        const subscriptionId = typeof (invoice as any).subscription === 'string' 
+          ? (invoice as any).subscription 
+          : (invoice as any).subscription.id;
+
+        try {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const priceId = subscription.items.data[0]?.price.id;
+          const isPro = priceId === PRICE_PRO_MONTHLY || priceId === PRICE_PRO_YEARLY;
+
+          if (isPro) {
+            // Update status to past_due if payment failed
+            const admin = getFirebaseAdmin();
+            const db = admin.firestore();
+            const userRef = db.collection('users').doc(userId);
+            
+            await userRef.update({
+              subscriptionStatus: subscription.status, // 'past_due' or 'unpaid'
+              updatedAt: admin.firestore.Timestamp.now(),
+            });
+            console.log(`✅ Updated user ${userId} subscription status to ${subscription.status} (payment failed)`);
+          }
+        } catch (error) {
+          console.error(`❌ Error updating subscription status after payment failure:`, error);
+        }
+        break;
+      }
+
       default:
         console.log(`ℹ️ Unhandled event type: ${event.type}`);
     }
