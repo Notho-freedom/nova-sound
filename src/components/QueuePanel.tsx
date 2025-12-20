@@ -88,11 +88,16 @@ export const QueuePanel = ({
 }: QueuePanelProps) => {
   const currentTrack = tracks[currentTrackIndex];
 
-  // File: Album tracks from current track onwards (suite de l'album)
-  const albumTracksFromCurrent = albumTracks.length > 0 && currentTrack
+  // File: Tous les tracks de l'album (flux de l'album complet)
+  const albumTracksForFile = albumTracks.length > 0 && currentTrack
     ? (() => {
-        const currentIndex = albumTracks.findIndex(t => t.id === currentTrack.id);
-        return currentIndex >= 0 ? albumTracks.slice(currentIndex + 1) : [];
+        // Pour les tracks locaux, afficher tous les tracks de l'album
+        // Pour les tracks YouTube, ne pas afficher de tracks d'album (pas d'album réel)
+        if (currentTrack.mediaSource === 'youtube') {
+          return [];
+        }
+        // Exclure le track actuel
+        return albumTracks.filter(t => t.id !== currentTrack.id);
       })()
     : [];
 
@@ -155,7 +160,7 @@ export const QueuePanel = ({
               className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
             >
               <Disc3 className="w-3 h-3 mr-1" />
-              File ({albumTracksFromCurrent.length})
+              File ({albumTracksForFile.length})
             </TabsTrigger>
             <TabsTrigger 
               value="similar" 
@@ -175,9 +180,9 @@ export const QueuePanel = ({
         </div>
 
         <ScrollArea className="flex-1">
-          {/* File: Suite de l'album */}
+          {/* File: Flux de l'album complet */}
           <TabsContent value="file" className="p-4 mt-0">
-            {albumTracksFromCurrent.length > 0 ? (
+            {albumTracksForFile.length > 0 ? (
               <div>
                 <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
                   <p className="text-xs text-muted-foreground mb-1">Album en lecture</p>
@@ -189,7 +194,7 @@ export const QueuePanel = ({
                   </p>
                 </div>
                 <div className="space-y-0.5">
-                  {albumTracksFromCurrent.map((track) => (
+                  {albumTracksForFile.map((track) => (
                     <TrackItem
                       key={track.id}
                       track={track}
@@ -201,20 +206,22 @@ export const QueuePanel = ({
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 {currentTrack 
-                  ? `Aucune autre piste dans l'album "${currentTrack.album}"`
+                  ? currentTrack.mediaSource === 'youtube'
+                    ? "Les vidéos YouTube n'ont pas d'album associé"
+                    : `Aucune autre piste dans l'album "${currentTrack.album}"`
                   : "Aucun album en lecture"}
               </div>
             )}
           </TabsContent>
 
-          {/* Similaire */}
+          {/* Similaire: Flux YouTube pour tracks YouTube, tracks locaux pour tracks locaux */}
           <TabsContent value="similar" className="p-4 mt-0">
             {similarTracks.length > 0 ? (
               <div>
                 {currentTrack && (
                   <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
                     <p className="text-xs text-muted-foreground mb-1">
-                      {currentTrack.mediaSource === 'youtube' ? 'Vidéos YouTube' : 'Bibliothèque locale'}
+                      {currentTrack.mediaSource === 'youtube' ? 'Flux YouTube' : 'Bibliothèque locale'}
                     </p>
                     <p className="text-sm font-medium text-foreground">
                       {currentTrack.artist}
@@ -239,7 +246,7 @@ export const QueuePanel = ({
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 {currentTrack?.mediaSource === 'youtube' 
-                  ? "Chargement des vidéos similaires..."
+                  ? "Chargement du flux YouTube..."
                   : "Aucune piste similaire trouvée"}
               </div>
             )}
