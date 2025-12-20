@@ -109,6 +109,51 @@ export async function GET(request: NextRequest) {
       expectedYearly: PRICE_PRO_YEARLY,
     });
 
+    // IMPORTANT: Synchroniser Firestore avec les données Stripe réelles si incohérence détectée
+    // Cela garantit que Firestore est toujours à jour avec Stripe
+    try {
+      const { getFirebaseAdmin } = await import('~/lib/firebaseAdmin');
+      const admin = getFirebaseAdmin();
+      const db = admin.firestore();
+      const userRef = db.collection('users').doc(auth.userId);
+      const userDoc = await userRef.get();
+      
+      if (userDoc.exists) {
+        const currentProfile = userDoc.data();
+        const needsUpdate = 
+          currentProfile?.plan !== subscriptionData.plan ||
+          currentProfile?.subscriptionStatus !== subscription.status ||
+          currentProfile?.subscriptionId !== subscription.id;
+        
+        if (needsUpdate) {
+          console.log('🔄 [SYNC] Mise à jour Firestore avec données Stripe réelles:', {
+            oldPlan: currentProfile?.plan,
+            newPlan: subscriptionData.plan,
+            oldStatus: currentProfile?.subscriptionStatus,
+            newStatus: subscription.status,
+          });
+          
+          const updateData: any = {
+            plan: subscriptionData.plan,
+            subscriptionStatus: subscription.status,
+            subscriptionId: subscription.id,
+            stripeCustomerId: customer.id,
+            updatedAt: admin.firestore.Timestamp.now(),
+          };
+          
+          if (subscription.current_period_end) {
+            updateData.subscriptionEndDate = new Date(subscription.current_period_end * 1000).toISOString();
+          }
+          
+          await userRef.update(updateData);
+          console.log('✅ [SYNC] Firestore mis à jour avec données Stripe');
+        }
+      }
+    } catch (syncError) {
+      // Ne pas bloquer la réponse si la synchronisation échoue
+      console.warn('⚠️ Erreur lors de la synchronisation Firestore (non-bloquant):', syncError);
+    }
+
     return NextResponse.json(subscriptionData);
   } catch (error: any) {
     console.error('Error getting subscription status:', error);

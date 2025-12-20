@@ -625,6 +625,55 @@ export const SettingsView = () => {
         const stripeStatus = await stripeService.getSubscriptionStatus();
         console.log('✅ SettingsView: Données Stripe récupérées:', stripeStatus);
         
+        // Vérifier l'incohérence avec Firestore
+        const profile = firebaseService.getUserProfile();
+        if (profile) {
+          const firestorePlan = profile.plan;
+          const firestoreStatus = profile.subscriptionStatus;
+          const stripePlan = stripeStatus.plan;
+          const stripeStatusValue = stripeStatus.status;
+          
+          // Détecter une incohérence
+          if (
+            (stripePlan === 'pro' && firestorePlan !== 'pro') ||
+            (stripePlan === 'free' && firestorePlan === 'pro') ||
+            (stripeStatusValue !== firestoreStatus && stripeStatusValue !== 'none')
+          ) {
+            console.warn('⚠️ INCOHÉRENCE DÉTECTÉE entre Stripe et Firestore:');
+            console.warn('   Stripe:', { plan: stripePlan, status: stripeStatusValue });
+            console.warn('   Firestore:', { plan: firestorePlan, status: firestoreStatus });
+            console.log('🔄 Synchronisation de Firestore avec Stripe...');
+            
+            // Synchroniser Firestore avec les données Stripe réelles
+            try {
+              const { firebaseService: fbService } = await import('@/services/firebase');
+              const currentUser = fbService.getCurrentUser();
+              if (currentUser && !currentUser.isAnonymous) {
+                const idToken = await fbService.getIdToken();
+                if (idToken) {
+                  const syncResponse = await fetch('/api/stripe/sync-profile', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${idToken}`,
+                    },
+                  });
+                  
+                  if (syncResponse.ok) {
+                    console.log('✅ Firestore synchronisé avec Stripe');
+                    // Forcer le rafraîchissement du profil
+                    await fbService.refreshProfile();
+                  } else {
+                    console.error('❌ Erreur lors de la synchronisation:', await syncResponse.text());
+                  }
+                }
+              }
+            } catch (syncError) {
+              console.error('❌ Erreur lors de la synchronisation Firestore:', syncError);
+            }
+          }
+        }
+        
         // Utiliser UNIQUEMENT les données Stripe (source de vérité)
         setSubscriptionStatus(stripeStatus);
       } catch (error) {
@@ -1926,6 +1975,57 @@ export const SettingsView = () => {
                   </div>
                 ) : subscriptionStatus ? (
                   <div className="space-y-4">
+                    {/* Bouton de synchronisation manuelle */}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          if (!nexusAuthenticated) return;
+                          setSubscriptionLoading(true);
+                          try {
+                            const { firebaseService: fbService } = await import('@/services/firebase');
+                            const currentUser = fbService.getCurrentUser();
+                            if (currentUser && !currentUser.isAnonymous) {
+                              const idToken = await fbService.getIdToken();
+                              if (idToken) {
+                                const syncResponse = await fetch('/api/stripe/sync-profile', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: `Bearer ${idToken}`,
+                                  },
+                                });
+                                
+                                if (syncResponse.ok) {
+                                  toast.success('Profil synchronisé avec Stripe');
+                                  // Forcer le rafraîchissement du profil
+                                  await fbService.refreshProfile();
+                                  // Recharger le statut depuis Stripe
+                                  const status = await stripeService.getSubscriptionStatus();
+                                  setSubscriptionStatus(status);
+                                } else {
+                                  const error = await syncResponse.json();
+                                  toast.error('Erreur de synchronisation', {
+                                    description: error.error || 'Impossible de synchroniser avec Stripe',
+                                  });
+                                }
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Erreur lors de la synchronisation:', error);
+                            toast.error('Erreur de synchronisation');
+                          } finally {
+                            setSubscriptionLoading(false);
+                          }
+                        }}
+                        disabled={subscriptionLoading || !nexusAuthenticated}
+                        className="gap-2"
+                      >
+                        <RefreshCw className={cn("w-4 h-4", subscriptionLoading && "animate-spin")} />
+                        Synchroniser avec Stripe
+                      </Button>
+                    </div>
                     <div className="text-center py-4">
                       <div className={cn(
                         "inline-block px-4 py-2 rounded-lg text-sm font-medium mb-3",

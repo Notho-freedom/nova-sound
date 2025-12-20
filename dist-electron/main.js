@@ -280,31 +280,64 @@ function createWindow() {
 }
 // Initialize all services
 async function initServices() {
-    // Initialize storage first (other services depend on it)
-    initStorage();
+    console.log('🔧 Initializing Electron services...');
+    try {
+        // Initialize storage first (other services depend on it)
+        console.log('📦 Initializing storage...');
+        initStorage();
+        console.log('✅ Storage initialized');
+    }
+    catch (error) {
+        console.error('❌ Failed to initialize storage:', error);
+        throw error; // Storage is critical, fail if it doesn't initialize
+    }
     // Initialize updater with callback for UI notification
     if (!isDev && !cliOptions.dev) {
-        await initUpdater((versionInfo) => {
-            // Notifier l'UI qu'une mise à jour a été effectuée
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('update:available', {
-                    version: versionInfo.version,
-                    changelog: versionInfo.changelog,
-                    buildDate: versionInfo.buildDate,
-                    commits: versionInfo.commits || [],
-                });
-            }
-        });
+        try {
+            console.log('🔄 Initializing updater...');
+            await initUpdater((versionInfo) => {
+                // Notifier l'UI qu'une mise à jour a été effectuée
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('update:available', {
+                        version: versionInfo.version,
+                        changelog: versionInfo.changelog,
+                        buildDate: versionInfo.buildDate,
+                        commits: versionInfo.commits || [],
+                    });
+                }
+            });
+            console.log('✅ Updater initialized');
+        }
+        catch (error) {
+            console.warn('⚠️ Failed to initialize updater (non-critical):', error);
+        }
     }
-    // Initialize other services
-    initMetadataExtractor();
-    initAudioScanner();
-    initVideoScanner();
-    initPlaylistManager();
-    initEqualizer();
-    initLyricsProvider();
-    initScrobbler();
-    initMusicRecognizer();
+    // Initialize other services with error handling
+    const services = [
+        { name: 'Metadata Extractor', init: initMetadataExtractor },
+        { name: 'Audio Scanner', init: initAudioScanner },
+        { name: 'Video Scanner', init: initVideoScanner },
+        { name: 'Playlist Manager', init: initPlaylistManager },
+        { name: 'Equalizer', init: initEqualizer },
+        { name: 'Lyrics Provider', init: initLyricsProvider },
+        { name: 'Scrobbler', init: initScrobbler },
+        { name: 'Music Recognizer', init: initMusicRecognizer },
+    ];
+    for (const service of services) {
+        try {
+            console.log(`🔧 Initializing ${service.name}...`);
+            service.init();
+            console.log(`✅ ${service.name} initialized`);
+        }
+        catch (error) {
+            console.error(`❌ Failed to initialize ${service.name}:`, error);
+            // Continue with other services even if one fails
+        }
+    }
+    console.log('✅ All services initialized');
+    // Note: IPC handlers are registered synchronously in init functions
+    // If handlers are missing, it's likely due to an error during service initialization
+    // which would have been logged above
 }
 // Window control handlers
 ipcMain.handle('window:minimize', () => {
