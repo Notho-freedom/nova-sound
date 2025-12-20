@@ -899,10 +899,10 @@ export const DesktopApp = () => {
       toast.success(`Lecture de "${track.title}" en mode audio`);
     };
 
-    window.addEventListener('youtube-audio-play', handleYouTubeAudioPlay as EventListener);
+    window.addEventListener('youtube-audio-play', handleYouTubeAudioPlay as unknown as EventListener);
     
     return () => {
-      window.removeEventListener('youtube-audio-play', handleYouTubeAudioPlay as EventListener);
+      window.removeEventListener('youtube-audio-play', handleYouTubeAudioPlay as unknown as EventListener);
     };
   }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect, showInlinePlayer, currentView, previousView]);
 

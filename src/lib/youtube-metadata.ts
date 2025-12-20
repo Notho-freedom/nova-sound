@@ -67,7 +67,7 @@ export async function fetchYouTubeVideoMetadata(
           viewCount: cached.viewCount || 0,
           likeCount: cached.likeCount,
           thumbnailUrl: cached.thumbnailUrl,
-          thumbnailHighUrl: cached.thumbnailHighUrl,
+          thumbnailHighUrl: cached.thumbnailHighUrl || cached.thumbnailUrl,
           tags: cached.tags,
           categoryId: cached.categoryId,
         },

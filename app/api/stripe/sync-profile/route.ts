@@ -77,10 +77,11 @@ async function syncUserProfileFromStripe(userId: string): Promise<void> {
       updatedAt: admin.firestore.Timestamp.now(),
     };
 
+    const periodEnd = (subscription as any).current_period_end;
     if (isPro && subscription.status === 'active') {
       updateData.plan = 'pro';
-      if (subscription.current_period_end) {
-        updateData.subscriptionEndDate = new Date(subscription.current_period_end * 1000).toISOString();
+      if (periodEnd) {
+        updateData.subscriptionEndDate = new Date(periodEnd * 1000).toISOString();
       }
     } else {
       updateData.plan = 'free';

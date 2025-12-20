@@ -147,8 +147,9 @@ export async function POST(request: NextRequest) {
     if (subscriptionId) {
       try {
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        if (subscription.current_period_end) {
-          subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+        const periodEnd = (subscription as any).current_period_end;
+        if (periodEnd) {
+          subscriptionEndDate = new Date(periodEnd * 1000);
         }
       } catch (error) {
         console.warn('Could not retrieve subscription details:', error);
