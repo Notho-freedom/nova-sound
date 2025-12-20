@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import type { Track } from "@/types/music";
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
@@ -977,10 +978,46 @@ export const DesktopApp = () => {
   }, [currentTrack, libraryTracks, getUniqueTracks]);
 
   // Get similar tracks (same artist or genre, random selection) - without duplicates
+  // État pour les tracks similaires YouTube
+  const [youtubeSimilarTracks, setYoutubeSimilarTracks] = useState<Track[]>([]);
+  const [loadingYoutubeSimilar, setLoadingYoutubeSimilar] = useState(false);
+
+  // Charger les tracks YouTube similaires si le track actuel est YouTube
+  useEffect(() => {
+    if (!currentTrack || currentTrack.mediaSource !== 'youtube') {
+      setYoutubeSimilarTracks([]);
+      return;
+    }
+
+    const loadYouTubeSimilar = async () => {
+      setLoadingYoutubeSimilar(true);
+      try {
+        const { searchYouTubeByArtist, youtubeSuggestionsToTracks } = await import('@/lib/youtube-artist-search');
+        const suggestions = await searchYouTubeByArtist(currentTrack.artist, 20);
+        // Exclure le track actuel
+        const filtered = suggestions.filter(s => s.videoId !== currentTrack.youtubeVideoId);
+        const tracks = youtubeSuggestionsToTracks(filtered);
+        setYoutubeSimilarTracks(tracks);
+      } catch (error) {
+        console.error('[DesktopApp] Erreur lors du chargement des tracks YouTube similaires:', error);
+        setYoutubeSimilarTracks([]);
+      } finally {
+        setLoadingYoutubeSimilar(false);
+      }
+    };
+
+    loadYouTubeSimilar();
+  }, [currentTrack?.id, currentTrack?.mediaSource, currentTrack?.artist, currentTrack?.youtubeVideoId]);
+
   const similarTracks = useMemo(() => {
     if (!currentTrack) return [];
-    
-    // Find tracks with same artist or genre
+
+    // Si c'est un track YouTube, utiliser les tracks YouTube similaires
+    if (currentTrack.mediaSource === 'youtube') {
+      return youtubeSimilarTracks;
+    }
+
+    // Sinon, trouver des tracks locaux avec le même artiste ou genre
     const candidates = libraryTracks.filter(t => 
       t.id !== currentTrack.id && 
       (t.artist === currentTrack.artist || 
@@ -991,7 +1028,7 @@ export const DesktopApp = () => {
     const unique = getUniqueTracks(candidates);
     const shuffled = [...unique].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 20);
-  }, [currentTrack, libraryTracks, getUniqueTracks]);
+  }, [currentTrack, libraryTracks, getUniqueTracks, youtubeSimilarTracks]);
 
   const handlePlayTrack = useCallback((track: Track) => {
     const trackIndex = tracks.findIndex(t => t.id === track.id);
@@ -1001,12 +1038,27 @@ export const DesktopApp = () => {
       // Track not in current queue, add it and play
       addToQueueNext(track);
       const newIndex = queue.tracks.length;
-      setTimeout(() => {
-        setCurrentIndex(newIndex);
-        setIsPlaying(true);
-      }, 100);
+      
+      // Si c'est un track YouTube, naviguer vers le player inline
+      if (track.mediaSource === 'youtube') {
+        setTimeout(() => {
+          setCurrentIndex(newIndex);
+          setIsPlaying(true);
+          // Naviguer vers le player inline si pas déjà ouvert
+          if (!showInlinePlayer) {
+            setPreviousView(currentView);
+            setShowInlinePlayer(true);
+            setCurrentView("player");
+          }
+        }, 200);
+      } else {
+        setTimeout(() => {
+          setCurrentIndex(newIndex);
+          setIsPlaying(true);
+        }, 100);
+      }
     }
-  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect]);
+  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect, showInlinePlayer, currentView, previousView]);
 
   const renderView = () => {
     // Inline player view

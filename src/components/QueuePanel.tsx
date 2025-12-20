@@ -210,18 +210,37 @@ export const QueuePanel = ({
           {/* Similaire */}
           <TabsContent value="similar" className="p-4 mt-0">
             {similarTracks.length > 0 ? (
-              <div className="space-y-0.5">
-                {similarTracks.map((track) => (
-                  <TrackItem
-                    key={track.id}
-                    track={track}
-                    onClick={() => onPlayTrack?.(track)}
-                  />
-                ))}
+              <div>
+                {currentTrack && (
+                  <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {currentTrack.mediaSource === 'youtube' ? 'Vidéos YouTube' : 'Bibliothèque locale'}
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {currentTrack.artist}
+                    </p>
+                    {currentTrack.mediaSource === 'youtube' && (
+                      <p className="text-xs text-muted-foreground">
+                        {currentTrack.album}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-0.5">
+                  {similarTracks.map((track) => (
+                    <TrackItem
+                      key={track.id}
+                      track={track}
+                      onClick={() => onPlayTrack?.(track)}
+                    />
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                Aucune piste similaire trouvée
+                {currentTrack?.mediaSource === 'youtube' 
+                  ? "Chargement des vidéos similaires..."
+                  : "Aucune piste similaire trouvée"}
               </div>
             )}
           </TabsContent>
