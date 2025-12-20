@@ -42,10 +42,54 @@ function getYouTubeApiKey(): string | null {
 
 /**
  * Récupère les métadonnées d'une vidéo YouTube via l'API YouTube Data v3
+ * Utilise le cache multi-niveaux (L1 mémoire + L2 Firebase) pour économiser le quota
  */
 export async function fetchYouTubeVideoMetadata(
   videoId: string
 ): Promise<YouTubeVideoMetadataResponse> {
+  // 1. Vérifier le cache d'abord (L1 puis L2)
+  try {
+    const { youtubeCacheService } = await import('@/services/youtube-cache');
+    const cached = await youtubeCacheService.getVideo(videoId);
+    
+    if (cached) {
+      // Convertir en format de réponse
+      return {
+        success: true,
+        metadata: {
+          id: cached.videoId,
+          title: cached.title,
+          description: cached.description || '',
+          channelTitle: cached.channelTitle,
+          channelId: cached.channelId,
+          publishedAt: cached.publishedAt,
+          duration: cached.duration || 0,
+          viewCount: cached.viewCount || 0,
+          likeCount: cached.likeCount,
+          thumbnailUrl: cached.thumbnailUrl,
+          thumbnailHighUrl: cached.thumbnailHighUrl,
+          tags: cached.tags,
+          categoryId: cached.categoryId,
+        },
+      };
+    }
+  } catch (error) {
+    console.warn('[YouTubeMetadata] Erreur cache, fallback API:', error);
+  }
+
+  // 2. Vérifier le quota avant d'appeler l'API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canGetMetadata(1)) {
+      return {
+        success: false,
+        error: "Quota API YouTube épuisé. Réessayez demain.",
+      };
+    }
+  } catch (error) {
+    console.warn('[YouTubeMetadata] Erreur quota manager:', error);
+  }
+
   const apiKey = getYouTubeApiKey();
   
   if (!apiKey) {
@@ -118,6 +162,34 @@ export async function fetchYouTubeVideoMetadata(
       tags: snippet.tags || [],
       categoryId: snippet.categoryId,
     };
+
+    // 3. Mettre en cache pour les prochaines fois
+    try {
+      const { youtubeCacheService } = await import('@/services/youtube-cache');
+      const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+      
+      await youtubeCacheService.setVideo({
+        id: metadata.id,
+        videoId: metadata.id,
+        title: metadata.title,
+        description: metadata.description,
+        channelTitle: metadata.channelTitle,
+        channelId: metadata.channelId,
+        publishedAt: metadata.publishedAt,
+        duration: metadata.duration,
+        viewCount: metadata.viewCount,
+        likeCount: metadata.likeCount,
+        thumbnailUrl: metadata.thumbnailUrl,
+        thumbnailHighUrl: metadata.thumbnailHighUrl,
+        tags: metadata.tags,
+        categoryId: metadata.categoryId,
+      });
+      
+      // Consommer le quota
+      youtubeQuotaManager.consumeMetadata(1);
+    } catch (error) {
+      console.warn('[YouTubeMetadata] Erreur mise en cache:', error);
+    }
 
     return {
       success: true,

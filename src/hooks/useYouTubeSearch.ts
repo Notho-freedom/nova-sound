@@ -46,8 +46,57 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
     return null;
   };
 
+  // Parse durée ISO 8601
+  const parseDuration = (duration?: string): number | undefined => {
+    if (!duration) return undefined;
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return undefined;
+    const hours = parseInt(match[1] || '0', 10);
+    const minutes = parseInt(match[2] || '0', 10);
+    const seconds = parseInt(match[3] || '0', 10);
+    return hours * 3600 + minutes * 60 + seconds;
+  };
+
   // Recherche via YouTube Data API v3 (si clé disponible)
+  // Utilise le cache multi-niveaux pour économiser le quota
   const searchWithApi = useCallback(async (query: string, apiKey: string) => {
+    // 1. Vérifier le cache d'abord
+    try {
+      const { youtubeCacheService } = await import('@/services/youtube-cache');
+      const cached = await youtubeCacheService.getSearch(query);
+      
+      if (cached && cached.results.length > 0) {
+        console.log(`[useYouTubeSearch] Cache HIT pour: ${query}`);
+        // Convertir en YouTubeSearchResult
+        const results: YouTubeSearchResult[] = cached.results.map(v => ({
+          videoId: v.videoId,
+          title: v.title,
+          description: v.description,
+          thumbnailUrl: v.thumbnailUrl,
+          channelTitle: v.channelTitle,
+          publishedAt: v.publishedAt,
+          duration: v.duration ? `PT${Math.floor(v.duration / 3600)}H${Math.floor((v.duration % 3600) / 60)}M${v.duration % 60}S` : undefined,
+          viewCount: v.viewCount?.toString(),
+        }));
+        return results;
+      }
+    } catch (error) {
+      console.warn('[useYouTubeSearch] Erreur cache:', error);
+    }
+
+    // 2. Vérifier le quota
+    try {
+      const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+      if (!youtubeQuotaManager.canSearch()) {
+        throw new Error(youtubeQuotaManager.getUXMessage() || "Quota de recherche épuisé pour aujourd'hui");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Quota')) {
+        throw error;
+      }
+      console.warn('[useYouTubeSearch] Erreur quota manager:', error);
+    }
+    
     try {
       const response = await fetch(
         `https://www.googleapis.com/youtube/v3/search?` +
@@ -91,6 +140,35 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
           viewCount: details?.statistics?.viewCount,
         };
       });
+
+      // 3. Mettre en cache les résultats de recherche
+      try {
+        const { youtubeCacheService } = await import('@/services/youtube-cache');
+        const { youtubeQuotaManager } = await import('@/services/youtube-cache');
+        
+        // Convertir les résultats en format cache
+        const cachedVideos = searchResults.map(result => ({
+          id: result.videoId,
+          videoId: result.videoId,
+          title: result.title,
+          description: result.description,
+          channelTitle: result.channelTitle,
+          channelId: '', // Pas disponible dans search
+          publishedAt: result.publishedAt,
+          duration: result.duration ? parseDuration(result.duration) : undefined,
+          viewCount: result.viewCount ? parseInt(result.viewCount) : undefined,
+          thumbnailUrl: result.thumbnailUrl,
+          thumbnailHighUrl: result.thumbnailUrl,
+        }));
+        
+        await youtubeCacheService.setSearch(query, cachedVideos);
+        
+        // Consommer le quota (100 unités pour search.list)
+        const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+        youtubeQuotaManager.consumeSearch();
+      } catch (error) {
+        console.warn('[useYouTubeSearch] Erreur mise en cache:', error);
+      }
 
       return searchResults;
     } catch (err) {
