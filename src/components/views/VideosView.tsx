@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, memo } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Play,
@@ -111,7 +111,7 @@ const genreLabels: Record<VideoGenre, string> = {
 type SortOption = "recent" | "title" | "duration" | "size" | "rating" | "added";
 type ViewMode = "home" | "browse" | "watchlist" | "favorites" | "history" | "youtube";
 
-export const VideosView = () => {
+export const VideosView = memo(() => {
   const {
     loading,
     error,
@@ -1446,6 +1446,8 @@ export const VideosView = () => {
       )}
     </div>
   );
-};
+});
+
+VideosView.displayName = 'VideosView';
 
 export default VideosView;

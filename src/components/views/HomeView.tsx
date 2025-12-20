@@ -4,7 +4,7 @@ import { Play, Clock, TrendingUp, Sparkles, Heart, Music, MoreHorizontal, Disc, 
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, memo } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,21 +65,57 @@ const formatTime = (seconds: number) => {
 };
 
 // Generate playlist selections from tracks
+/**
+ * Shuffle Fisher-Yates optimisé (déterministe basé sur seed)
+ */
+function fisherYatesShuffle<T>(array: T[], seed: number = 0): T[] {
+  const shuffled = [...array];
+  let currentIndex = shuffled.length;
+  let randomIndex: number;
+  
+  // Utiliser un générateur pseudo-aléatoire basé sur seed pour déterministe
+  let seedValue = seed;
+  const random = () => {
+    seedValue = (seedValue * 9301 + 49297) % 233280;
+    return seedValue / 233280;
+  };
+  
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(random() * currentIndex);
+    currentIndex--;
+    [shuffled[currentIndex], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[currentIndex]];
+  }
+  
+  return shuffled;
+}
+
+/**
+ * Génère des sélections de playlists optimisées (mémorisable)
+ */
 const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = []) => {
+  // Créer un Map pour O(1) lookup au lieu de O(n) avec find
   const playCountMap = new Map<string, number>();
   history.forEach(entry => {
     playCountMap.set(entry.trackId, entry.playCount || 1);
   });
 
-  const tracksWithCounts = tracks
-    .map(track => ({ track, playCount: playCountMap.get(track.id) || 0 }))
-    .filter(item => item.playCount > 0)
-    .sort((a, b) => b.playCount - a.playCount)
-    .slice(0, 50);
-
-  const shuffled1 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
-  const shuffled2 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
-  const shuffled3 = [...tracksWithCounts].sort(() => Math.random() - 0.5);
+  // Filtrer et trier en une seule passe optimisée
+  const tracksWithCounts: Array<{ track: Track; playCount: number }> = [];
+  for (const track of tracks) {
+    const playCount = playCountMap.get(track.id) || 0;
+    if (playCount > 0) {
+      tracksWithCounts.push({ track, playCount });
+    }
+  }
+  
+  // Trier par playCount (décroissant) et limiter à 50
+  tracksWithCounts.sort((a, b) => b.playCount - a.playCount);
+  const topTracks = tracksWithCounts.slice(0, 50);
+  
+  // Utiliser Fisher-Yates shuffle avec seeds différents pour variété
+  const shuffled1 = fisherYatesShuffle(topTracks, Date.now() % 1000);
+  const shuffled2 = fisherYatesShuffle(topTracks, (Date.now() + 1) % 1000);
+  const shuffled3 = fisherYatesShuffle(topTracks, (Date.now() + 2) % 1000);
 
   return {
     discoveries: shuffled1.slice(0, 10).map(item => item.track),
@@ -88,7 +124,7 @@ const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = [
   };
 };
 
-export const HomeView = ({
+export const HomeView = memo(({
   tracks,
   currentTrackIndex,
   isPlaying,
@@ -600,4 +636,6 @@ export const HomeView = ({
       )}
     </div>
   );
-};
+});
+
+HomeView.displayName = 'HomeView';

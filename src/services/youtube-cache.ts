@@ -259,12 +259,33 @@ class L2Cache {
       const db = this.getDb();
       const docRef = doc(db, this.COLLECTION_VIDEOS, video.videoId);
       
-      await setDoc(docRef, {
-        ...video,
+      // Compresser les données volumineuses (description, tags) pour économiser l'espace Firestore
+      const dataToSave: any = {
+        id: video.id,
+        videoId: video.videoId,
+        title: video.title,
+        description: video.description && video.description.length > 500 
+          ? video.description.substring(0, 500) + '...' // Tronquer descriptions longues
+          : video.description,
+        channelTitle: video.channelTitle,
+        channelId: video.channelId,
+        publishedAt: video.publishedAt,
+        duration: video.duration,
+        viewCount: video.viewCount,
+        likeCount: video.likeCount,
+        thumbnailUrl: video.thumbnailUrl,
+        thumbnailHighUrl: video.thumbnailHighUrl,
+        tags: video.tags && video.tags.length > 10 
+          ? video.tags.slice(0, 10) // Limiter tags à 10
+          : video.tags,
+        categoryId: video.categoryId,
         cachedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(video.expiresAt),
         lastAccessed: serverTimestamp(),
-      });
+        accessCount: video.accessCount || 0,
+      };
+      
+      await setDoc(docRef, dataToSave);
     } catch (error) {
       console.error('[L2Cache] Erreur setVideo:', error);
     }
@@ -312,11 +333,22 @@ class L2Cache {
       const db = this.getDb();
       const docRef = doc(db, this.COLLECTION_SEARCHES, queryHash);
       
+      // Compresser les résultats: limiter à 50 vidéos max et tronquer descriptions
+      const compressedResults = search.results.slice(0, 50).map(video => ({
+        ...video,
+        description: video.description && video.description.length > 200 
+          ? video.description.substring(0, 200) + '...'
+          : video.description,
+      }));
+      
       await setDoc(docRef, {
-        ...search,
+        id: search.id,
+        query: search.query,
+        results: compressedResults, // Résultats compressés
         cachedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(search.expiresAt),
         lastAccessed: serverTimestamp(),
+        accessCount: search.accessCount || 0,
       });
     } catch (error) {
       console.error('[L2Cache] Erreur setSearch:', error);

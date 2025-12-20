@@ -285,10 +285,13 @@ class FirebaseSyncService {
     this.reconnectAttempts.set('appData', 0);
     this.reconnectAttempts.set('playlists', 0);
     
-    // Main app data listener
+    // Main app data listener (optimisé: ignore metadata changes pour performance)
     const appDataRef = doc(db, 'users', userId, 'appData', 'data');
     const unsubscribeAppData = onSnapshot(
       appDataRef,
+      {
+        includeMetadataChanges: false, // Ignorer les changements de métadonnées (optimisation performance)
+      },
       (snapshot) => {
         // Reset reconnect attempts on successful connection
         this.reconnectAttempts.set('appData', 0);
@@ -319,11 +322,14 @@ class FirebaseSyncService {
     this.syncListeners.set('appData', unsubscribeAppData);
     console.log('✅ App data listener set up and active');
 
-    // Playlists subcollection listener
+    // Playlists subcollection listener (optimisé: ignore metadata changes pour performance)
     if (!this.syncListeners.has('playlists')) {
       const playlistsRef = collection(db, 'users', userId, 'playlists');
       const unsubscribePlaylists = onSnapshot(
         playlistsRef,
+        {
+          includeMetadataChanges: false, // Ignorer les changements de métadonnées (optimisation performance)
+        },
         (snapshot) => {
           // Reset reconnect attempts on successful connection
           this.reconnectAttempts.set('playlists', 0);

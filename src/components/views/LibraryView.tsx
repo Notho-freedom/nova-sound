@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { 
   Play, 
   Grid, 
@@ -147,7 +147,7 @@ const groupByFolder = (tracks: Track[]) => {
   return Array.from(folders.values()).sort((a, b) => a.path.localeCompare(b.path));
 };
 
-export const LibraryView = ({
+export const LibraryView = memo(({
   tracks,
   currentTrackIndex,
   isPlaying,
@@ -221,27 +221,47 @@ export const LibraryView = ({
   const filteredAndSortedTracks = useMemo(() => {
     // First remove duplicates from input tracks
     const uniqueTracks = getUniqueTracks(tracks);
-    let filtered = uniqueTracks;
     
-    // Apply search filter
+    // Utiliser l'index inversé pour recherche rapide si query présente
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = uniqueTracks.filter(track =>
-        track.title.toLowerCase().includes(query) ||
-        track.artist.toLowerCase().includes(query) ||
-        track.album.toLowerCase().includes(query)
-      );
+      // Import synchrone (require) pour éviter problèmes avec useMemo
+      try {
+        const { searchAndSortTracks } = require('@/lib/search-utils');
+        return searchAndSortTracks(uniqueTracks, searchQuery, sortMode as 'title' | 'artist' | 'album' | 'duration' | 'date');
+      } catch (error) {
+        // Fallback si import échoue
+        console.warn('[LibraryView] Erreur import search-utils, fallback recherche normale:', error);
+        const query = searchQuery.toLowerCase();
+        const filtered = uniqueTracks.filter(track =>
+          track.title.toLowerCase().includes(query) ||
+          track.artist.toLowerCase().includes(query) ||
+          track.album.toLowerCase().includes(query)
+        );
+        // Trier avec Intl.Collator
+        const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
+        return [...filtered].sort((a, b) => {
+          switch (sortMode) {
+            case "title": return collator.compare(a.title, b.title);
+            case "artist": return collator.compare(a.artist, b.artist);
+            case "album": return collator.compare(a.album, b.album);
+            case "duration": return b.duration - a.duration;
+            case "date": return (b.addedAt || "").localeCompare(a.addedAt || "");
+            default: return 0;
+          }
+        });
+      }
     }
     
-    // Apply sorting
-    return [...filtered].sort((a, b) => {
+    // Pas de recherche, juste trier avec Intl.Collator (plus performant)
+    const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
+    return [...uniqueTracks].sort((a, b) => {
       switch (sortMode) {
         case "title":
-          return a.title.localeCompare(b.title);
+          return collator.compare(a.title, b.title);
         case "artist":
-          return a.artist.localeCompare(b.artist);
+          return collator.compare(a.artist, b.artist);
         case "album":
-          return a.album.localeCompare(b.album);
+          return collator.compare(a.album, b.album);
         case "duration":
           return b.duration - a.duration;
         case "date":
@@ -2094,4 +2114,6 @@ export const LibraryView = ({
       </div>
     </div>
   );
-};
+});
+
+LibraryView.displayName = 'LibraryView';

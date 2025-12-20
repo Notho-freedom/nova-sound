@@ -1,117 +1,179 @@
 /**
- * Service de prefetch prédictif pour YouTube
- * Précharge les vidéos que l'utilisateur va probablement vouloir voir
- * pour une UX "instantanée" sans consommer de quota en session live
+ * Service de préchargement intelligent des suggestions YouTube
+ * Précharge les suggestions populaires au démarrage et en arrière-plan
  */
 
 import { youtubeCacheService } from './youtube-cache';
-import { youtubeBatchService } from './youtube-batch';
-import { youtubeQuotaManager } from './youtube-quota-manager';
-
-interface PrefetchContext {
-  currentVideoId?: string;
-  currentChannelId?: string;
-  watchHistory?: string[];
-  searchHistory?: string[];
-}
+import { fetchYouTubeTrending, fetchYouTubeSuggestionsFromHistory } from '@/lib/youtube-suggestions';
+import type { HistoryEntry } from '@/hooks/usePlayHistory';
+import type { Track, Video } from '@/types/music';
 
 class YouTubePrefetchService {
-  private prefetchQueue: string[] = [];
-  private isPrefetching = false;
+  private prefetchInProgress = false;
+  private prefetchedQueries = new Set<string>();
 
   /**
-   * Précharge les vidéos similaires à celle en cours
+   * Précharge les suggestions tendances au démarrage
    */
-  async prefetchSimilarVideos(videoId: string, channelId?: string): Promise<void> {
-    if (this.isPrefetching) return;
-    
-    this.isPrefetching = true;
-    
-    try {
-      // Vérifier le quota avant de précharger
-      if (!youtubeQuotaManager.canGetMetadata(5)) {
-        console.log('[Prefetch] Quota insuffisant pour prefetch');
-        return;
-      }
-
-      // 1. Vérifier si déjà en cache
-      const cached = await youtubeCacheService.getVideo(videoId);
-      if (cached) {
-        // Déjà en cache, pas besoin de précharger
-        return;
-      }
-
-      // 2. Précharger la vidéo actuelle si pas en cache
-      // (sera fait par le système normal, on skip ici)
-
-      // 3. Précharger les vidéos de la même chaîne (si channelId disponible)
-      if (channelId) {
-        // TODO: Implémenter la récupération des vidéos de la chaîne
-        // Pour l'instant, on skip
-      }
-    } catch (error) {
-      console.error('[Prefetch] Erreur prefetch similar:', error);
-    } finally {
-      this.isPrefetching = false;
+  async prefetchTrending(maxResults: number = 25): Promise<void> {
+    if (this.prefetchInProgress) {
+      console.log('[YouTubePrefetch] Préchargement déjà en cours, ignoré');
+      return;
     }
-  }
 
-  /**
-   * Précharge les vidéos basées sur l'historique
-   */
-  async prefetchFromHistory(watchHistory: string[], searchHistory: string[]): Promise<void> {
-    if (this.isPrefetching) return;
-    if (watchHistory.length === 0 && searchHistory.length === 0) return;
-    
-    this.isPrefetching = true;
-    
+    this.prefetchInProgress = true;
+
     try {
-      // Vérifier le quota
-      const maxPrefetch = Math.min(10, watchHistory.length);
-      if (!youtubeQuotaManager.canGetMetadata(maxPrefetch)) {
-        console.log('[Prefetch] Quota insuffisant pour prefetch history');
-        return;
-      }
-
-      // Précharger les vidéos récemment regardées qui ne sont plus en cache
-      const toPrefetch: string[] = [];
+      console.log('[YouTubePrefetch] Démarrage préchargement tendances...');
       
-      for (const videoId of watchHistory.slice(0, 10)) {
-        const cached = await youtubeCacheService.getVideo(videoId);
-        if (!cached) {
-          toPrefetch.push(videoId);
-        }
+      // Vérifier le cache d'abord
+      const cached = await youtubeCacheService.getSearch('trending');
+      if (cached && cached.results.length > 0) {
+        console.log('[YouTubePrefetch] Tendances déjà en cache, ignoré');
+        this.prefetchInProgress = false;
+        return;
       }
 
-      if (toPrefetch.length > 0) {
-        // Utiliser le batch service pour précharger en lot
-        await youtubeBatchService.getVideosBatch(toPrefetch);
-        console.log(`[Prefetch] Préchargé ${toPrefetch.length} vidéos de l'historique`);
+      // Charger les tendances
+      const trending = await fetchYouTubeTrending(maxResults);
+      
+      if (trending.length > 0) {
+        // Mettre en cache
+        await youtubeCacheService.setSearch('trending', trending.map(s => ({
+          id: s.videoId,
+          videoId: s.videoId,
+          title: s.title,
+          description: s.description,
+          channelTitle: s.channelTitle,
+          channelId: '',
+          publishedAt: s.publishedAt,
+          duration: s.duration,
+          viewCount: s.viewCount,
+          thumbnailUrl: s.thumbnailUrl,
+        })));
+        console.log(`[YouTubePrefetch] ✅ ${trending.length} tendances préchargées`);
       }
     } catch (error) {
-      console.error('[Prefetch] Erreur prefetch history:', error);
+      console.error('[YouTubePrefetch] Erreur préchargement tendances:', error);
     } finally {
-      this.isPrefetching = false;
+      this.prefetchInProgress = false;
     }
   }
 
   /**
-   * Précharge les vidéos suggérées basées sur le contexte
+   * Précharge les suggestions basées sur l'historique (en arrière-plan)
    */
-  async prefetchSuggestions(context: PrefetchContext): Promise<void> {
-    // Cette fonction sera appelée en arrière-plan
-    // pour précharger les suggestions probables
-    
-    if (this.isPrefetching) return;
-    
-    // Précharger seulement si on a du quota disponible
-    const remaining = youtubeQuotaManager.getRemainingBudget();
-    if (remaining.percentage > 50) {
-      // On a encore de la marge, on peut précharger
-      if (context.watchHistory && context.watchHistory.length > 0) {
-        await this.prefetchFromHistory(context.watchHistory, context.searchHistory || []);
-      }
+  async prefetchFromHistory(
+    audioHistory: HistoryEntry[],
+    audioTracks: Track[],
+    youtubeVideos: Video[],
+    searchHistory: string[] = []
+  ): Promise<void> {
+    if (audioHistory.length === 0 && youtubeVideos.length === 0 && searchHistory.length === 0) {
+      return; // Pas assez de données
     }
+
+    try {
+      // Générer des queries de préchargement basées sur l'historique
+      const queries: string[] = [];
+
+      // Top 3 artistes les plus écoutés
+      const artistCounts = new Map<string, number>();
+      audioHistory.forEach(entry => {
+        const track = audioTracks.find(t => t.id === entry.trackId);
+        if (track) {
+          const count = artistCounts.get(track.artist) || 0;
+          artistCounts.set(track.artist, count + (entry.playCount || 1));
+        }
+      });
+
+      const topArtists = Array.from(artistCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([artist]) => artist);
+      
+      queries.push(...topArtists);
+
+      // Top 2 genres
+      const genreCounts = new Map<string, number>();
+      audioHistory.forEach(entry => {
+        const track = audioTracks.find(t => t.id === entry.trackId);
+        if (track?.genre) {
+          const count = genreCounts.get(track.genre) || 0;
+          genreCounts.set(track.genre, count + (entry.playCount || 1));
+        }
+      });
+
+      const topGenres = Array.from(genreCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(([genre]) => genre);
+      
+      queries.push(...topGenres);
+
+      // Recherches récentes (max 3)
+      queries.push(...searchHistory.slice(0, 3));
+
+      // Précharger chaque query (en parallèle mais avec limite)
+      const prefetchPromises = queries
+        .filter(q => q.trim().length > 0 && !this.prefetchedQueries.has(q))
+        .slice(0, 5) // Limiter à 5 queries pour éviter surcharge
+        .map(async (query) => {
+          try {
+            // Vérifier le cache
+            const cached = await youtubeCacheService.getSearch(query);
+            if (cached && cached.results.length > 0) {
+              this.prefetchedQueries.add(query);
+              return;
+            }
+
+            // Précharger en arrière-plan (sans bloquer)
+            setTimeout(async () => {
+              try {
+                const suggestions = await fetchYouTubeSuggestionsFromHistory(
+                  audioHistory,
+                  audioTracks,
+                  youtubeVideos,
+                  [query],
+                  10 // Moins de résultats pour préchargement
+                );
+
+                if (suggestions.length > 0) {
+                  await youtubeCacheService.setSearch(query, suggestions.map(s => ({
+                    id: s.videoId,
+                    videoId: s.videoId,
+                    title: s.title,
+                    description: s.description,
+                    channelTitle: s.channelTitle,
+                    channelId: '',
+                    publishedAt: s.publishedAt,
+                    duration: s.duration,
+                    viewCount: s.viewCount,
+                    thumbnailUrl: s.thumbnailUrl,
+                  })));
+                  this.prefetchedQueries.add(query);
+                  console.log(`[YouTubePrefetch] ✅ Préchargé "${query}" (${suggestions.length} résultats)`);
+                }
+              } catch (error) {
+                console.warn(`[YouTubePrefetch] Erreur préchargement "${query}":`, error);
+              }
+            }, 1000); // Délai pour ne pas surcharger au démarrage
+          } catch (error) {
+            console.warn(`[YouTubePrefetch] Erreur vérification cache "${query}":`, error);
+          }
+        });
+
+      await Promise.allSettled(prefetchPromises);
+    } catch (error) {
+      console.error('[YouTubePrefetch] Erreur préchargement historique:', error);
+    }
+  }
+
+  /**
+   * Nettoie les queries préchargées
+   */
+  clearPrefetched(): void {
+    this.prefetchedQueries.clear();
   }
 }
 

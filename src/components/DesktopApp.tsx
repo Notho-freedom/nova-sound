@@ -81,6 +81,66 @@ export const DesktopApp = () => {
       setQueue(libraryTracks);
     }
   }, [libraryTracks, queue.tracks.length, setQueue]);
+
+  // Préchargement YouTube au démarrage (en arrière-plan)
+  useEffect(() => {
+    // Attendre que les données soient chargées
+    if (libraryLoading || !libraryTracks.length) return;
+
+    // Précharger les tendances YouTube
+    const prefetchTrending = async () => {
+      try {
+        const { youtubePrefetchService } = await import('@/services/youtube-prefetch');
+        await youtubePrefetchService.prefetchTrending(25);
+      } catch (error) {
+        console.warn('[DesktopApp] Erreur préchargement tendances YouTube:', error);
+      }
+    };
+
+    // Précharger avec délai pour ne pas surcharger au démarrage
+    const timeout = setTimeout(prefetchTrending, 2000);
+    return () => clearTimeout(timeout);
+  }, [libraryLoading, libraryTracks.length]);
+
+  // Préchargement basé sur l'historique (quand historique disponible)
+  useEffect(() => {
+    if (libraryLoading || !libraryTracks.length || !history.length) return;
+
+    const prefetchFromHistory = async () => {
+      try {
+        const { youtubePrefetchService } = await import('@/services/youtube-prefetch');
+        
+        // Charger les vidéos depuis Electron si disponible
+        let youtubeVideos: any[] = [];
+        if (typeof window !== 'undefined' && window.electronAPI) {
+          try {
+            const videos = await window.electronAPI.getVideos();
+            youtubeVideos = videos?.filter((v: any) => v.mediaSource === 'youtube') || [];
+          } catch (error) {
+            console.warn('[DesktopApp] Erreur chargement vidéos pour préchargement:', error);
+          }
+        }
+        
+        // Charger l'historique de recherche
+        const searchHistory = typeof window !== 'undefined' 
+          ? JSON.parse(localStorage.getItem('nexus-search-history') || '[]')
+          : [];
+
+        await youtubePrefetchService.prefetchFromHistory(
+          history,
+          libraryTracks,
+          youtubeVideos,
+          searchHistory
+        );
+      } catch (error) {
+        console.warn('[DesktopApp] Erreur préchargement historique YouTube:', error);
+      }
+    };
+
+    // Précharger avec délai plus long (après tendances)
+    const timeout = setTimeout(prefetchFromHistory, 5000);
+    return () => clearTimeout(timeout);
+  }, [libraryLoading, libraryTracks.length, history.length]);
   
   const tracks = queue.tracks.length > 0 ? queue.tracks : libraryTracks;
   const currentTrackIndex = queue.currentIndex;
