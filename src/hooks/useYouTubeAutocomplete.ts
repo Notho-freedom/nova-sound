@@ -76,13 +76,87 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
       const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
       canUseAPI = youtubeQuotaManager.canUseAPI();
       if (!canUseAPI) {
-        console.log('[YouTube Autocomplete] Circuit breaker ouvert, utilisation uniquement du fallback historique');
-        // Utiliser directement le fallback historique sans appeler l'API
+        console.log('[YouTube Autocomplete] Circuit breaker ouvert, utilisation du fallback amélioré');
+        
+        // Fallback amélioré : historique + cache YouTube + suggestions intelligentes
         const fallback: AutocompleteSuggestion[] = [];
+        
+        // 1. Ajouter les correspondances de l'historique
         historyMatches.forEach(suggestion => fallback.push(suggestion));
+        
+        // 2. Chercher dans le cache YouTube pour des recherches similaires
+        try {
+          const { youtubeCacheService } = await import('@/services/youtube-cache');
+          
+          // Chercher dans l'historique de recherche pour trouver des recherches similaires
+          const allSearchHistory = searchHistory.length > 0 ? searchHistory : [];
+          
+          // Pour chaque recherche de l'historique, vérifier le cache
+          for (const historyQuery of allSearchHistory.slice(0, 10)) {
+            if (fallback.length >= 8) break; // Limiter à 8 suggestions
+            
+            // Vérifier si la recherche de l'historique contient des mots de la requête actuelle
+            const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+            const historyWords = historyQuery.toLowerCase().split(/\s+/);
+            const hasCommonWords = queryWords.some(qw => 
+              historyWords.some(hw => hw.includes(qw) || qw.includes(hw))
+            );
+            
+            if (hasCommonWords || historyQuery.toLowerCase().includes(query.toLowerCase())) {
+              // Vérifier si cette recherche a des résultats en cache
+              const cached = await youtubeCacheService.getSearch(historyQuery);
+              if (cached && cached.results.length > 0) {
+                // Ajouter la recherche si elle n'est pas déjà présente
+                const key = historyQuery.toLowerCase();
+                if (!fallback.some(s => s.query.toLowerCase() === key)) {
+                  fallback.push({ query: historyQuery, type: 'search' });
+                }
+              }
+            }
+          }
+          
+          // 3. Ajouter des suggestions basées sur les titres de vidéos en cache
+          // Chercher dans les recherches récentes pour trouver des vidéos pertinentes
+          for (const historyQuery of allSearchHistory.slice(0, 5)) {
+            if (fallback.length >= 8) break;
+            
+            try {
+              const cached = await youtubeCacheService.getSearch(historyQuery);
+              if (cached && cached.results.length > 0) {
+                // Filtrer les vidéos dont le titre contient des mots de la requête
+                const queryLower = query.toLowerCase();
+                const relevantVideos = cached.results
+                  .filter(v => {
+                    const titleLower = (v.title || '').toLowerCase();
+                    const channelLower = (v.channelTitle || '').toLowerCase();
+                    return titleLower.includes(queryLower) || 
+                           channelLower.includes(queryLower) ||
+                           queryLower.split(/\s+/).some(word => 
+                             word.length > 2 && (titleLower.includes(word) || channelLower.includes(word))
+                           );
+                  })
+                  .slice(0, 3); // Max 3 suggestions de vidéos
+                
+                relevantVideos.forEach(video => {
+                  const key = video.title.toLowerCase();
+                  if (!fallback.some(s => s.query.toLowerCase() === key) && fallback.length < 8) {
+                    fallback.push({ query: video.title, type: 'video' });
+                  }
+                });
+              }
+            } catch (error) {
+              // Ignorer les erreurs individuelles
+            }
+          }
+        } catch (error) {
+          console.warn('[YouTube Autocomplete] Erreur lors de la recherche dans le cache:', error);
+        }
+        
+        // 4. Ajouter la requête actuelle si elle n'est pas déjà présente
         if (!fallback.some(s => s.query.toLowerCase() === query.toLowerCase())) {
           fallback.push({ query: query, type: 'search' });
         }
+        
         setSuggestions(fallback);
         setError(null);
         return; // Retourner immédiatement sans appeler l'API
@@ -119,7 +193,7 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
         const isQuotaError = response.status === 403 || response.status === 429;
         
         if (isQuotaError) {
-          console.warn('[YouTube Autocomplete] Quota épuisé, fallback historique');
+          console.warn('[YouTube Autocomplete] Quota épuisé, fallback amélioré');
           // Enregistrer l'échec
           try {
             const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
@@ -128,9 +202,37 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
             // Ignorer
           }
           
-          // Fallback : utiliser uniquement l'historique
+          // Fallback amélioré : historique + cache YouTube
           const fallback: AutocompleteSuggestion[] = [];
           historyMatches.forEach(suggestion => fallback.push(suggestion));
+          
+          // Chercher dans le cache YouTube pour des recherches similaires
+          try {
+            const { youtubeCacheService } = await import('@/services/youtube-cache');
+            
+            for (const historyQuery of searchHistory.slice(0, 10)) {
+              if (fallback.length >= 8) break;
+              
+              const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+              const historyWords = historyQuery.toLowerCase().split(/\s+/);
+              const hasCommonWords = queryWords.some(qw => 
+                historyWords.some(hw => hw.includes(qw) || qw.includes(hw))
+              );
+              
+              if (hasCommonWords || historyQuery.toLowerCase().includes(query.toLowerCase())) {
+                const cached = await youtubeCacheService.getSearch(historyQuery);
+                if (cached && cached.results.length > 0) {
+                  const key = historyQuery.toLowerCase();
+                  if (!fallback.some(s => s.query.toLowerCase() === key)) {
+                    fallback.push({ query: historyQuery, type: 'search' });
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            // Ignorer les erreurs de cache
+          }
+          
           if (!fallback.some(s => s.query.toLowerCase() === query.toLowerCase())) {
             fallback.push({ query: query, type: 'search' });
           }

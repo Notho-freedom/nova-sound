@@ -15,7 +15,7 @@ import type { Video, Track } from "@/types/music";
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
 import { extractYouTubeVideoId } from "@/lib/youtube";
-import { YouTubePlayer } from "@/components/YouTubePlayer";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { toast } from "sonner";
 
 interface YouTubeSearchViewProps {
@@ -637,47 +637,21 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   return (
     <div className="flex flex-col h-full relative">
       {/* Lecteur vidéo intégré en overlay */}
-      {isPlayerFullscreen && playingVideo && playingVideoId && (
+      {isPlayerFullscreen && playingVideo && (
         <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
-          <div className="absolute top-4 right-4 z-50">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setPlayingVideo(null);
-                setIsPlayerFullscreen(false);
-              }}
-              className="bg-black/50 hover:bg-black/70 text-white"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-          <div className="flex-1 w-full h-full">
-            {playingVideoId ? (
-              <YouTubePlayer
-                videoId={playingVideoId}
-                autoPlay={true}
-                audioOnly={playbackMode === "audio"}
-                className="w-full h-full"
-                onReady={() => {
-                  console.log('[YouTubeSearchView] YouTubePlayer prêt pour vidéo:', playingVideoId);
-                }}
-                onError={(error) => {
-                  console.error('[YouTubeSearchView] Erreur YouTubePlayer:', error);
-                  toast.error(`Erreur de lecture: ${error}`);
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-white">
-                <div className="text-center">
-                  <p className="text-lg mb-2">ID vidéo invalide</p>
-                  <p className="text-sm text-muted-foreground">
-                    Impossible de lire cette vidéo. Vérifiez que l'URL est valide.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+          <VideoPlayer
+            video={playingVideo}
+            videos={[]}
+            onClose={() => {
+              setPlayingVideo(null);
+              setIsPlayerFullscreen(false);
+            }}
+            className="w-full h-full"
+            showControls={true}
+            autoPlay={true}
+            isFullApp={true}
+            audioOnly={playbackMode === "audio"}
+          />
         </div>
       )}
       
@@ -977,7 +951,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                             <Button
                               size="icon"
                               className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90"
-                              onClick={() => onPlayVideo(video, playbackMode === "audio")}
+                              onClick={() => handlePlayHistoryVideo(video)}
                             >
                               <Play className="w-6 h-6 fill-current ml-1" />
                             </Button>
