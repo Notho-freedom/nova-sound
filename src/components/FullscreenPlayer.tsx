@@ -52,6 +52,7 @@ interface FullscreenPlayerProps {
   onMuteToggle: () => void;
   onClose: () => void;
   onToggleFavorite?: () => void;
+  youtubePlayerRef?: React.RefObject<YouTubePlayerRef | null>;
 }
 
 const formatTime = (seconds: number) => {
@@ -92,6 +93,7 @@ export const FullscreenPlayer = ({
   onMuteToggle,
   onClose,
   onToggleFavorite,
+  youtubePlayerRef: sharedYoutubePlayerRef,
 }: FullscreenPlayerProps) => {
   const [showLyrics, setShowLyrics] = useState(false);
   const [lyrics, setLyrics] = useState<string | null>(null);
@@ -99,7 +101,9 @@ export const FullscreenPlayer = ({
   // Détecter si c'est un track YouTube
   const isYouTube = currentTrack.mediaSource === 'youtube';
   const youtubeVideoId = currentTrack.youtubeVideoId || (isYouTube && currentTrack.filePath ? extractYouTubeVideoId(currentTrack.filePath) : null);
-  const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+  // Utiliser la ref partagée si fournie, sinon créer une nouvelle ref (pour compatibilité)
+  const localYoutubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+  const youtubePlayerRef = sharedYoutubePlayerRef || localYoutubePlayerRef;
   
   // État pour le player YouTube
   const [youtubeState, setYoutubeState] = useState({
@@ -184,8 +188,9 @@ export const FullscreenPlayer = ({
   }, [isPlaying, currentTrack.duration, volume, isMuted]);
 
   // Synchroniser les contrôles avec le player YouTube et ajouter à l'historique vidéo
+  // Seulement si on n'utilise pas la ref partagée (player persistant)
   useEffect(() => {
-    if (isYouTube && youtubePlayerRef.current && youtubeVideoId) {
+    if (isYouTube && !sharedYoutubePlayerRef && youtubePlayerRef.current && youtubeVideoId) {
       const player = youtubePlayerRef.current;
       
       // Vérifier si le player est prêt (a une durée > 0)
@@ -217,10 +222,10 @@ export const FullscreenPlayer = ({
         }
       }
     }
-  }, [isPlaying, isYouTube, youtubeVideoId, currentTrack.id, currentTrack.title]);
+  }, [isPlaying, isYouTube, youtubeVideoId, currentTrack.id, currentTrack.title, sharedYoutubePlayerRef]);
 
   useEffect(() => {
-    if (isYouTube && youtubePlayerRef.current) {
+    if (isYouTube && !sharedYoutubePlayerRef && youtubePlayerRef.current) {
       // Synchroniser le volume
       const currentVol = isMuted ? 0 : volume;
       const youtubeVol = youtubePlayerRef.current.volume;
@@ -247,7 +252,7 @@ export const FullscreenPlayer = ({
     } else {
       onSeek(value);
     }
-  }, [isYouTube, onSeek]);
+  }, [isYouTube, onSeek, sharedYoutubePlayerRef]);
   
 // Inside your component
 const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -333,7 +338,8 @@ useEffect(() => {
     return (
       <div className="h-full w-full flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
         {/* Player YouTube en arrière-plan (masqué visuellement) pour les tracks YouTube en mode inline */}
-        {isYouTube && youtubeVideoId && (
+        {/* Si sharedYoutubePlayerRef est fourni, on n'a pas besoin de créer un nouveau player */}
+        {isYouTube && youtubeVideoId && !sharedYoutubePlayerRef && (
           <div 
             className="absolute inset-0 pointer-events-none" 
             style={{ 
@@ -401,7 +407,9 @@ useEffect(() => {
       {/* Main Panel - Background with album cover and FFT */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Player YouTube - visible pour les vidéos, masqué pour l'audio */}
-        {isYouTube && youtubeVideoId && (
+        {/* Si sharedYoutubePlayerRef est fourni, on utilise le player persistant (déjà monté dans DesktopApp) */}
+        {/* On ne crée pas de nouveau player, on utilise celui qui joue déjà en background */}
+        {isYouTube && youtubeVideoId && !sharedYoutubePlayerRef && (
           <div 
             className="absolute inset-0" 
             style={{ 
@@ -418,6 +426,18 @@ useEffect(() => {
               onReady={handleYouTubeReady}
               className="w-full h-full"
             />
+          </div>
+        )}
+        {/* Si sharedYoutubePlayerRef est fourni, on affiche juste un placeholder car le player persistant gère la lecture */}
+        {isYouTube && youtubeVideoId && sharedYoutubePlayerRef && (
+          <div 
+            className="absolute inset-0 bg-black" 
+            style={{ 
+              zIndex: 1,
+            }}
+          >
+            {/* Le player YouTube persistant joue déjà en background, on affiche juste un fond noir */}
+            {/* TODO: Utiliser un portail React pour rendre le player persistant visible ici */}
           </div>
         )}
         
@@ -510,11 +530,11 @@ useEffect(() => {
           <div className="w-full mb-2">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs text-muted-foreground w-10 text-right font-mono">
-                {formatTime(isYouTube ? youtubeState.currentTime : currentTime)}
+                {formatTime(isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime)}
               </span>
               <Slider
-                value={[isYouTube ? youtubeState.currentTime : currentTime]}
-                max={isYouTube ? youtubeState.duration || currentTrack.duration : currentTrack.duration}
+                value={[isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime]}
+                max={isYouTube && !sharedYoutubePlayerRef ? (youtubeState.duration || currentTrack.duration) : currentTrack.duration}
                 step={1}
                 onValueChange={handleSeekYouTube}
                 className="flex-1"
@@ -550,7 +570,7 @@ useEffect(() => {
               onClick={onPlayPause}
               className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 shadow-lg transition-all duration-200 backdrop-blur-sm"
             >
-              {(isYouTube ? (youtubeState.isPlaying || false) : isPlaying) ? (
+              {(isYouTube && !sharedYoutubePlayerRef ? (youtubeState.isPlaying || false) : isPlaying) ? (
                 <Pause className="w-6 h-6 fill-current" />
               ) : (
                 <Play className="w-6 h-6 fill-current ml-0.5" />
