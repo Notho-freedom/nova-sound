@@ -254,6 +254,19 @@ class L2Cache {
     }
   }
 
+  /**
+   * Supprime les champs undefined d'un objet (Firestore n'accepte pas undefined)
+   */
+  private removeUndefinedFields(obj: any): any {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = value;
+      }
+    }
+    return cleaned;
+  }
+
   async setVideo(video: CachedYouTubeVideo): Promise<void> {
     try {
       const db = this.getDb();
@@ -272,7 +285,7 @@ class L2Cache {
         publishedAt: video.publishedAt,
         duration: video.duration,
         viewCount: video.viewCount,
-        likeCount: video.likeCount,
+        likeCount: video.likeCount, // Peut être undefined
         thumbnailUrl: video.thumbnailUrl,
         thumbnailHighUrl: video.thumbnailHighUrl,
         tags: video.tags && video.tags.length > 10 
@@ -285,7 +298,10 @@ class L2Cache {
         accessCount: video.accessCount || 0,
       };
       
-      await setDoc(docRef, dataToSave);
+      // Supprimer les champs undefined (Firestore ne les accepte pas)
+      const cleanedData = this.removeUndefinedFields(dataToSave);
+      
+      await setDoc(docRef, cleanedData);
     } catch (error) {
       console.error('[L2Cache] Erreur setVideo:', error);
     }
@@ -334,22 +350,44 @@ class L2Cache {
       const docRef = doc(db, this.COLLECTION_SEARCHES, queryHash);
       
       // Compresser les résultats: limiter à 50 vidéos max et tronquer descriptions
-      const compressedResults = search.results.slice(0, 50).map(video => ({
-        ...video,
-        description: video.description && video.description.length > 200 
-          ? video.description.substring(0, 200) + '...'
-          : video.description,
-      }));
+      // ET supprimer les champs undefined de chaque vidéo
+      const compressedResults = search.results.slice(0, 50).map(video => {
+        const cleaned = {
+          id: video.id,
+          videoId: video.videoId,
+          title: video.title,
+          description: video.description && video.description.length > 200 
+            ? video.description.substring(0, 200) + '...'
+            : video.description,
+          channelTitle: video.channelTitle,
+          channelId: video.channelId,
+          publishedAt: video.publishedAt,
+          duration: video.duration,
+          viewCount: video.viewCount,
+          likeCount: video.likeCount,
+          thumbnailUrl: video.thumbnailUrl,
+          thumbnailHighUrl: video.thumbnailHighUrl,
+          tags: video.tags,
+          categoryId: video.categoryId,
+        };
+        // Supprimer les undefined
+        return this.removeUndefinedFields(cleaned);
+      });
       
-      await setDoc(docRef, {
+      const dataToSave = {
         id: search.id,
         query: search.query,
-        results: compressedResults, // Résultats compressés
+        results: compressedResults, // Résultats compressés et nettoyés
         cachedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(search.expiresAt),
         lastAccessed: serverTimestamp(),
         accessCount: search.accessCount || 0,
-      });
+      };
+      
+      // Supprimer les undefined au niveau racine aussi
+      const cleanedData = this.removeUndefinedFields(dataToSave);
+      
+      await setDoc(docRef, cleanedData);
     } catch (error) {
       console.error('[L2Cache] Erreur setSearch:', error);
     }
@@ -392,11 +430,22 @@ class L2Cache {
       const db = this.getDb();
       const docRef = doc(db, this.COLLECTION_CHANNELS, channel.channelId);
       
-      await setDoc(docRef, {
-        ...channel,
+      const dataToSave = {
+        id: channel.id,
+        channelId: channel.channelId,
+        title: channel.title,
+        description: channel.description,
+        thumbnailUrl: channel.thumbnailUrl,
+        videoCount: channel.videoCount,
+        subscriberCount: channel.subscriberCount,
         cachedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(channel.expiresAt),
-      });
+      };
+      
+      // Supprimer les undefined
+      const cleanedData = this.removeUndefinedFields(dataToSave);
+      
+      await setDoc(docRef, cleanedData);
     } catch (error) {
       console.error('[L2Cache] Erreur setChannel:', error);
     }

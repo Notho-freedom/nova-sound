@@ -139,7 +139,7 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
 
       const data = await response.json();
       
-      // Récupérer les détails des vidéos (durée, vues)
+      // Récupérer les détails des vidéos (durée, vues, likes)
       const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
       const detailsResponse = await fetch(
         `https://www.googleapis.com/youtube/v3/videos?` +
@@ -149,7 +149,10 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       );
 
       const detailsData = await detailsResponse.json();
-      const detailsMap = new Map<string, { contentDetails?: { duration?: string }; statistics?: { viewCount?: string } }>(
+      const detailsMap = new Map<string, { 
+        contentDetails?: { duration?: string }; 
+        statistics?: { viewCount?: string; likeCount?: string } 
+      }>(
         detailsData.items.map((item: any) => [item.id, item])
       );
 
@@ -172,19 +175,38 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
         const { youtubeCacheService } = await import('@/services/youtube-cache');
         
         // Convertir les résultats en format pour setSearch (qui prend des videos partielles)
-        const videosForCache = searchResults.map(result => ({
-          id: result.videoId,
-          videoId: result.videoId,
-          title: result.title,
-          description: result.description,
-          channelTitle: result.channelTitle,
-          channelId: '', // Pas disponible dans search
-          publishedAt: result.publishedAt,
-          duration: result.duration ? parseDuration(result.duration) : undefined,
-          viewCount: result.viewCount ? parseInt(result.viewCount) : undefined,
-          thumbnailUrl: result.thumbnailUrl,
-          thumbnailHighUrl: result.thumbnailUrl,
-        }));
+        // Récupérer likeCount depuis detailsData si disponible
+        const videosForCache = searchResults.map(result => {
+          const details = detailsMap.get(result.videoId);
+          const likeCount = details?.statistics?.likeCount 
+            ? parseInt(details.statistics.likeCount) 
+            : undefined;
+          
+          // Construire l'objet sans undefined (sera filtré par removeUndefinedFields dans le cache)
+          const video: any = {
+            id: result.videoId,
+            videoId: result.videoId,
+            title: result.title,
+            description: result.description,
+            channelTitle: result.channelTitle,
+            channelId: '', // Pas disponible dans search
+            publishedAt: result.publishedAt,
+            duration: result.duration ? parseDuration(result.duration) : undefined,
+            viewCount: result.viewCount ? parseInt(result.viewCount) : undefined,
+            likeCount: likeCount, // Peut être undefined
+            thumbnailUrl: result.thumbnailUrl,
+            thumbnailHighUrl: result.thumbnailUrl,
+          };
+          
+          // Supprimer les undefined avant de retourner (le cache le fera aussi, mais c'est mieux ici)
+          const cleaned: any = {};
+          for (const [key, value] of Object.entries(video)) {
+            if (value !== undefined) {
+              cleaned[key] = value;
+            }
+          }
+          return cleaned;
+        });
         
         // setSearch accepte des vidéos partielles et ajoute les métadonnées de cache
         await youtubeCacheService.setSearch(query, videosForCache as any);
