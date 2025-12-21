@@ -467,6 +467,7 @@ export const VideosView = memo(() => {
           onCinemaMode={() => setIsCinemaMode(true)}
           isFullApp={isFullApp}
           audioOnly={youtubeAudioOnly}
+          onProgressUpdate={updateWatchProgress}
         />
       </div>
     );

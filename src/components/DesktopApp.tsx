@@ -1166,7 +1166,7 @@ export const DesktopApp = () => {
     return shuffled.slice(0, 20);
   }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
-  const renderView = () => {
+  const renderView = useMemo(() => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
@@ -1439,7 +1439,36 @@ export const DesktopApp = () => {
           </div>
         );
     }
-  };
+  }, [
+    showInlinePlayer,
+    currentTrack,
+    isPlaying,
+    currentTime,
+    isShuffle,
+    repeatMode,
+    volume,
+    isMuted,
+    currentView,
+    tracks,
+    currentTrackIndex,
+    libraryLoading,
+    albumToOpen,
+    audioRef.current,
+    handlePlayPause,
+    handlePrevious,
+    handleNext,
+    handleShuffle,
+    handleRepeat,
+    handleSeek,
+    handleVolumeChange,
+    handleTrackSelect,
+    handlePlayNext,
+    handleAddToQueue,
+    handleAddToPlaylist,
+    isFavorite,
+    handleToggleFavorite,
+    youtubePlayerRef,
+  ]);
 
   // Show loading screen
   if (isLoading) {
@@ -1541,16 +1570,16 @@ export const DesktopApp = () => {
             )}>
               {showInlinePlayer ? (
                 <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
-                  {renderView()}
+                  {renderView}
                 </div>
               ) : currentView === "videos" ? (
                 <div className="h-full w-full relative">
-                  {renderView()}
+                  {renderView}
                 </div>
               ) : (
                 <ScrollArea className="h-full w-full">
                   <div className="animate-in fade-in duration-200">
-                    {renderView()}
+                    {renderView}
                   </div>
                 </ScrollArea>
               )}

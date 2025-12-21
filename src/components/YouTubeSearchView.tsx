@@ -39,7 +39,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   const { suggestions, loading: autocompleteLoading, searchSuggestions, clearSuggestions } = useYouTubeAutocomplete();
   
   // Historique et suggestions
-  const { recentlyWatched, enhancedVideos } = useVideoLibrary();
+  const { recentlyWatched, enhancedVideos, updateWatchProgress } = useVideoLibrary();
   const { history: audioHistory } = usePlayHistory();
   const { tracks: audioTracks } = useLibrary();
   const [artistSuggestions, setArtistSuggestions] = useState<YouTubeSearchResult[]>([]);
@@ -47,6 +47,9 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   
   // État pour la vidéo en cours de lecture
   const [playingVideo, setPlayingVideo] = useState<Video | null>(null);
+  
+  // État pour les métadonnées enrichies des vidéos YouTube
+  const [enrichedVideos, setEnrichedVideos] = useState<Map<string, Partial<Video>>>(new Map());
   
   // État pour le circuit breaker (quota épuisé)
   const [quotaExhausted, setQuotaExhausted] = useState(false);
@@ -100,6 +103,32 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     const fromRawHistory: Video[] = [];
     const existingIds = new Set([...fromRecentlyWatched, ...fromEnhancedVideos].map(v => v.id));
     
+    // Fonction pour charger les métadonnées YouTube de manière asynchrone
+    const loadVideoMetadata = async (videoId: string): Promise<{ title: string; thumbnailUrl: string; description: string }> => {
+      try {
+        // Essayer d'abord le cache (pas de quota)
+        const { youtubeProvider } = await import('@/services/youtube-provider');
+        const result = await youtubeProvider.getVideoMetadata(videoId);
+        
+        if (result.success && result.metadata) {
+          return {
+            title: result.metadata.title,
+            thumbnailUrl: result.metadata.thumbnailUrl,
+            description: result.metadata.description || '',
+          };
+        }
+      } catch (error) {
+        console.warn(`[YouTubeSearchView] Erreur chargement métadonnées pour ${videoId}:`, error);
+      }
+      
+      // Fallback: retourner des valeurs par défaut
+      return {
+        title: `Vidéo YouTube ${videoId}`,
+        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        description: '',
+      };
+    };
+    
     for (const entry of rawWatchHistory) {
       // Vérifier si c'est une vidéo YouTube (ID commence par "youtube-" ou contient un videoId YouTube)
       if (entry.videoId.startsWith('youtube-') || entry.videoId.includes('youtube-audio-')) {
@@ -107,11 +136,17 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
         const id = `youtube-${videoId}`;
         
         if (!existingIds.has(id) && !existingIds.has(entry.videoId)) {
-          // Créer une vidéo YouTube minimale depuis l'historique
+          // Charger les métadonnées de manière asynchrone
+          loadVideoMetadata(videoId).then(metadata => {
+            // Mettre à jour la vidéo si elle existe toujours
+            // Note: Cette mise à jour se fera au prochain rendu via le useEffect
+          });
+          
+          // Créer une vidéo YouTube minimale depuis l'historique (titre sera mis à jour après)
           fromRawHistory.push({
             id: id,
             filePath: `https://www.youtube.com/watch?v=${videoId}`,
-            title: `Vidéo YouTube ${videoId}`,
+            title: `Vidéo YouTube ${videoId}`, // Sera mis à jour par loadVideoMetadata
             description: '',
             duration: 0,
             thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
@@ -129,10 +164,15 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
         if (videoId) {
           const id = `youtube-${videoId}`;
           if (!existingIds.has(id) && !existingIds.has(entry.videoId)) {
+            // Charger les métadonnées de manière asynchrone
+            loadVideoMetadata(videoId).then(metadata => {
+              // Mettre à jour la vidéo si elle existe toujours
+            });
+            
             fromRawHistory.push({
               id: id,
               filePath: entry.videoId,
-              title: `Vidéo YouTube ${videoId}`,
+              title: `Vidéo YouTube ${videoId}`, // Sera mis à jour par loadVideoMetadata
               description: '',
               duration: 0,
               thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
@@ -154,8 +194,17 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       new Map(allYouTubeVideos.map(v => [v.id, v])).values()
     );
     
-    // 6. Trier par date de visionnage (plus récent en premier)
-    const sorted = unique.sort((a, b) => {
+    // 6. Appliquer les métadonnées enrichies si disponibles
+    const videosWithEnrichment = unique.map(video => {
+      const enrichment = enrichedVideos.get(video.id);
+      if (enrichment) {
+        return { ...video, ...enrichment };
+      }
+      return video;
+    });
+    
+    // 7. Trier par date de visionnage (plus récent en premier)
+    const sorted = videosWithEnrichment.sort((a, b) => {
       const aTime = a.lastPlayedAt ? new Date(a.lastPlayedAt).getTime() : new Date(a.addedAt).getTime();
       const bTime = b.lastPlayedAt ? new Date(b.lastPlayedAt).getTime() : new Date(b.addedAt).getTime();
       return bTime - aTime;
@@ -169,10 +218,70 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       recentlyWatchedTotal: recentlyWatched.length,
       enhancedVideosTotal: enhancedVideos.length,
       rawWatchHistoryTotal: rawWatchHistory.length,
+      enrichedCount: enrichedVideos.size,
     });
     
     return sorted;
-  }, [recentlyWatched, enhancedVideos]);
+  }, [recentlyWatched, enhancedVideos, enrichedVideos]);
+  
+  // Charger les métadonnées pour les vidéos sans titre valide
+  useEffect(() => {
+    const videosToEnhance = youtubeWatchHistory.filter(v => 
+      v.title.startsWith('Vidéo YouTube ') && v.youtubeVideoId && !enrichedVideos.has(v.id)
+    );
+    
+    if (videosToEnhance.length === 0) return;
+    
+    // Charger les métadonnées en parallèle (limité à 10 pour éviter trop de requêtes)
+    const videosToLoad = videosToEnhance.slice(0, 10);
+    
+    Promise.all(
+      videosToLoad.map(async (video) => {
+        if (!video.youtubeVideoId) return null;
+        
+        try {
+          const { youtubeProvider } = await import('@/services/youtube-provider');
+          const result = await youtubeProvider.getVideoMetadata(video.youtubeVideoId);
+          
+          if (result.success && result.metadata) {
+            return {
+              videoId: video.id,
+              metadata: {
+                title: result.metadata.title,
+                description: result.metadata.description || video.description,
+                thumbnailUrl: result.metadata.thumbnailUrl || video.thumbnailUrl,
+                thumbnailHighUrl: result.metadata.thumbnailHighUrl || video.thumbnailUrl,
+                duration: result.metadata.duration || video.duration,
+                channelTitle: result.metadata.channelTitle || video.channelTitle,
+                channelId: result.metadata.channelId || video.channelId,
+                publishedAt: result.metadata.publishedAt || video.addedAt,
+                viewCount: result.metadata.viewCount,
+                likeCount: result.metadata.likeCount,
+                tags: result.metadata.tags,
+                categoryId: result.metadata.categoryId,
+              },
+            };
+          }
+        } catch (error) {
+          console.warn(`[YouTubeSearchView] Erreur chargement métadonnées pour ${video.youtubeVideoId}:`, error);
+        }
+        
+        return null;
+      })
+    ).then((results) => {
+      const newEnrichments = new Map(enrichedVideos);
+      
+      results.forEach((result) => {
+        if (result && result.metadata) {
+          newEnrichments.set(result.videoId, result.metadata);
+        }
+      });
+      
+      if (newEnrichments.size > enrichedVideos.size) {
+        setEnrichedVideos(newEnrichments);
+      }
+    });
+  }, [youtubeWatchHistory, enrichedVideos]);
   
   // Fonction helper pour extraire l'artiste d'un titre YouTube
   const extractArtistFromTitle = useCallback((title: string, channelTitle?: string): string | null => {
@@ -651,6 +760,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
             autoPlay={true}
             isFullApp={true}
             audioOnly={playbackMode === "audio"}
+            onProgressUpdate={updateWatchProgress}
           />
         </div>
       )}

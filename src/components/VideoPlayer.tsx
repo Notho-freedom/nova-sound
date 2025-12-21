@@ -38,6 +38,7 @@ interface VideoPlayerProps {
   onCinemaMode?: () => void;
   isFullApp?: boolean;
   audioOnly?: boolean; // Mode audio-only pour YouTube
+  onProgressUpdate?: (videoId: string, currentTime: number, duration: number) => void; // Callback pour sauvegarder la progression
 }
 
 const formatTime = (seconds: number) => {
@@ -63,6 +64,7 @@ export const VideoPlayer = ({
   onCinemaMode,
   isFullApp = false,
   audioOnly = false,
+  onProgressUpdate,
 }: VideoPlayerProps) => {
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
@@ -157,13 +159,39 @@ export const VideoPlayer = ({
     });
   }, []);
 
+  // Refs pour stocker les valeurs et éviter les problèmes de closure
+  const lastSavedTimeRef = useRef<number>(0);
+  const durationRef = useRef<number>(0);
+  const videoIdRef = useRef<string>(video.id);
+  
+  // Mettre à jour les refs quand les valeurs changent
+  useEffect(() => {
+    durationRef.current = duration;
+    videoIdRef.current = video.id;
+  }, [duration, video.id]);
+  
   const handleYouTubeTimeUpdate = useCallback((time: number) => {
     setYoutubeState(prev => {
       // Éviter les mises à jour inutiles (seulement si changement significatif)
       if (Math.abs(prev.currentTime - time) < 0.5) return prev;
       return { ...prev, currentTime: time };
     });
-  }, []);
+    
+    // Sauvegarder la progression de manière asynchrone (après le rendu)
+    // Toutes les 5 secondes pour éviter trop d'appels
+    if (onProgressUpdate && durationRef.current > 0) {
+      const currentTimeSeconds = Math.floor(time);
+      const lastSavedSeconds = Math.floor(lastSavedTimeRef.current);
+      
+      if (currentTimeSeconds % 5 === 0 && currentTimeSeconds !== lastSavedSeconds) {
+        lastSavedTimeRef.current = time;
+        // Utiliser setTimeout pour décaler l'appel après le rendu
+        setTimeout(() => {
+          onProgressUpdate(videoIdRef.current, time, durationRef.current);
+        }, 0);
+      }
+    }
+  }, [onProgressUpdate]);
 
   const handleYouTubeReady = useCallback(() => {
     // Le player est prêt - synchroniser l'état
@@ -171,17 +199,26 @@ export const VideoPlayer = ({
       // Utiliser setTimeout pour s'assurer que le player est complètement initialisé
       setTimeout(() => {
         if (youtubePlayerRef.current) {
+          const duration = youtubePlayerRef.current.duration;
           setYoutubeState(prev => ({
             ...prev,
             volume: youtubePlayerRef.current!.volume,
             isMuted: youtubePlayerRef.current!.isMuted,
-            duration: youtubePlayerRef.current!.duration,
+            duration: duration,
             isLoading: false,
           }));
+          
+          // Sauvegarder la progression initiale si callback fourni (de manière asynchrone)
+          if (onProgressUpdate && duration > 0) {
+            const currentTime = youtubePlayerRef.current.currentTime || 0;
+            setTimeout(() => {
+              onProgressUpdate(video.id, currentTime, duration);
+            }, 0);
+          }
         }
       }, 100);
     }
-  }, []);
+  }, [onProgressUpdate, video.id]);
 
   const handleYouTubeError = useCallback((error: string) => {
     console.error('Erreur YouTube Player:', error);
@@ -213,6 +250,14 @@ export const VideoPlayer = ({
               duration: result.metadata.duration,
               viewCount: result.metadata.viewCount,
             });
+            
+            // Synchroniser la durée avec l'état YouTube si disponible
+            if (result.metadata?.duration && result.metadata.duration > 0) {
+              setYoutubeState(prev => ({
+                ...prev,
+                duration: result.metadata!.duration || prev.duration,
+              }));
+            }
           }
         })
         .catch((err) => {
@@ -220,6 +265,38 @@ export const VideoPlayer = ({
         });
     }
   }, [isYouTube, youtubeVideoId]);
+  
+  // Sauvegarder la progression périodiquement pour YouTube (toutes les 10 secondes)
+  useEffect(() => {
+    if (!isYouTube || !onProgressUpdate || !isPlaying || duration === 0) return;
+    
+    const interval = setInterval(() => {
+      if (youtubePlayerRef.current && duration > 0) {
+        const currentTime = youtubePlayerRef.current.currentTime || 0;
+        onProgressUpdate(video.id, currentTime, duration);
+      }
+    }, 10000); // Toutes les 10 secondes
+    
+    return () => clearInterval(interval);
+  }, [isYouTube, onProgressUpdate, isPlaying, duration, video.id]);
+  
+  // Sauvegarder la progression lors de la pause ou de la fermeture
+  useEffect(() => {
+    if (!isYouTube || !onProgressUpdate || duration === 0) return;
+    
+    // Copier la ref dans une variable locale pour le cleanup
+    const playerRef = youtubePlayerRef.current;
+    const videoId = video.id;
+    const finalDuration = duration;
+    
+    return () => {
+      // Cleanup: sauvegarder la progression finale
+      if (playerRef && finalDuration > 0) {
+        const currentTime = playerRef.currentTime || 0;
+        onProgressUpdate(videoId, currentTime, finalDuration);
+      }
+    };
+  }, [isYouTube, onProgressUpdate, duration, video.id]);
 
   // Show/hide controls on mouse movement
   useEffect(() => {
