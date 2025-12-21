@@ -119,7 +119,7 @@ export function ArtistImageCarousel({
   className,
   onImageSelect,
 }: ArtistImageCarouselProps) {
-  const { images, isLoading } = useArtistImages({
+  const { images, isLoading } = useArtistImage({
     query: artistName,
     limit,
     enabled: !!artistName,
