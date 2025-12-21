@@ -2040,7 +2040,7 @@ export const LibraryView = memo(({
                 </tr>
               </thead>
               <tbody>
-              {filteredAndSortedTracks.map((track, idx) => {
+              {filteredAndSortedTracks.map((track: Track, idx: number) => {
                 const actualIndex = tracks.findIndex(t => t.id === track.id);
                 const isCurrentTrack = currentTrackIndex === actualIndex;
                 const tooltipText = `${track.title} - ${track.artist}${track.album ? ` (${track.album})` : ''} - ${formatTime(track.duration)}`;
@@ -2195,7 +2195,7 @@ export const LibraryView = memo(({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredAndSortedTracks.map((track, idx) => {
+          {filteredAndSortedTracks.map((track: Track, idx: number) => {
             const actualIndex = tracks.findIndex(t => t.id === track.id);
             const isCurrentTrack = currentTrackIndex === actualIndex;
 

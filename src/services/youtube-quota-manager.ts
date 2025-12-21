@@ -105,6 +105,10 @@ class YouTubeQuotaManager {
       usedSearch: 0,
       usedMetadata: 0,
       resetAt,
+      // Circuit breaker properties
+      consecutiveFailures: 0,
+      lastFailureAt: null,
+      circuitBreakerOpen: false,
     };
   }
 

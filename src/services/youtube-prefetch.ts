@@ -38,8 +38,8 @@ class YouTubePrefetchService {
       const trending = await fetchYouTubeTrending(maxResults);
       
       if (trending.length > 0) {
-        // Mettre en cache
-        await youtubeCacheService.setSearch('trending', trending.map(s => ({
+        // Mettre en cache - setSearch accepte des vidéos partielles et ajoute les métadonnées de cache
+        const videosForCache = trending.map(s => ({
           id: s.videoId,
           videoId: s.videoId,
           title: s.title,
@@ -50,7 +50,9 @@ class YouTubePrefetchService {
           duration: s.duration,
           viewCount: s.viewCount,
           thumbnailUrl: s.thumbnailUrl,
-        })));
+        }));
+        // Cast as any car setSearch ajoute les propriétés de cache automatiquement
+        await youtubeCacheService.setSearch('trending', videosForCache as any);
         console.log(`[YouTubePrefetch] ✅ ${trending.length} tendances préchargées`);
       }
     } catch (error) {
@@ -139,7 +141,7 @@ class YouTubePrefetchService {
                 );
 
                 if (suggestions.length > 0) {
-                  await youtubeCacheService.setSearch(query, suggestions.map(s => ({
+                  const videosForCache = suggestions.map(s => ({
                     id: s.videoId,
                     videoId: s.videoId,
                     title: s.title,
@@ -150,7 +152,9 @@ class YouTubePrefetchService {
                     duration: s.duration,
                     viewCount: s.viewCount,
                     thumbnailUrl: s.thumbnailUrl,
-                  })));
+                  }));
+                  // Cast as any car setSearch ajoute les propriétés de cache automatiquement
+                  await youtubeCacheService.setSearch(query, videosForCache as any);
                   this.prefetchedQueries.add(query);
                   console.log(`[YouTubePrefetch] ✅ Préchargé "${query}" (${suggestions.length} résultats)`);
                 }

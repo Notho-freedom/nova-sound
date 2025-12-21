@@ -478,12 +478,10 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       duration: parseDuration(result.duration),
       thumbnailUrl: result.thumbnailUrl,
       posterUrl: result.thumbnailUrl,
-      // Métadonnées YouTube essentielles pour la lecture
-      mediaSource: 'youtube' as const,
-      youtubeVideoId: result.videoId,
+      channelTitle: result.channelTitle,
       fileSize: 0,
       addedAt: new Date().toISOString(),
-      mediaSource: 'youtube',
+      mediaSource: 'youtube' as const,
       youtubeVideoId: result.videoId,
       type: 'music_video',
     };

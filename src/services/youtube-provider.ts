@@ -240,6 +240,7 @@ class YouTubeProvider {
         metadata: {
           id: videoId,
           title: `Vidéo YouTube ${videoId}`,
+          channelTitle: 'YouTube', // Fallback obligatoire pour éviter undefined
           thumbnailUrl: `https://img.youtube.com/vi/${videoId}/default.jpg`,
           thumbnailHighUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
         },

@@ -344,6 +344,10 @@ export interface Video {
   country?: string;
   language?: string;
   
+  // YouTube-specific metadata
+  channelTitle?: string;
+  channelId?: string;
+  
   // Ratings
   ratings?: VideoRating[];
   userRating?: number;

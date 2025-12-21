@@ -36,7 +36,7 @@ export interface YouTubePlayerRef {
  * Composant YouTube Player utilisant l'API officielle IFrame
  * 100% conforme aux conditions d'utilisation YouTube
  */
-export const YouTubePlayer = forwardRef<YouTubePlayerRef, YouTubePlayerProps>(({
+export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerProps>(({
   videoId,
   className,
   autoPlay = false,
