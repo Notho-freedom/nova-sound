@@ -101,9 +101,8 @@ export const FullscreenPlayer = ({
   // Détecter si c'est un track YouTube
   const isYouTube = currentTrack.mediaSource === 'youtube';
   const youtubeVideoId = currentTrack.youtubeVideoId || (isYouTube && currentTrack.filePath ? extractYouTubeVideoId(currentTrack.filePath) : null);
-  // Utiliser la ref partagée si fournie, sinon créer une nouvelle ref (pour compatibilité)
-  const localYoutubePlayerRef = useRef<YouTubePlayerRef | null>(null);
-  const youtubePlayerRef = sharedYoutubePlayerRef || localYoutubePlayerRef;
+  // Utiliser uniquement la ref partagée (player persistant de DesktopApp)
+  // Ne jamais créer de nouveau player ici pour éviter les doublures
   
   // État pour le player YouTube
   const [youtubeState, setYoutubeState] = useState({
@@ -147,8 +146,10 @@ export const FullscreenPlayer = ({
   }, [onSeek]);
 
   const handleYouTubeReady = useCallback(() => {
-    if (youtubePlayerRef.current) {
-      const player = youtubePlayerRef.current;
+    // Ce callback n'est plus utilisé car on utilise le player persistant de DesktopApp
+    // Mais on le garde pour compatibilité si jamais un player local est créé
+    if (sharedYoutubePlayerRef && sharedYoutubePlayerRef.current) {
+      const player = sharedYoutubePlayerRef.current;
       
       // Mettre à jour l'état avec les valeurs du player
       setYoutubeState(prev => ({
@@ -187,14 +188,14 @@ export const FullscreenPlayer = ({
     }
   }, [isPlaying, currentTrack.duration, volume, isMuted]);
 
-  // Synchroniser les contrôles avec le player YouTube et ajouter à l'historique vidéo
-  // Seulement si on n'utilise pas la ref partagée (player persistant)
+  // Synchroniser les contrôles avec le player YouTube persistant
+  // Utiliser toujours la ref partagée (player persistant de DesktopApp)
   useEffect(() => {
-    if (isYouTube && !sharedYoutubePlayerRef && youtubePlayerRef.current && youtubeVideoId) {
-      const player = youtubePlayerRef.current;
+    if (isYouTube && sharedYoutubePlayerRef && sharedYoutubePlayerRef.current && youtubeVideoId) {
+      const player = sharedYoutubePlayerRef.current;
       
       // Vérifier si le player est prêt (a une durée > 0)
-        if (player.duration > 0) {
+      if (player.duration > 0) {
         // Synchroniser play/pause
         if (isPlaying && !player.isPlaying) {
           // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
@@ -225,30 +226,30 @@ export const FullscreenPlayer = ({
   }, [isPlaying, isYouTube, youtubeVideoId, currentTrack.id, currentTrack.title, sharedYoutubePlayerRef]);
 
   useEffect(() => {
-    if (isYouTube && !sharedYoutubePlayerRef && youtubePlayerRef.current) {
-      // Synchroniser le volume
+    if (isYouTube && sharedYoutubePlayerRef && sharedYoutubePlayerRef.current) {
+      // Synchroniser le volume avec le player persistant
       const currentVol = isMuted ? 0 : volume;
-      const youtubeVol = youtubePlayerRef.current.volume;
+      const youtubeVol = sharedYoutubePlayerRef.current.volume;
       if (Math.abs(youtubeVol - currentVol) > 1) {
-        youtubePlayerRef.current.setVolume(currentVol);
+        sharedYoutubePlayerRef.current.setVolume(currentVol);
       }
       
       // Synchroniser le mute
-      const youtubeMuted = youtubePlayerRef.current.isMuted;
+      const youtubeMuted = sharedYoutubePlayerRef.current.isMuted;
       if (youtubeMuted !== isMuted) {
         if (isMuted) {
-          youtubePlayerRef.current.toggleMute();
+          sharedYoutubePlayerRef.current.toggleMute();
         } else {
-          youtubePlayerRef.current.toggleMute();
+          sharedYoutubePlayerRef.current.toggleMute();
         }
       }
     }
-  }, [volume, isMuted, isYouTube]);
+  }, [volume, isMuted, isYouTube, sharedYoutubePlayerRef]);
 
   // Gérer le seek pour YouTube
   const handleSeekYouTube = useCallback((value: number[]) => {
-    if (isYouTube && youtubePlayerRef.current) {
-      youtubePlayerRef.current.seek(value[0]);
+    if (isYouTube && sharedYoutubePlayerRef && sharedYoutubePlayerRef.current) {
+      sharedYoutubePlayerRef.current.seek(value[0]);
     } else {
       onSeek(value);
     }
@@ -338,30 +339,9 @@ useEffect(() => {
     return (
       <div className="h-full w-full flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
         {/* Player YouTube en arrière-plan (masqué visuellement) pour les tracks YouTube en mode inline */}
-        {/* Si sharedYoutubePlayerRef est fourni, on n'a pas besoin de créer un nouveau player */}
-        {isYouTube && youtubeVideoId && !sharedYoutubePlayerRef && (
-          <div 
-            className="absolute inset-0 pointer-events-none" 
-            style={{ 
-              zIndex: 1,
-              opacity: 0,
-              width: '1px',
-              height: '1px',
-              overflow: 'hidden',
-            }}
-          >
-            <YouTubePlayer
-              ref={youtubePlayerRef}
-              videoId={youtubeVideoId}
-              autoPlay={isPlaying}
-              audioOnly={true}
-              onStateChange={handleYouTubeStateChange}
-              onTimeUpdate={handleYouTubeTimeUpdate}
-              onReady={handleYouTubeReady}
-              className="w-full h-full"
-            />
-          </div>
-        )}
+        {/* IMPORTANT: Ne jamais créer de nouveau player YouTube ici */}
+        {/* On utilise toujours le player persistant de DesktopApp via sharedYoutubePlayerRef */}
+        {/* Le player persistant est déjà monté dans DesktopApp et gère la lecture */}
         
         <div className="flex flex-col items-center justify-center w-full relative z-10">
           {/* Album Art with glow effect */}
@@ -407,30 +387,10 @@ useEffect(() => {
       {/* Main Panel - Background with album cover and FFT */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Player YouTube - visible pour les vidéos, masqué pour l'audio */}
-        {/* Si sharedYoutubePlayerRef est fourni, on utilise le player persistant (déjà monté dans DesktopApp) */}
-        {/* On ne crée pas de nouveau player, on utilise celui qui joue déjà en background */}
-        {isYouTube && youtubeVideoId && !sharedYoutubePlayerRef && (
-          <div 
-            className="absolute inset-0" 
-            style={{ 
-              zIndex: 1,
-            }}
-          >
-            <YouTubePlayer
-              ref={youtubePlayerRef}
-              videoId={youtubeVideoId}
-              autoPlay={isPlaying}
-              audioOnly={false} // Mode vidéo visible pour fullscreen
-              onStateChange={handleYouTubeStateChange}
-              onTimeUpdate={handleYouTubeTimeUpdate}
-              onReady={handleYouTubeReady}
-              className="w-full h-full"
-            />
-          </div>
-        )}
-        {/* Si sharedYoutubePlayerRef est fourni, le player persistant est déjà visible en fullscreen */}
-        {/* On affiche juste un overlay pour les contrôles Nexus */}
-        {isYouTube && youtubeVideoId && sharedYoutubePlayerRef && (
+        {/* IMPORTANT: Ne jamais créer de nouveau player YouTube ici */}
+        {/* On utilise toujours le player persistant de DesktopApp via sharedYoutubePlayerRef */}
+        {/* Le player persistant est déjà rendu visible en fullscreen par DesktopApp */}
+        {isYouTube && youtubeVideoId && (
           <div 
             className="absolute inset-0 pointer-events-none" 
             style={{ 
@@ -439,6 +399,7 @@ useEffect(() => {
           >
             {/* Le player YouTube persistant est déjà rendu visible en fullscreen par DesktopApp */}
             {/* Cet overlay permet juste de gérer les contrôles Nexus par-dessus */}
+            {/* Aucun nouveau player n'est créé ici pour éviter les doublures */}
           </div>
         )}
         

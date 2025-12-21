@@ -363,7 +363,14 @@ export const DesktopApp = () => {
         playbackStartTimeRef.current = Date.now();
         lastTimeUpdateRef.current = Date.now();
       }
-      audioRef.current.play().catch(console.error);
+      // Vérifier si l'audio n'est pas déjà en train de jouer pour éviter les appels multiples
+      if (audioRef.current.paused) {
+        audioRef.current.play().catch((err) => {
+          console.error('Erreur lors de la lecture:', err);
+          // Si la lecture échoue, mettre à jour l'état
+          setIsPlaying(false);
+        });
+      }
     } else {
       // Enregistrer le temps d'écoute accumulé quand on pause
       if (playbackStartTrackIdRef.current === currentTrack.id && accumulatedPlaybackTimeRef.current > 0) {
@@ -381,7 +388,10 @@ export const DesktopApp = () => {
         }
         playbackStartTimeRef.current = null;
       }
-      audioRef.current.pause();
+      // Vérifier si l'audio n'est pas déjà en pause pour éviter les appels multiples
+      if (!audioRef.current.paused) {
+        audioRef.current.pause();
+      }
     }
   }, [isPlaying, currentTrack?.filePath, currentTrack?.id, currentTrack?.mediaSource, currentTrack?.youtubeVideoId]);
 
@@ -413,7 +423,46 @@ export const DesktopApp = () => {
   }, [volume, isMuted, currentTrack?.mediaSource, currentTrack?.youtubeVideoId]);
 
   // Define handlers before useEffects that use them
-  const handlePlayPause = useCallback(() => setIsPlaying(prev => !prev), []);
+  const handlePlayPause = useCallback(() => {
+    // Pour les tracks YouTube, contrôler directement le player YouTube
+    if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+      const player = youtubePlayerRef.current;
+      
+      console.log('[DesktopApp] handlePlayPause YouTube:', {
+        playerIsPlaying: player.isPlaying,
+        stateIsPlaying: isPlaying,
+        hasPlayer: !!player,
+        hasPause: typeof player.pause === 'function',
+        hasPlay: typeof player.play === 'function',
+      });
+      
+      // Utiliser l'état local comme source de vérité (plus fiable que player.isPlaying)
+      // Le callback onStateChange synchronisera l'état après l'action
+      if (isPlaying) {
+        try {
+          console.log('[DesktopApp] Appel de pause() sur le player YouTube');
+          player.pause();
+          // Mettre à jour l'état immédiatement (optimistic update)
+          // Le callback onStateChange confirmera la mise à jour
+          setIsPlaying(false);
+        } catch (err) {
+          console.error('[DesktopApp] Erreur lors de la pause YouTube:', err);
+        }
+      } else {
+        try {
+          console.log('[DesktopApp] Appel de play() sur le player YouTube');
+          player.play();
+          // Mettre à jour l'état immédiatement (optimistic update)
+          setIsPlaying(true);
+        } catch (err) {
+          console.error('[DesktopApp] Erreur lors de la lecture YouTube:', err);
+        }
+      }
+    } else {
+      // Pour les tracks locaux, basculer l'état
+      setIsPlaying(prev => !prev);
+    }
+  }, [currentTrack?.mediaSource, isPlaying]);
 
   const handlePrevious = useCallback(() => {
     if (tracks.length === 0) return;
@@ -622,6 +671,32 @@ export const DesktopApp = () => {
     // Also listen to timeupdate as backup
     audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
     audioRef.current.addEventListener('ended', handleEnded);
+    
+    // Synchroniser l'état avec les événements natifs de l'audio
+    const handlePlay = () => {
+      // Si l'audio joue mais l'état dit pause, synchroniser
+      if (!isPlaying && audioRef.current && !audioRef.current.paused) {
+        setIsPlaying(true);
+      }
+    };
+    
+    const handlePause = () => {
+      // Si l'audio est en pause mais l'état dit play, synchroniser
+      if (isPlaying && audioRef.current && audioRef.current.paused) {
+        setIsPlaying(false);
+      }
+    };
+    
+    const handlePlaying = () => {
+      // L'audio a réellement commencé à jouer
+      if (!isPlaying) {
+        setIsPlaying(true);
+      }
+    };
+    
+    audioRef.current.addEventListener('play', handlePlay);
+    audioRef.current.addEventListener('pause', handlePause);
+    audioRef.current.addEventListener('playing', handlePlaying);
 
     return () => {
       if (animationFrameId) {
@@ -630,6 +705,9 @@ export const DesktopApp = () => {
       if (audioRef.current) {
         audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
         audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.removeEventListener('play', handlePlay);
+        audioRef.current.removeEventListener('pause', handlePause);
+        audioRef.current.removeEventListener('playing', handlePlaying);
       }
     };
   }, [isPlaying, repeatMode, currentTrack?.id, currentTrack?.mediaSource]);
@@ -1712,6 +1790,7 @@ export const DesktopApp = () => {
               autoPlay={isPlaying}
               audioOnly={!isFullscreen} // Audio-only en background, vidéo visible en fullscreen
               onStateChange={(playing) => {
+                console.log('[DesktopApp] YouTube onStateChange:', { playing, currentIsPlaying: isPlaying });
                 if (playing !== isPlaying) {
                   setIsPlaying(playing);
                 }
