@@ -371,16 +371,16 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
       }
     };
 
-    // Mettre à jour toutes les secondes
+    // Mettre à jour toutes les 500ms pour éviter le clignotement
     updateProgress(); // Appel immédiat
-    updateIntervalRef.current = setInterval(updateProgress, 1000);
+    updateIntervalRef.current = setInterval(updateProgress, 500);
     
     return () => {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
       }
     };
-  }, [isReady, isPlaying]);
+  }, [isReady]); // Ne pas dépendre de isPlaying pour continuer à mettre à jour même en pause
 
   // Charger une nouvelle vidéo
   const loadVideo = useCallback((newVideoId: string, startSeconds?: number) => {

@@ -428,16 +428,17 @@ useEffect(() => {
             />
           </div>
         )}
-        {/* Si sharedYoutubePlayerRef est fourni, on affiche juste un placeholder car le player persistant gère la lecture */}
+        {/* Si sharedYoutubePlayerRef est fourni, le player persistant est déjà visible en fullscreen */}
+        {/* On affiche juste un overlay pour les contrôles Nexus */}
         {isYouTube && youtubeVideoId && sharedYoutubePlayerRef && (
           <div 
-            className="absolute inset-0 bg-black" 
+            className="absolute inset-0 pointer-events-none" 
             style={{ 
               zIndex: 1,
             }}
           >
-            {/* Le player YouTube persistant joue déjà en background, on affiche juste un fond noir */}
-            {/* TODO: Utiliser un portail React pour rendre le player persistant visible ici */}
+            {/* Le player YouTube persistant est déjà rendu visible en fullscreen par DesktopApp */}
+            {/* Cet overlay permet juste de gérer les contrôles Nexus par-dessus */}
           </div>
         )}
         

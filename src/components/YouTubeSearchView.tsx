@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Search, Play, Music, Video as VideoIcon, Loader2, AlertCircle, ExternalLink, ChevronRight, History, TrendingUp } from "lucide-react";
+import { Search, Play, Music, Video as VideoIcon, Loader2, AlertCircle, ExternalLink, ChevronRight, History, TrendingUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import type { Video, Track } from "@/types/music";
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
 import { extractYouTubeVideoId } from "@/lib/youtube";
+import { YouTubePlayer } from "@/components/YouTubePlayer";
 
 interface YouTubeSearchViewProps {
   onPlayVideo: (video: Video, audioOnly?: boolean) => void;
@@ -42,6 +43,10 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   const { tracks: audioTracks } = useLibrary();
   const [artistSuggestions, setArtistSuggestions] = useState<YouTubeSearchResult[]>([]);
   const [loadingArtistSuggestions, setLoadingArtistSuggestions] = useState(false);
+  
+  // État pour la vidéo en cours de lecture
+  const [playingVideo, setPlayingVideo] = useState<Video | null>(null);
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   
   // Filtrer TOUTES les vidéos YouTube de l'historique (pas de limite)
   // Utiliser à la fois recentlyWatched, enhancedVideos ET l'historique brut depuis localStorage
@@ -460,11 +465,42 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       const track = youtubeVideoToTrack(result);
       onPlayAsAudio(track);
     } else {
-      // Mode vidéo : jouer comme vidéo
+      // Mode vidéo : jouer dans le lecteur intégré
       const video = convertToVideo(result);
-      onPlayVideo(video, playbackMode === "audio");
+      setPlayingVideo(video);
+      setIsPlayerFullscreen(true);
+      // Ajouter à l'historique
+      if (onPlayVideo) {
+        onPlayVideo(video, playbackMode === "audio");
+      }
     }
   }, [convertToVideo, onPlayVideo, playbackMode, onPlayAsAudio]);
+  
+  // Gérer la lecture des vidéos de l'historique
+  const handlePlayHistoryVideo = useCallback((video: Video) => {
+    if (playbackMode === "audio" && onPlayAsAudio) {
+      // Mode audio : convertir en Track
+      const track = youtubeVideoToTrack({
+        videoId: video.youtubeVideoId || extractYouTubeVideoId(video.filePath || '') || '',
+        title: video.title,
+        description: video.description || '',
+        thumbnailUrl: video.thumbnailUrl || '',
+        channelTitle: video.channelTitle || '',
+        publishedAt: video.addedAt || '',
+        duration: video.duration ? `PT${Math.floor(video.duration / 3600)}H${Math.floor((video.duration % 3600) / 60)}M${video.duration % 60}S` : undefined,
+        viewCount: undefined,
+      });
+      onPlayAsAudio(track);
+    } else {
+      // Mode vidéo : jouer dans le lecteur intégré
+      setPlayingVideo(video);
+      setIsPlayerFullscreen(true);
+      // Ajouter à l'historique
+      if (onPlayVideo) {
+        onPlayVideo(video, playbackMode === "audio");
+      }
+    }
+  }, [playbackMode, onPlayAsAudio, onPlayVideo]);
 
   const handleAddToQueue = useCallback((result: YouTubeSearchResult) => {
     if (onAddToQueue) {
@@ -496,8 +532,42 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     return `${num} vues`;
   };
 
+  // Obtenir l'ID de la vidéo YouTube en cours de lecture
+  const playingVideoId = playingVideo 
+    ? (playingVideo.youtubeVideoId || extractYouTubeVideoId(playingVideo.filePath || ''))
+    : null;
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Lecteur vidéo intégré en overlay */}
+      {isPlayerFullscreen && playingVideo && playingVideoId && (
+        <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+          <div className="absolute top-4 right-4 z-50">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setPlayingVideo(null);
+                setIsPlayerFullscreen(false);
+              }}
+              className="bg-black/50 hover:bg-black/70 text-white"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="flex-1 w-full h-full">
+            <YouTubePlayer
+              videoId={playingVideoId}
+              autoPlay={true}
+              audioOnly={playbackMode === "audio"}
+              className="w-full h-full"
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Contenu principal */}
+      <div className={cn("flex flex-col h-full", isPlayerFullscreen && "opacity-0 pointer-events-none")}>
       {/* Header avec recherche */}
       <div className="flex-shrink-0 p-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
         <div className="space-y-4">
@@ -882,6 +952,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

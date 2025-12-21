@@ -101,8 +101,10 @@ export const NowPlayingBar = ({
       ? Volume1 
       : Volume2;
 
+  // Arrondir currentTime pour éviter le clignotement
+  const roundedCurrentTime = Math.floor(currentTime * 2) / 2;
   const progress = currentTrack.duration > 0 
-    ? (currentTime / currentTrack.duration) * 100 
+    ? (roundedCurrentTime / currentTrack.duration) * 100 
     : 0;
 
   const { notifySuccess, notify } = useNotifications();
@@ -246,7 +248,7 @@ export const NowPlayingBar = ({
           <div className="flex items-center gap-1 w-64 justify-end ml-auto flex-shrink-0">
             {/* Time Display - Hidden when volume slider expands */}
             <div className="text-xs text-muted-foreground font-mono w-24 text-center mr-2 transition-all duration-200 group-hover/volume:opacity-0 group-hover/volume:w-0 group-hover/volume:overflow-hidden group-hover/volume:mr-0">
-              {formatTime(currentTime)} / {formatTime(currentTrack.duration)}
+              {formatTime(roundedCurrentTime)} / {formatTime(currentTrack.duration)}
             </div>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
