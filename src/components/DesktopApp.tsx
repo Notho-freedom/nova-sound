@@ -352,6 +352,20 @@ export const DesktopApp = () => {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
+      
+      // Démarrer le suivi du temps d'écoute pour YouTube
+      if (isPlaying && playbackStartTrackIdRef.current === currentTrack.id && playbackStartTimeRef.current === null) {
+        playbackStartTimeRef.current = Date.now();
+        lastTimeUpdateRef.current = Date.now();
+      } else if (!isPlaying && playbackStartTimeRef.current !== null) {
+        // Mettre à jour le temps accumulé une dernière fois avant de pause
+        const realTimeNow = Date.now();
+        const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+        accumulatedPlaybackTimeRef.current += delta;
+        lastTimeUpdateRef.current = realTimeNow;
+        playbackStartTimeRef.current = null;
+      }
+      
       return;
     }
 
@@ -372,10 +386,21 @@ export const DesktopApp = () => {
         });
       }
     } else {
-      // Enregistrer le temps d'écoute accumulé quand on pause
+      // Enregistrer le temps d'écoute accumulé quand on pause (pour tracks locaux ET YouTube)
       if (playbackStartTrackIdRef.current === currentTrack.id && accumulatedPlaybackTimeRef.current > 0) {
+        // Mettre à jour le temps accumulé une dernière fois
+        if (playbackStartTimeRef.current !== null) {
+          const realTimeNow = Date.now();
+          const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000;
+          accumulatedPlaybackTimeRef.current += delta;
+          lastTimeUpdateRef.current = realTimeNow;
+        }
+        
         const elapsedTime = accumulatedPlaybackTimeRef.current;
-        const trackDuration = currentTrack.duration || 0;
+        // Pour YouTube, utiliser youtubeDuration si disponible
+        const trackDuration = currentTrack.mediaSource === 'youtube' 
+          ? (youtubeDuration || currentTrack.duration || 0)
+          : (currentTrack.duration || 0);
         const completedPercentage = trackDuration > 0
           ? Math.min(100, (elapsedTime / trackDuration) * 100)
           : 100;
@@ -388,8 +413,9 @@ export const DesktopApp = () => {
         }
         playbackStartTimeRef.current = null;
       }
-      // Vérifier si l'audio n'est pas déjà en pause pour éviter les appels multiples
-      if (!audioRef.current.paused) {
+      
+      // Pour les tracks locaux uniquement, pauser l'audio HTML5
+      if (currentTrack?.mediaSource !== 'youtube' && audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
       }
     }
@@ -1091,6 +1117,31 @@ export const DesktopApp = () => {
       window.removeEventListener('youtube-audio-play', handleYouTubeAudioPlay as unknown as EventListener);
     };
   }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect, showInlinePlayer, currentView, previousView]);
+
+  // Écouter les événements pour ajouter les vidéos YouTube à l'historique audio
+  useEffect(() => {
+    const handleYouTubeVideoPlayed = (event: CustomEvent<{ videoId: string; trackId: string; title: string }>) => {
+      const { trackId } = event.detail;
+      
+      // Ajouter à l'historique audio si le track est dans la queue
+      const track = tracks.find(t => t.id === trackId);
+      if (track) {
+        console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', track.title);
+        addToHistory(trackId);
+      } else {
+        // Si le track n'est pas encore dans la queue, l'ajouter à l'historique quand même
+        // Il sera synchronisé quand le track sera ajouté à la queue
+        console.log('[DesktopApp] Track YouTube non trouvé dans la queue, ajout direct à l\'historique:', trackId);
+        addToHistory(trackId);
+      }
+    };
+
+    window.addEventListener('youtube-video-played', handleYouTubeVideoPlayed as unknown as EventListener);
+    
+    return () => {
+      window.removeEventListener('youtube-video-played', handleYouTubeVideoPlayed as unknown as EventListener);
+    };
+  }, [tracks, addToHistory]);
 
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
@@ -1794,6 +1845,22 @@ export const DesktopApp = () => {
                 if (playing !== isPlaying) {
                   setIsPlaying(playing);
                 }
+                
+                // Quand la vidéo YouTube commence à jouer, s'assurer qu'elle est dans l'historique
+                if (playing && currentTrack?.mediaSource === 'youtube' && currentTrack.id) {
+                  // Toujours ajouter à l'historique (addToHistory gère les doublons)
+                  console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', currentTrack.title);
+                  addToHistory(currentTrack.id);
+                  
+                  // Émettre l'événement pour VideosView
+                  window.dispatchEvent(new CustomEvent('youtube-video-played', { 
+                    detail: { 
+                      videoId: currentTrack.youtubeVideoId || '',
+                      trackId: currentTrack.id,
+                      title: currentTrack.title,
+                    } 
+                  }));
+                }
               }}
               onTimeUpdate={(time) => {
                 // Mettre à jour currentTime directement pour une progression fluide
@@ -1802,6 +1869,16 @@ export const DesktopApp = () => {
                 // Mettre à jour aussi la durée si elle est disponible
                 if (youtubePlayerRef.current && youtubePlayerRef.current.duration > 0) {
                   setYoutubeDuration(youtubePlayerRef.current.duration);
+                }
+                
+                // Suivre le temps d'écoute pour YouTube (comme pour les tracks locaux)
+                if (isPlaying && currentTrack && currentTrack.mediaSource === 'youtube' && 
+                    playbackStartTrackIdRef.current === currentTrack.id && 
+                    playbackStartTimeRef.current !== null) {
+                  const realTimeNow = Date.now();
+                  const delta = (realTimeNow - lastTimeUpdateRef.current) / 1000; // en secondes
+                  accumulatedPlaybackTimeRef.current += delta;
+                  lastTimeUpdateRef.current = realTimeNow;
                 }
               }}
               onReady={() => {
