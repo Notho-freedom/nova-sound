@@ -195,6 +195,9 @@ export const DesktopApp = () => {
   
   // YouTube Player ref pour lecture persistante en arrière-plan
   const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+  
+  // Durée du player YouTube (pour les tracks YouTube où currentTrack.duration peut être 0)
+  const [youtubeDuration, setYoutubeDuration] = useState(0);
 
   // Loading complete handler
   const handleLoadComplete = useCallback(() => {
@@ -237,8 +240,9 @@ export const DesktopApp = () => {
     // Le player YouTube sera géré séparément via le composant YouTubePlayer
     if (currentTrack.mediaSource === 'youtube') {
       console.log('Track YouTube détecté, le player YouTube sera utilisé');
-      // Réinitialiser currentTime pour les tracks YouTube
+      // Réinitialiser currentTime et durée pour les tracks YouTube
       setCurrentTime(0);
+      setYoutubeDuration(0);
       // Ne pas charger dans l'élément audio HTML
       return;
     }
@@ -1595,6 +1599,7 @@ export const DesktopApp = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={() => setIsMuted(!isMuted)}
+            youtubeDuration={currentTrack?.mediaSource === 'youtube' ? youtubeDuration : undefined}
             onToggleQueue={() => {
               setIsQueueOpen(!isQueueOpen);
               if (!isQueueOpen) {
@@ -1665,21 +1670,34 @@ export const DesktopApp = () => {
                 }
               }}
               onTimeUpdate={(time) => {
-                // Arrondir à 0.5s près pour éviter le clignotement des compteurs
-                const roundedTime = Math.floor(time * 2) / 2;
-                setCurrentTime(roundedTime);
+                // Mettre à jour currentTime directement (sans arrondi pour une progression fluide)
+                // L'arrondi sera fait dans NowPlayingBar pour l'affichage seulement
+                setCurrentTime(time);
+                // Mettre à jour aussi la durée si elle est disponible
+                if (youtubePlayerRef.current && youtubePlayerRef.current.duration > 0) {
+                  setYoutubeDuration(youtubePlayerRef.current.duration);
+                }
               }}
               onReady={() => {
                 if (youtubePlayerRef.current) {
                   const player = youtubePlayerRef.current;
                   // Initialiser currentTime avec la valeur du player
                   if (player.currentTime > 0) {
-                    setCurrentTime(Math.floor(player.currentTime * 2) / 2);
+                    setCurrentTime(player.currentTime);
                   } else {
                     setCurrentTime(0);
                   }
-                  // La durée sera récupérée automatiquement par le hook useYouTubePlayer
-                  // et sera disponible via player.duration
+                  // Initialiser la durée du player YouTube
+                  if (player.duration > 0) {
+                    setYoutubeDuration(player.duration);
+                  } else {
+                    // Essayer de récupérer la durée après un court délai (elle peut ne pas être disponible immédiatement)
+                    setTimeout(() => {
+                      if (youtubePlayerRef.current && youtubePlayerRef.current.duration > 0) {
+                        setYoutubeDuration(youtubePlayerRef.current.duration);
+                      }
+                    }, 1000);
+                  }
                   // Synchroniser le volume
                   if (Math.abs(player.volume - volume) > 1) {
                     player.setVolume(volume);

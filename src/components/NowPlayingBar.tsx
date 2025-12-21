@@ -61,6 +61,7 @@ interface NowPlayingBarProps {
   onNavigateToAlbum?: () => void;
   onNavigateToArtist?: () => void;
   isQueueOpen: boolean;
+  youtubeDuration?: number; // Durée du player YouTube (si différente de currentTrack.duration)
 }
 
 const formatTime = (seconds: number) => {
@@ -94,6 +95,7 @@ export const NowPlayingBar = ({
   onNavigateToAlbum,
   onNavigateToArtist,
   isQueueOpen,
+  youtubeDuration,
 }: NowPlayingBarProps) => {
   const VolumeIcon = isMuted || volume === 0 
     ? VolumeX 
@@ -101,10 +103,12 @@ export const NowPlayingBar = ({
       ? Volume1 
       : Volume2;
 
-  // Arrondir currentTime pour éviter le clignotement
-  const roundedCurrentTime = Math.floor(currentTime * 2) / 2;
-  const progress = currentTrack.duration > 0 
-    ? (roundedCurrentTime / currentTrack.duration) * 100 
+  // Arrondir currentTime pour l'affichage seulement (évite le clignotement des compteurs)
+  const roundedCurrentTime = Math.floor(currentTime);
+  // Utiliser youtubeDuration si disponible (pour les tracks YouTube), sinon currentTrack.duration
+  const effectiveDuration = youtubeDuration || currentTrack.duration || 0;
+  const progress = effectiveDuration > 0 
+    ? (currentTime / effectiveDuration) * 100 
     : 0;
 
   const { notifySuccess, notify } = useNotifications();
@@ -115,7 +119,7 @@ export const NowPlayingBar = ({
       <div className="h-1 w-full bg-muted/30 cursor-pointer group" onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const percent = (e.clientX - rect.left) / rect.width;
-        onSeek([percent * currentTrack.duration]);
+        onSeek([percent * effectiveDuration]);
       }}>
         <div 
           className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-200 ease-out relative"

@@ -339,7 +339,7 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
 
         // Mettre à jour le temps actuel
         const current = player.getCurrentTime();
-        if (current !== undefined && !isNaN(current)) {
+        if (current !== undefined && !isNaN(current) && current >= 0) {
           setCurrentTime(current);
         }
         
@@ -371,9 +371,9 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
       }
     };
 
-    // Mettre à jour toutes les 500ms pour éviter le clignotement
+    // Mettre à jour toutes les 250ms pour une progression fluide
     updateProgress(); // Appel immédiat
-    updateIntervalRef.current = setInterval(updateProgress, 500);
+    updateIntervalRef.current = setInterval(updateProgress, 250);
     
     return () => {
       if (updateIntervalRef.current) {
