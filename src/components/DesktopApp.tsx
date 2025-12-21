@@ -776,6 +776,27 @@ export const DesktopApp = () => {
     }
   }, [tracks, libraryTracks, queue.tracks, setCurrentIndex, addToQueueNext]);
 
+  // Play a track directly (add to queue if not present, then play)
+  const handlePlayTrack = useCallback((track: Track) => {
+    // Check if track is already in queue
+    const existingIndex = queue.tracks.findIndex(t => t.id === track.id);
+    
+    if (existingIndex >= 0) {
+      // Track is already in queue, just play it
+      setCurrentIndex(existingIndex);
+      setCurrentTime(0);
+      setIsPlaying(true);
+    } else {
+      // Add track to queue - it will be added at the end
+      const newIndex = queue.tracks.length;
+      addToQueue([track]);
+      // Play it immediately (the track will be at the end of the queue)
+      setCurrentIndex(newIndex);
+      setCurrentTime(0);
+      setIsPlaying(true);
+    }
+  }, [queue.tracks, setCurrentIndex, addToQueue]);
+
   // Queue management handlers
   const handlePlayNext = useCallback((track: Track | Track[]) => {
     const tracksToAdd = Array.isArray(track) ? track : [track];
@@ -1145,21 +1166,6 @@ export const DesktopApp = () => {
     return shuffled.slice(0, 20);
   }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
-  const handlePlayTrack = useCallback((track: Track) => {
-    const trackIndex = tracks.findIndex(t => t.id === track.id);
-    if (trackIndex >= 0) {
-      handleTrackSelect(trackIndex);
-    } else {
-      // Track not in current queue, add it and play
-      addToQueueNext(track);
-      const newIndex = queue.tracks.length;
-      setTimeout(() => {
-        setCurrentIndex(newIndex);
-        setIsPlaying(true);
-      }, 100);
-    }
-  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect]);
-
   const renderView = () => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
@@ -1212,6 +1218,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}

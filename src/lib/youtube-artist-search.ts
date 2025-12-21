@@ -32,6 +32,21 @@ export async function searchYouTubeByArtist(
     return [];
   }
 
+  // Vérifier le circuit breaker AVANT d'appeler l'API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canUseAPI()) {
+      console.log(`[YouTube Artist Search] Circuit breaker ouvert, pas d'appel API pour: ${artistName}`);
+      return [];
+    }
+    if (!youtubeQuotaManager.canSearch()) {
+      console.log(`[YouTube Artist Search] Budget recherche épuisé, pas d'appel API pour: ${artistName}`);
+      return [];
+    }
+  } catch (error) {
+    // Continuer si le service n'est pas disponible
+  }
+
   try {
     // Rechercher des vidéos avec le nom de l'artiste
     const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
@@ -113,8 +128,10 @@ export async function searchYouTubeByArtist(
       });
     }
 
-    // Convertir en YouTubeSuggestion
-    const suggestions: YouTubeSuggestion[] = data.items.map((item: any) => {
+    // Convertir en YouTubeSuggestion et filtrer les items sans videoId valide
+    const suggestions: YouTubeSuggestion[] = data.items
+      .filter((item: any) => item.id?.videoId && item.id.videoId !== 'undefined' && item.id.videoId.trim() !== '')
+      .map((item: any) => {
       const details = detailsMap.get(item.id.videoId) || {};
       const thumbnails = item.snippet?.thumbnails || {};
       

@@ -20,6 +20,7 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,9 @@ import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
 import { UploadIndicator } from "@/components/UploadIndicator";
 import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton, PageHeaderSkeleton, AlbumTableSkeleton, ArtistTableSkeleton } from "@/components/ui/skeletons";
+import { fetchYouTubeChannelPlaylists, fetchYouTubePlaylistVideos } from "@/lib/youtube-playlists";
+import { extractYouTubeChannelId } from "@/lib/youtube";
+import { youtubeSuggestionsToTracks } from "@/lib/youtube-artist-search";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -206,6 +210,10 @@ export const LibraryView = memo(({
 
   const [searchQuery, setSearchQuery] = useState("");
 
+  // État pour les playlists YouTube de l'artiste (toujours déclaré, même si non utilisé)
+  const [youtubePlaylists, setYoutubePlaylists] = useState<Array<{ id: string; title: string; videoCount: number; tracks: Track[] }>>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+
   // Utility function to remove duplicates
   const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
     const seen = new Set<string>();
@@ -231,12 +239,12 @@ export const LibraryView = memo(({
       } catch (error) {
         // Fallback si import échoue
         console.warn('[LibraryView] Erreur import search-utils, fallback recherche normale:', error);
-        const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase();
         const filtered = uniqueTracks.filter(track =>
-          track.title.toLowerCase().includes(query) ||
-          track.artist.toLowerCase().includes(query) ||
-          track.album.toLowerCase().includes(query)
-        );
+        track.title.toLowerCase().includes(query) ||
+        track.artist.toLowerCase().includes(query) ||
+        track.album.toLowerCase().includes(query)
+      );
         // Trier avec Intl.Collator
         const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
         return [...filtered].sort((a, b) => {
@@ -611,6 +619,119 @@ export const LibraryView = memo(({
     );
   }
 
+  // Charger les playlists YouTube de l'artiste si c'est un profil YouTube
+  // (hooks toujours appelés, mais logique conditionnelle à l'intérieur)
+  useEffect(() => {
+    // Ne charger que si on est en mode artistes et qu'un artiste est sélectionné
+    if (viewMode !== "artists" || !selectedArtist) {
+      setYoutubePlaylists([]);
+      setLoadingPlaylists(false);
+      return;
+    }
+
+    const loadArtistPlaylists = async () => {
+      // Trouver l'artiste
+      const artist = artists.find(a => a.name === selectedArtist);
+      if (!artist) {
+        setYoutubePlaylists([]);
+        return;
+      }
+
+      // Chercher un track YouTube de cet artiste pour détecter le profil
+      const youtubeTrack = artist.tracks.find(t => 
+        t.mediaSource === 'youtube' && 
+        (t.filePath?.includes('/@') || t.filePath?.includes('/channel/') || 
+         (!t.youtubeVideoId || t.youtubeVideoId === 'undefined' || t.duration === 0))
+      );
+
+      if (!youtubeTrack || !youtubeTrack.filePath) {
+        console.log(`[LibraryView] Pas de profil YouTube trouvé pour l'artiste: ${selectedArtist}`);
+        setYoutubePlaylists([]);
+        return;
+      }
+
+      console.log(`[LibraryView] 🎵 Chargement playlists YouTube pour l'artiste: ${selectedArtist}`);
+      setLoadingPlaylists(true);
+
+      try {
+        // Extraire le channelId depuis le track
+        const channelId = extractYouTubeChannelId(youtubeTrack.filePath);
+        
+        let actualChannelId = channelId;
+        
+        // Si pas de channelId direct, rechercher par nom d'artiste
+        if (!actualChannelId) {
+          console.log(`[LibraryView] Recherche channelId pour: ${selectedArtist}`);
+          const apiKey = typeof window !== 'undefined' 
+            ? (localStorage.getItem("nexus-youtube-api-key") || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || null)
+            : null;
+          
+          if (apiKey) {
+            const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+            searchUrl.searchParams.set("key", apiKey);
+            searchUrl.searchParams.set("part", "snippet");
+            searchUrl.searchParams.set("type", "channel");
+            searchUrl.searchParams.set("q", selectedArtist);
+            searchUrl.searchParams.set("maxResults", "1");
+            
+            const searchResponse = await fetch(searchUrl.toString());
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              if (searchData.items && searchData.items.length > 0) {
+                actualChannelId = searchData.items[0].id.channelId;
+                console.log(`[LibraryView] ✅ ChannelId trouvé: ${actualChannelId}`);
+              }
+            }
+          }
+        }
+
+        if (actualChannelId) {
+          // Charger les playlists
+          const playlists = await fetchYouTubeChannelPlaylists(actualChannelId, 20);
+          console.log(`[LibraryView] ${playlists.length} playlists trouvées pour ${selectedArtist}`);
+
+          // Charger les vidéos de chaque playlist
+          const playlistsWithTracks = await Promise.all(
+            playlists.slice(0, 10).map(async (playlist) => {
+              try {
+                const videos = await fetchYouTubePlaylistVideos(playlist.videoId, 10);
+                // Filtrer les vidéos sans videoId valide
+                const validVideos = videos.filter(v => v.videoId && v.videoId !== 'undefined' && v.videoId.trim() !== '');
+                const tracks = youtubeSuggestionsToTracks(validVideos);
+                return {
+                  id: playlist.videoId,
+                  title: playlist.title,
+                  videoCount: playlist.viewCount || validVideos.length,
+                  tracks: tracks,
+                };
+              } catch (err) {
+                console.warn(`[LibraryView] Erreur chargement playlist ${playlist.videoId}:`, err);
+                return {
+                  id: playlist.videoId,
+                  title: playlist.title,
+                  videoCount: playlist.viewCount || 0,
+                  tracks: [],
+                };
+              }
+            })
+          );
+
+          setYoutubePlaylists(playlistsWithTracks.filter(p => p.tracks.length > 0));
+          console.log(`[LibraryView] ✅ ${playlistsWithTracks.filter(p => p.tracks.length > 0).length} playlists chargées avec succès`);
+        } else {
+          setYoutubePlaylists([]);
+        }
+      } catch (err) {
+        console.error(`[LibraryView] Erreur chargement playlists pour ${selectedArtist}:`, err);
+        setYoutubePlaylists([]);
+      } finally {
+        setLoadingPlaylists(false);
+      }
+    };
+
+    loadArtistPlaylists();
+  }, [viewMode, selectedArtist, artists]);
+
   // Artist Details View
   if (viewMode === "artists" && selectedArtist) {
     const artist = artists.find(a => a.name === selectedArtist);
@@ -694,11 +815,71 @@ export const LibraryView = memo(({
           </div>
         </div>
 
+        {/* Playlists YouTube */}
+        {youtubePlaylists.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <ListMusic className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-semibold">Playlists YouTube</h2>
+          </div>
+            {loadingPlaylists ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {youtubePlaylists.map((playlist) => (
+                  <div
+                    key={playlist.id}
+                    className="group relative p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    onClick={() => {
+                      // Jouer la première vidéo de la playlist
+                      if (playlist.tracks.length > 0) {
+                        const firstTrack = playlist.tracks[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) {
+                          onTrackSelect(idx);
+                        } else {
+                          // Ajouter tous les tracks de la playlist à la queue
+                          if (onAddToQueue) {
+                            playlist.tracks.forEach(track => onAddToQueue(track));
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg bg-gradient-to-br from-primary/20 to-secondary/20">
+                      {playlist.tracks[0]?.coverUrl ? (
+                        <img
+                          src={getCoverUrl(playlist.tracks[0].coverUrl)}
+                          alt={playlist.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ListMusic className="w-10 h-10 text-primary/50" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                          <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium truncate text-foreground">{playlist.title}</p>
+                    <p className="text-xs text-muted-foreground/70">{playlist.videoCount} vidéos</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Albums Grid */}
         {artistAlbums.length > 0 && (
           <div>
             <h2 className="text-xl font-semibold mb-4">Albums</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {artistAlbums.map((album) => (
                 <AlbumContextMenu
                   key={album.name}

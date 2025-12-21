@@ -170,6 +170,12 @@ class YouTubeBatchService {
       throw new Error('YouTube API key not found');
     }
     
+    // Vérifier le circuit breaker AVANT l'appel API
+    if (!youtubeQuotaManager.canUseAPI()) {
+      console.log('[YouTubeBatch] Circuit breaker ouvert, skip API batch call');
+      throw new Error('Circuit breaker ouvert - quota épuisé');
+    }
+    
     // Diviser en chunks de 50 (limite API)
     const chunks: string[][] = [];
     for (let i = 0; i < videoIds.length; i += this.MAX_BATCH_SIZE) {

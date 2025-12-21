@@ -137,6 +137,20 @@ export async function fetchYouTubeVideoMetadata(
     };
   }
 
+  // Vérifier le circuit breaker AVANT l'appel API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canUseAPI()) {
+      console.log('[YouTubeMetadata] Circuit breaker ouvert, skip API call');
+      return {
+        success: false,
+        error: "Quota API épuisé. Utilisez youtubeProvider pour routing intelligent.",
+      };
+    }
+  } catch (error) {
+    // Continuer si le service n'est pas disponible
+  }
+
   try {
     const url = new URL("https://www.googleapis.com/youtube/v3/videos");
     url.searchParams.set("id", videoId);

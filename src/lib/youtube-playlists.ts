@@ -58,19 +58,46 @@ export function getChannelIdFromTrack(track: Track): { channelId: string | null;
   }
   
   // Cas 2: youtubeVideoId est undefined ou invalide, mais filePath ressemble à une URL de chaîne
-  // Vérifier si le filePath contient des patterns de chaîne
-  if (!track.youtubeVideoId || track.youtubeVideoId === 'undefined') {
+  // Vérifier si le filePath contient des patterns de chaîne (notamment @username)
+  if (!track.youtubeVideoId || track.youtubeVideoId === 'undefined' || track.youtubeVideoId.trim() === '') {
     // Si l'URL ressemble à une chaîne mais qu'on n'a pas pu extraire le channelId
     // Peut-être que c'est un profil stocké différemment
     if (track.filePath.includes('/channel/') || track.filePath.includes('/@') || track.filePath.includes('/c/') || track.filePath.includes('/user/')) {
-      console.log('[getChannelIdFromTrack] ⚠️ URL ressemble à une chaîne mais channelId non extrait, tentative avec artiste');
-      // Essayer de rechercher par nom d'artiste
+      console.log('[getChannelIdFromTrack] ⚠️ URL ressemble à une chaîne mais channelId non extrait, tentative extraction');
+      
+      // Réessayer l'extraction (peut-être que extractYouTubeChannelId n'a pas fonctionné la première fois)
+      const retryChannelId = extractYouTubeChannelId(track.filePath);
+      if (retryChannelId) {
+        console.log(`[getChannelIdFromTrack] ✅ ChannelId extrait au second essai: ${retryChannelId}`);
+        return { channelId: retryChannelId };
+      }
+      
+      // Si toujours pas de channelId, essayer de rechercher par nom d'artiste
       if (track.artist) {
+        console.log(`[getChannelIdFromTrack] Recherche par nom d'artiste: ${track.artist}`);
         return { channelId: null, searchByArtist: track.artist };
       }
     }
     console.log('[getChannelIdFromTrack] Track avec youtubeVideoId undefined, pas un profil détectable');
     return null;
+  }
+  
+  // Cas 3: Vérifier si la durée est nulle (0 ou très proche de 0) - indicateur d'un profil
+  // Les profils YouTube ont généralement une durée de 0
+  if (track.duration === 0 || (track.duration && track.duration < 1)) {
+    // Vérifier si l'URL ressemble à une chaîne
+    if (track.filePath && (track.filePath.includes('/channel/') || track.filePath.includes('/@') || track.filePath.includes('/c/') || track.filePath.includes('/user/'))) {
+      const retryChannelId = extractYouTubeChannelId(track.filePath);
+      if (retryChannelId) {
+        console.log(`[getChannelIdFromTrack] ✅ Profil YouTube détecté (durée nulle + URL chaîne): ${retryChannelId}`);
+        return { channelId: retryChannelId };
+      }
+      // Si pas de channelId mais durée nulle et URL de chaîne, rechercher par artiste
+      if (track.artist) {
+        console.log(`[getChannelIdFromTrack] Profil probable (durée nulle), recherche par artiste: ${track.artist}`);
+        return { channelId: null, searchByArtist: track.artist };
+      }
+    }
   }
   
   // Cas 3: C'est une vidéo valide, mais on peut quand même chercher la chaîne par artiste
@@ -92,6 +119,17 @@ export async function fetchYouTubeChannelPlaylists(
   if (!apiKey) {
     console.warn('[YouTube Playlists] Clé API YouTube non configurée');
     return [];
+  }
+
+  // Vérifier le circuit breaker AVANT tout appel API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canUseAPI() || !youtubeQuotaManager.canSearch()) {
+      console.log('[YouTube Playlists] Circuit breaker ouvert ou quota recherche épuisé, retour vide');
+      return [];
+    }
+  } catch (error) {
+    // Continuer si le service n'est pas disponible
   }
 
   try {
@@ -202,6 +240,17 @@ export async function fetchYouTubePlaylistVideos(
     return [];
   }
 
+  // Vérifier le circuit breaker AVANT tout appel API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canUseAPI()) {
+      console.log('[YouTube Playlists] Circuit breaker ouvert, retour vide');
+      return [];
+    }
+  } catch (error) {
+    // Continuer si le service n'est pas disponible
+  }
+
   try {
     // Récupérer les vidéos de la playlist
     const playlistItemsUrl = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
@@ -269,34 +318,39 @@ export async function fetchYouTubePlaylistVideos(
       });
     }
 
-    // Convertir en YouTubeSuggestion
-    const suggestions: YouTubeSuggestion[] = data.items.map((item: any) => {
-      const videoId = item.contentDetails?.videoId;
-      const videoDetails = videosMap.get(videoId) || {};
-      const thumbnails = item.snippet?.thumbnails || {};
-      
-      // Parser la durée ISO 8601 en secondes
-      const parseDuration = (duration?: string): number => {
-        if (!duration) return 0;
-        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-        if (!match) return 0;
-        const hours = parseInt(match[1] || '0', 10);
-        const minutes = parseInt(match[2] || '0', 10);
-        const seconds = parseInt(match[3] || '0', 10);
-        return hours * 3600 + minutes * 60 + seconds;
-      };
+    // Convertir en YouTubeSuggestion et filtrer les items sans videoId valide
+    const suggestions: YouTubeSuggestion[] = data.items
+      .filter((item: any) => {
+        const videoId = item.contentDetails?.videoId;
+        return videoId && videoId !== 'undefined' && videoId.trim() !== '';
+      })
+      .map((item: any) => {
+        const videoId = item.contentDetails?.videoId;
+        const videoDetails = videosMap.get(videoId) || {};
+        const thumbnails = item.snippet?.thumbnails || {};
+        
+        // Parser la durée ISO 8601 en secondes
+        const parseDuration = (duration?: string): number => {
+          if (!duration) return 0;
+          const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+          if (!match) return 0;
+          const hours = parseInt(match[1] || '0', 10);
+          const minutes = parseInt(match[2] || '0', 10);
+          const seconds = parseInt(match[3] || '0', 10);
+          return hours * 3600 + minutes * 60 + seconds;
+        };
 
-      return {
-        videoId: videoId || '',
-        title: item.snippet?.title || "",
-        description: item.snippet?.description || "",
-        thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
-        channelTitle: item.snippet?.channelTitle || "",
-        publishedAt: item.snippet?.publishedAt || "",
-        duration: parseDuration(videoDetails.duration),
-        viewCount: videoDetails.viewCount ? parseInt(videoDetails.viewCount, 10) : undefined,
-      };
-    });
+        return {
+          videoId: videoId || '',
+          title: item.snippet?.title || "",
+          description: item.snippet?.description || "",
+          thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
+          channelTitle: item.snippet?.channelTitle || "",
+          publishedAt: item.snippet?.publishedAt || "",
+          duration: parseDuration(videoDetails.duration),
+          viewCount: videoDetails.viewCount ? parseInt(videoDetails.viewCount, 10) : undefined,
+        };
+      });
 
     console.log(`[fetchYouTubePlaylistVideos] ✅ ${suggestions.length} suggestions créées pour la playlist ${playlistId}`);
     return suggestions;

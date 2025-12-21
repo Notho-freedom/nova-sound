@@ -16,6 +16,7 @@ import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
 import { extractYouTubeVideoId } from "@/lib/youtube";
 import { YouTubePlayer } from "@/components/YouTubePlayer";
+import { toast } from "sonner";
 
 interface YouTubeSearchViewProps {
   onPlayVideo: (video: Video, audioOnly?: boolean) => void;
@@ -46,6 +47,30 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   
   // État pour la vidéo en cours de lecture
   const [playingVideo, setPlayingVideo] = useState<Video | null>(null);
+  
+  // État pour le circuit breaker (quota épuisé)
+  const [quotaExhausted, setQuotaExhausted] = useState(false);
+  const [quotaMessage, setQuotaMessage] = useState<string | null>(null);
+  
+  // Vérifier l'état du quota au montage et périodiquement
+  useEffect(() => {
+    const checkQuota = async () => {
+      try {
+        const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+        const canUse = youtubeQuotaManager.canUseAPI();
+        const message = youtubeQuotaManager.getUXMessage();
+        setQuotaExhausted(!canUse);
+        setQuotaMessage(message);
+      } catch (error) {
+        // Ignorer si le service n'est pas disponible
+      }
+    };
+    
+    checkQuota();
+    // Vérifier toutes les 30 secondes
+    const interval = setInterval(checkQuota, 30000);
+    return () => clearInterval(interval);
+  }, []);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   
   // Filtrer TOUTES les vidéos YouTube de l'historique (pas de limite)
@@ -294,32 +319,49 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       const allSuggestions: YouTubeSearchResult[] = [];
       let apiFailed = false;
       
-      // Essayer d'abord avec l'API YouTube
-      for (const term of searchTerms) {
-        try {
-          const suggestions = await searchYouTubeByArtist(term, 5);
-          if (suggestions.length > 0) {
-            const converted = suggestions.map(s => ({
-              videoId: s.videoId,
-              title: s.title,
-              description: s.description,
-              thumbnailUrl: s.thumbnailUrl,
-              channelTitle: s.channelTitle,
-              publishedAt: s.publishedAt,
-              duration: s.duration ? `PT${Math.floor(s.duration / 3600)}H${Math.floor((s.duration % 3600) / 60)}M${s.duration % 60}S` : undefined,
-              viewCount: s.viewCount?.toString(),
-            }));
-            allSuggestions.push(...converted);
-          }
-        } catch (error) {
-          console.warn(`[YouTubeSearchView] Erreur API suggestions pour ${term}:`, error);
-          apiFailed = true;
+      // Vérifier le circuit breaker AVANT d'appeler l'API
+      let canUseAPI = true;
+      try {
+        const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+        canUseAPI = youtubeQuotaManager.canUseAPI();
+        if (!canUseAPI) {
+          console.log('[YouTubeSearchView] Circuit breaker ouvert, utilisation uniquement du cache/local');
         }
+      } catch (error) {
+        // Ignorer si le service n'est pas disponible
+      }
+
+      // Essayer d'abord avec l'API YouTube (seulement si circuit breaker fermé)
+      if (canUseAPI) {
+        for (const term of searchTerms) {
+          try {
+            const suggestions = await searchYouTubeByArtist(term, 5);
+            if (suggestions.length > 0) {
+              const converted = suggestions.map(s => ({
+                videoId: s.videoId,
+                title: s.title,
+                description: s.description,
+                thumbnailUrl: s.thumbnailUrl,
+                channelTitle: s.channelTitle,
+                publishedAt: s.publishedAt,
+                duration: s.duration ? `PT${Math.floor(s.duration / 3600)}H${Math.floor((s.duration % 3600) / 60)}M${s.duration % 60}S` : undefined,
+                viewCount: s.viewCount?.toString(),
+              }));
+              allSuggestions.push(...converted);
+            }
+          } catch (error) {
+            console.warn(`[YouTubeSearchView] Erreur API suggestions pour ${term}:`, error);
+            apiFailed = true;
+          }
+        }
+      } else {
+        // Circuit breaker ouvert, forcer l'utilisation du fallback
+        apiFailed = true;
       }
       
       // Si l'API a échoué ou n'a pas retourné assez de résultats, utiliser le fallback historique
       if (apiFailed || allSuggestions.length < 5) {
-        console.log(`[YouTubeSearchView] Utilisation du fallback historique (API: ${allSuggestions.length} résultats)`);
+        console.log(`[YouTubeSearchView] Utilisation du fallback historique (API: ${allSuggestions.length} résultats, circuit breaker: ${!canUseAPI ? 'ouvert' : 'fermé'})`);
         const historySuggestions = findSuggestionsFromHistory(searchTerms);
         
         // Combiner les résultats API et historique, en priorisant l'API
@@ -460,13 +502,32 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   }, [search, clearSuggestions]);
 
   const handlePlay = useCallback((result: YouTubeSearchResult) => {
+    console.log('[YouTubeSearchView] handlePlay appelé', { result, playbackMode });
+    
+    // Extraire l'ID vidéo depuis le résultat
+    // result.videoId devrait être défini directement
+    const videoId = result.videoId?.trim() || null;
+    if (!videoId || videoId === 'undefined' || videoId === '') {
+      console.error('[YouTubeSearchView] Impossible d\'extraire l\'ID vidéo du résultat', result);
+      toast.error('Impossible de lire cette vidéo : ID invalide');
+      return;
+    }
+    
     if (playbackMode === "audio" && onPlayAsAudio) {
       // Mode audio : convertir en Track et jouer dans le système audio
       const track = youtubeVideoToTrack(result);
+      console.log('[YouTubeSearchView] Lecture en mode audio', { track, videoId });
       onPlayAsAudio(track);
     } else {
       // Mode vidéo : jouer dans le lecteur intégré
       const video = convertToVideo(result);
+      console.log('[YouTubeSearchView] Lecture en mode vidéo', { video, videoId, youtubeVideoId: video.youtubeVideoId });
+      
+      // S'assurer que l'ID vidéo est bien défini
+      if (!video.youtubeVideoId && videoId) {
+        video.youtubeVideoId = videoId;
+      }
+      
       setPlayingVideo(video);
       setIsPlayerFullscreen(true);
       // Ajouter à l'historique
@@ -533,9 +594,45 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   };
 
   // Obtenir l'ID de la vidéo YouTube en cours de lecture
-  const playingVideoId = playingVideo 
-    ? (playingVideo.youtubeVideoId || extractYouTubeVideoId(playingVideo.filePath || ''))
-    : null;
+  const playingVideoId = useMemo(() => {
+    if (!playingVideo) return null;
+    
+    // Priorité 1: youtubeVideoId direct
+    if (playingVideo.youtubeVideoId && playingVideo.youtubeVideoId !== 'undefined' && playingVideo.youtubeVideoId.trim() !== '') {
+      return playingVideo.youtubeVideoId;
+    }
+    
+    // Priorité 2: extraire depuis filePath
+    if (playingVideo.filePath) {
+      const extracted = extractYouTubeVideoId(playingVideo.filePath);
+      if (extracted && extracted !== 'undefined' && extracted.trim() !== '') {
+        return extracted;
+      }
+    }
+    
+    return null;
+  }, [playingVideo]);
+  
+  // Debug: vérifier que l'ID est valide
+  useEffect(() => {
+    if (isPlayerFullscreen && playingVideo) {
+      console.log('[YouTubeSearchView] Player fullscreen activé', {
+        playingVideo,
+        playingVideoId,
+        youtubeVideoId: playingVideo.youtubeVideoId,
+        filePath: playingVideo.filePath,
+        extractedId: playingVideo.filePath ? extractYouTubeVideoId(playingVideo.filePath) : null,
+      });
+      
+      if (!playingVideoId) {
+        console.error('[YouTubeSearchView] ⚠️ playingVideoId est null ou invalide!', {
+          playingVideo,
+          youtubeVideoId: playingVideo.youtubeVideoId,
+          filePath: playingVideo.filePath,
+        });
+      }
+    }
+  }, [isPlayerFullscreen, playingVideo, playingVideoId]);
 
   return (
     <div className="flex flex-col h-full relative">
@@ -556,12 +653,30 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
             </Button>
           </div>
           <div className="flex-1 w-full h-full">
-            <YouTubePlayer
-              videoId={playingVideoId}
-              autoPlay={true}
-              audioOnly={playbackMode === "audio"}
-              className="w-full h-full"
-            />
+            {playingVideoId ? (
+              <YouTubePlayer
+                videoId={playingVideoId}
+                autoPlay={true}
+                audioOnly={playbackMode === "audio"}
+                className="w-full h-full"
+                onReady={() => {
+                  console.log('[YouTubeSearchView] YouTubePlayer prêt pour vidéo:', playingVideoId);
+                }}
+                onError={(error) => {
+                  console.error('[YouTubeSearchView] Erreur YouTubePlayer:', error);
+                  toast.error(`Erreur de lecture: ${error}`);
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-white">
+                <div className="text-center">
+                  <p className="text-lg mb-2">ID vidéo invalide</p>
+                  <p className="text-sm text-muted-foreground">
+                    Impossible de lire cette vidéo. Vérifiez que l'URL est valide.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -683,12 +798,27 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
 
       {/* Contenu */}
       <div className="flex-1 overflow-y-auto p-6">
+        {/* Message informatif si quota épuisé */}
+        {quotaExhausted && quotaMessage && (
+          <div className="mb-6 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-500 mb-1">Mode lecture optimisé</p>
+              <p className="text-sm text-muted-foreground">{quotaMessage}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                💡 Vous pouvez toujours lire les vidéos de votre historique et utiliser le player YouTube.
+              </p>
+            </div>
+          </div>
+        )}
+        
         {/* Debug: Afficher l'état de la recherche */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mb-4 p-2 bg-muted/50 rounded text-xs font-mono">
             <div>searchQuery: "{searchQuery}" (trim: "{searchQuery.trim()}")</div>
             <div>searchQuery.trim() === "": {searchQuery.trim() === "" ? 'true' : 'false'}</div>
             <div>Condition: {searchQuery.trim() ? 'AFFICHER RÉSULTATS' : 'AFFICHER HISTORIQUE/SUGGESTIONS'}</div>
+            <div>Quota épuisé: {quotaExhausted ? 'Oui' : 'Non'}</div>
           </div>
         )}
         

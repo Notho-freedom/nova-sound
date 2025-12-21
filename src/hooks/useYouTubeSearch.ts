@@ -84,9 +84,15 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       console.warn('[useYouTubeSearch] Erreur cache:', error);
     }
 
-    // 2. Vérifier le quota
+    // 2. Vérifier le quota ET le circuit breaker
     try {
       const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+      // Vérifier d'abord le circuit breaker (canUseAPI vérifie le circuit breaker)
+      if (!youtubeQuotaManager.canUseAPI()) {
+        const uxMessage = youtubeQuotaManager.getUXMessage();
+        throw new Error(uxMessage || "Quota API épuisé. Mode lecture optimisé activé - la lecture fonctionne toujours ✅");
+      }
+      // Ensuite vérifier le budget de recherche
       if (!youtubeQuotaManager.canSearch()) {
         throw new Error(youtubeQuotaManager.getUXMessage() || "Quota de recherche épuisé pour aujourd'hui");
       }
@@ -472,6 +478,9 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       duration: parseDuration(result.duration),
       thumbnailUrl: result.thumbnailUrl,
       posterUrl: result.thumbnailUrl,
+      // Métadonnées YouTube essentielles pour la lecture
+      mediaSource: 'youtube' as const,
+      youtubeVideoId: result.videoId,
       fileSize: 0,
       addedAt: new Date().toISOString(),
       mediaSource: 'youtube',

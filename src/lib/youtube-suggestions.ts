@@ -45,6 +45,17 @@ export async function fetchYouTubeTrending(
     return [];
   }
 
+  // Vérifier le circuit breaker AVANT d'appeler l'API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canUseAPI()) {
+      console.warn('[YouTube Suggestions] Quota épuisé pour tendances, retour vide');
+      return [];
+    }
+  } catch (error) {
+    // Continuer si le service n'est pas disponible
+  }
+
   try {
     const url = new URL("https://www.googleapis.com/youtube/v3/videos");
     url.searchParams.set("key", apiKey);
@@ -374,7 +385,50 @@ export async function fetchYouTubeSuggestionsFromHistory(
     }
   });
 
-  // Créer des requêtes de recherche basées sur les préférences
+  // Vérifier le circuit breaker EN PREMIER (avant toute logique de recherche)
+  let canUseAPI = true;
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    canUseAPI = youtubeQuotaManager.canUseAPI();
+    
+    // Si circuit breaker ouvert ET on a des vidéos dans l'historique, retourner directement
+    if (!canUseAPI && youtubeVideos.length > 0) {
+      console.log(`[YouTube Suggestions] ⚠️ Circuit breaker ouvert - Retour direct de ${youtubeVideos.length} vidéos de l'historique`);
+      const historySuggestions: YouTubeSuggestion[] = [];
+      const seenIds = new Set<string>();
+      
+      for (const video of youtubeVideos.slice(0, maxResults)) {
+        const videoId = video.youtubeVideoId || extractYouTubeVideoId(video.filePath || '');
+        if (!videoId || seenIds.has(videoId)) continue;
+        
+        seenIds.add(videoId);
+        historySuggestions.push({
+          videoId,
+          title: video.title || `Vidéo YouTube ${videoId}`,
+          description: video.description || '',
+          thumbnailUrl: video.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/default.jpg`,
+          channelTitle: (video as any).channelTitle || video.director || '',
+          publishedAt: video.addedAt || video.lastPlayedAt || new Date().toISOString(),
+          duration: video.duration,
+          viewCount: undefined,
+        });
+      }
+      
+      if (historySuggestions.length > 0) {
+        console.log(`[YouTube Suggestions] ✅ ${historySuggestions.length} suggestions depuis l'historique (circuit breaker ouvert)`);
+        return historySuggestions;
+      }
+    }
+    
+    if (!canUseAPI) {
+      console.log('[YouTube Suggestions] Circuit breaker ouvert mais pas de vidéos dans l\'historique, retour vide');
+      return [];
+    }
+  } catch (error) {
+    // Ignorer si le service n'est pas disponible
+  }
+
+  // Créer des requêtes de recherche basées sur les préférences (seulement si API disponible)
   const searchQueries: string[] = [];
   
   // Top 3 artistes les plus écoutés
@@ -417,7 +471,7 @@ export async function fetchYouTubeSuggestionsFromHistory(
   // Rechercher basée sur les artistes/genres (en parallèle pour performance maximale)
   const searchPromises = searchQueries.slice(0, 3).map(async (query) => {
     try {
-      // Vérifier le cache d'abord
+      // Vérifier le cache d'abord (TOUJOURS, même si API disponible)
       const { youtubeCacheService } = await import('@/services/youtube-cache');
       const cached = await youtubeCacheService.getSearch(query);
       if (cached && cached.results.length > 0) {
@@ -432,6 +486,12 @@ export async function fetchYouTubeSuggestionsFromHistory(
           duration: v.duration,
           viewCount: v.viewCount,
         }));
+      }
+
+      // Si circuit breaker ouvert, ne pas appeler l'API
+      if (!canUseAPI) {
+        console.log(`[YouTube Suggestions] Circuit breaker ouvert, pas d'appel API pour: ${query}`);
+        return [];
       }
 
       const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
@@ -527,8 +587,33 @@ export async function fetchYouTubeSuggestionsFromHistory(
     }
   });
 
-  // Si on a des vidéos YouTube dans l'historique, chercher des vidéos similaires
-  if (youtubeVideoIds.length > 0 && allSuggestions.length < maxResults) {
+  // FALLBACK SECONDAIRE: Si pas assez de résultats même avec API, compléter avec l'historique
+  if (canUseAPI && allSuggestions.length < maxResults && youtubeVideos.length > 0) {
+    console.log(`[YouTube Suggestions] Complément avec ${youtubeVideos.length} vidéos de l'historique local`);
+    
+    // Convertir les vidéos YouTube de l'historique en suggestions
+    for (const video of youtubeVideos) {
+      if (allSuggestions.length >= maxResults) break;
+      
+      const videoId = video.youtubeVideoId || extractYouTubeVideoId(video.filePath || '');
+      if (!videoId || seenVideoIds.has(videoId)) continue;
+      
+      seenVideoIds.add(videoId);
+      allSuggestions.push({
+        videoId,
+        title: video.title || `Vidéo YouTube ${videoId}`,
+        description: video.description || '',
+        thumbnailUrl: video.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/default.jpg`,
+        channelTitle: (video as any).channelTitle || video.director || '',
+        publishedAt: video.addedAt || video.lastPlayedAt || new Date().toISOString(),
+        duration: video.duration,
+        viewCount: undefined,
+      });
+    }
+  }
+
+  // Si on a des vidéos YouTube dans l'historique, chercher des vidéos similaires (seulement si API disponible)
+  if (canUseAPI && youtubeVideoIds.length > 0 && allSuggestions.length < maxResults) {
     const videoIdToUse = youtubeVideoIds[0]; // Utiliser la vidéo la plus récente
     try {
       const related = await fetchYouTubeRelated(videoIdToUse, maxResults - allSuggestions.length);
@@ -543,8 +628,8 @@ export async function fetchYouTubeSuggestionsFromHistory(
     }
   }
 
-  // Si on n'a toujours pas assez de suggestions, compléter avec des tendances
-  if (allSuggestions.length < maxResults) {
+  // Si on n'a toujours pas assez de suggestions, compléter avec des tendances (seulement si API disponible)
+  if (canUseAPI && allSuggestions.length < maxResults) {
     try {
       const trending = await fetchYouTubeTrending(maxResults - allSuggestions.length);
       trending.forEach(suggestion => {

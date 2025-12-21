@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, Play, X, Clock, TrendingUp, Disc3, User, Music, MoreHorizontal } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Search, Play, X, Clock, TrendingUp, Disc3, User, Music, MoreHorizontal, Loader2 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -17,12 +17,15 @@ import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { useYouTubeSearch } from "@/hooks/useYouTubeSearch";
+import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 
 interface SearchViewProps {
   tracks: Track[];
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayNext?: (track: Track) => void;
   onAddToQueue?: (track: Track) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
@@ -42,6 +45,7 @@ export const SearchView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
@@ -49,6 +53,8 @@ export const SearchView = ({
 }: SearchViewProps) => {
   const [query, setQuery] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [youtubeTracks, setYoutubeTracks] = useState<Track[]>([]);
+  const youtubeSearchTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Hooks for context menu
   const playlistsResult = usePlaylists();
@@ -65,6 +71,9 @@ export const SearchView = ({
   const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro; // Free only
   const canUploadToBunny = nexusIsPro && nexusAuthenticated; // Pro only (serveur 1)
   const canUploadToNexus = nexusIsPro && nexusAuthenticated; // Pro only (serveur 2)
+  
+  // YouTube search hook
+  const { results: youtubeResults, loading: youtubeLoading, search: searchYouTube, error: youtubeError } = useYouTubeSearch();
 
   // Load search history from localStorage
   useEffect(() => {
@@ -139,24 +148,67 @@ export const SearchView = ({
     });
   }, []);
 
-  // Search results
+  // Effect to search YouTube when query changes (with debounce)
+  useEffect(() => {
+    // Clear previous timer
+    if (youtubeSearchTimerRef.current) {
+      clearTimeout(youtubeSearchTimerRef.current);
+    }
+
+    if (query.trim() && query.length >= 2) {
+      // Debounce de 500ms pour éviter trop de requêtes
+      youtubeSearchTimerRef.current = setTimeout(() => {
+        console.log('[SearchView] Recherche YouTube pour:', query);
+        searchYouTube(query);
+      }, 500);
+    } else {
+      setYoutubeTracks([]);
+    }
+
+    // Cleanup
+    return () => {
+      if (youtubeSearchTimerRef.current) {
+        clearTimeout(youtubeSearchTimerRef.current);
+      }
+    };
+  }, [query, searchYouTube]);
+
+  // Convert YouTube results to tracks
+  useEffect(() => {
+    if (youtubeResults.length > 0) {
+      console.log('[SearchView] Conversion de', youtubeResults.length, 'résultats YouTube en tracks');
+      const converted = youtubeResults
+        .filter(result => result.videoId && result.videoId !== 'undefined' && result.videoId.trim() !== '')
+        .map(result => youtubeVideoToTrack(result));
+      setYoutubeTracks(converted);
+      console.log('[SearchView] ✅', converted.length, 'tracks YouTube créés');
+    } else {
+      setYoutubeTracks([]);
+    }
+  }, [youtubeResults]);
+
+  // Search results (local + YouTube)
   const searchResults = useMemo(() => {
     if (!query.trim()) return { tracks: [], albums: [], artists: [] };
 
     const q = query.toLowerCase();
     
+    // Local tracks
     const matchedTracks = tracks.filter(t =>
       t.title.toLowerCase().includes(q) ||
       t.artist.toLowerCase().includes(q) ||
       t.album.toLowerCase().includes(q)
     );
     
-    // Remove duplicates
-    const uniqueMatchedTracks = getUniqueTracks(matchedTracks);
+    // Combine local and YouTube tracks
+    const allTracks = [...matchedTracks, ...youtubeTracks];
+    
+    // Remove duplicates (by id)
+    const uniqueMatchedTracks = getUniqueTracks(allTracks);
 
-    // Group by album
+    // Group by album (only for local tracks, not YouTube)
     const albumsMap = new Map<string, { name: string; artist: string; coverUrl: string; count: number }>();
-    uniqueMatchedTracks.forEach(t => {
+    matchedTracks.forEach(t => {
       const key = `${t.album}-${t.artist}`;
       if (!albumsMap.has(key)) {
         albumsMap.set(key, { name: t.album, artist: t.artist, coverUrl: t.coverUrl, count: 0 });
@@ -164,9 +216,9 @@ export const SearchView = ({
       albumsMap.get(key)!.count++;
     });
 
-    // Group by artist
+    // Group by artist (only for local tracks, not YouTube)
     const artistsMap = new Map<string, { name: string; coverUrl: string; count: number }>();
-    uniqueMatchedTracks.forEach(t => {
+    matchedTracks.forEach(t => {
       if (!artistsMap.has(t.artist)) {
         artistsMap.set(t.artist, { name: t.artist, coverUrl: t.coverUrl, count: 0 });
       }
@@ -178,7 +230,7 @@ export const SearchView = ({
       albums: Array.from(albumsMap.values()).slice(0, 6),
       artists: Array.from(artistsMap.values()).slice(0, 6)
     };
-  }, [query, tracks, getUniqueTracks]);
+  }, [query, tracks, youtubeTracks, getUniqueTracks]);
 
   // Get unique genres from tracks
   const genres = useMemo(() => {
@@ -327,8 +379,16 @@ export const SearchView = ({
               <h2 className="font-display text-lg tracking-wider">
                 TITRES ({searchResults.tracks.length})
               </h2>
+              {youtubeLoading && (
+                <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+              )}
             </div>
-            {searchResults.tracks.length === 0 ? (
+            {youtubeError && (
+              <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
+                <p className="text-sm text-muted-foreground">{youtubeError}</p>
+              </div>
+            )}
+            {searchResults.tracks.length === 0 && !youtubeLoading ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
                   <Search className="w-8 h-8 text-muted-foreground" />
@@ -339,9 +399,22 @@ export const SearchView = ({
               </div>
             ) : (
               <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 divide-y divide-border/30">
-                {searchResults.tracks.slice(0, 20).map((track) => {
-                  const actualIndex = tracks.findIndex((t) => t.id === track.id);
-                  const isCurrentTrack = currentTrackIndex === actualIndex;
+                {searchResults.tracks.slice(0, 50).map((track) => {
+                  // For YouTube tracks, find index in combined array (local + YouTube)
+                  // For local tracks, find in original tracks array
+                  const isYouTubeTrack = track.mediaSource === 'youtube';
+                  let actualIndex: number;
+                  
+                  if (isYouTubeTrack) {
+                    // For YouTube tracks, we need to find them in the combined array
+                    // Since they're not in the original tracks array, we'll use a special handling
+                    // We'll pass the track directly to onTrackSelect via a callback
+                    actualIndex = -1; // Mark as YouTube track
+                  } else {
+                    actualIndex = tracks.findIndex((t) => t.id === track.id);
+                  }
+                  
+                  const isCurrentTrack = !isYouTubeTrack && currentTrackIndex === actualIndex;
 
                   return (
                     <TrackContextMenu
@@ -349,26 +422,42 @@ export const SearchView = ({
                       track={track}
                       playlists={playlists}
                       isFavorite={isFavorite(track.id)}
-                      onPlay={() => onTrackSelect(actualIndex)}
+                      onPlay={() => {
+                        if (isYouTubeTrack && onPlayTrack) {
+                          onPlayTrack(track);
+                        } else if (!isYouTubeTrack) {
+                          onTrackSelect(actualIndex);
+                        } else {
+                          onAddToQueue?.(track);
+                        }
+                      }}
                       onPlayNext={() => onPlayNext?.(track)}
                       onAddToQueue={() => onAddToQueue?.(track)}
                       onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
                       onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
                       onToggleFavorite={() => toggleFavorite(track.id)}
                       onUploadToCloudinary={() => uploadTrack?.(track)}
-                      canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                      canUploadToCloudinary={canUploadToCloudinary && !!track.filePath && !isYouTubeTrack}
                       isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
                       onUploadToBunny={() => uploadTrackToBunny?.(track)}
-                      canUploadToBunny={canUploadToBunny && !!track.filePath}
+                      canUploadToBunny={canUploadToBunny && !!track.filePath && !isYouTubeTrack}
                       isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
                       onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                      canUploadToNexus={canUploadToNexus && !!track.filePath}
+                      canUploadToNexus={canUploadToNexus && !!track.filePath && !isYouTubeTrack}
                       isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                     >
                       <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          onClick={() => onTrackSelect(actualIndex)}
+                          onClick={() => {
+                            if (isYouTubeTrack && onPlayTrack) {
+                              onPlayTrack(track);
+                            } else if (!isYouTubeTrack) {
+                              onTrackSelect(actualIndex);
+                            } else {
+                              onAddToQueue?.(track);
+                            }
+                          }}
                           className={cn(
                             "flex items-center gap-4 px-3 py-2.5 cursor-pointer transition-all duration-200 ease-out group",
                             isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
@@ -393,6 +482,11 @@ export const SearchView = ({
                         )}>
                           {track.title}
                         </p>
+                                {isYouTubeTrack && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">
+                                    YT
+                                  </span>
+                                )}
                                 {isUploaded(track.id) && (
                                   <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
                                 )}

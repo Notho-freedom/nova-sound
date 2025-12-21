@@ -70,6 +70,27 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
       return;
     }
 
+    // Vérifier le circuit breaker AVANT tout appel API
+    let canUseAPI = true;
+    try {
+      const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+      canUseAPI = youtubeQuotaManager.canUseAPI();
+      if (!canUseAPI) {
+        console.log('[YouTube Autocomplete] Circuit breaker ouvert, utilisation uniquement du fallback historique');
+        // Utiliser directement le fallback historique sans appeler l'API
+        const fallback: AutocompleteSuggestion[] = [];
+        historyMatches.forEach(suggestion => fallback.push(suggestion));
+        if (!fallback.some(s => s.query.toLowerCase() === query.toLowerCase())) {
+          fallback.push({ query: query, type: 'search' });
+        }
+        setSuggestions(fallback);
+        setError(null);
+        return; // Retourner immédiatement sans appeler l'API
+      }
+    } catch (error) {
+      // Continuer si le service n'est pas disponible
+    }
+
     // Annuler la requête précédente si elle existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
