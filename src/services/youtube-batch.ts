@@ -22,13 +22,17 @@ class YouTubeBatchService {
 
   /**
    * Récupère les métadonnées de plusieurs vidéos en batch
+   * Utilise le YouTubeProvider pour routing intelligent
    */
   async getVideosBatch(videoIds: string[]): Promise<any[]> {
-    // Vérifier le cache d'abord
+    // Déduplication : supprimer les doublons
+    const uniqueIds = Array.from(new Set(videoIds));
+    
+    // Vérifier le cache d'abord (NO QUOTA)
     const cachedVideos: any[] = [];
     const uncachedIds: string[] = [];
     
-    for (const videoId of videoIds) {
+    for (const videoId of uniqueIds) {
       const cached = await youtubeCacheService.getVideo(videoId);
       if (cached) {
         cachedVideos.push(cached);
@@ -42,11 +46,91 @@ class YouTubeBatchService {
       return cachedVideos;
     }
     
-    // Vérifier le quota
-    if (!youtubeQuotaManager.canBatch(uncachedIds.length)) {
-      console.warn('[YouTubeBatch] Quota insuffisant pour batch');
-      return cachedVideos; // Retourner ce qu'on a en cache
+    // Pour les vidéos non cachées, utiliser le provider (routing intelligent)
+    // Le provider gère automatiquement oEmbed/API selon quota
+    const { youtubeProvider } = await import('./youtube-provider');
+    const providerResults = await Promise.allSettled(
+      uncachedIds.map(id => youtubeProvider.getVideoMetadata(id))
+    );
+    
+    const providerVideos: any[] = [];
+    for (let i = 0; i < providerResults.length; i++) {
+      const result = providerResults[i];
+      if (result.status === 'fulfilled' && result.value.success && result.value.metadata) {
+        const metadata = result.value.metadata;
+        providerVideos.push({
+          id: metadata.id,
+          videoId: metadata.id,
+          title: metadata.title,
+          description: metadata.description,
+          channelTitle: metadata.channelTitle,
+          channelId: metadata.channelId,
+          publishedAt: metadata.publishedAt,
+          duration: metadata.duration,
+          viewCount: metadata.viewCount,
+          likeCount: metadata.likeCount,
+          thumbnailUrl: metadata.thumbnailUrl,
+          thumbnailHighUrl: metadata.thumbnailHighUrl,
+          tags: metadata.tags,
+          categoryId: metadata.categoryId,
+        });
+      }
     }
+    
+    // Si quota disponible et certaines vidéos manquent encore, essayer batch API
+    if (providerVideos.length < uncachedIds.length && youtubeQuotaManager.canBatch(uncachedIds.length)) {
+      try {
+        const apiVideos = await this.fetchVideosFromAPI(uncachedIds);
+        // Mettre en cache et ajouter
+        for (const video of apiVideos) {
+          await youtubeCacheService.setVideo({
+            id: video.id,
+            videoId: video.id,
+            title: video.snippet?.title || '',
+            description: video.snippet?.description,
+            channelTitle: video.snippet?.channelTitle || '',
+            channelId: video.snippet?.channelId || '',
+            publishedAt: video.snippet?.publishedAt || '',
+            duration: this.parseDuration(video.contentDetails?.duration),
+            viewCount: parseInt(video.statistics?.viewCount || '0'),
+            likeCount: parseInt(video.statistics?.likeCount || '0'),
+            thumbnailUrl: video.snippet?.thumbnails?.default?.url || '',
+            thumbnailHighUrl: video.snippet?.thumbnails?.high?.url || '',
+            tags: video.snippet?.tags,
+            categoryId: video.snippet?.categoryId,
+          });
+        }
+        
+        youtubeQuotaManager.consumeBatch(uncachedIds.length);
+        youtubeQuotaManager.recordSuccess();
+        
+        // Convertir en format standardisé
+        const apiFormatted = apiVideos.map(video => ({
+          id: video.id,
+          videoId: video.id,
+          title: video.snippet?.title || '',
+          description: video.snippet?.description,
+          channelTitle: video.snippet?.channelTitle || '',
+          channelId: video.snippet?.channelId || '',
+          publishedAt: video.snippet?.publishedAt || '',
+          duration: this.parseDuration(video.contentDetails?.duration),
+          viewCount: parseInt(video.statistics?.viewCount || '0'),
+          likeCount: parseInt(video.statistics?.likeCount || '0'),
+          thumbnailUrl: video.snippet?.thumbnails?.default?.url || '',
+          thumbnailHighUrl: video.snippet?.thumbnails?.high?.url || '',
+          tags: video.snippet?.tags,
+          categoryId: video.snippet?.categoryId,
+        }));
+        
+        return [...cachedVideos, ...providerVideos, ...apiFormatted];
+      } catch (error) {
+        console.warn('[YouTubeBatch] Erreur batch API, utiliser provider results:', error);
+        youtubeQuotaManager.recordFailure();
+      }
+    }
+    
+    // Retourner cache + résultats provider
+    return [...cachedVideos, ...providerVideos];
     
     // Faire l'appel API batch
     const apiVideos = await this.fetchVideosFromAPI(uncachedIds);

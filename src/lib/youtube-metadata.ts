@@ -43,10 +43,48 @@ function getYouTubeApiKey(): string | null {
 /**
  * Récupère les métadonnées d'une vidéo YouTube via l'API YouTube Data v3
  * Utilise le cache multi-niveaux (L1 mémoire + L2 Firebase) pour économiser le quota
+ * 
+ * ⚠️ DEPRECATED: Utiliser youtubeProvider.getVideoMetadata() à la place
+ * Cette fonction est conservée pour compatibilité mais sera remplacée progressivement
  */
 export async function fetchYouTubeVideoMetadata(
   videoId: string
 ): Promise<YouTubeVideoMetadataResponse> {
+  // Utiliser le YouTubeProvider Nexus (routing intelligent)
+  try {
+    const { youtubeProvider } = await import('@/services/youtube-provider');
+    const result = await youtubeProvider.getVideoMetadata(videoId);
+    
+    if (result.success && result.metadata) {
+      return {
+        success: true,
+        metadata: {
+          id: result.metadata.id,
+          title: result.metadata.title,
+          description: result.metadata.description || '',
+          channelTitle: result.metadata.channelTitle,
+          channelId: result.metadata.channelId || '',
+          publishedAt: result.metadata.publishedAt || '',
+          duration: result.metadata.duration || 0,
+          viewCount: result.metadata.viewCount || 0,
+          likeCount: result.metadata.likeCount,
+          thumbnailUrl: result.metadata.thumbnailUrl,
+          thumbnailHighUrl: result.metadata.thumbnailHighUrl || result.metadata.thumbnailUrl,
+          tags: result.metadata.tags,
+          categoryId: result.metadata.categoryId,
+        },
+      };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Impossible de récupérer les métadonnées',
+      };
+    }
+  } catch (error) {
+    console.warn('[YouTubeMetadata] Erreur provider, fallback direct:', error);
+  }
+
+  // Fallback direct (ancien code) - pour compatibilité
   // 1. Vérifier le cache d'abord (L1 puis L2)
   try {
     const { youtubeCacheService } = await import('@/services/youtube-cache');
@@ -83,7 +121,7 @@ export async function fetchYouTubeVideoMetadata(
     if (!youtubeQuotaManager.canGetMetadata(1)) {
       return {
         success: false,
-        error: "Quota API YouTube épuisé. Réessayez demain.",
+        error: "Quota API YouTube épuisé. La lecture fonctionne toujours via iframe.",
       };
     }
   } catch (error) {

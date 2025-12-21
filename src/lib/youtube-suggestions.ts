@@ -426,6 +426,24 @@ export async function fetchYouTubeSuggestionsFromHistory(
 
       const response = await fetch(searchUrl.toString());
       
+      // Gérer les erreurs 403/429 (quota épuisé)
+      if (!response.ok) {
+        const isQuotaError = response.status === 403 || response.status === 429;
+        if (isQuotaError) {
+          console.warn(`[YouTube Suggestions] Quota épuisé pour recherche: ${query}`);
+          // Enregistrer l'échec
+          try {
+            const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+            youtubeQuotaManager.recordFailure();
+          } catch (error) {
+            // Ignorer
+          }
+          return []; // Retourner vide au lieu de planter
+        }
+        console.warn(`[YouTube Suggestions] Erreur API ${response.status} pour: ${query}`);
+        return [];
+      }
+      
       if (response.ok) {
         const data = await response.json();
         if (data.items && data.items.length > 0) {

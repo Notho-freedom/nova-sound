@@ -95,9 +95,38 @@ export function useYouTubeAutocomplete(): UseYouTubeAutocompleteReturn {
       );
 
       if (!response.ok) {
+        const isQuotaError = response.status === 403 || response.status === 429;
+        
+        if (isQuotaError) {
+          console.warn('[YouTube Autocomplete] Quota épuisé, fallback historique');
+          // Enregistrer l'échec
+          try {
+            const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+            youtubeQuotaManager.recordFailure();
+          } catch (error) {
+            // Ignorer
+          }
+          
+          // Fallback : utiliser uniquement l'historique
+          const fallback: AutocompleteSuggestion[] = [];
+          historyMatches.forEach(suggestion => fallback.push(suggestion));
+          if (!fallback.some(s => s.query.toLowerCase() === query.toLowerCase())) {
+            fallback.push({ query: query, type: 'search' });
+          }
+          setSuggestions(fallback);
+          return; // Retourner sans erreur
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         console.error('[YouTube Autocomplete] Erreur API:', response.status, errorData);
-        throw new Error(`Erreur API YouTube: ${response.status} - ${errorData.error?.message || 'Erreur inconnue'}`);
+        // Pour les autres erreurs, utiliser quand même le fallback historique
+        const fallback: AutocompleteSuggestion[] = [];
+        historyMatches.forEach(suggestion => fallback.push(suggestion));
+        if (!fallback.some(s => s.query.toLowerCase() === query.toLowerCase())) {
+          fallback.push({ query: query, type: 'search' });
+        }
+        setSuggestions(fallback);
+        return; // Ne pas lancer d'erreur, utiliser le fallback
       }
 
       const data = await response.json();

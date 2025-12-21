@@ -108,7 +108,33 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       );
 
       if (!response.ok) {
+        // Détecter les erreurs de quota/403
+        const isQuotaError = response.status === 403 || response.status === 429;
+        
+        if (isQuotaError) {
+          // Enregistrer l'échec dans le quota manager
+          try {
+            const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+            youtubeQuotaManager.recordFailure();
+          } catch (error) {
+            console.warn('[useYouTubeSearch] Erreur quota manager:', error);
+          }
+          
+          // Lancer une erreur spéciale pour déclencher le fallback
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error?.message || 'Quota API YouTube épuisé';
+          throw new Error(`QUOTA_ERROR:${errorMessage}`);
+        }
+        
         throw new Error(`Erreur API: ${response.status}`);
+      }
+      
+      // Enregistrer le succès
+      try {
+        const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+        youtubeQuotaManager.recordSuccess();
+      } catch (error) {
+        // Ignorer les erreurs silencieuses
       }
 
       const data = await response.json();
@@ -171,10 +197,129 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       }
 
       return searchResults;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur recherche YouTube API:', err);
+      
+      // Si c'est une erreur de quota, lancer une erreur spéciale pour le fallback
+      if (err.message && err.message.startsWith('QUOTA_ERROR:')) {
+        throw err; // Relancer pour déclencher le fallback
+      }
+      
       throw err;
     }
+  }, []);
+
+  /**
+   * Fallback intelligent : recherche dans l'historique et cache
+   */
+  const searchWithFallback = useCallback(async (query: string): Promise<YouTubeSearchResult[]> => {
+    console.log(`[useYouTubeSearch] 🔄 Fallback activé pour: ${query}`);
+    
+    const results: YouTubeSearchResult[] = [];
+    
+    // 1. Chercher dans l'historique de recherche (recherches similaires)
+    try {
+      if (typeof window !== 'undefined') {
+        const searchHistory = JSON.parse(localStorage.getItem('nexus-search-history') || '[]') as string[];
+        const queryLower = query.toLowerCase();
+        
+        // Trouver des recherches similaires dans l'historique
+        const similarSearches = searchHistory.filter(h => 
+          h.toLowerCase().includes(queryLower) || queryLower.includes(h.toLowerCase())
+        ).slice(0, 3);
+        
+        // Pour chaque recherche similaire, récupérer le cache
+        for (const similarQuery of similarSearches) {
+          try {
+            const { youtubeCacheService } = await import('@/services/youtube-cache');
+            const cached = await youtubeCacheService.getSearch(similarQuery);
+            
+            if (cached && cached.results.length > 0) {
+              // Filtrer les résultats qui correspondent à la query actuelle
+              const matchingResults = cached.results
+                .filter(v => 
+                  v.title.toLowerCase().includes(queryLower) ||
+                  v.channelTitle.toLowerCase().includes(queryLower)
+                )
+                .map(v => ({
+                  videoId: v.videoId,
+                  title: v.title,
+                  description: v.description,
+                  thumbnailUrl: v.thumbnailUrl,
+                  channelTitle: v.channelTitle,
+                  publishedAt: v.publishedAt,
+                  duration: v.duration ? `PT${Math.floor(v.duration / 3600)}H${Math.floor((v.duration % 3600) / 60)}M${v.duration % 60}S` : undefined,
+                  viewCount: v.viewCount?.toString(),
+                }));
+              
+              results.push(...matchingResults);
+            }
+          } catch (error) {
+            console.warn(`[useYouTubeSearch] Erreur cache pour "${similarQuery}":`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[useYouTubeSearch] Erreur fallback historique:', error);
+    }
+    
+    // 2. Si pas assez de résultats, chercher dans tous les caches (recherches récentes)
+    if (results.length < 5) {
+      try {
+        const { youtubeCacheService } = await import('@/services/youtube-cache');
+        // On ne peut pas lister tous les caches facilement, donc on utilise l'historique
+        // et on récupère les résultats les plus récents
+        if (typeof window !== 'undefined') {
+          const searchHistory = JSON.parse(localStorage.getItem('nexus-search-history') || '[]') as string[];
+          const recentSearches = searchHistory.slice(0, 10); // 10 recherches les plus récentes
+          
+          for (const recentQuery of recentSearches) {
+            if (results.length >= 20) break; // Limiter à 20 résultats
+            
+            try {
+              const { youtubeCacheService } = await import('@/services/youtube-cache');
+              const cached = await youtubeCacheService.getSearch(recentQuery);
+              
+              if (cached && cached.results.length > 0) {
+                const queryLower = query.toLowerCase();
+                const matchingResults = cached.results
+                  .filter(v => 
+                    !results.some(r => r.videoId === v.videoId) && // Éviter doublons
+                    (v.title.toLowerCase().includes(queryLower) ||
+                     v.channelTitle.toLowerCase().includes(queryLower) ||
+                     v.description?.toLowerCase().includes(queryLower))
+                  )
+                  .slice(0, 5) // Max 5 par recherche
+                  .map(v => ({
+                    videoId: v.videoId,
+                    title: v.title,
+                    description: v.description,
+                    thumbnailUrl: v.thumbnailUrl,
+                    channelTitle: v.channelTitle,
+                    publishedAt: v.publishedAt,
+                    duration: v.duration ? `PT${Math.floor(v.duration / 3600)}H${Math.floor((v.duration % 3600) / 60)}M${v.duration % 60}S` : undefined,
+                    viewCount: v.viewCount?.toString(),
+                  }));
+                
+                results.push(...matchingResults);
+              }
+            } catch (error) {
+              // Ignorer les erreurs individuelles
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[useYouTubeSearch] Erreur fallback cache étendu:', error);
+      }
+    }
+    
+    // Dédupliquer par videoId
+    const uniqueResults = Array.from(
+      new Map(results.map(r => [r.videoId, r])).values()
+    );
+    
+    console.log(`[useYouTubeSearch] ✅ Fallback: ${uniqueResults.length} résultats trouvés`);
+    return uniqueResults.slice(0, 20); // Limiter à 20
   }, []);
 
   // Recherche alternative (sans clé API) - non disponible pour des raisons de conformité
@@ -205,18 +350,58 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
 
     try {
       const apiKey = getYouTubeApiKey();
-      let searchResults: YouTubeSearchResult[];
+      let searchResults: YouTubeSearchResult[] = [];
+      let usedFallback = false;
 
       if (apiKey) {
-        // Utiliser l'API officielle
-        searchResults = await searchWithApi(query, apiKey);
-      } else {
-        // Essayer la méthode alternative
         try {
-          searchResults = await searchWithoutApi(query);
-        } catch (altError) {
+          // Utiliser l'API officielle
+          searchResults = await searchWithApi(query, apiKey);
+        } catch (err: any) {
+          // Si erreur de quota (403/429), utiliser le fallback
+          if (err.message && err.message.startsWith('QUOTA_ERROR:')) {
+            console.log('[useYouTubeSearch] ⚠️ Quota épuisé, activation fallback');
+            const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+            const uxMessage = youtubeQuotaManager.getUXMessage();
+            
+            // Essayer le fallback
+            try {
+              searchResults = await searchWithFallback(query);
+              usedFallback = true;
+              
+              // Afficher un message informatif mais pas d'erreur bloquante
+              if (searchResults.length > 0) {
+                setError(uxMessage || 'Résultats depuis le cache (quota API épuisé)');
+              } else {
+                setError(uxMessage || 'Aucun résultat en cache. Réessayez demain ou configurez une nouvelle clé API.');
+              }
+            } catch (fallbackError) {
+              // Si le fallback échoue aussi, afficher l'erreur
+              setError(uxMessage || 'Quota API YouTube épuisé. Réessayez demain.');
+              searchResults = [];
+            }
+          } else {
+            // Autre erreur (non-quota)
+            throw err;
+          }
+        }
+      } else {
+        // Pas de clé API, essayer le fallback quand même
+        try {
+          searchResults = await searchWithFallback(query);
+          usedFallback = true;
+          
+          if (searchResults.length === 0) {
+            setError(
+              'Pour rechercher sur YouTube, veuillez ajouter une clé API YouTube Data v3 dans les paramètres.\n' +
+              'Obtenez votre clé sur: https://console.cloud.google.com/apis/credentials'
+            );
+          } else {
+            setError('Résultats depuis le cache (clé API non configurée)');
+          }
+        } catch (fallbackError) {
           // Si l'alternative échoue, suggérer d'ajouter une clé API
-          throw new Error(
+          setError(
             'Pour rechercher sur YouTube, veuillez ajouter une clé API YouTube Data v3 dans les paramètres.\n' +
             'Obtenez votre clé sur: https://console.cloud.google.com/apis/credentials'
           );
@@ -224,13 +409,19 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
       }
 
       setResults(searchResults);
+      
+      // Si on a utilisé le fallback et qu'on a des résultats, c'est un succès partiel
+      if (usedFallback && searchResults.length > 0) {
+        console.log(`[useYouTubeSearch] ✅ Fallback réussi: ${searchResults.length} résultats`);
+      }
     } catch (err: any) {
+      console.error('[useYouTubeSearch] Erreur recherche:', err);
       setError(err.message || 'Erreur lors de la recherche YouTube');
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [searchWithApi, searchWithoutApi]);
+  }, [searchWithApi, searchWithoutApi, searchWithFallback]);
 
   const clearResults = useCallback(() => {
     setResults([]);

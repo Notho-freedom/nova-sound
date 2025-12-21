@@ -46,6 +46,41 @@ export async function searchYouTubeByArtist(
     const response = await fetch(searchUrl.toString());
     
     if (!response.ok) {
+      const isQuotaError = response.status === 403 || response.status === 429;
+      
+      if (isQuotaError) {
+        console.warn('[YouTube Artist Search] Quota épuisé, fallback cache');
+        // Enregistrer l'échec
+        try {
+          const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+          youtubeQuotaManager.recordFailure();
+        } catch (error) {
+          // Ignorer
+        }
+        
+        // Essayer de trouver dans le cache avec des recherches similaires
+        try {
+          const { youtubeCacheService } = await import('@/services/youtube-cache');
+          // Chercher dans le cache avec le nom de l'artiste
+          const cached = await youtubeCacheService.getSearch(artistName);
+          if (cached && cached.results.length > 0) {
+            console.log(`[YouTube Artist Search] Cache HIT (fallback): ${artistName}`);
+            return cached.results.map(v => ({
+              videoId: v.videoId,
+              title: v.title,
+              description: v.description,
+              thumbnailUrl: v.thumbnailUrl,
+              channelTitle: v.channelTitle,
+              publishedAt: v.publishedAt,
+              duration: v.duration,
+              viewCount: v.viewCount,
+            })).slice(0, maxResults);
+          }
+        } catch (error) {
+          // Ignorer
+        }
+      }
+      
       const errorData = await response.json().catch(() => ({}));
       console.error('[YouTube Artist Search] Erreur API:', response.status, errorData);
       return [];

@@ -415,6 +415,27 @@ class YouTubeCacheService {
   private readonly TTL_VIDEO = 12 * 60 * 60 * 1000; // 12h
   private readonly TTL_SEARCH = 7 * 24 * 60 * 60 * 1000; // 7 jours
   private readonly TTL_CHANNEL = 24 * 60 * 60 * 1000; // 24h
+  
+  /**
+   * TTL adaptatif selon popularité (viewCount)
+   * Vidéos populaires = TTL long (7 jours)
+   * Vidéos rares = TTL court (12h)
+   */
+  private getAdaptiveTTL(viewCount?: number): number {
+    if (!viewCount) return this.TTL_VIDEO;
+    
+    // Seuils de popularité
+    const POPULAR_THRESHOLD = 1_000_000; // 1M vues = populaire
+    const VERY_POPULAR_THRESHOLD = 10_000_000; // 10M vues = très populaire
+    
+    if (viewCount >= VERY_POPULAR_THRESHOLD) {
+      return 7 * 24 * 60 * 60 * 1000; // 7 jours
+    } else if (viewCount >= POPULAR_THRESHOLD) {
+      return 3 * 24 * 60 * 60 * 1000; // 3 jours
+    } else {
+      return this.TTL_VIDEO; // 12h par défaut
+    }
+  }
 
   /**
    * Hash une query pour l'utiliser comme clé de cache (optimisé avec crypto.subtle si disponible)
@@ -477,10 +498,12 @@ class YouTubeCacheService {
    */
   async setVideo(video: Omit<CachedYouTubeVideo, 'cachedAt' | 'expiresAt' | 'accessCount' | 'lastAccessed'>): Promise<void> {
     const now = new Date();
+    // TTL adaptatif selon popularité
+    const ttl = this.getAdaptiveTTL(video.viewCount);
     const cached: CachedYouTubeVideo = {
       ...video,
       cachedAt: now,
-      expiresAt: new Date(now.getTime() + this.TTL_VIDEO),
+      expiresAt: new Date(now.getTime() + ttl),
       accessCount: 0,
       lastAccessed: now,
     };
