@@ -360,6 +360,9 @@ export const VideosView = memo(() => {
         return recentlyWatched;
       case "browse":
         return filteredVideos;
+      case "youtube":
+        return []; // Mode YouTube: pas de vidéos locales, YouTubeSearchView gère sa propre liste
+      case "home":
       default:
         return enhancedVideos;
     }
@@ -449,7 +452,7 @@ export const VideosView = memo(() => {
       <div
         className={cn(
           "flex flex-col animate-in fade-in duration-300 bg-black",
-          isFullApp ? "fixed inset-0 z-[9998]" : viewMode === "youtube" ? "fixed inset-0 z-[9997]" : "absolute inset-0"
+          isFullApp ? "fixed inset-0 z-[9998]" : (viewMode as string) === "youtube" ? "fixed inset-0 z-[9997]" : "absolute inset-0"
         )}
       >
         {/* TEMPORAIRE: Utiliser YouTubePlayer directement pour les vidéos YouTube */}
@@ -465,7 +468,7 @@ export const VideosView = memo(() => {
               }}
               className={cn(
                 "absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white",
-                viewMode === "youtube" && "top-16" // Ajuster la position en mode YouTube
+                (viewMode as string) === "youtube" && "top-16" // Ajuster la position en mode YouTube
               )}
             >
               <X className="w-5 h-5" />
