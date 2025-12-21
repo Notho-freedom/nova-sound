@@ -240,8 +240,7 @@ export const DesktopApp = () => {
     // Le player YouTube sera géré séparément via le composant YouTubePlayer
     if (currentTrack.mediaSource === 'youtube') {
       console.log('Track YouTube détecté, le player YouTube sera utilisé');
-      // Réinitialiser currentTime et durée pour les tracks YouTube
-      setCurrentTime(0);
+      // Réinitialiser seulement la durée, currentTime sera géré par le player YouTube persistant
       setYoutubeDuration(0);
       // Ne pas charger dans l'élément audio HTML
       return;
@@ -444,6 +443,15 @@ export const DesktopApp = () => {
       accumulatedPlaybackTimeRef.current = 0;
     }
     
+    // Pour les tracks YouTube, ne pas utiliser la logique de réinitialisation basée sur currentTime
+    // car currentTime est géré par le player YouTube persistant
+    if (currentTrack?.mediaSource === 'youtube') {
+      const newIndex = currentTrackIndex === 0 ? tracks.length - 1 : currentTrackIndex - 1;
+      setCurrentIndex(newIndex);
+      setCurrentTime(0);
+      return;
+    }
+    
     if (currentTime > 3) {
       setCurrentTime(0);
       if (audioRef.current) {
@@ -454,7 +462,7 @@ export const DesktopApp = () => {
       setCurrentIndex(newIndex);
       setCurrentTime(0);
     }
-  }, [currentTime, tracks, currentTrackIndex, setCurrentIndex]);
+  }, [currentTime, tracks, currentTrackIndex, setCurrentIndex, currentTrack?.mediaSource]);
 
   const handleNext = useCallback(() => {
     if (tracks.length === 0) return;
@@ -529,8 +537,9 @@ export const DesktopApp = () => {
   }, [repeatMode, isShuffle, currentTrackIndex, tracks, setCurrentIndex]);
 
   // Update current time from audio element with higher precision
+  // Ne pas s'exécuter pour les tracks YouTube (géré par le player YouTube persistant)
   useEffect(() => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || currentTrack?.mediaSource === 'youtube') return;
 
     // Use requestAnimationFrame for smoother, more frequent updates
     let animationFrameId: number;
@@ -623,10 +632,12 @@ export const DesktopApp = () => {
         audioRef.current.removeEventListener('ended', handleEnded);
       }
     };
-  }, [isPlaying, repeatMode, currentTrack?.id]);
+  }, [isPlaying, repeatMode, currentTrack?.id, currentTrack?.mediaSource]);
 
   // Fallback: Simulate playback progress when no real audio file
+  // Ne pas s'exécuter pour les tracks YouTube (géré par le player YouTube persistant)
   useEffect(() => {
+    if (currentTrack?.mediaSource === 'youtube') return;
     if (!isPlaying || !currentTrack || currentTrack.filePath) return;
 
     const interval = setInterval(() => {
@@ -645,7 +656,7 @@ export const DesktopApp = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath, repeatMode]);
+  }, [isPlaying, currentTrack?.duration, currentTrack?.filePath, repeatMode, currentTrack?.mediaSource]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1670,7 +1681,7 @@ export const DesktopApp = () => {
                 }
               }}
               onTimeUpdate={(time) => {
-                // Mettre à jour currentTime directement (sans arrondi pour une progression fluide)
+                // Mettre à jour currentTime directement pour une progression fluide
                 // L'arrondi sera fait dans NowPlayingBar pour l'affichage seulement
                 setCurrentTime(time);
                 // Mettre à jour aussi la durée si elle est disponible
@@ -1681,11 +1692,10 @@ export const DesktopApp = () => {
               onReady={() => {
                 if (youtubePlayerRef.current) {
                   const player = youtubePlayerRef.current;
-                  // Initialiser currentTime avec la valeur du player
+                  // Initialiser currentTime avec la valeur actuelle du player (si disponible)
+                  // Sinon, onTimeUpdate le mettra à jour automatiquement
                   if (player.currentTime > 0) {
                     setCurrentTime(player.currentTime);
-                  } else {
-                    setCurrentTime(0);
                   }
                   // Initialiser la durée du player YouTube
                   if (player.duration > 0) {

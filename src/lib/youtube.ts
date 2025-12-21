@@ -134,3 +134,54 @@ export function normalizeYouTubeUrl(url: string): string {
   
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
+
+/**
+ * Extrait l'ID de chaîne YouTube d'une URL
+ * Supporte les formats:
+ * - youtube.com/channel/UC...
+ * - youtube.com/@username
+ * - youtube.com/c/ChannelName
+ * - youtube.com/user/username
+ */
+export function extractYouTubeChannelId(url: string): string | null {
+  if (!isYouTubeUrl(url)) return null;
+  
+  // Pattern pour channel ID (UC...)
+  const channelIdMatch = url.match(/youtube\.com\/channel\/([^/?&#]+)/);
+  if (channelIdMatch && channelIdMatch[1]) {
+    return channelIdMatch[1];
+  }
+  
+  // Pattern pour @username
+  const usernameMatch = url.match(/youtube\.com\/@([^/?&#]+)/);
+  if (usernameMatch && usernameMatch[1]) {
+    return `@${usernameMatch[1]}`;
+  }
+  
+  // Pattern pour /c/ChannelName
+  const cMatch = url.match(/youtube\.com\/c\/([^/?&#]+)/);
+  if (cMatch && cMatch[1]) {
+    return `c/${cMatch[1]}`;
+  }
+  
+  // Pattern pour /user/username
+  const userMatch = url.match(/youtube\.com\/user\/([^/?&#]+)/);
+  if (userMatch && userMatch[1]) {
+    return `user/${userMatch[1]}`;
+  }
+  
+  return null;
+}
+
+/**
+ * Vérifie si une URL YouTube est un profil/channel plutôt qu'une vidéo
+ */
+export function isYouTubeChannelUrl(url: string): boolean {
+  if (!isYouTubeUrl(url)) return false;
+  
+  // Si c'est une URL de chaîne (pas de videoId)
+  const channelId = extractYouTubeChannelId(url);
+  const videoId = extractYouTubeVideoId(url);
+  
+  return !!channelId && !videoId;
+}
