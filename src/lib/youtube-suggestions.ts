@@ -57,6 +57,25 @@ export async function fetchYouTubeTrending(
     const response = await fetch(url.toString());
     
     if (!response.ok) {
+      const isQuotaError = response.status === 403 || response.status === 429;
+      
+      if (isQuotaError) {
+        // Enregistrer l'échec dans le quota manager
+        try {
+          const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+          youtubeQuotaManager.recordFailure();
+        } catch (error) {
+          // Ignorer
+        }
+        
+        const errorData = await response.json().catch(() => ({}));
+        console.warn('[YouTube Suggestions] Quota épuisé pour tendances, retour vide');
+        if (errorData.error?.message) {
+          console.warn('[YouTube Suggestions] Message d\'erreur:', errorData.error.message);
+        }
+        return []; // Retourner vide au lieu de planter
+      }
+      
       const errorData = await response.json().catch(() => ({}));
       console.error('[YouTube Suggestions] Erreur API tendances:', response.status, errorData);
       if (errorData.error?.message) {

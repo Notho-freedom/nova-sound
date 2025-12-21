@@ -39,6 +39,8 @@ import { toast } from "sonner";
 import type { Track } from "@/types/music";
 import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 import { useAudioVibes } from "@/hooks/useAudioVibes";
+import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 export const DesktopApp = () => {
   // Initialize theme hook to ensure theme is loaded and applied on mount
@@ -190,6 +192,18 @@ export const DesktopApp = () => {
 
   // Audio element ref for real playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // YouTube Player ref pour lecture persistante en arrière-plan
+  const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+  
+  // État pour le player YouTube (pour synchronisation)
+  const [youtubeState, setYoutubeState] = useState({
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 70,
+    isMuted: false,
+  });
 
   // Loading complete handler
   const handleLoadComplete = useCallback(() => {
@@ -334,13 +348,34 @@ export const DesktopApp = () => {
 
   // Handle play/pause
   useEffect(() => {
-    // Pour les tracks YouTube, ne pas utiliser l'audio HTML5
-    // Le player YouTube sera géré par FullscreenPlayer
+    // Pour les tracks YouTube, utiliser le player YouTube persistant
     if (currentTrack?.mediaSource === 'youtube') {
       // S'assurer que l'audio HTML5 est arrêté si un track YouTube est sélectionné
       if (audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
+      }
+      
+      // Synchroniser avec le player YouTube persistant
+      if (youtubePlayerRef.current) {
+        const player = youtubePlayerRef.current;
+        if (isPlaying && !player.isPlaying) {
+          setTimeout(() => {
+            if (youtubePlayerRef.current && typeof youtubePlayerRef.current.play === 'function') {
+              try {
+                youtubePlayerRef.current.play();
+              } catch (err) {
+                console.error('[DesktopApp] Erreur play YouTube:', err);
+              }
+            }
+          }, 100);
+        } else if (!isPlaying && player.isPlaying) {
+          try {
+            player.pause();
+          } catch (err) {
+            console.error('[DesktopApp] Erreur pause YouTube:', err);
+          }
+        }
       }
       return;
     }
@@ -373,12 +408,24 @@ export const DesktopApp = () => {
       }
       audioRef.current.pause();
     }
-  }, [isPlaying, currentTrack?.filePath, currentTrack?.id, currentTrack?.mediaSource]);
+  }, [isPlaying, currentTrack?.filePath, currentTrack?.id, currentTrack?.mediaSource, currentTrack?.youtubeVideoId]);
 
   // Handle volume changes
   useEffect(() => {
-    // Pour les tracks YouTube, le volume est géré par le player YouTube dans FullscreenPlayer
-    if (currentTrack?.mediaSource === 'youtube') {
+    // Pour les tracks YouTube, synchroniser avec le player YouTube persistant
+    if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+      const player = youtubePlayerRef.current;
+      const currentVol = isMuted ? 0 : volume;
+      if (Math.abs(player.volume - currentVol) > 1) {
+        player.setVolume(currentVol);
+      }
+      if (player.isMuted !== isMuted) {
+        if (isMuted && !player.isMuted) {
+          player.toggleMute();
+        } else if (!isMuted && player.isMuted) {
+          player.toggleMute();
+        }
+      }
       return;
     }
     
@@ -400,10 +447,21 @@ export const DesktopApp = () => {
     }, 1000);
     
     return () => clearTimeout(timeoutId);
-  }, [volume, isMuted]);
+  }, [volume, isMuted, currentTrack?.mediaSource, currentTrack?.youtubeVideoId]);
 
   // Define handlers before useEffects that use them
-  const handlePlayPause = useCallback(() => setIsPlaying(prev => !prev), []);
+  const handlePlayPause = useCallback(() => {
+    // Pour les tracks YouTube, utiliser le player YouTube persistant
+    if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+      try {
+        youtubePlayerRef.current.togglePlayPause();
+      } catch (err) {
+        console.error('[DesktopApp] Erreur toggle play/pause YouTube:', err);
+      }
+      return;
+    }
+    setIsPlaying(prev => !prev);
+  }, [currentTrack?.mediaSource]);
 
   const handlePrevious = useCallback(() => {
     if (tracks.length === 0) return;
@@ -646,7 +704,16 @@ export const DesktopApp = () => {
       switch (e.code) {
         case "Space":
           e.preventDefault();
-          setIsPlaying((prev) => !prev);
+          // Pour les tracks YouTube, utiliser le player YouTube persistant
+          if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+            try {
+              youtubePlayerRef.current.togglePlayPause();
+            } catch (err) {
+              console.error('[DesktopApp] Erreur toggle play/pause YouTube:', err);
+            }
+          } else {
+            setIsPlaying((prev) => !prev);
+          }
           break;
         case "ArrowRight":
           if (e.ctrlKey || e.metaKey) {
@@ -699,8 +766,13 @@ export const DesktopApp = () => {
   const handleSeek = useCallback((value: number[]) => {
     const newTime = value[0];
     setCurrentTime(newTime);
-    // Pour les tracks YouTube, le seek est géré par le player YouTube dans FullscreenPlayer
-    if (currentTrack?.mediaSource === 'youtube') {
+    // Pour les tracks YouTube, utiliser le player YouTube persistant
+    if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+      try {
+        youtubePlayerRef.current.seek(newTime);
+      } catch (err) {
+        console.error('[DesktopApp] Erreur seek YouTube:', err);
+      }
       return;
     }
     if (audioRef.current) {
@@ -1562,6 +1634,72 @@ export const DesktopApp = () => {
             )}
           </div>
         </div>
+
+        {/* YouTube Player persistant en arrière-plan (pour tracks YouTube) */}
+        {currentTrack?.mediaSource === 'youtube' && currentTrack.youtubeVideoId && (
+          <div 
+            className="fixed inset-0 pointer-events-none"
+            style={{
+              zIndex: -1,
+              opacity: 0,
+              width: '1px',
+              height: '1px',
+              overflow: 'hidden',
+            }}
+          >
+            <YouTubePlayer
+              ref={youtubePlayerRef}
+              videoId={currentTrack.youtubeVideoId}
+              autoPlay={isPlaying}
+              audioOnly={true}
+              onStateChange={(playing) => {
+                setYoutubeState(prev => ({ ...prev, isPlaying: playing }));
+                if (playing !== isPlaying) {
+                  setIsPlaying(playing);
+                }
+              }}
+              onTimeUpdate={(time) => {
+                setYoutubeState(prev => ({ ...prev, currentTime: time }));
+                setCurrentTime(time);
+              }}
+              onReady={() => {
+                if (youtubePlayerRef.current) {
+                  const player = youtubePlayerRef.current;
+                  setYoutubeState({
+                    isPlaying: player.isPlaying,
+                    currentTime: player.currentTime,
+                    duration: player.duration || currentTrack.duration,
+                    volume: player.volume,
+                    isMuted: player.isMuted,
+                  });
+                  // Synchroniser le volume
+                  if (Math.abs(player.volume - volume) > 1) {
+                    player.setVolume(volume);
+                  }
+                  if (player.isMuted !== isMuted) {
+                    if (isMuted && !player.isMuted) {
+                      player.toggleMute();
+                    } else if (!isMuted && player.isMuted) {
+                      player.toggleMute();
+                    }
+                  }
+                  // Démarrer si nécessaire
+                  if (isPlaying && !player.isPlaying) {
+                    setTimeout(() => {
+                      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.play === 'function') {
+                        try {
+                          youtubePlayerRef.current.play();
+                        } catch (err) {
+                          console.error('[DesktopApp] Erreur play YouTube:', err);
+                        }
+                      }
+                    }, 300);
+                  }
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Now Playing Bar */}
         {currentTrack && !isVideoPlaying && currentView !== "videos" && (

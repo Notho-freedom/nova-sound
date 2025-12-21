@@ -426,7 +426,8 @@ export const VideosView = memo(() => {
   }
 
   // Video Player View
-  if (selectedVideo) {
+  // Ne pas afficher le lecteur vidéo en mode YouTube (YouTubeSearchView gère sa propre lecture)
+  if (selectedVideo && viewMode !== "youtube") {
     const currentIndex = displayVideos.findIndex((v) => v.id === selectedVideo.id);
     const handleNext = () => {
       if (currentIndex >= 0 && currentIndex < displayVideos.length - 1) {
@@ -448,7 +449,7 @@ export const VideosView = memo(() => {
       <div
         className={cn(
           "flex flex-col animate-in fade-in duration-300 bg-black",
-          isFullApp ? "fixed inset-0 z-[9998]" : "absolute inset-0"
+          isFullApp ? "fixed inset-0 z-[9998]" : viewMode === "youtube" ? "fixed inset-0 z-[9997]" : "absolute inset-0"
         )}
       >
         {/* TEMPORAIRE: Utiliser YouTubePlayer directement pour les vidéos YouTube */}
@@ -462,7 +463,10 @@ export const VideosView = memo(() => {
                 setSelectedVideo(null);
                 setYoutubeAudioOnly(false);
               }}
-              className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white"
+              className={cn(
+                "absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white",
+                viewMode === "youtube" && "top-16" // Ajuster la position en mode YouTube
+              )}
             >
               <X className="w-5 h-5" />
             </Button>

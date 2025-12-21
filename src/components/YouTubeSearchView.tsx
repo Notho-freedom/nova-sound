@@ -144,8 +144,92 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     return sorted;
   }, [recentlyWatched, enhancedVideos]);
   
+  // Fonction helper pour extraire l'artiste d'un titre YouTube
+  const extractArtistFromTitle = useCallback((title: string, channelTitle?: string): string | null => {
+    if (!title) return null;
+    
+    // Patterns communs: "Artiste - Titre", "Artiste – Titre", "Artiste | Titre"
+    const separators = [' - ', ' – ', ' — ', ' | ', ' • '];
+    for (const sep of separators) {
+      if (title.includes(sep)) {
+        const parts = title.split(sep);
+        if (parts.length >= 2 && parts[0].trim().length > 1) {
+          return parts[0].trim();
+        }
+      }
+    }
+    
+    // Si pas de séparateur, utiliser le channel comme artiste
+    return channelTitle || null;
+  }, []);
+
+  // Fonction helper pour vérifier si une vidéo correspond à un artiste
+  const videoMatchesArtist = useCallback((video: Video, artistName: string): boolean => {
+    if (!artistName || artistName.length < 2) return false;
+    
+    const artistLower = artistName.toLowerCase().trim();
+    const titleLower = (video.title || '').toLowerCase();
+    const channelLower = (video.channelTitle || '').toLowerCase();
+    const descriptionLower = (video.description || '').toLowerCase();
+    
+    // Vérifier si l'artiste apparaît dans le titre, la chaîne ou la description
+    if (titleLower.includes(artistLower) || channelLower.includes(artistLower) || descriptionLower.includes(artistLower)) {
+      return true;
+    }
+    
+    // Extraire l'artiste du titre et comparer
+    const extractedArtist = extractArtistFromTitle(video.title, video.channelTitle);
+    if (extractedArtist && extractedArtist.toLowerCase().includes(artistLower)) {
+      return true;
+    }
+    
+    return false;
+  }, [extractArtistFromTitle]);
+
+  // Fallback: chercher dans l'historique YouTube local des vidéos correspondant aux artistes
+  const findSuggestionsFromHistory = useCallback((artists: string[]): YouTubeSearchResult[] => {
+    if (artists.length === 0 || youtubeWatchHistory.length === 0) {
+      return [];
+    }
+    
+    const matchedVideos: YouTubeSearchResult[] = [];
+    const seenVideoIds = new Set<string>();
+    
+    // Pour chaque artiste, chercher des vidéos correspondantes dans l'historique
+    for (const artist of artists) {
+      if (matchedVideos.length >= 15) break; // Limite de 15 suggestions
+      
+      for (const video of youtubeWatchHistory) {
+        if (seenVideoIds.has(video.id)) continue;
+        
+        if (videoMatchesArtist(video, artist)) {
+          // Convertir Video en YouTubeSearchResult
+          const videoId = video.youtubeVideoId || extractYouTubeVideoId(video.filePath) || '';
+          if (!videoId) continue;
+          
+          matchedVideos.push({
+            videoId: videoId,
+            title: video.title || '',
+            description: video.description || '',
+            thumbnailUrl: video.thumbnailUrl || '',
+            channelTitle: video.channelTitle || '',
+            publishedAt: video.addedAt || video.lastPlayedAt || '',
+            duration: video.duration ? `PT${Math.floor(video.duration / 3600)}H${Math.floor((video.duration % 3600) / 60)}M${video.duration % 60}S` : undefined,
+            viewCount: undefined,
+          });
+          
+          seenVideoIds.add(video.id);
+          
+          if (matchedVideos.length >= 15) break;
+        }
+      }
+    }
+    
+    return matchedVideos;
+  }, [youtubeWatchHistory, videoMatchesArtist]);
+
   // Charger les suggestions basées sur les artistes les plus écoutés OU l'historique de recherche YouTube
-  useEffect(() => {
+  const loadArtistSuggestions = useCallback(async () => {
     // Charger l'historique de recherche YouTube
     let searchHistory: string[] = [];
     try {
@@ -183,10 +267,10 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       }
     });
     
-    // Top 3 artistes (ou utiliser les recherches récentes si pas d'artistes)
+    // Top 5 artistes (augmenté pour avoir plus de résultats)
     const topArtists = Array.from(artistCounts.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
+      .slice(0, 5)
       .map(([artist]) => artist);
     
     // Si pas d'artistes mais des recherches, utiliser les recherches comme "artistes"
@@ -194,17 +278,22 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       ? searchHistory.slice(0, 3)
       : topArtists;
     
-    if (searchTerms.length === 0) return;
+    if (searchTerms.length === 0) {
+      setArtistSuggestions([]);
+      return;
+    }
     
     // Charger les suggestions pour chaque terme (artiste ou recherche)
-    const loadSuggestions = async () => {
-      setLoadingArtistSuggestions(true);
-      try {
-        const allSuggestions: YouTubeSearchResult[] = [];
-        
-        for (const term of searchTerms) {
-          try {
-            const suggestions = await searchYouTubeByArtist(term, 5);
+    setLoadingArtistSuggestions(true);
+    try {
+      const allSuggestions: YouTubeSearchResult[] = [];
+      let apiFailed = false;
+      
+      // Essayer d'abord avec l'API YouTube
+      for (const term of searchTerms) {
+        try {
+          const suggestions = await searchYouTubeByArtist(term, 5);
+          if (suggestions.length > 0) {
             const converted = suggestions.map(s => ({
               videoId: s.videoId,
               title: s.title,
@@ -216,35 +305,68 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
               viewCount: s.viewCount?.toString(),
             }));
             allSuggestions.push(...converted);
-          } catch (error) {
-            console.warn(`[YouTubeSearchView] Erreur suggestions pour ${term}:`, error);
+          }
+        } catch (error) {
+          console.warn(`[YouTubeSearchView] Erreur API suggestions pour ${term}:`, error);
+          apiFailed = true;
+        }
+      }
+      
+      // Si l'API a échoué ou n'a pas retourné assez de résultats, utiliser le fallback historique
+      if (apiFailed || allSuggestions.length < 5) {
+        console.log(`[YouTubeSearchView] Utilisation du fallback historique (API: ${allSuggestions.length} résultats)`);
+        const historySuggestions = findSuggestionsFromHistory(searchTerms);
+        
+        // Combiner les résultats API et historique, en priorisant l'API
+        const combined = [...allSuggestions];
+        const existingIds = new Set(allSuggestions.map(s => s.videoId));
+        
+        for (const histSuggestion of historySuggestions) {
+          if (!existingIds.has(histSuggestion.videoId)) {
+            combined.push(histSuggestion);
           }
         }
         
-        // Dédupliquer par videoId
-        const unique = Array.from(
-          new Map(allSuggestions.map(r => [r.videoId, r])).values()
-        );
-
-        const finalSuggestions = unique.slice(0, 15); // Max 15 suggestions
-        console.log(`[YouTubeSearchView] Suggestions artistes chargées: ${finalSuggestions.length} vidéos`, {
-          searchTerms,
-          allSuggestionsCount: allSuggestions.length,
-          uniqueCount: unique.length,
-        });
-        setArtistSuggestions(finalSuggestions);
-      } catch (error) {
-        console.error('[YouTubeSearchView] Erreur chargement suggestions artistes:', error);
-        setArtistSuggestions([]);
-      } finally {
-        setLoadingArtistSuggestions(false);
+        allSuggestions.length = 0;
+        allSuggestions.push(...combined);
       }
-    };
+      
+      // Dédupliquer par videoId
+      const unique = Array.from(
+        new Map(allSuggestions.map(r => [r.videoId, r])).values()
+      );
 
-    // Charger les suggestions uniquement quand il n'y a pas de recherche active
-    // (pour éviter de charger inutilement si l'utilisateur est en train de chercher)
-    loadSuggestions();
-  }, [audioHistory, audioTracks]);
+      const finalSuggestions = unique.slice(0, 15); // Max 15 suggestions
+      console.log(`[YouTubeSearchView] Suggestions artistes chargées: ${finalSuggestions.length} vidéos`, {
+        searchTerms,
+        allSuggestionsCount: allSuggestions.length,
+        uniqueCount: unique.length,
+        fromAPI: !apiFailed,
+        fromHistory: apiFailed || allSuggestions.length < 5,
+      });
+      setArtistSuggestions(finalSuggestions);
+    } catch (error) {
+      console.error('[YouTubeSearchView] Erreur chargement suggestions artistes:', error);
+      // En cas d'erreur totale, essayer quand même le fallback historique
+      try {
+        const historySuggestions = findSuggestionsFromHistory(searchTerms);
+        setArtistSuggestions(historySuggestions.slice(0, 15));
+      } catch (fallbackError) {
+        console.error('[YouTubeSearchView] Erreur fallback historique:', fallbackError);
+        setArtistSuggestions([]);
+      }
+    } finally {
+      setLoadingArtistSuggestions(false);
+    }
+  }, [audioHistory, audioTracks, findSuggestionsFromHistory, youtubeWatchHistory]);
+
+  // Charger les suggestions au montage et quand les données changent
+  useEffect(() => {
+    // Ne charger que si on n'a pas de recherche active
+    if (!searchQuery.trim()) {
+      loadArtistSuggestions();
+    }
+  }, [loadArtistSuggestions, searchQuery]);
 
   // Mettre à jour les suggestions quand la requête change
   useEffect(() => {
