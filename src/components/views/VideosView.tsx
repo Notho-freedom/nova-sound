@@ -795,24 +795,24 @@ export const VideosView = memo(() => {
                 />
               )}
 
-              {/* Suggestions YouTube basées sur votre historique */}
-              {loadingTrending ? (
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold mb-4">Suggestions pour vous</h3>
-                  <VideoCarouselSkeleton />
-                </div>
-              ) : trendingVideos.length > 0 ? (
-                <VideoCarousel
-                  title="Suggestions pour vous"
-                  videos={trendingVideos}
-                  onVideoSelect={handlePlayVideo}
-                  onViewDetails={handleViewDetails}
-                  onToggleWatchlist={handleToggleWatchlist}
-                  onToggleFavorite={handleToggleFavorite}
-                  isInWatchlist={isInWatchlist}
-                  isFavorite={isFavorite}
-                />
-              ) : null}
+              {/* Vidéos YouTube déjà regardées */}
+              {(() => {
+                const youtubeWatchedVideos = recentlyWatched.filter(
+                  v => v.mediaSource === 'youtube' || v.youtubeVideoId || (v.filePath && extractYouTubeVideoId(v.filePath))
+                );
+                return youtubeWatchedVideos.length > 0 ? (
+                  <VideoCarousel
+                    title="Vidéos YouTube regardées"
+                    videos={youtubeWatchedVideos}
+                    onVideoSelect={handlePlayVideo}
+                    onViewDetails={handleViewDetails}
+                    onToggleWatchlist={handleToggleWatchlist}
+                    onToggleFavorite={handleToggleFavorite}
+                    isInWatchlist={isInWatchlist}
+                    isFavorite={isFavorite}
+                  />
+                ) : null;
+              })()}
 
               {/* By Genre */}
               {availableGenres.slice(0, 5).map((genre) => {

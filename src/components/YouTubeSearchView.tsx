@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { Search, Play, Music, Video as VideoIcon, Loader2, AlertCircle, ExternalLink, ChevronRight } from "lucide-react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { Search, Play, Music, Video as VideoIcon, Loader2, AlertCircle, ExternalLink, ChevronRight, History, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useYouTubeSearch, type YouTubeSearchResult } from "@/hooks/useYouTubeSearch";
 import { useYouTubeAutocomplete } from "@/hooks/useYouTubeAutocomplete";
+import { useVideoLibrary } from "@/hooks/useVideoLibrary";
+import { usePlayHistory } from "@/hooks/usePlayHistory";
+import { useLibrary } from "@/hooks/useLibrary";
 import type { Video, Track } from "@/types/music";
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
+import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 interface YouTubeSearchViewProps {
   onPlayVideo: (video: Video, audioOnly?: boolean) => void;
@@ -30,6 +35,216 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   
   const { results, loading, error, search, clearResults, convertToVideo } = useYouTubeSearch();
   const { suggestions, loading: autocompleteLoading, searchSuggestions, clearSuggestions } = useYouTubeAutocomplete();
+  
+  // Historique et suggestions
+  const { recentlyWatched, enhancedVideos } = useVideoLibrary();
+  const { history: audioHistory } = usePlayHistory();
+  const { tracks: audioTracks } = useLibrary();
+  const [artistSuggestions, setArtistSuggestions] = useState<YouTubeSearchResult[]>([]);
+  const [loadingArtistSuggestions, setLoadingArtistSuggestions] = useState(false);
+  
+  // Filtrer TOUTES les vidéos YouTube de l'historique (pas de limite)
+  // Utiliser à la fois recentlyWatched, enhancedVideos ET l'historique brut depuis localStorage
+  const youtubeWatchHistory = useMemo(() => {
+    // 1. Vidéos YouTube depuis recentlyWatched
+    const fromRecentlyWatched = recentlyWatched
+      .filter(v => v.mediaSource === 'youtube' || v.youtubeVideoId || (v.filePath && extractYouTubeVideoId(v.filePath)));
+    
+    // 2. Vidéos YouTube depuis enhancedVideos (pour capturer celles qui ne sont pas dans recentlyWatched)
+    const fromEnhancedVideos = enhancedVideos
+      .filter(v => (v.mediaSource === 'youtube' || v.youtubeVideoId || (v.filePath && extractYouTubeVideoId(v.filePath))))
+      .filter(v => !fromRecentlyWatched.some(rw => rw.id === v.id));
+    
+    // 3. Récupérer l'historique brut depuis localStorage pour trouver les vidéos YouTube manquantes
+    let rawWatchHistory: Array<{ videoId: string; watchedAt: string }> = [];
+    try {
+      const saved = localStorage.getItem("nexus-video-watch-history");
+      if (saved) {
+        rawWatchHistory = JSON.parse(saved);
+      }
+    } catch (error) {
+      // Ignorer les erreurs de parsing
+    }
+    
+    // 4. Reconstruire les vidéos YouTube depuis l'historique brut si elles ne sont pas dans enhancedVideos
+    const fromRawHistory: Video[] = [];
+    const existingIds = new Set([...fromRecentlyWatched, ...fromEnhancedVideos].map(v => v.id));
+    
+    for (const entry of rawWatchHistory) {
+      // Vérifier si c'est une vidéo YouTube (ID commence par "youtube-" ou contient un videoId YouTube)
+      if (entry.videoId.startsWith('youtube-') || entry.videoId.includes('youtube-audio-')) {
+        const videoId = entry.videoId.replace('youtube-', '').replace('youtube-audio-', '');
+        const id = `youtube-${videoId}`;
+        
+        if (!existingIds.has(id) && !existingIds.has(entry.videoId)) {
+          // Créer une vidéo YouTube minimale depuis l'historique
+          fromRawHistory.push({
+            id: id,
+            filePath: `https://www.youtube.com/watch?v=${videoId}`,
+            title: `Vidéo YouTube ${videoId}`,
+            description: '',
+            duration: 0,
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            fileSize: 0,
+            addedAt: entry.watchedAt,
+            mediaSource: 'youtube',
+            youtubeVideoId: videoId,
+            type: 'music_video',
+            lastPlayedAt: entry.watchedAt,
+          });
+        }
+      } else {
+        // Vérifier si c'est une URL YouTube
+        const videoId = extractYouTubeVideoId(entry.videoId);
+        if (videoId) {
+          const id = `youtube-${videoId}`;
+          if (!existingIds.has(id) && !existingIds.has(entry.videoId)) {
+            fromRawHistory.push({
+              id: id,
+              filePath: entry.videoId,
+              title: `Vidéo YouTube ${videoId}`,
+              description: '',
+              duration: 0,
+              thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              fileSize: 0,
+              addedAt: entry.watchedAt,
+              mediaSource: 'youtube',
+              youtubeVideoId: videoId,
+              type: 'music_video',
+              lastPlayedAt: entry.watchedAt,
+            });
+          }
+        }
+      }
+    }
+    
+    // 5. Combiner et dédupliquer par ID
+    const allYouTubeVideos = [...fromRecentlyWatched, ...fromEnhancedVideos, ...fromRawHistory];
+    const unique = Array.from(
+      new Map(allYouTubeVideos.map(v => [v.id, v])).values()
+    );
+    
+    // 6. Trier par date de visionnage (plus récent en premier)
+    const sorted = unique.sort((a, b) => {
+      const aTime = a.lastPlayedAt ? new Date(a.lastPlayedAt).getTime() : new Date(a.addedAt).getTime();
+      const bTime = b.lastPlayedAt ? new Date(b.lastPlayedAt).getTime() : new Date(b.addedAt).getTime();
+      return bTime - aTime;
+    });
+    
+    // Log pour débogage (toujours afficher pour voir l'état)
+    console.log(`[YouTubeSearchView] Historique YouTube calculé: ${sorted.length} vidéos`, {
+      fromRecentlyWatched: fromRecentlyWatched.length,
+      fromEnhancedVideos: fromEnhancedVideos.length,
+      fromRawHistory: fromRawHistory.length,
+      recentlyWatchedTotal: recentlyWatched.length,
+      enhancedVideosTotal: enhancedVideos.length,
+      rawWatchHistoryTotal: rawWatchHistory.length,
+    });
+    
+    return sorted;
+  }, [recentlyWatched, enhancedVideos]);
+  
+  // Charger les suggestions basées sur les artistes les plus écoutés OU l'historique de recherche YouTube
+  useEffect(() => {
+    // Charger l'historique de recherche YouTube
+    let searchHistory: string[] = [];
+    try {
+      const saved = localStorage.getItem("nexus-search-history");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          searchHistory = parsed.slice(0, 10); // Top 10 recherches récentes
+        }
+      }
+    } catch (error) {
+      // Ignorer les erreurs de parsing
+    }
+    
+    // Calculer les artistes les plus écoutés depuis l'historique audio
+    const artistCounts = new Map<string, number>();
+    if (audioHistory.length > 0 && audioTracks.length > 0) {
+      audioHistory.forEach(entry => {
+        const track = audioTracks.find(t => t.id === entry.trackId);
+        if (track && track.artist) {
+          const count = artistCounts.get(track.artist) || 0;
+          artistCounts.set(track.artist, count + (entry.playCount || 1));
+        }
+      });
+    }
+    
+    // Extraire aussi les artistes depuis l'historique de recherche YouTube
+    // (chercher des patterns comme "artiste - titre" ou juste "artiste")
+    searchHistory.forEach(query => {
+      const parts = query.split(/\s*-\s*|\s*–\s*/);
+      if (parts.length > 0 && parts[0].trim().length > 2) {
+        const artist = parts[0].trim();
+        const count = artistCounts.get(artist) || 0;
+        artistCounts.set(artist, count + 1);
+      }
+    });
+    
+    // Top 3 artistes (ou utiliser les recherches récentes si pas d'artistes)
+    const topArtists = Array.from(artistCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([artist]) => artist);
+    
+    // Si pas d'artistes mais des recherches, utiliser les recherches comme "artistes"
+    const searchTerms = topArtists.length === 0 && searchHistory.length > 0
+      ? searchHistory.slice(0, 3)
+      : topArtists;
+    
+    if (searchTerms.length === 0) return;
+    
+    // Charger les suggestions pour chaque terme (artiste ou recherche)
+    const loadSuggestions = async () => {
+      setLoadingArtistSuggestions(true);
+      try {
+        const allSuggestions: YouTubeSearchResult[] = [];
+        
+        for (const term of searchTerms) {
+          try {
+            const suggestions = await searchYouTubeByArtist(term, 5);
+            const converted = suggestions.map(s => ({
+              videoId: s.videoId,
+              title: s.title,
+              description: s.description,
+              thumbnailUrl: s.thumbnailUrl,
+              channelTitle: s.channelTitle,
+              publishedAt: s.publishedAt,
+              duration: s.duration ? `PT${Math.floor(s.duration / 3600)}H${Math.floor((s.duration % 3600) / 60)}M${s.duration % 60}S` : undefined,
+              viewCount: s.viewCount?.toString(),
+            }));
+            allSuggestions.push(...converted);
+          } catch (error) {
+            console.warn(`[YouTubeSearchView] Erreur suggestions pour ${term}:`, error);
+          }
+        }
+        
+        // Dédupliquer par videoId
+        const unique = Array.from(
+          new Map(allSuggestions.map(r => [r.videoId, r])).values()
+        );
+
+        const finalSuggestions = unique.slice(0, 15); // Max 15 suggestions
+        console.log(`[YouTubeSearchView] Suggestions artistes chargées: ${finalSuggestions.length} vidéos`, {
+          searchTerms,
+          allSuggestionsCount: allSuggestions.length,
+          uniqueCount: unique.length,
+        });
+        setArtistSuggestions(finalSuggestions);
+      } catch (error) {
+        console.error('[YouTubeSearchView] Erreur chargement suggestions artistes:', error);
+        setArtistSuggestions([]);
+      } finally {
+        setLoadingArtistSuggestions(false);
+      }
+    };
+
+    // Charger les suggestions uniquement quand il n'y a pas de recherche active
+    // (pour éviter de charger inutilement si l'utilisateur est en train de chercher)
+    loadSuggestions();
+  }, [audioHistory, audioTracks]);
 
   // Mettre à jour les suggestions quand la requête change
   useEffect(() => {
@@ -39,8 +254,11 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     } else {
       clearSuggestions();
       setShowSuggestions(false);
+      // Si la recherche est vide, on affiche l'historique et les suggestions
+      clearResults();
     }
-  }, [searchQuery, searchSuggestions, clearSuggestions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   // Fermer les suggestions quand on clique en dehors
   useEffect(() => {
@@ -193,7 +411,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                   <div className="p-1">
                     {suggestions.map((suggestion, index) => (
                       <button
-                        key={`${suggestion.query}-${index}`}
+                        key={`suggestion-${suggestion.query}-${index}-${suggestion.type || 'query'}`}
                         type="button"
                         onClick={() => handleSuggestionClick(suggestion.query)}
                         className={cn(
@@ -273,19 +491,35 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
 
       {/* Contenu */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* Message d'erreur */}
-        {error && (
-          <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive mb-1">Erreur de recherche</p>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{error}</p>
-            </div>
+        {/* Debug: Afficher l'état de la recherche */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-4 p-2 bg-muted/50 rounded text-xs font-mono">
+            <div>searchQuery: "{searchQuery}" (trim: "{searchQuery.trim()}")</div>
+            <div>searchQuery.trim() === "": {searchQuery.trim() === "" ? 'true' : 'false'}</div>
+            <div>Condition: {searchQuery.trim() ? 'AFFICHER RÉSULTATS' : 'AFFICHER HISTORIQUE/SUGGESTIONS'}</div>
           </div>
         )}
+        
+        {/* Mode recherche active */}
+        {searchQuery.trim() ? (
+          <>
+            {/* Message d'erreur */}
+            {error && (
+              <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive mb-1">Erreur de recherche</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{error}</p>
+                </div>
+              </div>
+            )}
 
-        {/* Résultats */}
-        {results.length > 0 ? (
+            {/* Résultats de recherche */}
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : results.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {results.map((result) => (
               <div
@@ -367,30 +601,165 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
               </div>
             ))}
           </div>
-        ) : !loading && !error && searchQuery ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <Search className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Aucun résultat</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Aucune vidéo trouvée pour "{searchQuery}". Essayez avec d'autres mots-clés.
-            </p>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                <Search className="w-16 h-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Aucun résultat</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Aucune vidéo trouvée pour "{searchQuery}". Essayez avec d'autres mots-clés.
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Pas de recherche active : afficher historique et suggestions */
+          <div className="space-y-8">
+            {/* Debug: Afficher l'état */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mb-4 p-2 bg-muted/50 rounded text-xs">
+                <div>Historique: {youtubeWatchHistory.length} vidéos</div>
+                <div>Suggestions: {artistSuggestions.length} vidéos</div>
+                <div>Chargement suggestions: {loadingArtistSuggestions ? 'Oui' : 'Non'}</div>
+              </div>
+            )}
+            
+            {/* Historique de visionnage YouTube */}
+            {youtubeWatchHistory.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Vidéos récemment regardées</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {youtubeWatchHistory
+                    .filter((video) => {
+                      const videoId = video.youtubeVideoId || extractYouTubeVideoId(video.filePath || '');
+                      return !!videoId;
+                    })
+                    .map((video) => {
+                      const videoId = video.youtubeVideoId || extractYouTubeVideoId(video.filePath || '');
+                      
+                      return (
+                        <div
+                          key={`youtube-history-${video.id}-${videoId}`}
+                        className="group relative bg-card rounded-lg overflow-hidden border border-border/50 hover:border-primary/50 transition-all duration-200 hover:shadow-lg"
+                      >
+                        <div className="relative aspect-video bg-muted overflow-hidden">
+                          <img
+                            src={video.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+                            alt={video.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              size="icon"
+                              className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90"
+                              onClick={() => onPlayVideo(video, playbackMode === "audio")}
+                            >
+                              <Play className="w-6 h-6 fill-current ml-1" />
+                            </Button>
+                          </div>
+                          {video.duration && (
+                            <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/80 rounded text-xs text-white font-medium">
+                              {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                            {video.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {video.description || 'YouTube'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Suggestions basées sur les artistes */}
+            {artistSuggestions.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Suggestions basées sur vos artistes</h2>
+                </div>
+                {loadingArtistSuggestions ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {artistSuggestions.map((result) => (
+                      <div
+                        key={result.videoId}
+                        className="group relative bg-card rounded-lg overflow-hidden border border-border/50 hover:border-primary/50 transition-all duration-200 hover:shadow-lg"
+                      >
+                        <div className="relative aspect-video bg-muted overflow-hidden">
+                          <img
+                            src={result.thumbnailUrl}
+                            alt={result.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              size="icon"
+                              className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90"
+                              onClick={() => handlePlay(result)}
+                            >
+                              <Play className="w-6 h-6 fill-current ml-1" />
+                            </Button>
+                          </div>
+                          {result.duration && (
+                            <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/80 rounded text-xs text-white font-medium">
+                              {formatYouTubeDuration(result.duration)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                            {result.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {result.channelTitle}
+                          </p>
+                          {result.viewCount && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatViewCount(result.viewCount)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Message par défaut si pas d'historique ni de suggestions */}
+            {youtubeWatchHistory.length === 0 && artistSuggestions.length === 0 && !loadingArtistSuggestions && (
+              <div className="flex flex-col items-center justify-center min-h-[400px] text-center py-12">
+                <VideoIcon className="w-16 h-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Recherche YouTube</h3>
+                <p className="text-sm text-muted-foreground max-w-md mb-4">
+                  Recherchez des vidéos sur YouTube et lisez-les directement dans Nexus.
+                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <VideoIcon className="w-4 h-4" />
+                  <span>Mode vidéo</span>
+                  <span>•</span>
+                  <Music className="w-4 h-4" />
+                  <span>Mode audio</span>
+                </div>
+              </div>
+            )}
           </div>
-        ) : !loading && !error ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <VideoIcon className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Recherche YouTube</h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-4">
-              Recherchez des vidéos sur YouTube et lisez-les directement dans Nexus.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <VideoIcon className="w-4 h-4" />
-              <span>Mode vidéo</span>
-              <span>•</span>
-              <Music className="w-4 h-4" />
-              <span>Mode audio</span>
-            </div>
-          </div>
-        ) : null}
+        )}
       </div>
     </div>
   );

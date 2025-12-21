@@ -269,6 +269,12 @@ class L2Cache {
 
   async setVideo(video: CachedYouTubeVideo): Promise<void> {
     try {
+      // Vérifier que videoId existe et est valide
+      if (!video.videoId || typeof video.videoId !== 'string' || video.videoId.trim() === '') {
+        console.warn('[L2Cache] setVideo: videoId invalide ou manquant, ignoré:', video);
+        return;
+      }
+      
       const db = this.getDb();
       const docRef = doc(db, this.COLLECTION_VIDEOS, video.videoId);
       
@@ -595,11 +601,13 @@ class YouTubeCacheService {
     
     // Mettre en cache les vidéos individuellement aussi (pour réutilisation future)
     // Cela permet de réutiliser les vidéos dans d'autres recherches sans appeler l'API
-    const videoPromises = results.map(video => 
-      this.setVideo(video).catch(err => {
-        console.warn(`[YouTubeCache] Failed to cache individual video ${video.videoId}:`, err);
-      })
-    );
+    const videoPromises = results
+      .filter(video => video && video.videoId && typeof video.videoId === 'string' && video.videoId.trim() !== '')
+      .map(video => 
+        this.setVideo(video).catch(err => {
+          console.warn(`[YouTubeCache] Failed to cache individual video ${video.videoId}:`, err);
+        })
+      );
     // Ne pas attendre la fin pour continuer
     Promise.all(videoPromises).catch(() => {
       // Ignorer les erreurs individuelles
