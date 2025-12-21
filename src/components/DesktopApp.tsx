@@ -416,7 +416,7 @@ export const DesktopApp = () => {
       
       // Pour les tracks locaux uniquement, pauser l'audio HTML5
       if (currentTrack?.mediaSource !== 'youtube' && audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
+      audioRef.current.pause();
       }
     }
   }, [isPlaying, currentTrack?.filePath, currentTrack?.id, currentTrack?.mediaSource, currentTrack?.youtubeVideoId]);

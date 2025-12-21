@@ -752,14 +752,14 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
             video={playingVideo}
             videos={[]}
             onClose={() => {
-              setPlayingVideo(null);
-              setIsPlayerFullscreen(false);
-            }}
+                setPlayingVideo(null);
+                setIsPlayerFullscreen(false);
+              }}
             className="w-full h-full"
             showControls={true}
-            autoPlay={true}
+                autoPlay={true}
             isFullApp={true}
-            audioOnly={playbackMode === "audio"}
+                audioOnly={playbackMode === "audio"}
             onProgressUpdate={updateWatchProgress}
           />
         </div>

@@ -242,18 +242,20 @@ export const HomeView = memo(({
 
   return (
     <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
-      {/* Hero Section */}
+      {/* Hero Section - Carousel */}
       <HeroSection
+        tracks={displayRecent.slice(0, 10)}
         currentTrack={currentTrack}
         isPlaying={isPlaying}
         userName={userName}
-        onPlay={onPlayPause}
-        onPause={onPlayPause}
-        onNext={onNext}
-        onPrevious={onPrevious}
-        onShuffle={onShuffle}
-        onToggleFavorite={currentTrack ? () => toggleFavorite(currentTrack.id) : undefined}
-        isFavorite={currentTrack ? isFavorite(currentTrack.id) : false}
+        autoPlay={true}
+        autoPlayInterval={6000}
+        onTrackSelect={(track) => {
+          const index = tracks.findIndex(t => t.id === track.id);
+          if (index !== -1) {
+            onTrackSelect(index);
+          }
+        }}
       />
 
       {/* Stats Section */}
