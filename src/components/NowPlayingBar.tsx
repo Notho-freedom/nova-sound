@@ -38,7 +38,6 @@ import type { Track } from "@/types/music"
 import { toast } from "sonner"
 import { useNotifications } from "@/hooks/useNotifications"
 import { useState } from "react"
-import { ArtistInfoPanel } from "./ArtistInfoPanel"
 
 interface NowPlayingBarProps {
   currentTrack: Track
@@ -63,6 +62,7 @@ interface NowPlayingBarProps {
   onToggleFavorite?: () => void
   onShowPlayer?: () => void
   onShowLyrics?: () => void
+  onShowArtistInfo?: () => void
   onNavigateToAlbum?: () => void
   onNavigateToArtist?: () => void
   isQueueOpen: boolean
@@ -97,6 +97,7 @@ export const NowPlayingBar = ({
   onToggleFavorite,
   onShowPlayer,
   onShowLyrics,
+  onShowArtistInfo,
   onNavigateToAlbum,
   onNavigateToArtist,
   isQueueOpen,
@@ -104,7 +105,6 @@ export const NowPlayingBar = ({
 }: NowPlayingBarProps) => {
   const [isHoveringProgress, setIsHoveringProgress] = useState(false)
   const [isHoveringVolume, setIsHoveringVolume] = useState(false)
-  const [isArtistInfoOpen, setIsArtistInfoOpen] = useState(false)
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2
 
@@ -379,13 +379,14 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setIsArtistInfoOpen(true)}
+                    onClick={() => onShowArtistInfo?.()}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-primary",
                       "hover:bg-primary/10 active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     )}
+                    disabled={!onShowArtistInfo}
                   >
                     <Sparkles className="w-4 h-4" />
                   </button>
@@ -555,12 +556,6 @@ export const NowPlayingBar = ({
           </div>
         </div>
 
-        {/* Artist Info Panel */}
-        <ArtistInfoPanel
-          isOpen={isArtistInfoOpen}
-          onClose={() => setIsArtistInfoOpen(false)}
-          currentTrack={currentTrack}
-        />
       </div>
     </TooltipProvider>
   )

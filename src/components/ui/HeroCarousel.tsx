@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, memo } from "react";
+import { useState, useEffect, useCallback, memo, useRef } from "react";
 import { ChevronLeft, ChevronRight, Play, Pause, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
@@ -41,7 +41,7 @@ export const HeroCarousel = memo(({
   const [direction, setDirection] = useState(0);
   const [enhancedSlides, setEnhancedSlides] = useState<CarouselSlide[]>(slides);
   const [imageCache, setImageCache] = useState<Map<string, string>>(new Map());
-
+  const imageRef = useRef<HTMLImageElement>(null);
   const goToNext = useCallback(() => {
     setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % enhancedSlides.length);
@@ -63,9 +63,10 @@ export const HeroCarousel = memo(({
   // Ratio: ~16:9 ou landscape pour un meilleur rendu
   const getOptimalImageDimensions = useCallback(() => {
     // Pour un carousel hero, on veut des images larges en format paysage
-    // Dimensions cibles: 1920x1080 (Full HD) ou plus pour un meilleur rendu
-    const width = 1920; // Largeur optimale pour desktop
-    const height = 1080; // Hauteur optimale (ratio 16:9)
+    const image = imageRef.current;
+    if (!image) return { width: 0, height: 0 };
+    const width = image.width;
+    const height = image.height;
     
     return { width, height };
   }, []);
@@ -203,15 +204,10 @@ export const HeroCarousel = memo(({
           {/* Image - Optimisée pour le format hero avec dimensions sur mesure */}
           <div className="absolute inset-0 overflow-hidden">
             <img
+              ref={imageRef}
               src={currentSlide.imageUrl}
               alt={currentSlide.title}
               className="absolute inset-0 w-full h-full object-cover transform scale-105 transition-transform duration-[8s]"
-              style={{
-                minWidth: '100%',
-                minHeight: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center',
-              }}
               loading="eager"
               decoding="async"
               width={1920}

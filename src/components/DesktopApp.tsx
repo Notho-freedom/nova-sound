@@ -7,6 +7,7 @@ import { FullscreenPlayer } from "./FullscreenPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { NotificationsPanel } from "./NotificationsPanel";
+import { ArtistInfoPanel } from "./ArtistInfoPanel";
 import { UpdateNotification } from "./UpdateNotification";
 import { lazy, Suspense } from "react";
 import { HomeView } from "./views/HomeView";
@@ -146,6 +147,7 @@ export const DesktopApp = () => {
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isArtistInfoOpen, setIsArtistInfoOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1633,7 +1635,7 @@ export const DesktopApp = () => {
             
             <div className={cn(
               "flex-1 transition-all duration-300 relative",
-              isQueueOpen && "mr-80",
+              (isQueueOpen || isLyricsOpen || isNotificationsOpen || isArtistInfoOpen) && "mr-80",
               showInlinePlayer && "flex items-center justify-center",
               currentView === "videos" && "overflow-hidden"
             )}>
@@ -1693,6 +1695,23 @@ export const DesktopApp = () => {
                 />
               </div>
             )}
+
+            {/* Artist Info Panel */}
+            {isArtistInfoOpen && currentTrack && (
+              <div className="absolute right-0 top-0 bottom-0 z-20 w-80 animate-in slide-in-from-right duration-300">
+                <ArtistInfoPanel
+                  isOpen={isArtistInfoOpen}
+                  onClose={() => setIsArtistInfoOpen(false)}
+                  currentTrack={currentTrack}
+                  onNavigateToArtist={() => {
+                    // Navigate to artist view in library
+                    setCurrentView("library");
+                    // Could set selected artist if needed
+                  }}
+                  onPlayTrack={handlePlayTrack}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -1730,6 +1749,15 @@ export const DesktopApp = () => {
               setIsLyricsOpen(!isLyricsOpen);
               if (!isLyricsOpen) {
                 setIsQueueOpen(false);
+                setIsNotificationsOpen(false);
+                setIsArtistInfoOpen(false);
+              }
+            }}
+            onShowArtistInfo={() => {
+              setIsArtistInfoOpen(!isArtistInfoOpen);
+              if (!isArtistInfoOpen) {
+                setIsQueueOpen(false);
+                setIsLyricsOpen(false);
                 setIsNotificationsOpen(false);
               }
             }}

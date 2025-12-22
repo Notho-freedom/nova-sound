@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, memo } from "react"
+import { useState, useEffect, useCallback, memo, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   X,
@@ -16,19 +16,32 @@ import {
   Sparkles,
   Info,
   Loader2,
+  Clock,
+  Play,
+  Facebook,
+  Twitter,
+  Instagram,
+  Youtube,
+  TrendingUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useArtistMetadata, useAlbumMetadata } from "@/hooks/useArtistMetadata"
 import { useArtistImages } from "@/hooks/useArtistImage"
+import { useLibrary } from "@/hooks/useLibrary"
+import { usePlayHistory } from "@/hooks/usePlayHistory"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { getCoverUrl } from "@/lib/audio"
 import type { Track } from "@/types/music"
 
 interface ArtistInfoPanelProps {
   isOpen: boolean
   onClose: () => void
   currentTrack: Track | null
+  onNavigateToArtist?: () => void
+  onPlayTrack?: (track: Track) => void
 }
 
 // Carousel d'images
@@ -81,6 +94,7 @@ const ImageCarousel = memo(({ images, artistName }: { images: { url: string; aut
         <>
           <button
             onClick={prev}
+            aria-label="Image précédente"
             className={cn(
               "absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full",
               "bg-black/50 backdrop-blur-sm text-white",
@@ -92,6 +106,7 @@ const ImageCarousel = memo(({ images, artistName }: { images: { url: string; aut
           </button>
           <button
             onClick={next}
+            aria-label="Image suivante"
             className={cn(
               "absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full",
               "bg-black/50 backdrop-blur-sm text-white",
@@ -174,7 +189,7 @@ const LoadingSkeleton = () => (
   </div>
 )
 
-export const ArtistInfoPanel = memo(({ isOpen, onClose, currentTrack }: ArtistInfoPanelProps) => {
+export const ArtistInfoPanel = memo(({ isOpen, onClose, currentTrack, onNavigateToArtist, onPlayTrack }: ArtistInfoPanelProps) => {
   const artistName = currentTrack?.artist || ""
   const albumName = currentTrack?.album || ""
 
@@ -199,35 +214,64 @@ export const ArtistInfoPanel = memo(({ isOpen, onClose, currentTrack }: ArtistIn
     enabled: isOpen && !!artistName,
   })
 
+  // Récupérer les tracks de l'artiste depuis la bibliothèque
+  const { getTracksByArtist } = useLibrary()
+  const { history } = usePlayHistory()
+  
+  const artistTracks = useMemo(() => {
+    if (!artistName) return []
+    return getTracksByArtist(artistName)
+  }, [artistName, getTracksByArtist])
+
+  // Calculer les statistiques de l'artiste
+  const artistStats = useMemo(() => {
+    if (artistTracks.length === 0) return null
+
+    const albums = new Set(artistTracks.map(t => t.album).filter(Boolean))
+    const totalDuration = artistTracks.reduce((sum, t) => sum + (t.duration || 0), 0)
+    const playCount = history
+      .filter(h => artistTracks.some(t => t.id === h.trackId))
+      .reduce((sum, h) => sum + (h.playCount || 1), 0)
+
+    // Grouper par album
+    const albumsMap = new Map<string, { name: string; coverUrl: string; tracks: Track[]; year?: number }>()
+    artistTracks.forEach(track => {
+      if (!track.album) return
+      const key = `${track.album}-${track.artist}`
+      if (!albumsMap.has(key)) {
+        albumsMap.set(key, {
+          name: track.album,
+          coverUrl: track.coverUrl,
+          tracks: [],
+          year: track.year
+        })
+      }
+      albumsMap.get(key)!.tracks.push(track)
+    })
+
+    return {
+      trackCount: artistTracks.length,
+      albumCount: albums.size,
+      totalDuration,
+      playCount,
+      albums: Array.from(albumsMap.values()).sort((a, b) => {
+        // Trier par année si disponible, sinon par nom
+        if (a.year && b.year) return b.year - a.year
+        if (a.year) return -1
+        if (b.year) return 1
+        return a.name.localeCompare(b.name)
+      })
+    }
+  }, [artistTracks, history])
+
   const isLoading = isLoadingArtist || isLoadingAlbum || isLoadingImages
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            onClick={onClose}
-          />
+  if (!isOpen) return null;
 
-          {/* Panel */}
-          <motion.div
-            initial={{ x: "100%", opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: "100%", opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className={cn(
-              "fixed right-0 top-0 bottom-0 w-full max-w-md z-50",
-              "bg-gradient-to-b from-card via-card to-background",
-              "border-l border-white/10 shadow-2xl"
-            )}
-          >
-            {/* Header */}
-            <div className="relative p-4 border-b border-white/10">
+  return (
+    <div className="h-full w-full bg-gradient-to-b from-card via-card to-background border-l border-border/30 flex flex-col">
+      {/* Header */}
+      <div className="relative p-4 border-b border-border/30">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-primary/10">
@@ -240,158 +284,253 @@ export const ArtistInfoPanel = memo(({ isOpen, onClose, currentTrack }: ArtistIn
                 </div>
                 <button
                   onClick={onClose}
+                  aria-label="Fermer le panel"
                   className={cn(
                     "p-2 rounded-full transition-all",
                     "text-muted-foreground hover:text-foreground",
-                    "hover:bg-white/10 active:scale-95"
+                    "hover:bg-muted/40 active:scale-95"
                   )}
                 >
                   <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+                  </button>
+        </div>
+      </div>
 
-            {/* Content */}
-            <ScrollArea className="h-[calc(100vh-80px)]">
-              {!currentTrack ? (
-                <div className="flex flex-col items-center justify-center h-64 text-center p-6">
-                  <Music2 className="w-12 h-12 text-muted-foreground/30 mb-4" />
-                  <p className="text-muted-foreground">Aucune piste en lecture</p>
+      {/* Content */}
+      <ScrollArea className="flex-1">
+        {!currentTrack ? (
+          <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+            <Music2 className="w-12 h-12 text-muted-foreground/30 mb-4" />
+            <p className="text-muted-foreground">Aucune piste en lecture</p>
+          </div>
+        ) : isLoading ? (
+          <LoadingSkeleton />
+        ) : (
+          <div className="p-6 space-y-6">
+            {/* Carrousel d'images */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+            >
+              <ImageCarousel images={images} artistName={artistName} />
+            </motion.div>
+
+            {/* Statistiques de la bibliothèque */}
+            {artistStats && artistStats.trackCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.4 }}
+                className="grid grid-cols-3 gap-3"
+              >
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Music2 className="w-4 h-4 text-primary" />
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Titres</span>
+                  </div>
+                  <p className="text-2xl font-bold">{artistStats.trackCount}</p>
                 </div>
-              ) : isLoading ? (
-                <LoadingSkeleton />
-              ) : (
-                <div className="p-6 space-y-8">
-                  {/* Carrousel d'images */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.4 }}
-                  >
-                    <ImageCarousel images={images} artistName={artistName} />
-                  </motion.div>
+                <div className="bg-gradient-to-br from-secondary/10 to-secondary/5 rounded-xl p-4 border border-secondary/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Disc3 className="w-4 h-4 text-secondary" />
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Albums</span>
+                  </div>
+                  <p className="text-2xl font-bold">{artistStats.albumCount}</p>
+                </div>
+                <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-xl p-4 border border-accent/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-accent" />
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Durée</span>
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {Math.floor(artistStats.totalDuration / 60)}m
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
-                  {/* Infos rapides */}
-                  {artistMetadata && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1, duration: 0.4 }}
-                      className="space-y-4"
-                    >
-                      {/* Genres */}
-                      {artistMetadata.genres && artistMetadata.genres.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {artistMetadata.genres.slice(0, 5).map((genre, idx) => (
-                            <Badge
-                              key={idx}
-                              variant="secondary"
-                              className="bg-primary/10 text-primary border-primary/20"
-                            >
-                              {genre}
-                            </Badge>
-                          ))}
-                        </div>
+            {/* Infos rapides */}
+            {artistMetadata && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+                className="space-y-4"
+              >
+                {/* Genres */}
+                {artistMetadata.genres && artistMetadata.genres.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {artistMetadata.genres.slice(0, 6).map((genre, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="secondary"
+                        className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors"
+                      >
+                        {genre}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {/* Infos de base */}
+                <div className="grid grid-cols-2 gap-3">
+                  {artistMetadata.origin && (
+                    <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-lg p-2.5">
+                      <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="truncate">{artistMetadata.origin}</span>
+                    </div>
+                  )}
+                  {artistMetadata.country && !artistMetadata.origin && (
+                    <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-lg p-2.5">
+                      <Globe className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="truncate">{artistMetadata.country}</span>
+                    </div>
+                  )}
+                  {artistMetadata.birthDate && (
+                    <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-lg p-2.5">
+                      <Calendar className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span>{new Date(artistMetadata.birthDate).getFullYear()}</span>
+                      {artistMetadata.deathDate && (
+                        <span className="text-muted-foreground">
+                          - {new Date(artistMetadata.deathDate).getFullYear()}
+                        </span>
                       )}
-
-                      {/* Infos de base */}
-                      <div className="grid grid-cols-2 gap-3">
-                        {artistMetadata.origin && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="w-4 h-4 text-primary" />
-                            <span>{artistMetadata.origin}</span>
-                          </div>
-                        )}
-                        {artistMetadata.country && !artistMetadata.origin && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Globe className="w-4 h-4 text-primary" />
-                            <span>{artistMetadata.country}</span>
-                          </div>
-                        )}
-                        {artistMetadata.birthDate && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4 text-primary" />
-                            <span>{new Date(artistMetadata.birthDate).getFullYear()}</span>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
+                    </div>
                   )}
+                  {artistMetadata.yearsActive && (
+                    <div className="flex items-center gap-2 text-sm bg-muted/30 rounded-lg p-2.5">
+                      <TrendingUp className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="truncate">{artistMetadata.yearsActive}</span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
 
-                  {/* Biographie de l'artiste */}
-                  {artistMetadata?.biography && (
-                    <InfoSection title="Biographie" icon={Users} delay={0.2}>
-                      <div className="prose prose-sm prose-invert max-w-none">
-                        <p className="text-muted-foreground leading-relaxed text-sm">
-                          {artistMetadata.biographyShort || artistMetadata.biography.slice(0, 500)}
-                          {artistMetadata.biography.length > 500 && "..."}
+            {/* Albums de la bibliothèque */}
+            {artistStats && artistStats.albums.length > 0 && (
+              <InfoSection title="Albums dans votre bibliothèque" icon={Disc3} delay={0.15}>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {artistStats.albums.slice(0, 5).map((album: { name: string; coverUrl: string; tracks: Track[]; year?: number }, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors group cursor-pointer"
+                      onClick={() => {
+                        if (onPlayTrack && album.tracks.length > 0) {
+                          onPlayTrack(album.tracks[0])
+                        }
+                      }}
+                    >
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src={getCoverUrl(album.coverUrl)}
+                          alt={album.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                          {album.name}
                         </p>
-                        {artistMetadata.biographyUrl && (
-                          <a
-                            href={artistMetadata.biographyUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline mt-2 text-xs"
-                          >
-                            Lire plus <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {album.tracks.length} titre{album.tracks.length > 1 ? 's' : ''}
+                          {album.year && ` • ${album.year}`}
+                        </p>
                       </div>
-                    </InfoSection>
+                      <Play className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  ))}
+                  {artistStats.albums.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center pt-2">
+                      + {artistStats.albums.length - 5} autre{artistStats.albums.length - 5 > 1 ? 's' : ''} album{artistStats.albums.length - 5 > 1 ? 's' : ''}
+                    </p>
                   )}
+                </div>
+              </InfoSection>
+            )}
 
-                  {/* Album en cours */}
-                  {albumMetadata && (
-                    <InfoSection title="Album en cours" icon={Disc3} delay={0.3}>
-                      <div className="bg-white/5 rounded-xl p-4 space-y-3">
-                        <div className="flex items-start gap-4">
-                          {albumMetadata.coverUrl && (
-                            <img
-                              src={albumMetadata.coverUrl}
-                              alt={albumMetadata.name}
-                              className="w-20 h-20 rounded-lg object-cover ring-1 ring-white/10"
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold truncate">{albumMetadata.name}</h4>
-                            <p className="text-sm text-muted-foreground">{albumMetadata.artist}</p>
-                            {albumMetadata.year && (
-                              <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                                <Calendar className="w-3 h-3" />
-                                <span>{albumMetadata.year}</span>
-                              </div>
-                            )}
-                            {albumMetadata.label && (
-                              <p className="text-xs text-muted-foreground/60 mt-1">
-                                Label: {albumMetadata.label}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+            {/* Biographie de l'artiste */}
+            {artistMetadata?.biography && (
+              <InfoSection title="Biographie" icon={Users} delay={0.2}>
+                <div className="prose prose-sm prose-invert max-w-none">
+                  <p className="text-muted-foreground leading-relaxed text-sm">
+                    {artistMetadata.biographyShort || artistMetadata.biography.slice(0, 500)}
+                    {artistMetadata.biography.length > 500 && "..."}
+                  </p>
+                  {artistMetadata.biographyUrl && (
+                    <a
+                      href={artistMetadata.biographyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline mt-2 text-xs"
+                    >
+                      Lire plus <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </InfoSection>
+            )}
 
-                        {albumMetadata.description && (
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {albumMetadata.description.slice(0, 200)}
-                            {albumMetadata.description.length > 200 && "..."}
-                          </p>
-                        )}
-
-                        {albumMetadata.genres && albumMetadata.genres.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {albumMetadata.genres.slice(0, 3).map((genre, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="outline"
-                                className="text-xs border-white/10"
-                              >
-                                {genre}
-                              </Badge>
-                            ))}
+            {/* Album en cours */}
+            {albumMetadata && (
+              <InfoSection title="Album en cours" icon={Disc3} delay={0.3}>
+                <div className="bg-gradient-to-br from-card/50 to-card/30 rounded-xl p-4 space-y-3 border border-border/30">
+                  <div className="flex items-start gap-4">
+                    {albumMetadata.coverUrl && (
+                      <img
+                        src={albumMetadata.coverUrl}
+                        alt={albumMetadata.name}
+                        className="w-20 h-20 rounded-lg object-cover ring-2 ring-primary/20 shadow-lg"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-base truncate mb-1">{albumMetadata.name}</h4>
+                      <p className="text-sm text-muted-foreground mb-2">{albumMetadata.artist}</p>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {albumMetadata.year && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                            <Calendar className="w-3 h-3" />
+                            <span>{albumMetadata.year}</span>
                           </div>
                         )}
+                        {albumMetadata.trackCount && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                            <Music2 className="w-3 h-3" />
+                            <span>{albumMetadata.trackCount} pistes</span>
+                          </div>
+                        )}
+                        {albumMetadata.label && (
+                          <div className="text-xs text-muted-foreground/80 bg-muted/30 px-2 py-1 rounded">
+                            {albumMetadata.label}
+                          </div>
+                        )}
                       </div>
-                    </InfoSection>
+                    </div>
+                  </div>
+
+                  {albumMetadata.description && (
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                      {albumMetadata.description}
+                    </p>
                   )}
+
+                  {albumMetadata.genres && albumMetadata.genres.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/20">
+                      {albumMetadata.genres.slice(0, 4).map((genre, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="outline"
+                          className="text-xs border-primary/20 text-primary/80"
+                        >
+                          {genre}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </InfoSection>
+            )}
 
                   {/* Titre en cours */}
                   <InfoSection title="Titre en lecture" icon={Music2} delay={0.4}>
@@ -411,74 +550,133 @@ export const ArtistInfoPanel = memo(({ isOpen, onClose, currentTrack }: ArtistIn
                         </Badge>
                       )}
                     </div>
-                  </InfoSection>
+            </InfoSection>
 
-                  {/* Artistes similaires */}
-                  {artistMetadata?.similarArtists && artistMetadata.similarArtists.length > 0 && (
-                    <InfoSection title="Artistes similaires" icon={Users} delay={0.5}>
-                      <div className="flex flex-wrap gap-2">
-                        {artistMetadata.similarArtists.slice(0, 8).map((name, idx) => (
-                          <Badge
-                            key={idx}
-                            variant="outline"
-                            className="border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
-                          >
-                            {name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </InfoSection>
+            {/* Artistes similaires */}
+            {artistMetadata?.similarArtists && artistMetadata.similarArtists.length > 0 && (
+              <InfoSection title="Artistes similaires" icon={Users} delay={0.5}>
+                <div className="flex flex-wrap gap-2">
+                  {artistMetadata.similarArtists.slice(0, 10).map((name, idx) => (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className="border-border/30 hover:bg-primary/10 hover:border-primary/30 hover:text-primary cursor-pointer transition-all hover:scale-105"
+                    >
+                      {name}
+                    </Badge>
+                  ))}
+                </div>
+              </InfoSection>
+            )}
+
+            {/* Liens sociaux */}
+            {artistMetadata?.socialLinks && Object.keys(artistMetadata.socialLinks).length > 0 && (
+              <InfoSection title="Réseaux sociaux" icon={Globe} delay={0.6}>
+                <div className="grid grid-cols-2 gap-2">
+                  {artistMetadata.socialLinks.official && (
+                    <a
+                      href={artistMetadata.socialLinks.official}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
+                        "bg-white/5 hover:bg-white/10 transition-all hover:scale-[1.02]",
+                        "border border-border/30"
+                      )}
+                    >
+                      <Globe className="w-4 h-4" />
+                      Site officiel
+                    </a>
                   )}
-
-                  {/* Liens */}
-                  {artistMetadata?.socialLinks && Object.keys(artistMetadata.socialLinks).length > 0 && (
-                    <InfoSection title="Liens" icon={Globe} delay={0.6}>
-                      <div className="flex flex-wrap gap-2">
-                        {artistMetadata.socialLinks.official && (
-                          <a
-                            href={artistMetadata.socialLinks.official}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={cn(
-                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs",
-                              "bg-white/5 hover:bg-white/10 transition-colors"
-                            )}
-                          >
-                            <Globe className="w-3 h-3" />
-                            Site officiel
-                          </a>
-                        )}
-                        {artistMetadata.socialLinks.wikipedia && (
-                          <a
-                            href={artistMetadata.socialLinks.wikipedia}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={cn(
-                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs",
-                              "bg-white/5 hover:bg-white/10 transition-colors"
-                            )}
-                          >
-                            <Info className="w-3 h-3" />
-                            Wikipedia
-                          </a>
-                        )}
-                      </div>
-                    </InfoSection>
+                  {artistMetadata.socialLinks.wikipedia && (
+                    <a
+                      href={artistMetadata.socialLinks.wikipedia}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
+                        "bg-white/5 hover:bg-white/10 transition-all hover:scale-[1.02]",
+                        "border border-border/30"
+                      )}
+                    >
+                      <Info className="w-4 h-4" />
+                      Wikipedia
+                    </a>
                   )}
-
-                  {/* Source */}
-                  {artistMetadata?.source && (
-                    <div className="text-center text-xs text-muted-foreground/50 pt-4 border-t border-white/5">
-                      Données fournies par {artistMetadata.source}
-                    </div>
+                  {artistMetadata.socialLinks.youtube && (
+                    <a
+                      href={artistMetadata.socialLinks.youtube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
+                        "bg-red-500/10 hover:bg-red-500/20 transition-all hover:scale-[1.02]",
+                        "border border-red-500/20 text-red-400"
+                      )}
+                    >
+                      <Youtube className="w-4 h-4" />
+                      YouTube
+                    </a>
+                  )}
+                  {artistMetadata.socialLinks.instagram && (
+                    <a
+                      href={artistMetadata.socialLinks.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
+                        "bg-pink-500/10 hover:bg-pink-500/20 transition-all hover:scale-[1.02]",
+                        "border border-pink-500/20 text-pink-400"
+                      )}
+                    >
+                      <Instagram className="w-4 h-4" />
+                      Instagram
+                    </a>
+                  )}
+                  {artistMetadata.socialLinks.twitter && (
+                    <a
+                      href={artistMetadata.socialLinks.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
+                        "bg-blue-500/10 hover:bg-blue-500/20 transition-all hover:scale-[1.02]",
+                        "border border-blue-500/20 text-blue-400"
+                      )}
+                    >
+                      <Twitter className="w-4 h-4" />
+                      Twitter
+                    </a>
+                  )}
+                  {artistMetadata.socialLinks.facebook && (
+                    <a
+                      href={artistMetadata.socialLinks.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium",
+                        "bg-blue-600/10 hover:bg-blue-600/20 transition-all hover:scale-[1.02]",
+                        "border border-blue-600/20 text-blue-400"
+                      )}
+                    >
+                      <Facebook className="w-4 h-4" />
+                      Facebook
+                    </a>
                   )}
                 </div>
-              )}
-            </ScrollArea>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+              </InfoSection>
+            )}
+
+            {/* Source */}
+            {artistMetadata?.source && (
+              <div className="text-center text-xs text-muted-foreground/50 pt-4 border-t border-white/5">
+                Données fournies par {artistMetadata.source}
+              </div>
+            )}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
   )
 })
 

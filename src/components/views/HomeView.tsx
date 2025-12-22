@@ -435,7 +435,7 @@ export const HomeView = memo(({
             subtitle={`${displayRecent.length} titres`}
             icon={<Clock className="w-5 h-5 text-accent" />}
           >
-            {displayRecent.map((track, idx) => {
+            {displayRecent.slice(0, 5).map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;
               
@@ -486,7 +486,7 @@ export const HomeView = memo(({
             subtitle="Récemment ajouté à votre bibliothèque"
             icon={<Star className="w-5 h-5 text-yellow-500" />}
           >
-            {newTracks.map((track, idx) => {
+            {newTracks.slice(0,5).map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;
               
