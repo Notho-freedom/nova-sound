@@ -346,7 +346,7 @@ export const DesktopApp = () => {
   useEffect(() => {
     // Pour les tracks YouTube, ne pas utiliser l'audio HTML5
     // Le player YouTube sera géré par FullscreenPlayer
-    if (currentTrack?.mediaSource === 'youtube') {
+    if ((currentTrack?.mediaSource as string) === 'youtube') {
       // S'assurer que l'audio HTML5 est arrêté si un track YouTube est sélectionné
       if (audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
@@ -354,7 +354,7 @@ export const DesktopApp = () => {
       }
       
       // Démarrer le suivi du temps d'écoute pour YouTube
-      if (isPlaying && playbackStartTrackIdRef.current === currentTrack.id && playbackStartTimeRef.current === null) {
+      if (isPlaying && currentTrack && playbackStartTrackIdRef.current === currentTrack.id && playbackStartTimeRef.current === null) {
         playbackStartTimeRef.current = Date.now();
         lastTimeUpdateRef.current = Date.now();
       } else if (!isPlaying && playbackStartTimeRef.current !== null) {
@@ -415,7 +415,7 @@ export const DesktopApp = () => {
       }
       
       // Pour les tracks locaux uniquement, pauser l'audio HTML5
-      if (currentTrack?.mediaSource !== 'youtube' && audioRef.current && !audioRef.current.paused) {
+      if ((currentTrack?.mediaSource as string) !== 'youtube' && audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       }
     }
@@ -424,7 +424,7 @@ export const DesktopApp = () => {
   // Handle volume changes
   useEffect(() => {
     // Pour les tracks YouTube, le volume est géré par le player YouTube dans FullscreenPlayer
-    if (currentTrack?.mediaSource === 'youtube') {
+    if ((currentTrack?.mediaSource as string) === 'youtube') {
       return;
     }
     
@@ -451,7 +451,7 @@ export const DesktopApp = () => {
   // Define handlers before useEffects that use them
   const handlePlayPause = useCallback(() => {
     // Pour les tracks YouTube, contrôler directement le player YouTube
-    if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+    if ((currentTrack?.mediaSource as string) === 'youtube' && youtubePlayerRef.current) {
       const player = youtubePlayerRef.current;
       
       console.log('[DesktopApp] handlePlayPause YouTube:', {
@@ -520,7 +520,7 @@ export const DesktopApp = () => {
     
     // Pour les tracks YouTube, ne pas utiliser la logique de réinitialisation basée sur currentTime
     // car currentTime est géré par le player YouTube persistant
-    if (currentTrack?.mediaSource === 'youtube') {
+    if ((currentTrack?.mediaSource as string) === 'youtube') {
       const newIndex = currentTrackIndex === 0 ? tracks.length - 1 : currentTrackIndex - 1;
       setCurrentIndex(newIndex);
       setCurrentTime(0);
@@ -614,7 +614,7 @@ export const DesktopApp = () => {
   // Update current time from audio element with higher precision
   // Ne pas s'exécuter pour les tracks YouTube (géré par le player YouTube persistant)
   useEffect(() => {
-    if (!audioRef.current || currentTrack?.mediaSource === 'youtube') return;
+    if (!audioRef.current || (currentTrack?.mediaSource as string) === 'youtube') return;
 
     // Use requestAnimationFrame for smoother, more frequent updates
     let animationFrameId: number;
@@ -741,7 +741,7 @@ export const DesktopApp = () => {
   // Fallback: Simulate playback progress when no real audio file
   // Ne pas s'exécuter pour les tracks YouTube (géré par le player YouTube persistant)
   useEffect(() => {
-    if (currentTrack?.mediaSource === 'youtube') return;
+    if ((currentTrack?.mediaSource as string) === 'youtube') return;
     if (!isPlaying || !currentTrack || currentTrack.filePath) return;
 
     const interval = setInterval(() => {
@@ -826,7 +826,7 @@ export const DesktopApp = () => {
     const newTime = value[0];
     setCurrentTime(newTime);
     // Pour les tracks YouTube, utiliser le player YouTube persistant
-    if (currentTrack?.mediaSource === 'youtube' && youtubePlayerRef.current) {
+    if ((currentTrack?.mediaSource as string) === 'youtube' && youtubePlayerRef.current) {
       try {
         youtubePlayerRef.current.seek(newTime);
       } catch (err) {
@@ -1747,7 +1747,7 @@ export const DesktopApp = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={() => setIsMuted(!isMuted)}
-            youtubeDuration={currentTrack?.mediaSource === 'youtube' ? youtubeDuration : undefined}
+            youtubeDuration={(currentTrack?.mediaSource as string) === 'youtube' ? youtubeDuration : undefined}
             onToggleQueue={() => {
               setIsQueueOpen(!isQueueOpen);
               if (!isQueueOpen) {
@@ -1788,7 +1788,7 @@ export const DesktopApp = () => {
 
         {/* YouTube Player persistant en arrière-plan (pour tracks YouTube) */}
         {/* En mode fullscreen, on le rend visible pour afficher la vidéo */}
-        {currentTrack?.mediaSource === 'youtube' && currentTrack.youtubeVideoId && (
+        {currentTrack && (currentTrack.mediaSource as string) === 'youtube' && currentTrack.youtubeVideoId && (
           <div 
             className={cn(
               "fixed inset-0",
@@ -1809,7 +1809,7 @@ export const DesktopApp = () => {
           >
             <YouTubePlayer
               ref={youtubePlayerRef}
-              videoId={currentTrack.youtubeVideoId}
+              videoId={currentTrack?.youtubeVideoId || ''}
               autoPlay={isPlaying}
               audioOnly={!isFullscreen} // Audio-only en background, vidéo visible en fullscreen
               onStateChange={(playing) => {
@@ -1819,7 +1819,7 @@ export const DesktopApp = () => {
                 }
                 
                 // Quand la vidéo YouTube commence à jouer, s'assurer qu'elle est dans l'historique
-                if (playing && currentTrack?.mediaSource === 'youtube' && currentTrack.id) {
+                if (playing && currentTrack && (currentTrack.mediaSource as string) === 'youtube' && currentTrack.id) {
                   // Toujours ajouter à l'historique (addToHistory gère les doublons)
                   console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', currentTrack.title);
                   addToHistory(currentTrack.id);
