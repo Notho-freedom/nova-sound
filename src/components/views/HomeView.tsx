@@ -1,14 +1,13 @@
 "use client";
 
-import { Play, Clock, TrendingUp, Sparkles, Heart, Music, MoreHorizontal, Disc, Timer, Users, Star, Zap, Library } from "lucide-react";
+import { Play, Clock, TrendingUp, Sparkles, Heart, Music, Disc, Timer, Users, Star, Zap, Library, ChevronRight, Headphones } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
-import { useState, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrackCardSkeleton, PlaylistCardSkeleton, TableRowSkeleton } from "@/components/ui/skeletons";
+import { TrackCardSkeleton, PlaylistCardSkeleton } from "@/components/ui/skeletons";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { UploadIndicator } from "@/components/UploadIndicator";
 import { usePlaylists } from "@/hooks/usePlaylists";
@@ -20,7 +19,7 @@ import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useListeningStats, formatDuration } from "@/hooks/useListeningStats";
 import { useGenres, formatGenreName } from "@/hooks/useGenres";
 import { Button } from "@/components/ui/button";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { motion } from "framer-motion";
 
 // UI Components
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -29,6 +28,10 @@ import { ArtistCard } from "@/components/ui/ArtistCard";
 import { PlaylistCard } from "@/components/ui/PlaylistCard";
 import { GenreCard } from "@/components/ui/GenreCard";
 import { TrackCard } from "@/components/ui/TrackCard";
+import { HeroCarousel } from "@/components/ui/HeroCarousel";
+import { ContentCarousel } from "@/components/ui/ContentCarousel";
+import { QuickPlayCard } from "@/components/ui/QuickPlayCard";
+import { FeaturedCard } from "@/components/ui/FeaturedCard";
 
 interface HistoryEntry {
   trackId: string;
@@ -63,42 +66,27 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-// Generate playlist selections from tracks
-/**
- * Shuffle Fisher-Yates optimisé (déterministe basé sur seed)
- */
+// Fisher-Yates shuffle
 function fisherYatesShuffle<T>(array: T[], seed: number = 0): T[] {
   const shuffled = [...array];
   let currentIndex = shuffled.length;
-  let randomIndex: number;
-  
-  // Utiliser un générateur pseudo-aléatoire basé sur seed pour déterministe
   let seedValue = seed;
   const random = () => {
     seedValue = (seedValue * 9301 + 49297) % 233280;
     return seedValue / 233280;
   };
-  
   while (currentIndex !== 0) {
-    randomIndex = Math.floor(random() * currentIndex);
+    const randomIndex = Math.floor(random() * currentIndex);
     currentIndex--;
     [shuffled[currentIndex], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[currentIndex]];
   }
-  
   return shuffled;
 }
 
-/**
- * Génère des sélections de playlists optimisées (mémorisable)
- */
 const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = []) => {
-  // Créer un Map pour O(1) lookup au lieu de O(n) avec find
   const playCountMap = new Map<string, number>();
-  history.forEach(entry => {
-    playCountMap.set(entry.trackId, entry.playCount || 1);
-  });
+  history.forEach(entry => playCountMap.set(entry.trackId, entry.playCount || 1));
 
-  // Filtrer et trier en une seule passe optimisée
   const tracksWithCounts: Array<{ track: Track; playCount: number }> = [];
   for (const track of tracks) {
     const playCount = playCountMap.get(track.id) || 0;
@@ -107,11 +95,9 @@ const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = [
     }
   }
   
-  // Trier par playCount (décroissant) et limiter à 50
   tracksWithCounts.sort((a, b) => b.playCount - a.playCount);
   const topTracks = tracksWithCounts.slice(0, 50);
   
-  // Utiliser Fisher-Yates shuffle avec seeds différents pour variété
   const shuffled1 = fisherYatesShuffle(topTracks, Date.now() % 1000);
   const shuffled2 = fisherYatesShuffle(topTracks, (Date.now() + 1) % 1000);
   const shuffled3 = fisherYatesShuffle(topTracks, (Date.now() + 2) % 1000);
@@ -121,6 +107,15 @@ const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = [
     similar: shuffled2.slice(0, 10).map(item => item.track),
     mix: shuffled3.slice(0, 10).map(item => item.track),
   };
+};
+
+// Greeting based on time of day
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 6) return "Bonne nuit";
+  if (hour < 12) return "Bonjour";
+  if (hour < 18) return "Bon après-midi";
+  return "Bonsoir";
 };
 
 export const HomeView = memo(({
@@ -156,16 +151,14 @@ export const HomeView = memo(({
   const { stats } = useListeningStats(tracks, history);
   const { genres, getTracksByGenre } = useGenres(tracks);
   
-  // Free users: Cloudinary only (serveur 0)
-  // Pro users: Bunny (serveur 1) and PlanetHoster/Nexus (serveur 2)
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro; // Free only
-  const canUploadToBunny = nexusIsPro && nexusAuthenticated; // Pro only (serveur 1)
-  const canUploadToNexus = nexusIsPro && nexusAuthenticated; // Pro only (serveur 2)
+  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated;
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
-  // Current track
   const currentTrack = currentTrackIndex >= 0 ? tracks[currentTrackIndex] : null;
+  const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
 
-  // Helper to get unique tracks
+  // Helpers
   const getUniqueTracks = useCallback((trackList: Track[]) => {
     const seen = new Set<string>();
     return trackList.filter(track => {
@@ -184,9 +177,7 @@ export const HomeView = memo(({
   );
   
   const displayFavorites = useMemo(() => 
-    favoriteTracks.length > 0 
-      ? getUniqueTracks(favoriteTracks).slice(0, 6) 
-      : [],
+    favoriteTracks.length > 0 ? getUniqueTracks(favoriteTracks).slice(0, 10) : [],
     [favoriteTracks, getUniqueTracks]
   );
 
@@ -195,94 +186,203 @@ export const HomeView = memo(({
     [tracks, history]
   );
 
-  // New tracks (added in last 7 days based on file name patterns or just recent)
   const newTracks = useMemo(() => {
-    // For now, just get the last 10 tracks by ID (assuming newer IDs = newer tracks)
-    return getUniqueTracks(tracks).slice(-10).reverse();
+    return getUniqueTracks(tracks).slice(-12).reverse();
   }, [tracks, getUniqueTracks]);
 
-  // Top genres (limit to 6)
-  const topGenres = useMemo(() => genres.slice(0, 6), [genres]);
+  const topGenres = useMemo(() => genres.slice(0, 8), [genres]);
 
-  // Recent artists
   const recentArtists = useMemo(() => {
     if (!stats?.recentArtists) return [];
-    return stats.recentArtists.slice(0, 8);
+    return stats.recentArtists.slice(0, 10);
   }, [stats]);
 
-  const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
+  // Hero slides
+  const heroSlides = useMemo(() => {
+    const slides = [];
+    
+    // Current track or first recent
+    if (currentTrack) {
+      slides.push({
+        id: currentTrack.id,
+        title: currentTrack.title,
+        subtitle: "En cours de lecture",
+        description: `${currentTrack.artist} • ${currentTrack.album}`,
+        imageUrl: getCoverUrl(currentTrack.coverUrl),
+        gradient: "from-primary/40 to-secondary/40",
+      });
+    }
+
+    // Top artists
+    recentArtists.slice(0, 3).forEach(artist => {
+      const artistTrack = tracks.find(t => t.artist === artist.name);
+      if (artistTrack) {
+        slides.push({
+          id: `artist-${artist.name}`,
+          title: artist.name,
+          subtitle: "Artiste populaire",
+          description: `${artist.trackCount} titres • ${artist.playCount} écoutes`,
+          imageUrl: artist.imageUrl || getCoverUrl(artistTrack.coverUrl),
+          gradient: "from-secondary/40 to-accent/40",
+        });
+      }
+    });
+
+    // Recent albums
+    const seenAlbums = new Set<string>();
+    displayRecent.slice(0, 3).forEach(track => {
+      const albumKey = `${track.album}-${track.artist}`;
+      if (!seenAlbums.has(albumKey) && track.album !== "Album inconnu") {
+        seenAlbums.add(albumKey);
+        slides.push({
+          id: `album-${albumKey}`,
+          title: track.album,
+          subtitle: "Album récent",
+          description: track.artist,
+          imageUrl: getCoverUrl(track.coverUrl),
+          gradient: "from-accent/40 to-primary/40",
+        });
+      }
+    });
+
+    return slides.slice(0, 6);
+  }, [currentTrack, recentArtists, displayRecent, tracks]);
+
+  // Quick play items (6 items for the grid)
+  const quickPlayItems = useMemo(() => {
+    const items: Track[] = [];
+    const seen = new Set<string>();
+
+    // Add recent tracks
+    displayRecent.forEach(track => {
+      if (items.length < 6 && !seen.has(track.id)) {
+        seen.add(track.id);
+        items.push(track);
+      }
+    });
+
+    return items;
+  }, [displayRecent]);
 
   // Loading skeleton
   if (loading) {
     return (
-      <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
-        {/* Hero Skeleton */}
-        <Skeleton className="w-full h-[280px] rounded-2xl" />
-        
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={`stat-skeleton-${i}`} className="h-24 rounded-xl" />
+      <div className="px-6 py-4 space-y-8 animate-fade-in">
+        <Skeleton className="w-full h-[480px] rounded-3xl" />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
           ))}
         </div>
-        
-        {/* Recent Section Skeleton */}
-        <div>
-          <Skeleton className="h-6 w-48 mb-4" />
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <TrackCardSkeleton key={`recent-skeleton-${i}`} />
-            ))}
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
+    <div className="pb-8 space-y-10 animate-fade-in">
+      {/* Hero Section with Carousel */}
+      {heroSlides.length > 0 && (
+        <section className="px-6">
+          <HeroCarousel
+            slides={heroSlides}
+            autoPlay={true}
+            interval={8000}
+            onPlay={(slide) => {
+              const track = tracks.find(t => t.id === slide.id);
+              if (track) {
+                const idx = tracks.findIndex(t => t.id === track.id);
+                if (idx !== -1) onTrackSelect(idx);
+              }
+            }}
+            onShuffle={onShuffle}
+          />
+        </section>
+      )}
+
+      {/* Greeting & Quick Play Grid */}
+      <section className="px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h2 className="font-display text-2xl md:text-3xl font-bold mb-6">
+            {getGreeting()}{userName ? `, ${userName}` : ""}
+          </h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {quickPlayItems.map((track) => {
+              const actualIndex = tracks.findIndex(t => t.id === track.id);
+              const isCurrent = currentTrackIndex === actualIndex;
+              
+              return (
+                <QuickPlayCard
+                  key={track.id}
+                  title={track.title}
+                  subtitle={track.artist}
+                  imageUrl={getCoverUrl(track.coverUrl)}
+                  isPlaying={isPlaying}
+                  isCurrent={isCurrent}
+                  onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                />
+              );
+            })}
+          </div>
+        </motion.div>
+      </section>
 
       {/* Stats Section */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            label="Temps d'écoute"
-            value={formatDuration(stats.weeklyListeningTime)}
-            icon={<Timer className="w-5 h-5" />}
-            subtitle="Cette semaine"
-            trend={stats.weeklyListeningTime > stats.dailyListeningTime * 7 * 0.8 ? "up" : "neutral"}
-          />
-          <StatCard
-            label="Pistes"
-            value={stats.totalTracks.toLocaleString()}
-            icon={<Music className="w-5 h-5" />}
-            subtitle="Dans votre bibliothèque"
-          />
-          <StatCard
-            label="Écoutes"
-            value={stats.totalPlays.toLocaleString()}
-            icon={<Play className="w-5 h-5" />}
-            subtitle="Total"
-            trend="up"
-          />
-          <StatCard
-            label="Artistes"
-            value={stats.topArtists.length.toLocaleString()}
-            icon={<Users className="w-5 h-5" />}
-            subtitle="Différents"
-          />
-        </div>
+        <section className="px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+          >
+            <StatCard
+              label="Temps d'écoute"
+              value={formatDuration(stats.weeklyListeningTime)}
+              icon={<Timer className="w-5 h-5" />}
+              subtitle="Cette semaine"
+              trend={stats.weeklyListeningTime > stats.dailyListeningTime * 7 * 0.8 ? "up" : "neutral"}
+            />
+            <StatCard
+              label="Pistes"
+              value={stats.totalTracks.toLocaleString()}
+              icon={<Music className="w-5 h-5" />}
+              subtitle="Dans votre bibliothèque"
+            />
+            <StatCard
+              label="Écoutes"
+              value={stats.totalPlays.toLocaleString()}
+              icon={<Headphones className="w-5 h-5" />}
+              subtitle="Total"
+              trend="up"
+            />
+            <StatCard
+              label="Artistes"
+              value={stats.topArtists.length.toLocaleString()}
+              icon={<Users className="w-5 h-5" />}
+              subtitle="Différents"
+            />
+          </motion.div>
+        </section>
       )}
 
-      {/* Recently Played Artists */}
+      {/* Recently Played Artists - Carousel */}
       {recentArtists.length > 0 && (
-        <section>
-          <SectionHeader
+        <section className="pl-6">
+          <ContentCarousel
             title="Artistes récents"
-            icon={<Users className="w-5 h-5" />}
             subtitle="Vos artistes écoutés récemment"
-          />
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
+            icon={<Users className="w-5 h-5 text-primary" />}
+          >
             {recentArtists.map((artist, idx) => (
               <ArtistCard
                 key={`artist-${artist.name}-${idx}`}
@@ -291,43 +391,50 @@ export const HomeView = memo(({
                 trackCount={artist.trackCount}
                 playCount={artist.playCount}
                 onClick={() => onFilterByArtist?.(artist.name)}
-                className="flex-shrink-0"
+                className="flex-shrink-0 snap-start"
               />
             ))}
-          </div>
+          </ContentCarousel>
         </section>
       )}
 
-      {/* Genres / Moods */}
+      {/* Explore by Genre - Carousel */}
       {topGenres.length > 0 && (
-        <section>
-          <SectionHeader
+        <section className="pl-6">
+          <ContentCarousel
             title="Explorer par genre"
-            icon={<Disc className="w-5 h-5" />}
-            count={genres.length}
-          />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            subtitle={`${genres.length} genres disponibles`}
+            icon={<Disc className="w-5 h-5 text-secondary" />}
+            action={
+              genres.length > 8 && (
+                <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground">
+                  Voir tout
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              )
+            }
+          >
             {topGenres.map((genre) => (
               <GenreCard
                 key={genre.name}
                 name={formatGenreName(genre.name)}
                 trackCount={genre.trackCount}
                 onClick={() => onFilterByGenre?.(genre.name)}
+                className="flex-shrink-0 snap-start w-40"
               />
             ))}
-          </div>
+          </ContentCarousel>
         </section>
       )}
 
-      {/* Recently Played Tracks */}
+      {/* Recently Played Tracks - Carousel */}
       {displayRecent.length > 0 && (
-        <section>
-          <SectionHeader
+        <section className="pl-6">
+          <ContentCarousel
             title={recentTracks.length > 0 ? "Écouté récemment" : "À découvrir"}
-            icon={<Clock className="w-5 h-5" />}
-            count={displayRecent.length}
-          />
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            subtitle={`${displayRecent.length} titres`}
+            icon={<Clock className="w-5 h-5 text-accent" />}
+          >
             {displayRecent.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;
@@ -354,124 +461,72 @@ export const HomeView = memo(({
                   canUploadToNexus={canUploadToNexus && !!track.filePath}
                   isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                 >
-                  <TrackCard
-                    track={track}
+                  <FeaturedCard
+                    title={track.title}
+                    subtitle={track.artist}
+                    imageUrl={getCoverUrl(track.coverUrl)}
                     isPlaying={isPlaying}
                     isCurrent={isCurrent}
                     onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                    showUploadStatus
-                    uploadProvider={getUploadedProvider(track.id)}
+                    size="md"
+                    className="snap-start"
                   />
                 </TrackContextMenu>
               );
             })}
-          </div>
+          </ContentCarousel>
         </section>
       )}
 
-      {/* New in Library */}
+      {/* New in Library - Carousel */}
       {newTracks.length > 0 && (
-        <section>
-          <SectionHeader
+        <section className="pl-6">
+          <ContentCarousel
             title="Nouveautés"
-            icon={<Star className="w-5 h-5 text-yellow-500" />}
             subtitle="Récemment ajouté à votre bibliothèque"
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {newTracks.slice(0, 6).map((track, idx) => {
+            icon={<Star className="w-5 h-5 text-yellow-500" />}
+          >
+            {newTracks.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;
               
               return (
-                <TrackContextMenu
+                <FeaturedCard
                   key={`new-${track.id}-${idx}`}
-                  track={track}
-                  playlists={playlists}
-                  isFavorite={isFavorite(track.id)}
+                  title={track.title}
+                  subtitle={track.artist}
+                  imageUrl={getCoverUrl(track.coverUrl)}
+                  badge="NEW"
+                  badgeColor="bg-yellow-500"
+                  isPlaying={isPlaying}
+                  isCurrent={isCurrent}
+                  onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                   onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                  onPlayNext={() => onPlayNext?.(track)}
-                  onAddToQueue={() => onAddToQueue?.(track)}
-                  onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
-                  onToggleFavorite={() => toggleFavorite(track.id)}
-                  onUploadToCloudinary={() => uploadTrack?.(track)}
-                  canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
-                  isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-                  onUploadToBunny={() => uploadTrackToBunny?.(track)}
-                  canUploadToBunny={canUploadToBunny && !!track.filePath}
-                  isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
-                  onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                  canUploadToNexus={canUploadToNexus && !!track.filePath}
-                  isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                >
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-card/30 hover:bg-card/50 transition-all group cursor-pointer">
-                    <div className="relative flex-shrink-0">
-                      <span className="absolute -top-1 -left-1 px-1.5 py-0.5 text-[10px] font-bold bg-yellow-500 text-black rounded-full z-10">
-                        NEW
-                      </span>
-                      <div className="w-12 h-12 rounded-lg overflow-hidden">
-                        <img
-                          src={getCoverUrl(track.coverUrl)}
-                          alt={track.album || track.title}
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "font-medium text-sm truncate",
-                        isCurrent ? "text-primary" : "text-foreground"
-                      )}>
-                        {track.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (actualIndex !== -1) {
-                          onTrackSelect(actualIndex);
-                        }
-                      }}
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                    </Button>
-                  </div>
-                </TrackContextMenu>
+                  size="md"
+                  className="snap-start"
+                />
               );
             })}
-          </div>
+          </ContentCarousel>
         </section>
       )}
 
       {/* Favorites Section */}
       {displayFavorites.length > 0 && (
-        <section>
+        <section className="px-6">
           <SectionHeader
             title="Vos favoris"
             icon={<Heart className="w-5 h-5 text-red-500" />}
             count={favoriteTracks.length}
           />
-          <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30">
+          <div className="bg-card/30 backdrop-blur-sm rounded-2xl overflow-hidden border border-border/30">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border/30">
-                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">
-                    #
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
-                    Titre
-                  </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                    Album
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
-                    Durée
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
+                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Album</th>
+                  <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
                 </tr>
               </thead>
               <tbody>
@@ -484,11 +539,11 @@ export const HomeView = memo(({
                       key={`favorite-${track.id}-${idx}`}
                       onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                       className={cn(
-                        "group cursor-pointer transition-all duration-200 ease-out",
+                        "group cursor-pointer transition-all duration-200",
                         isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"
                       )}
                     >
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-3">
                         <div className="w-6 flex items-center justify-center">
                           {isCurrentTrack && isPlaying ? (
                             <div className="flex items-center gap-0.5">
@@ -504,39 +559,25 @@ export const HomeView = memo(({
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                            <img
-                              src={getCoverUrl(track.coverUrl)}
-                              alt={track.album}
-                              loading="lazy"
-                              className="w-full h-full object-cover"
-                            />
+                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
+                            <img src={getCoverUrl(track.coverUrl)} alt={track.album} loading="lazy" className="w-full h-full object-cover" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <p className={cn(
-                                "text-sm font-medium truncate",
-                                isCurrentTrack ? "text-primary" : "text-foreground"
-                              )}>
-                                {track.title}
-                              </p>
-                              {isUploaded(track.id) && (
-                                <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
-                              )}
+                              <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>{track.title}</p>
+                              {isUploaded(track.id) && <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />}
                             </div>
                             <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 hidden md:table-cell">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         <p className="text-sm text-muted-foreground truncate">{track.album}</p>
                       </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span className="text-sm text-muted-foreground font-mono">
-                          {formatTime(track.duration)}
-                        </span>
+                      <td className="px-4 py-3 text-right">
+                        <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
                       </td>
                     </tr>
                   );
@@ -549,7 +590,7 @@ export const HomeView = memo(({
 
       {/* Made For You - Playlist Recommendations */}
       {(playlistSelections.discoveries.length > 0 || playlistSelections.similar.length > 0 || playlistSelections.mix.length > 0) && (
-        <section>
+        <section className="px-6">
           <SectionHeader
             title="Pour vous"
             icon={<Sparkles className="w-5 h-5 text-amber-500" />}
@@ -612,11 +653,16 @@ export const HomeView = memo(({
 
       {/* Empty state */}
       {tracks.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
-            <Library className="w-10 h-10 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium mb-2">Bibliothèque vide</h3>
+        <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mb-6"
+          >
+            <Library className="w-12 h-12 text-primary" />
+          </motion.div>
+          <h3 className="text-xl font-display font-bold mb-2">Bibliothèque vide</h3>
           <p className="text-muted-foreground text-sm max-w-md">
             Ajoutez des dossiers de musique dans les paramètres pour commencer à écouter.
           </p>
