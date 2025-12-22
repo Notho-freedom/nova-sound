@@ -4,9 +4,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { verifyAuth } from '../../../auth/middleware';
 
 const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
+const PRICE_PRO_YEARLY = process.env.STRIPE_PRICE_PRO_YEARLY || '';
+
+const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
+  ? new Stripe(STRIPE_SECRET_KEY.trim(), {
+      apiVersion: '2025-11-17.clover',
+    })
+  : null;
 
 interface TranscriptionRequest {
   audioUrl?: string;
@@ -70,8 +80,6 @@ export async function POST(request: NextRequest) {
           if (subscriptions.data.length > 0) {
             const subscription = subscriptions.data[0];
             const priceId = subscription.items.data[0]?.price.id;
-            const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
-            const PRICE_PRO_YEARLY = process.env.STRIPE_PRICE_PRO_YEARLY || '';
             isProStripe = 
               subscription.status === 'active' &&
               (priceId === PRICE_PRO_MONTHLY || priceId === PRICE_PRO_YEARLY);

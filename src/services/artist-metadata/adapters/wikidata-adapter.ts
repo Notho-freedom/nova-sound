@@ -112,7 +112,7 @@ export class WikidataAdapter {
         biographyUrl: wikipediaLink,
         birthDate: birthDate,
         deathDate: deathDate,
-        country: country,
+        country: country || undefined,
         genres: genres.length > 0 ? genres : undefined,
         website: website,
         imageUrl: imageUrl,

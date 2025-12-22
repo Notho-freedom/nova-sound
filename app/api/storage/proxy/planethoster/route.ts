@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       // Video
       'mp4': 'video/mp4',
       'webm': 'video/webm',
-      'ogg': 'video/ogg',
+      'ogv': 'video/ogg', // OGV pour les vidéos Ogg (différent de OGG audio)
       'avi': 'video/x-msvideo',
       'mov': 'video/quicktime',
       'wmv': 'video/x-ms-wmv',

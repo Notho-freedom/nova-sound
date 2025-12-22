@@ -799,8 +799,9 @@ export const SettingsView = () => {
       try {
         const { firebaseSyncService } = await import("@/services/firebase-sync")
         // Update settings object and sync
-        // No need to merge here, just send the new value for the specific key
-        await firebaseSyncService.updateSetting(key, value)
+        // Merge the new value with existing settings
+        const updatedSettings = { ...settings, [key]: value }
+        firebaseSyncService.queueSync('settings', updatedSettings)
       } catch (err) {
         // Silently fail if Firebase sync is not available
         console.warn("Failed to sync setting to Firebase:", err)

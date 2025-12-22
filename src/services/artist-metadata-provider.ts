@@ -216,28 +216,30 @@ export class ArtistMetadataProvider {
       }
     }
 
-    // Essayer chaque source
+    // Essayer chaque source (Wikidata n'a pas de méthode search, seulement searchArtist/searchAlbum)
     const sources: Array<keyof typeof this.adapters> = [
       'lastfm',
       'musicbrainz',
-      'wikidata',
       'wikipedia',
     ];
 
     for (const source of sources) {
       const adapter = this.adapters[source];
-      if (!adapter) {
-        continue;
+      if (!adapter || source === 'wikidata') {
+        continue; // Wikidata n'a pas de méthode search
       }
 
       try {
-        const result = await adapter.search(options);
-        if (result.items.length > 0) {
-          // Mettre en cache
-          if (this.config.cache?.enabled) {
-            this.cache.set(options.query, result.items, options.type, result.source);
+        // Type guard: vérifier que l'adapter a la méthode search
+        if ('search' in adapter && typeof adapter.search === 'function') {
+          const result = await adapter.search(options);
+          if (result.items.length > 0) {
+            // Mettre en cache
+            if (this.config.cache?.enabled) {
+              this.cache.set(options.query, result.items, options.type, result.source);
+            }
+            return result;
           }
-          return result;
         }
       } catch (error) {
         console.warn(`[ArtistMetadataProvider] ${source} search failed:`, error);

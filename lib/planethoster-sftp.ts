@@ -112,6 +112,7 @@ export async function uploadToPlanetHoster(
 
   const fullRemotePath = `${config.basePath}/${remotePath}`.replace(/\/+/g, '/');
   let lastError: Error | null = null;
+  let sftp: any = null; // Déclarer sftp au niveau supérieur pour l'accessibilité dans le catch
 
   // Determine protocol based on port: port 21 = FTP/FTPS, port 22 = SFTP
   const useFTP = config.port === 21;
@@ -216,7 +217,7 @@ export async function uploadToPlanetHoster(
         };
       } else {
         // Use SFTP for port 22 or other ports
-        const sftp = await createSFTPClient();
+        sftp = await createSFTPClient();
         
         // Connect to SFTP server with increased timeout and additional options
         const connectConfig: any = {
@@ -334,12 +335,13 @@ export async function uploadToPlanetHoster(
       console.error(`[PlanetHoster] ❌ Upload attempt ${attempt + 1}/${maxRetries} failed:`, errorMessage);
       
       // Close connection if it was established
-      if (connectionEstablished) {
+      if (connectionEstablished && sftp) {
         try {
           await sftp.end();
         } catch (closeError) {
           // Ignore close errors
         }
+        sftp = null; // Reset pour le prochain essai
       }
 
       // Check if error is retryable

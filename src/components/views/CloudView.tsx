@@ -10,7 +10,7 @@ import {
   MoreVertical,
   File,
   Music,
-  Video,
+  Video as VideoIcon,
   Image,
   FileText,
   CheckCircle2,
@@ -318,7 +318,7 @@ export const CloudView = () => {
       case "audio":
         return <Music className="w-5 h-5" />;
       case "video":
-        return <Video className="w-5 h-5" />;
+        return <VideoIcon className="w-5 h-5" />;
       case "image":
         return <Image className="w-5 h-5" />;
       default:
@@ -684,7 +684,7 @@ export const CloudView = () => {
                                 onChange={() => {}}
                                 className="rounded"
                               />
-                              <Video className="w-4 h-4" />
+                              <VideoIcon className="w-4 h-4" />
                               <span className="flex-1 truncate">{video.title}</span>
                             </div>
                           ))}

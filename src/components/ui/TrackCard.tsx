@@ -247,7 +247,7 @@ export const TrackCard = ({
             </div>
 
             {/* Info */}
-            <div className={cn("p-3", variant === "compact" && "p-2")}>
+            <div className={cn("p-3")}>
               <p className={cn("text-sm font-medium truncate", isCurrent ? "text-primary" : "text-foreground", sizes.title)}>
                 {track.title}
               </p>

@@ -37,6 +37,11 @@ export class MetadataCacheManager {
     source?: string
   ): T | null {
     try {
+      // Vérifier si localStorage est disponible (navigateur uniquement)
+      if (typeof localStorage === 'undefined') {
+        return null;
+      }
+
       const key = this.getCacheKey(query, type, source);
       const cached = localStorage.getItem(key);
 
@@ -71,6 +76,11 @@ export class MetadataCacheManager {
     source: string
   ): void {
     try {
+      // Vérifier si localStorage est disponible (navigateur uniquement)
+      if (typeof localStorage === 'undefined') {
+        return;
+      }
+
       const key = this.getCacheKey(query, type, source);
       const now = new Date();
       const expiresAt = new Date(now.getTime() + this.ttl);
@@ -113,6 +123,10 @@ export class MetadataCacheManager {
    * Calcule la taille actuelle du cache
    */
   private getCacheSize(): number {
+    if (typeof localStorage === 'undefined') {
+      return 0;
+    }
+
     let size = 0;
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -130,6 +144,10 @@ export class MetadataCacheManager {
    * Nettoie les entrées expirées
    */
   private cleanExpired(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
     const now = new Date();
     const keysToRemove: string[] = [];
 
@@ -154,6 +172,10 @@ export class MetadataCacheManager {
    * Nettoie les entrées les plus anciennes
    */
   private cleanOldest(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
     const entries: Array<{ key: string; cachedAt: string }> = [];
 
     for (let i = 0; i < localStorage.length; i++) {
@@ -184,6 +206,10 @@ export class MetadataCacheManager {
    * Vide tout le cache
    */
   clear(): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
     const keysToRemove: string[] = [];
 
     for (let i = 0; i < localStorage.length; i++) {

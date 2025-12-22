@@ -49,6 +49,7 @@
     "electron",
     "dist-electron",
     "server",
+    "updates-from-v0",
     "vitest.config.ts",
     "vitest.setup.ts",
     "**/*.test.ts",

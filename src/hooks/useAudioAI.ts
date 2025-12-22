@@ -318,7 +318,7 @@ export function useAudioAI(options: UseAudioAIOptions) {
     startBrowserAnalysis,
     stopBrowserAnalysis,
     startAIAnalysis,
-    isPro: features?.level === 'pro' ?? false,
+    isPro: features?.level === 'pro' || false,
   };
 }
 

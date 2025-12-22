@@ -195,7 +195,7 @@ export function useVideoUpload(): UseVideoUploadReturn {
                   status: 'completed',
                   progress: 100,
                   cloudUrl: result.url,
-                  publicId: result.publicId,
+                  cloudId: result.publicId,
                   completedAt: new Date().toISOString(),
                 });
                 saveUploadedVideo(video, 'cloudinary', result.url!);

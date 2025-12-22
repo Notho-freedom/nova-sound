@@ -89,9 +89,9 @@ export class BrowserAudioAnalyzer {
           console.warn('L\'élément média est déjà connecté, utilisation de captureStream() comme fallback');
           
           // Utiliser captureStream() si disponible (pour vidéos)
-          if (mediaElement.captureStream && typeof mediaElement.captureStream === 'function') {
+          if ('captureStream' in mediaElement && typeof (mediaElement as any).captureStream === 'function') {
             try {
-              const stream = mediaElement.captureStream();
+              const stream = (mediaElement as any).captureStream();
               const streamSource = this.audioContext.createMediaStreamSource(stream);
               streamSource.connect(this.analyser);
               // Ne pas connecter à destination pour éviter la double sortie

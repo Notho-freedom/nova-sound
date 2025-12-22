@@ -13,7 +13,7 @@ const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await verifyAuth(request);
@@ -24,7 +24,7 @@ export async function GET(
       );
     }
 
-    const transcriptId = params.id;
+    const { id: transcriptId } = await params;
 
     // Vérifier d'abord dans le cache Firestore
     const { getFirebaseAdmin } = await import('~/lib/firebaseAdmin');
