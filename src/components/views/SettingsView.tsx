@@ -61,41 +61,87 @@ const API_BASE_URL = typeof window !== 'undefined'
   : "";
 
 interface SettingRowProps {
-  label: string;
-  description?: string;
-  children: React.ReactNode;
+  label: string
+  description?: string
+  children: React.ReactNode
+  icon?: React.ElementType
 }
 
-const SettingRow = ({ label, description, children }: SettingRowProps) => (
-  <div className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
-    <div className="flex-1 min-w-0 pr-4">
-      <p className="text-sm font-medium text-foreground">{label}</p>
-      {description && (
-        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+const SettingRow = ({ label, description, children, icon: Icon }: SettingRowProps) => (
+  <div className="flex items-center justify-between py-4 group hover:bg-white/[0.02] -mx-4 px-4 rounded-lg transition-colors">
+    <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
+      {Icon && (
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/10 flex items-center justify-center flex-shrink-0">
+          <Icon className="w-4 h-4 text-primary/80" />
+        </div>
       )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {description && <p className="text-xs text-muted-foreground/70 mt-0.5 line-clamp-1">{description}</p>}
+      </div>
     </div>
     <div className="flex-shrink-0">{children}</div>
   </div>
-);
+)
 
 interface SettingsCardProps {
-  title: string;
-  icon: typeof Volume2;
-  children: React.ReactNode;
-  className?: string;
+  title: string
+  icon: typeof Volume2
+  children: React.ReactNode
+  className?: string
+  accentColor?: string
+  badge?: string
 }
 
-const SettingsCard = ({ title, icon: Icon, children, className }: SettingsCardProps) => (
-  <div className={cn("bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 p-5", className)}>
-    <div className="flex items-center gap-3 mb-4">
-      <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-        <Icon className="w-4.5 h-4.5 text-primary" />
+const SettingsCard = ({
+  title,
+  icon: Icon,
+  children,
+  className,
+  accentColor = "from-primary/20 to-secondary/10",
+  badge,
+}: SettingsCardProps) => (
+  <div
+    className={cn(
+      "relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-transparent backdrop-blur-xl",
+      "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_40px_rgba(0,0,0,0.4)] transition-all duration-300",
+      "before:absolute before:inset-0 before:rounded-2xl before:p-[1px] before:bg-gradient-to-b before:from-white/10 before:to-transparent before:-z-10",
+      className,
+    )}
+  >
+    {/* Ambient glow effect */}
+    <div
+      className={cn(
+        "absolute -top-20 -right-20 w-40 h-40 rounded-full bg-gradient-to-br opacity-20 blur-3xl pointer-events-none",
+        accentColor,
+      )}
+    />
+
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg",
+              accentColor,
+            )}
+          >
+            <Icon className="w-5 h-5 text-foreground" />
+          </div>
+          <div>
+            <h3 className="font-display text-base font-semibold text-foreground tracking-tight">{title}</h3>
+            {badge && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary mt-0.5">
+                {badge}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
-      <h3 className="font-display text-base font-semibold text-foreground">{title}</h3>
+      <div className="divide-y divide-white/[0.05]">{children}</div>
     </div>
-    {children}
   </div>
-);
+)
 
 // Config status alert
 // Recognition Card Component
@@ -731,33 +777,36 @@ export const SettingsView = () => {
   }, []);
 
   const updateSetting = async <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-    
+    setSettings((prev) => ({ ...prev, [key]: value }))
+
     // Save to localStorage immediately
-    localStorage.setItem(`nexus-setting-${key}`, JSON.stringify(value));
-    
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`nexus-${key}`, JSON.stringify(value)) // Use nexus- prefix
+    }
+
     // Save to Electron storage if in Electron
     if (isElectron && window.electronAPI) {
       try {
-        await window.electronAPI.updateSettings({ [key]: value });
+        // Electron needs a specific method to update settings
+        window.electronAPI.updateSettings({ [key]: value })
       } catch (err) {
-        console.error("Failed to save setting to Electron:", err);
+        console.error("Failed to save setting to Electron:", err)
       }
     }
-    
+
     // Sync to Firebase if authenticated
     if (nexusAuthenticated) {
       try {
-        const { firebaseSyncService } = await import('@/services/firebase-sync');
+        const { firebaseSyncService } = await import("@/services/firebase-sync")
         // Update settings object and sync
-        const currentSettings = { ...settings, [key]: value };
-        await firebaseSyncService.queueSync('settings', currentSettings);
+        // No need to merge here, just send the new value for the specific key
+        await firebaseSyncService.updateSetting(key, value)
       } catch (err) {
         // Silently fail if Firebase sync is not available
-        console.warn("Failed to sync setting to Firebase:", err);
+        console.warn("Failed to sync setting to Firebase:", err)
       }
     }
-  };
+  }
 
   const handleAddMusicFolder = async () => {
     const folders = await selectMusicFolders();
