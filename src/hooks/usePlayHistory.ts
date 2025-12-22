@@ -49,7 +49,12 @@ export function usePlayHistory(): UsePlayHistoryReturn {
 
   // Save history to localStorage and sync to Firebase
   useEffect(() => {
-    localStorage.setItem("nexus-play-history", JSON.stringify(history));
+    // Sauvegarder dans localStorage à chaque changement
+    try {
+      localStorage.setItem("nexus-play-history", JSON.stringify(history));
+    } catch (error) {
+      console.error("Failed to save history to localStorage:", error);
+    }
     
     // Sync to Firebase (debounced to avoid too many writes)
     // Sauvegarder plus fréquemment pour assurer la persistance
@@ -67,14 +72,44 @@ export function usePlayHistory(): UsePlayHistoryReturn {
     return () => clearTimeout(timeoutId);
   }, [history]);
 
+  // Sauvegarder l'historique avant que la page ne se ferme
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem("nexus-play-history", JSON.stringify(history));
+      } catch (error) {
+        console.error("Failed to save history before unload:", error);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        try {
+          localStorage.setItem("nexus-play-history", JSON.stringify(history));
+        } catch (error) {
+          console.error("Failed to save history on visibility change:", error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [history]);
+
   const addToHistory = useCallback((trackId: string) => {
     setHistory((prev) => {
       const existingIndex = prev.findIndex((h) => h.trackId === trackId);
       const now = new Date().toISOString();
 
+      let updated: HistoryEntry[];
       if (existingIndex !== -1) {
         // Update existing entry
-        const updated = [...prev];
+        updated = [...prev];
         const existing = updated[existingIndex];
         updated.splice(existingIndex, 1);
         updated.unshift({
@@ -84,14 +119,23 @@ export function usePlayHistory(): UsePlayHistoryReturn {
           // Conserver la durée existante si elle existe
           duration: existing.duration || 0,
         });
-        return updated.slice(0, MAX_HISTORY_SIZE);
+        updated = updated.slice(0, MAX_HISTORY_SIZE);
       } else {
         // Add new entry
-        return [
+        updated = [
           { trackId, playedAt: now, playCount: 1, duration: 0 },
           ...prev,
         ].slice(0, MAX_HISTORY_SIZE);
       }
+
+      // Sauvegarder immédiatement dans localStorage pour assurer la persistance
+      try {
+        localStorage.setItem("nexus-play-history", JSON.stringify(updated));
+      } catch (error) {
+        console.error("Failed to save history to localStorage:", error);
+      }
+
+      return updated;
     });
   }, []);
 

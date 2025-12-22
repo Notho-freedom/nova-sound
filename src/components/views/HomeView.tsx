@@ -242,7 +242,7 @@ export const HomeView = memo(({
 
   return (
     <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
-      {/* Hero Section - Carousel */}
+      {/* Hero Section - Carousel
       <HeroSection
         tracks={displayRecent.slice(0, 10)}
         currentTrack={currentTrack}
@@ -250,13 +250,13 @@ export const HomeView = memo(({
         userName={userName}
         autoPlay={true}
         autoPlayInterval={6000}
-        onTrackSelect={(track) => {
+        onTrackSelect={(track: Track) => {
           const index = tracks.findIndex(t => t.id === track.id);
           if (index !== -1) {
             onTrackSelect(index);
           }
         }}
-      />
+      /> */}
 
       {/* Stats Section */}
       {stats && (
@@ -449,7 +449,9 @@ export const HomeView = memo(({
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
-                        actualIndex !== -1 && onTrackSelect(actualIndex);
+                        if (actualIndex !== -1) {
+                          onTrackSelect(actualIndex);
+                        }
                       }}
                     >
                       <Play className="w-4 h-4 fill-current" />
