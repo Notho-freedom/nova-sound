@@ -25,6 +25,12 @@ export function formatDuration(seconds: number): string {
  */
 export function getAudioSrc(filePath?: string): string | null {
   if (!filePath) return null;
+
+  // For PlanetHoster URLs, use secure proxy
+  if (filePath.includes('planethoster') || filePath.includes('nexus/')) {
+    const { getSecurePlanetHosterUrl } = require('@/lib/planethoster-url');
+    return getSecurePlanetHosterUrl(filePath);
+  }
   
   // Check if it's already a URL
   if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {
@@ -50,6 +56,12 @@ export function getAudioSrc(filePath?: string): string | null {
  */
 export function getVideoSrc(filePath?: string): string | null {
   if (!filePath) return null;
+
+  // For PlanetHoster URLs, use secure proxy
+  if (filePath.includes('planethoster') || filePath.includes('nexus/')) {
+    const { getSecurePlanetHosterUrl } = require('@/lib/planethoster-url');
+    return getSecurePlanetHosterUrl(filePath);
+  }
   
   // Check if it's already a URL
   if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {

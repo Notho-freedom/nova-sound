@@ -429,14 +429,13 @@ export const Sidebar = ({
                       }}
                       onView={() => onViewChange("playlists")}
                     >
-                      <button
+                      <div
                         onClick={() => onViewChange("playlists")}
                         className={cn(
-                          "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl group",
+                          "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl group cursor-pointer",
                           "text-muted-foreground hover:text-foreground",
                           "hover:bg-white/5 active:bg-white/10",
                           "transition-all duration-300 ease-out",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                         )}
                       >
                         <div
@@ -465,7 +464,7 @@ export const Sidebar = ({
                             <Play className="w-3.5 h-3.5 fill-current" />
                           </button>
                         </div>
-                      </button>
+                      </div>
                     </PlaylistContextMenu>
                   ))}
 

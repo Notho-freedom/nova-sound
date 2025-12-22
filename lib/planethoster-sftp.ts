@@ -206,14 +206,11 @@ export async function uploadToPlanetHoster(
         console.log(`[PlanetHoster] ✅ File uploaded successfully: ${fullRemotePath}`);
         client.close();
 
-        // Construct public URL
-        const publicUrl = config.cdnUrl
-          ? `${config.cdnUrl}/${remotePath}`
-          : `https://${config.host}/${remotePath}`;
-
+        // Return only the path, not the public URL (security: files are served via proxy)
+        // The URL will be generated client-side using the secure proxy endpoint
         return {
           success: true,
-          url: publicUrl,
+          url: `/api/storage/proxy/planethoster?path=${encodeURIComponent(remotePath)}`,
           path: remotePath,
           size: fileBuffer.length,
         };
@@ -314,11 +311,8 @@ export async function uploadToPlanetHoster(
 
         console.log(`[PlanetHoster] ✅ File uploaded successfully: ${fullRemotePath}`);
 
-        // Construct public URL
-        const publicUrl = config.cdnUrl
-          ? `${config.cdnUrl}/${remotePath}`
-          : `https://${config.host}/${remotePath}`;
-
+        // Return only the path, not the public URL (security: files are served via proxy)
+        // The URL will be generated client-side using the secure proxy endpoint
         // Close connection before returning
         try {
           await sftp.end();
@@ -328,7 +322,7 @@ export async function uploadToPlanetHoster(
 
         return {
           success: true,
-          url: publicUrl,
+          url: `/api/storage/proxy/planethoster?path=${encodeURIComponent(remotePath)}`,
           path: remotePath,
           size: fileBuffer.length,
         };
@@ -507,6 +501,112 @@ export async function fileExistsOnPlanetHoster(remotePath: string): Promise<bool
     } catch (closeError) {
       // Ignore close errors
     }
+  }
+}
+
+/**
+ * Read a file from PlanetHoster via SFTP/FTP
+ * Used by the secure proxy to serve files to authenticated users
+ * 
+ * @param remotePath - Path on the server (e.g., "nexus/user123/file.mp3")
+ * @returns File content as Buffer
+ */
+export async function readFileFromPlanetHoster(remotePath: string): Promise<Buffer> {
+  const config = getPlanetHosterConfig();
+  
+  if (!(config.host && config.user && (config.password || config.privateKey))) {
+    throw new Error('PlanetHoster SFTP is not configured');
+  }
+
+  const fullRemotePath = `${config.basePath}/${remotePath}`.replace(/\/+/g, '/');
+  
+  // Always use SFTP for reading files (more reliable than FTP)
+  // If port 21 is configured, we'll still try SFTP on port 22 as fallback
+  const sftp = await createSFTPClient();
+
+  try {
+    // Try configured port first
+    let connected = false;
+    try {
+      await sftp.connect({
+        host: config.host!,
+        port: config.port,
+        username: config.user!,
+        readyTimeout: 60000,
+        keepaliveInterval: 10000,
+        keepaliveCountMax: 3,
+        ...(config.privateKey
+          ? {
+              privateKey: config.privateKey.replace(/\\n/g, '\n'),
+              passphrase: config.passphrase,
+            }
+          : {
+              password: config.password!,
+            }),
+      });
+      connected = true;
+    } catch (error: any) {
+      // If port 21 fails, try port 22 (standard SFTP port)
+      if (config.port === 21) {
+        console.log('[PlanetHoster] Port 21 failed, trying SFTP on port 22...');
+        try {
+          await sftp.connect({
+            host: config.host!,
+            port: 22,
+            username: config.user!,
+            readyTimeout: 60000,
+            keepaliveInterval: 10000,
+            keepaliveCountMax: 3,
+            ...(config.privateKey
+              ? {
+                  privateKey: config.privateKey.replace(/\\n/g, '\n'),
+                  passphrase: config.passphrase,
+                }
+              : {
+                  password: config.password!,
+                }),
+          });
+          connected = true;
+        } catch (fallbackError: any) {
+          throw new Error(`Failed to connect to PlanetHoster: ${fallbackError.message}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    if (!connected) {
+      throw new Error('Failed to connect to PlanetHoster');
+    }
+
+    const fileBuffer = await sftp.get(fullRemotePath);
+    await sftp.end();
+    
+    // Convert to Buffer if needed
+    if (Buffer.isBuffer(fileBuffer)) {
+      return fileBuffer;
+    } else if (typeof fileBuffer === 'string') {
+      return Buffer.from(fileBuffer, 'utf-8');
+    } else {
+      // If it's a stream, read it
+      const chunks: Buffer[] = [];
+      for await (const chunk of fileBuffer as any) {
+        chunks.push(Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    }
+  } catch (error: any) {
+    console.error('PlanetHoster SFTP read error:', error.message);
+    try {
+      await sftp.end();
+    } catch {
+      // Ignore close errors
+    }
+    
+    if (error.message?.includes('No such file') || error.message?.includes('not found')) {
+      throw new Error(`File not found: ${remotePath}`);
+    }
+    throw new Error(`Failed to read from PlanetHoster: ${error.message}`);
   }
 }
 

@@ -832,8 +832,9 @@ ipcMain.handle('file:uploadToNexus', async (_event, options: {
       let uploadedBytes = 0;
       const fileStream = fs.createReadStream(filePath);
       
-      fileStream.on('data', (chunk: Buffer) => {
-        uploadedBytes += chunk.length;
+      fileStream.on('data', (chunk: Buffer | string) => {
+        const chunkLength = typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length;
+        uploadedBytes += chunkLength;
         if (onProgress && fileSize > 0) {
           const progress = Math.round((uploadedBytes / fileSize) * 100);
           onProgress(progress);

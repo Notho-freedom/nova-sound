@@ -24,6 +24,9 @@ import { useVideoPlayer } from "@/hooks/useVideoPlayer";
 import { YouTubePlayer, type YouTubePlayerRef } from "./YouTubePlayer";
 import { detectMediaSource, extractYouTubeVideoId } from "@/lib/youtube";
 import { fetchYouTubeVideoMetadata } from "@/lib/youtube-metadata";
+import { useAudioAI } from "@/hooks/useAudioAI";
+import { AIAnalysisPanel } from "./AIAnalysisPanel";
+import { Brain } from "lucide-react";
 
 interface VideoPlayerProps {
   video: Video;
@@ -68,6 +71,7 @@ export const VideoPlayer = ({
 }: VideoPlayerProps) => {
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Détecter si c'est une vidéo YouTube
@@ -86,6 +90,43 @@ export const VideoPlayer = ({
   });
   
   const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+
+  // Hook d'analyse audio IA - utiliser un état pour l'élément média
+  const [mediaElementForAI, setMediaElementForAI] = useState<HTMLVideoElement | null>(null);
+  
+  useEffect(() => {
+    if (!isYouTube && videoRef.current) {
+      setMediaElementForAI(videoRef.current);
+    } else {
+      setMediaElementForAI(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYouTube]); // videoRef est une ref stable, pas besoin de la mettre dans les dépendances
+
+  const audioUrlForAI = video.filePath && !isYouTube ? video.filePath : undefined;
+  
+  const {
+    analysis: aiAnalysis,
+    startBrowserAnalysis,
+    startAIAnalysis,
+    isPro: isAIPro,
+  } = useAudioAI({
+    mediaElement: mediaElementForAI,
+    audioUrl: audioUrlForAI,
+    autoStart: true,
+    enableAI: false, // Sera activé manuellement via startAIAnalysis si Pro
+  });
+
+  // Activer l'IA automatiquement si Pro et panneau ouvert (uniquement pour les vidéos non-YouTube avec URL)
+  useEffect(() => {
+    if (isAIPro && showAIPanel && !isYouTube && audioUrlForAI && !aiAnalysis.transcription && !aiAnalysis.isLoading) {
+      // Délai pour s'assurer que le panneau est bien affiché
+      const timer = setTimeout(() => {
+        startAIAnalysis();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAIPro, showAIPanel, isYouTube, audioUrlForAI, aiAnalysis.transcription, aiAnalysis.isLoading, startAIAnalysis]);
 
   // Player pour vidéos locales/cloud
   const {
@@ -481,6 +522,22 @@ export const VideoPlayer = ({
               </Button>
             )}
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowAIPanel(!showAIPanel)}
+                className={cn(
+                  "text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95",
+                  showAIPanel && "bg-primary/20 text-primary",
+                  isAIPro && "ring-2 ring-primary/50"
+                )}
+                title={isAIPro ? "Analyse IA Pro" : "Analyse audio native (Gratuit)"}
+              >
+                <Brain className="w-5 h-5" />
+                {isAIPro && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+                )}
+              </Button>
               {onCinemaMode && (
                 <Button
                   variant="ghost"
@@ -701,6 +758,16 @@ export const VideoPlayer = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* AI Analysis Panel */}
+      {showAIPanel && (
+        <div className="absolute bottom-20 right-4 w-96 z-40 pointer-events-auto">
+          <AIAnalysisPanel
+            analysis={aiAnalysis}
+            onStartAI={startAIAnalysis}
+          />
         </div>
       )}
     </div>

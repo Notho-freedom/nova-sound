@@ -84,9 +84,11 @@ export async function POST(request: NextRequest) {
     // Upload to PlanetHoster via SFTP
     const result = await uploadToPlanetHoster(remotePath, buffer);
 
+    // For PlanetHoster, the URL is already a secure proxy URL
+    // No need to modify it - it's generated in uploadToPlanetHoster
     return NextResponse.json({
       id: uniqueSuffix,
-      url: result.url,
+      url: result.url, // Already a secure proxy URL
       size: file.size,
       filename: file.name,
       provider: 'planethoster',

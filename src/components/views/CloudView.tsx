@@ -461,7 +461,32 @@ export const CloudView = () => {
 
   const startDownload = async (url: string, filename: string) => {
     try {
-      const response = await fetch(url);
+      // For PlanetHoster URLs, ensure we use the secure proxy with authentication
+      let downloadUrl = url;
+      
+      // If it's a PlanetHoster URL, ensure it uses the secure proxy
+      if (url.includes('planethoster') || url.includes('nexus/')) {
+        const { getSecurePlanetHosterUrl } = await import('@/lib/planethoster-url');
+        downloadUrl = getSecurePlanetHosterUrl(url);
+      }
+
+      // Get authentication token
+      let accessToken: string | null = null;
+      try {
+        const { firebaseService } = await import('@/services/firebase');
+        if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+          accessToken = await firebaseService.getIdToken();
+        }
+      } catch (error) {
+        console.error('Failed to get Firebase token:', error);
+      }
+
+      const response = await fetch(downloadUrl, {
+        headers: accessToken ? {
+          'Authorization': `Bearer ${accessToken}`,
+        } : {},
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

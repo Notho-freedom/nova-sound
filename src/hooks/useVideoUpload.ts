@@ -363,6 +363,8 @@ export function useVideoUpload(): UseVideoUploadReturn {
       const mimeType = getMimeType(video.filePath);
       const fileName = video.filePath.split(/[\\/]/).pop() || `video_${video.id}`;
 
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
       // Use streaming upload for large files (> 100MB)
       if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
         console.log(`[BunnyVideoUpload] File too large (${fileSizeMB.toFixed(2)} MB), using streaming upload`);
@@ -452,8 +454,6 @@ export function useVideoUpload(): UseVideoUploadReturn {
       // Create form data
       const formData = new FormData();
       formData.append('file', blob, fileName);
-
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
       // Upload with progress tracking
       const result = await new Promise<{ success: boolean; url?: string; id?: string; error?: string }>((resolve) => {
@@ -678,8 +678,6 @@ export function useVideoUpload(): UseVideoUploadReturn {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: mimeType });
       formData.append('file', blob, fileName);
-
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
       // Upload with progress tracking
       const result = await new Promise<{ success: boolean; url?: string; id?: string; error?: string }>((resolve) => {

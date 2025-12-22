@@ -133,9 +133,11 @@ export async function POST(request: NextRequest) {
           const result = await uploadToPlanetHoster(remotePath, buffer);
           console.log(`[Upload] ✅ PlanetHoster upload successful: ${result.url}`);
 
+          // For PlanetHoster, the URL is already a secure proxy URL
+          // No need to modify it - it's generated in uploadToPlanetHoster
           return NextResponse.json({
             id: fileId,
-            url: result.url,
+            url: result.url, // Already a secure proxy URL
             size: file.size,
             filename: file.name,
             provider: 'planethoster',

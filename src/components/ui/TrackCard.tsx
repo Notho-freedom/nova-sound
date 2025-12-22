@@ -77,7 +77,10 @@ export const TrackCard = ({
             <button
               onClick={onPlay}
               onContextMenu={(e) => {
-                e.preventDefault()
+                if (e) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }
                 onContextMenu?.()
               }}
               className={cn(
@@ -154,7 +157,10 @@ export const TrackCard = ({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             onContextMenu={(e) => {
-              e.preventDefault()
+              if (e) {
+                e.preventDefault()
+                e.stopPropagation()
+              }
               onContextMenu?.()
             }}
             className={cn(
