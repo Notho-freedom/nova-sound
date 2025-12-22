@@ -898,7 +898,7 @@ export const PlaylistView = memo(({
           <GlassCard className="overflow-hidden">
             {playlistTracks.length === 0 ? (
               <EmptyState
-                icon={Music}
+                icon={<Music className="w-10 h-10 text-primary" />}
                 title="Playlist vide"
                 description="Ajoutez des titres pour commencer"
                 action={
@@ -911,7 +911,7 @@ export const PlaylistView = memo(({
             ) : (
               <>
                 <div className="p-4 border-b border-border/30">
-                  <ViewToggle value={viewMode} onChange={setViewMode} />
+                  <ViewToggle view={viewMode} onViewChange={setViewMode} />
                 </div>
                 <div className="p-4">
                   {viewMode === "grid" ? (
@@ -991,7 +991,7 @@ export const PlaylistView = memo(({
           onChange={setSearchQuery}
           placeholder="Rechercher une playlist..."
         />
-        <ViewToggle value={viewMode} onChange={setViewMode} />
+        <ViewToggle view={viewMode} onViewChange={setViewMode} />
       </Toolbar>
 
       {/* Loading */}
@@ -999,7 +999,7 @@ export const PlaylistView = memo(({
         viewMode === "grid" ? <AlbumGridSkeleton count={12} /> : <TrackTableSkeleton count={8} />
       ) : filteredPlaylists.length === 0 ? (
         <EmptyState
-          icon={ListMusic}
+          icon={<ListMusic className="w-10 h-10 text-primary" />}
           title={searchQuery ? "Aucune playlist trouvée" : "Aucune playlist"}
           description={searchQuery ? "Essayez une autre recherche" : "Créez votre première playlist"}
           action={

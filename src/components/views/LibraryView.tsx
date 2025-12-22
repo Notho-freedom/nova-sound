@@ -545,7 +545,7 @@ export const LibraryView = memo(({
     return (
       <PageContainer>
         <EmptyState
-          icon={Library}
+          icon={<Library className="w-10 h-10 text-primary" />}
           title={emptyMessage}
           description={
             viewMode === "tracks" ? "Ajoutez des fichiers audio pour voir votre bibliothèque." :
@@ -975,21 +975,23 @@ export const LibraryView = memo(({
             {albumsSortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
 
-          <ViewToggle value={albumsViewMode} onChange={setAlbumsViewMode} />
+          <ViewToggle view={albumsViewMode} onViewChange={setAlbumsViewMode} />
         </Toolbar>
 
         {/* Active Filters */}
         {(albumsSearchQuery || albumsFilterArtist) && (
           <div className="flex flex-wrap gap-2 mb-6">
             {albumsSearchQuery && (
-              <FilterChip onRemove={() => setAlbumsSearchQuery("")}>
-                Recherche: {albumsSearchQuery}
-              </FilterChip>
+              <FilterChip 
+                label={`Recherche: ${albumsSearchQuery}`} 
+                onRemove={() => setAlbumsSearchQuery("")}
+              />
             )}
             {albumsFilterArtist && (
-              <FilterChip onRemove={() => setAlbumsFilterArtist(null)}>
-                Artiste: {albumsFilterArtist}
-              </FilterChip>
+              <FilterChip 
+                label={`Artiste: ${albumsFilterArtist}`} 
+                onRemove={() => setAlbumsFilterArtist(null)}
+              />
             )}
           </div>
         )}
@@ -1020,7 +1022,7 @@ export const LibraryView = memo(({
 
         {filteredAndSortedAlbums.length === 0 && (
           <EmptyState
-            icon={Disc3}
+            icon={<Disc3 className="w-10 h-10 text-primary" />}
             title="Aucun album trouvé"
             description="Essayez de modifier vos filtres de recherche"
           />
@@ -1086,7 +1088,7 @@ export const LibraryView = memo(({
             {artistsSortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
 
-          <ViewToggle value={artistsViewMode} onChange={setArtistsViewMode} />
+          <ViewToggle view={artistsViewMode} onViewChange={setArtistsViewMode} />
         </Toolbar>
 
         {/* Artists Grid */}
@@ -1115,7 +1117,7 @@ export const LibraryView = memo(({
 
         {filteredAndSortedArtists.length === 0 && (
           <EmptyState
-            icon={User}
+            icon={<User className="w-10 h-10 text-primary" />}
             title="Aucun artiste trouvé"
             description="Essayez de modifier vos filtres de recherche"
           />
@@ -1256,15 +1258,16 @@ export const LibraryView = memo(({
           </SelectContent>
         </Select>
 
-        <ViewToggle value={displayMode} onChange={setDisplayMode} />
+        <ViewToggle view={displayMode} onViewChange={setDisplayMode} />
       </Toolbar>
 
       {/* Active Filters */}
       {searchQuery && (
         <div className="flex flex-wrap gap-2 mb-6">
-          <FilterChip onRemove={() => setSearchQuery("")}>
-            Recherche: {searchQuery}
-          </FilterChip>
+          <FilterChip 
+            label={`Recherche: ${searchQuery}`} 
+            onRemove={() => setSearchQuery("")}
+          />
         </div>
       )}
 
@@ -1309,7 +1312,7 @@ export const LibraryView = memo(({
 
       {filteredAndSortedTracks.length === 0 && (
         <EmptyState
-          icon={Music}
+          icon={<Music className="w-10 h-10 text-primary" />}
           title="Aucun titre trouvé"
           description="Essayez de modifier vos filtres de recherche"
         />
