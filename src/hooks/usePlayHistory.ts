@@ -1,11 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+/**
+ * Hook optimisé pour l'historique de lecture
+ * Optimisations: debounce Firebase 5s, batch localStorage, mémorisation
+ */
+
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 export interface HistoryEntry {
   trackId: string;
   playedAt: string;
   playCount: number;
-  duration: number; // Temps d'écoute réel en secondes
-  completedPercentage?: number; // Pourcentage de la piste écouté (0-100)
+  duration: number;
+  completedPercentage?: number;
 }
 
 interface UsePlayHistoryReturn {
@@ -18,265 +23,192 @@ interface UsePlayHistoryReturn {
   getTotalListeningTime: (trackId?: string) => number;
 }
 
-const MAX_HISTORY_SIZE = 1000; // Augmenté pour stocker plus d'entrées
+const MAX_HISTORY_SIZE = 1000;
+const STORAGE_KEY = "nexus-play-history";
+const FIREBASE_DEBOUNCE_MS = 5000; // 5 secondes
 
 export function usePlayHistory(): UsePlayHistoryReturn {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const firebaseSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncRef = useRef<number>(0);
+  const pendingSyncRef = useRef<boolean>(false);
 
-  // Load history from localStorage and listen to Firebase sync updates
+  // Chargement initial optimisé
   useEffect(() => {
-    // Charger depuis localStorage immédiatement
-    const loadFromLocalStorage = () => {
-      const stored = localStorage.getItem("nexus-play-history");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setHistory(parsed);
-            return;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setHistory(parsed);
+        }
+      } catch {}
+    }
+
+    // Écouter les mises à jour Firebase
+    const handleFirebaseUpdate = (event: CustomEvent) => {
+      const data = event.detail?.history;
+      if (Array.isArray(data) && data.length > 0) {
+        setHistory(prev => {
+          // Fusionner intelligemment au lieu de remplacer
+          if (data.length > prev.length) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            return data;
           }
-        } catch {
-          // Ignorer les erreurs de parsing
-        }
-      }
-      setHistory([]);
-    };
-
-    loadFromLocalStorage();
-
-    // Écouter les mises à jour Firebase (qui peuvent arriver après le chargement initial)
-    const handleSyncUpdate = (event: CustomEvent) => {
-      if (event.detail?.history && Array.isArray(event.detail.history)) {
-        console.log('[usePlayHistory] Mise à jour depuis Firebase (firebase-sync-update):', event.detail.history.length, 'entrées');
-        setHistory(event.detail.history);
-        // Sauvegarder immédiatement dans localStorage
-        try {
-          localStorage.setItem("nexus-play-history", JSON.stringify(event.detail.history));
-        } catch (error) {
-          console.error("Failed to save history from Firebase to localStorage:", error);
-        }
+          return prev;
+        });
       }
     };
 
-    // Écouter aussi l'événement spécifique pour l'historique
-    const handleHistoryUpdate = (event: CustomEvent) => {
-      if (event.detail?.history && Array.isArray(event.detail.history)) {
-        console.log('[usePlayHistory] Mise à jour depuis Firebase (firebase-history-update):', event.detail.history.length, 'entrées');
-        setHistory(event.detail.history);
-        // Sauvegarder immédiatement dans localStorage
-        try {
-          localStorage.setItem("nexus-play-history", JSON.stringify(event.detail.history));
-        } catch (error) {
-          console.error("Failed to save history from Firebase to localStorage:", error);
-        }
-      }
-    };
-
-    window.addEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
-    window.addEventListener('firebase-history-update', handleHistoryUpdate as EventListener);
-    
-    // Recharger depuis localStorage après un court délai pour capturer les mises à jour Firebase
-    // Firebase peut mettre à jour localStorage après le montage du hook
-    // Utiliser plusieurs tentatives pour s'assurer de capturer les données Firebase
-    const checkAndReload = () => {
-      const stored = localStorage.getItem("nexus-play-history");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            setHistory(prev => {
-              // Utiliser les données Firebase si elles sont plus récentes ou plus complètes
-              if (prev.length === 0 || parsed.length > prev.length) {
-                console.log('[usePlayHistory] Rechargement depuis localStorage:', parsed.length, 'entrées');
-                return parsed;
-              }
-              return prev;
-            });
-          }
-        } catch {
-          // Ignorer les erreurs
-        }
-      }
-    };
-
-    // Vérifier immédiatement, puis après 1s, 3s et 5s pour capturer les mises à jour Firebase
-    const timeout1 = setTimeout(checkAndReload, 1000);
-    const timeout2 = setTimeout(checkAndReload, 3000);
-    const timeout3 = setTimeout(checkAndReload, 5000);
+    window.addEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+    window.addEventListener('firebase-history-update', handleFirebaseUpdate as EventListener);
 
     return () => {
-      window.removeEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
-      window.removeEventListener('firebase-history-update', handleHistoryUpdate as EventListener);
-      clearTimeout(timeout1);
-      clearTimeout(timeout2);
-      clearTimeout(timeout3);
+      window.removeEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+      window.removeEventListener('firebase-history-update', handleFirebaseUpdate as EventListener);
     };
   }, []);
 
-  // Save history to localStorage and sync to Firebase
-  useEffect(() => {
-    // Sauvegarder dans localStorage à chaque changement
-    try {
-      localStorage.setItem("nexus-play-history", JSON.stringify(history));
-    } catch (error) {
-      console.error("Failed to save history to localStorage:", error);
+  // Sync Firebase avec debounce optimisé
+  const syncToFirebase = useCallback(() => {
+    if (pendingSyncRef.current) return;
+    
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncRef.current;
+    
+    // Si moins de 5s depuis le dernier sync, programmer un sync différé
+    if (timeSinceLastSync < FIREBASE_DEBOUNCE_MS) {
+      if (firebaseSyncTimeoutRef.current) {
+        clearTimeout(firebaseSyncTimeoutRef.current);
+      }
+      firebaseSyncTimeoutRef.current = setTimeout(() => {
+        syncToFirebase();
+      }, FIREBASE_DEBOUNCE_MS - timeSinceLastSync);
+      return;
     }
-    
-    // Sync to Firebase (debounced to avoid too many writes)
-    // Sauvegarder plus fréquemment pour assurer la persistance
-    const timeoutId = setTimeout(() => {
-      (async () => {
-        try {
-          const { firebaseSyncService } = await import('@/services/firebase-sync');
-          firebaseSyncService.queueSync('history', history);
-        } catch (error) {
-          // Silently fail if Firebase sync is not available
-        }
-      })();
-    }, 2000); // Debounce 2 secondes pour éviter trop d'écritures mais assurer la persistance
-    
-    return () => clearTimeout(timeoutId);
+
+    pendingSyncRef.current = true;
+    lastSyncRef.current = now;
+
+    // Sync async sans bloquer
+    import('@/services/firebase-sync').then(({ firebaseSyncService }) => {
+      firebaseSyncService.queueSync('history', history);
+    }).catch(() => {}).finally(() => {
+      pendingSyncRef.current = false;
+    });
   }, [history]);
 
-  // Sauvegarder l'historique avant que la page ne se ferme
+  // Sauvegarde localStorage + Firebase avec debounce
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      try {
-        localStorage.setItem("nexus-play-history", JSON.stringify(history));
-      } catch (error) {
-        console.error("Failed to save history before unload:", error);
-      }
-    };
+    if (history.length === 0) return;
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        try {
-          localStorage.setItem("nexus-play-history", JSON.stringify(history));
-        } catch (error) {
-          console.error("Failed to save history on visibility change:", error);
-        }
-      }
-    };
+    // Sauvegarder immédiatement en localStorage (synchrone, rapide)
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch {}
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Sync Firebase avec debounce
+    syncToFirebase();
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (firebaseSyncTimeoutRef.current) {
+        clearTimeout(firebaseSyncTimeoutRef.current);
+      }
+    };
+  }, [history, syncToFirebase]);
+
+  // Sauvegarde avant fermeture
+  useEffect(() => {
+    const saveBeforeUnload = () => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      } catch {}
+    };
+
+    window.addEventListener('beforeunload', saveBeforeUnload);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') saveBeforeUnload();
+    });
+
+    return () => {
+      window.removeEventListener('beforeunload', saveBeforeUnload);
     };
   }, [history]);
 
   const addToHistory = useCallback((trackId: string) => {
-    setHistory((prev) => {
-      const existingIndex = prev.findIndex((h) => h.trackId === trackId);
+    setHistory(prev => {
       const now = new Date().toISOString();
+      const existingIndex = prev.findIndex(h => h.trackId === trackId);
 
-      let updated: HistoryEntry[];
       if (existingIndex !== -1) {
-        // Update existing entry
-        updated = [...prev];
-        const existing = updated[existingIndex];
-        updated.splice(existingIndex, 1);
-        updated.unshift({
-          ...existing,
-          playedAt: now,
-          playCount: existing.playCount + 1,
-          // Conserver la durée existante si elle existe
-          duration: existing.duration || 0,
-        });
-        updated = updated.slice(0, MAX_HISTORY_SIZE);
-      } else {
-        // Add new entry
-        updated = [
-          { trackId, playedAt: now, playCount: 1, duration: 0 },
-          ...prev,
+        const updated = [...prev];
+        const existing = updated.splice(existingIndex, 1)[0];
+        return [
+          { ...existing, playedAt: now, playCount: existing.playCount + 1 },
+          ...updated,
         ].slice(0, MAX_HISTORY_SIZE);
       }
 
-      // Sauvegarder immédiatement dans localStorage pour assurer la persistance
-      try {
-        localStorage.setItem("nexus-play-history", JSON.stringify(updated));
-      } catch (error) {
-        console.error("Failed to save history to localStorage:", error);
-      }
-
-      return updated;
+      return [
+        { trackId, playedAt: now, playCount: 1, duration: 0 },
+        ...prev,
+      ].slice(0, MAX_HISTORY_SIZE);
     });
   }, []);
 
-  // Enregistrer une session d'écoute complète avec durée réelle
-  // Cette fonction ajoute une nouvelle entrée à l'historique pour chaque session d'écoute
-  // Elle accumule aussi le temps d'écoute total pour chaque piste
   const recordPlayback = useCallback((trackId: string, duration: number, completedPercentage?: number) => {
-    setHistory((prev) => {
+    setHistory(prev => {
       const now = new Date().toISOString();
-      
-      // Trouver toutes les entrées existantes pour cette piste pour calculer le playCount
-      const existingEntries = prev.filter((h) => h.trackId === trackId);
+      const existingEntries = prev.filter(h => h.trackId === trackId);
       const playCount = existingEntries.length > 0 
-        ? Math.max(...existingEntries.map(e => e.playCount)) + 1
+        ? Math.max(...existingEntries.map(e => e.playCount)) + 1 
         : 1;
-      
-      // Créer une nouvelle entrée pour cette session d'écoute
-      const newEntry: HistoryEntry = {
-        trackId,
-        playedAt: now,
-        playCount: playCount,
-        duration: duration,
-        completedPercentage: completedPercentage || (duration > 0 ? 100 : 0),
-      };
-      
-      // Ajouter la nouvelle entrée au début (plus récente) et garder toutes les sessions
-      // Cela permet l'accumulation dans le temps - chaque session est enregistrée séparément
-      const updated = [newEntry, ...prev].slice(0, MAX_HISTORY_SIZE);
-      
-      // Sauvegarder immédiatement dans localStorage pour assurer la persistance
-      try {
-        localStorage.setItem("nexus-play-history", JSON.stringify(updated));
-      } catch (error) {
-        console.error("Failed to save history to localStorage:", error);
-      }
-      
-      return updated;
+
+      return [
+        {
+          trackId,
+          playedAt: now,
+          playCount,
+          duration,
+          completedPercentage: completedPercentage ?? (duration > 0 ? 100 : 0),
+        },
+        ...prev,
+      ].slice(0, MAX_HISTORY_SIZE);
     });
   }, []);
 
   const clearHistory = useCallback(() => {
     setHistory([]);
-    localStorage.removeItem("nexus-play-history");
+    localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const getPlayCount = useCallback(
-    (trackId: string): number => {
-      const entry = history.find((h) => h.trackId === trackId);
-      return entry?.playCount || 0;
-    },
-    [history]
-  );
-
-  const getLastPlayed = useCallback(
-    (trackId: string): string | null => {
-      const entry = history.find((h) => h.trackId === trackId);
-      return entry?.playedAt || null;
-    },
-    [history]
-  );
-
-  const getTotalListeningTime = useCallback(
-    (trackId?: string): number => {
-      if (trackId) {
-        // Temps total pour une piste spécifique
-        return history
-          .filter((h) => h.trackId === trackId)
-          .reduce((sum, entry) => sum + (entry.duration || 0), 0);
-      } else {
-        // Temps total pour toutes les pistes
-        return history.reduce((sum, entry) => sum + (entry.duration || 0), 0);
+  // Mémoïsation des lookups fréquents
+  const historyMap = useMemo(() => {
+    const map = new Map<string, HistoryEntry>();
+    for (const entry of history) {
+      if (!map.has(entry.trackId)) {
+        map.set(entry.trackId, entry);
       }
-    },
-    [history]
-  );
+    }
+    return map;
+  }, [history]);
+
+  const getPlayCount = useCallback((trackId: string): number => {
+    return historyMap.get(trackId)?.playCount ?? 0;
+  }, [historyMap]);
+
+  const getLastPlayed = useCallback((trackId: string): string | null => {
+    return historyMap.get(trackId)?.playedAt ?? null;
+  }, [historyMap]);
+
+  const getTotalListeningTime = useCallback((trackId?: string): number => {
+    if (trackId) {
+      return history
+        .filter(h => h.trackId === trackId)
+        .reduce((sum, e) => sum + (e.duration || 0), 0);
+    }
+    return history.reduce((sum, e) => sum + (e.duration || 0), 0);
+  }, [history]);
 
   return {
     history,
@@ -288,4 +220,3 @@ export function usePlayHistory(): UsePlayHistoryReturn {
     getTotalListeningTime,
   };
 }
-

@@ -21,8 +21,8 @@ interface QuotaConfig {
 
 const DEFAULT_CONFIG: QuotaConfig = {
   dailyLimit: 10000,
-  circuitBreakerThreshold: 5,
-  circuitBreakerResetTime: 60 * 1000, // 1 minute
+  circuitBreakerThreshold: 3,          // Réduit pour réaction plus rapide
+  circuitBreakerResetTime: 30 * 1000,  // 30 secondes (plus rapide)
   quotaCosts: {
     search: 100,
     videoDetails: 1,
