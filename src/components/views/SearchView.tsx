@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react"
 import {
   Search,
   Play,
@@ -15,6 +15,8 @@ import {
   History,
   ChevronRight,
   Pause,
+  Mic,
+  Radio,
 } from "lucide-react"
 import type { Track } from "@/types/music"
 import { cn } from "@/lib/utils"
@@ -34,6 +36,9 @@ import { useCloudSync } from "@/hooks/useCloudSync"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { Button } from "@/components/ui/button"
+import { motion, AnimatePresence } from "framer-motion"
+import { ContentCarousel } from "@/components/ui/ContentCarousel"
+import { FeaturedCard } from "@/components/ui/FeaturedCard"
 
 interface SearchViewProps {
   tracks: Track[];
@@ -55,40 +60,52 @@ const formatTime = (seconds: number) => {
 
 const MAX_HISTORY = 8
 
-// Browse category card
-const CategoryCard = ({
+// Browse category card - Enhanced
+const CategoryCard = memo(({
   name,
   color,
+  icon,
   onClick,
 }: {
   name: string
   color: string
+  icon?: React.ReactNode
   onClick?: () => void
 }) => (
-  <button
+  <motion.button
+    whileHover={{ scale: 1.03, y: -2 }}
+    whileTap={{ scale: 0.98 }}
     onClick={onClick}
     className={cn(
-      "group relative h-24 rounded-2xl overflow-hidden",
+      "group relative h-28 rounded-2xl overflow-hidden",
       "transition-all duration-300 ease-out",
-      "hover:scale-[1.03] hover:shadow-xl",
+      "hover:shadow-xl hover:shadow-primary/10",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
     )}
   >
     <div className={cn("absolute inset-0", color)} />
     <div
-      className="absolute inset-0 opacity-20"
+      className="absolute inset-0 opacity-30"
       style={{
         backgroundImage: `radial-gradient(circle at 80% 20%, white 0%, transparent 50%)`,
       }}
     />
+    {/* Icon */}
+    {icon && (
+      <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity">
+        {icon}
+      </div>
+    )}
     <div className="relative h-full flex items-end p-4">
-      <h3 className="font-display font-bold text-white text-base">{name}</h3>
+      <h3 className="font-display font-bold text-white text-lg drop-shadow-lg">{name}</h3>
     </div>
-  </button>
-)
+  </motion.button>
+))
 
-// Search result track item
-const SearchTrackItem = ({
+CategoryCard.displayName = "CategoryCard"
+
+// Search result track item - Enhanced
+const SearchTrackItem = memo(({
   track,
   isPlaying,
   isCurrent,
@@ -177,10 +194,12 @@ const SearchTrackItem = ({
       )}
     </div>
   </div>
-)
+))
 
-// History item chip
-const HistoryChip = ({
+SearchTrackItem.displayName = "SearchTrackItem"
+
+// History item chip - Enhanced
+const HistoryChip = memo(({
   term,
   onSelect,
   onRemove,
@@ -189,14 +208,16 @@ const HistoryChip = ({
   onSelect: () => void
   onRemove: () => void
 }) => (
-  <div
+  <motion.div
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
     className={cn(
-      "group flex items-center gap-2 px-3 py-1.5 rounded-full",
-      "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/30",
+      "group flex items-center gap-2 px-4 py-2 rounded-full",
+      "bg-muted/50 hover:bg-muted border border-border/50 hover:border-primary/30",
       "transition-all duration-300 cursor-pointer",
     )}
   >
-    <Clock className="w-3 h-3 text-muted-foreground" />
+    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
     <span onClick={onSelect} className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
       {term}
     </span>
@@ -205,13 +226,15 @@ const HistoryChip = ({
         e.stopPropagation()
         onRemove()
       }}
-      className="opacity-0 group-hover:opacity-100 p-0.5 rounded-full hover:bg-white/10 transition-all"
+      className="opacity-0 group-hover:opacity-100 p-0.5 rounded-full hover:bg-background/50 transition-all"
       title="Supprimer de l'historique"
     >
-      <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+      <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
     </button>
-  </div>
-)
+  </motion.div>
+))
+
+HistoryChip.displayName = "HistoryChip"
 
 export const SearchView = ({
   tracks,
@@ -401,18 +424,28 @@ export const SearchView = ({
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col animate-in fade-in duration-500">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="h-full flex flex-col"
+      >
         <div className="flex-1 overflow-y-auto">
           <div className="px-6 py-6 space-y-8">
-            {/* Search Header */}
-            <div>
-              <h1 className="font-display text-3xl font-bold tracking-tight mb-2">
-                <span className="text-gradient">Recherche</span>
+            {/* Search Header - Enhanced */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center max-w-2xl mx-auto"
+            >
+              <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-3">
+                <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                  Recherche
+                </span>
               </h1>
-              <p className="text-muted-foreground">
-                Explorez votre bibliothèque et découvrez de nouvelles pistes sur YouTube
+              <p className="text-muted-foreground text-lg">
+                Explorez votre bibliothèque et découvrez de nouvelles pistes
               </p>
-            </div>
+            </motion.div>
 
             {/* Search Bar - Enhanced */}
             <div className="relative">
@@ -783,7 +816,7 @@ export const SearchView = ({
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
     </TooltipProvider>
   )
 }
