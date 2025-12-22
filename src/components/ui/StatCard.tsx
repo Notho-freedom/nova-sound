@@ -1,98 +1,82 @@
-"use client";
+"use client"
 
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { TrendingUp } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface StatCardProps {
-  label: string;
-  value: string | number;
-  icon?: React.ReactNode;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
-  subtitle?: string;
-  className?: string;
-  variant?: "default" | "compact" | "large";
+  label: string
+  value: string
+  icon: React.ReactNode
+  subtitle?: string
+  trend?: "up" | "down" | "neutral"
+  color?: "primary" | "secondary" | "accent" | "rose" | "amber" | "emerald"
+  className?: string
 }
 
 export const StatCard = ({
   label,
   value,
   icon,
-  trend,
-  trendValue,
   subtitle,
+  trend,
+  color = "primary",
   className,
-  variant = "default",
 }: StatCardProps) => {
-  const trendColors = {
-    up: "text-green-500",
-    down: "text-red-500",
-    neutral: "text-muted-foreground",
-  };
-
-  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
-
-  const sizeClasses = {
-    compact: {
-      container: "p-3",
-      value: "text-xl",
-      label: "text-xs",
-      icon: "w-4 h-4",
-    },
-    default: {
-      container: "p-4",
-      value: "text-2xl",
-      label: "text-sm",
-      icon: "w-5 h-5",
-    },
-    large: {
-      container: "p-6",
-      value: "text-4xl",
-      label: "text-base",
-      icon: "w-6 h-6",
-    },
-  };
-
-  const sizes = sizeClasses[variant];
+  const colorClasses = {
+    primary: "from-primary/20 to-primary/5 text-primary border-primary/20",
+    secondary: "from-secondary/20 to-secondary/5 text-secondary border-secondary/20",
+    accent: "from-accent/20 to-accent/5 text-accent border-accent/20",
+    rose: "from-rose-500/20 to-rose-500/5 text-rose-400 border-rose-500/20",
+    amber: "from-amber-500/20 to-amber-500/5 text-amber-400 border-amber-500/20",
+    emerald: "from-emerald-500/20 to-emerald-500/5 text-emerald-400 border-emerald-500/20",
+  }
 
   return (
     <div
       className={cn(
-        "rounded-xl bg-card/30 backdrop-blur-sm border border-border/30",
-        "transition-all duration-200 hover:bg-card/50 hover:border-border/50",
-        sizes.container,
-        className
+        "relative group p-5 rounded-2xl overflow-hidden",
+        "bg-gradient-to-br border backdrop-blur-sm",
+        "transition-all duration-300 ease-out",
+        "hover:scale-[1.02] hover:shadow-lg",
+        colorClasses[color],
+        className,
       )}
     >
-      {/* Header with icon and trend */}
-      <div className="flex items-center justify-between mb-2">
-        {icon && (
-          <div className="text-muted-foreground">{icon}</div>
+      {/* Background glow */}
+      <div
+        className={cn(
+          "absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl opacity-30",
+          color === "primary" && "bg-primary",
+          color === "secondary" && "bg-secondary",
+          color === "accent" && "bg-accent",
+          color === "rose" && "bg-rose-500",
+          color === "amber" && "bg-amber-500",
+          color === "emerald" && "bg-emerald-500",
         )}
-        {trend && (
-          <div className={cn("flex items-center gap-1", trendColors[trend])}>
-            <TrendIcon className="w-3 h-3" />
-            {trendValue && <span className="text-xs">{trendValue}</span>}
-          </div>
-        )}
+      />
+
+      <div className="relative flex items-start justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground/70 font-medium">{label}</p>
+          <p className="text-2xl font-display font-bold mt-1">{value}</p>
+          {subtitle && <p className="text-xs text-muted-foreground/60 mt-1">{subtitle}</p>}
+        </div>
+        <div
+          className={cn(
+            "p-2.5 rounded-xl bg-white/5 transition-all duration-300",
+            "group-hover:scale-110 group-hover:bg-white/10",
+          )}
+        >
+          {icon}
+        </div>
       </div>
 
-      {/* Value */}
-      <div className={cn("font-bold font-mono", sizes.value)}>
-        {value}
-      </div>
-
-      {/* Label */}
-      <div className={cn("text-muted-foreground", sizes.label)}>
-        {label}
-      </div>
-
-      {/* Subtitle */}
-      {subtitle && (
-        <div className="text-xs text-muted-foreground/70 mt-1">
-          {subtitle}
+      {trend && (
+        <div className="absolute bottom-3 right-3">
+          {trend === "up" && <TrendingUp className="w-4 h-4 text-emerald-400" />}
+          {trend === "down" && <TrendingUp className="w-4 h-4 text-rose-400 rotate-180" />}
         </div>
       )}
     </div>
-  );
-};
+  )
+}

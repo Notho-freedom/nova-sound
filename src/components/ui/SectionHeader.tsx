@@ -1,14 +1,14 @@
-"use client";
+"use client"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 interface SectionHeaderProps {
-  title: string;
-  icon?: React.ReactNode;
-  action?: React.ReactNode;
-  count?: number;
-  subtitle?: string;
-  className?: string;
+  title: string
+  icon?: React.ReactNode
+  action?: React.ReactNode
+  count?: number
+  subtitle?: string
+  className?: string
 }
 
 export const SectionHeader = ({
@@ -20,28 +20,22 @@ export const SectionHeader = ({
   className,
 }: SectionHeaderProps) => {
   return (
-    <div className={cn("flex items-center justify-between mb-4", className)}>
-      <div className="flex items-center gap-2">
+    <div className={cn("flex items-center justify-between mb-5", className)}>
+      <div className="flex items-center gap-3">
         {icon && (
-          <div className="text-primary">{icon}</div>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/10 flex items-center justify-center text-primary">
+            {icon}
+          </div>
         )}
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-display text-lg tracking-wider uppercase">
-              {title}
-            </h2>
-            {count !== undefined && count > 0 && (
-              <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted/50">
-                {count}
-              </span>
-            )}
-          </div>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-          )}
+          <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
+            {title}
+            {count !== undefined && <span className="ml-2 text-sm text-muted-foreground font-normal">({count})</span>}
+          </h2>
+          {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
       </div>
       {action && <div>{action}</div>}
     </div>
-  );
-};
+  )
+}

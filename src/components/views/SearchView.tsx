@@ -1,24 +1,37 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Search, Play, X, Clock, TrendingUp, Disc3, User, Music, MoreHorizontal, Loader2 } from "lucide-react";
-import { Track } from "@/types/music";
-import { cn } from "@/lib/utils";
-import { getCoverUrl } from "@/lib/audio";
-import { Input } from "@/components/ui/input";
-import { PageHeader } from "@/components/PageHeader";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton";
-import { TrackCardSkeleton, AlbumCardSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
-import { TrackContextMenu } from "@/components/TrackContextMenu";
-import { UploadIndicator } from "@/components/UploadIndicator";
-import { usePlaylists } from "@/hooks/usePlaylists";
-import { useFavorites } from "@/hooks/useFavorites";
-import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
-import { useBunnyUpload } from "@/hooks/useBunnyUpload";
-import { useNexusUpload } from "@/hooks/useNexusUpload";
-import { useUploadedStatus } from "@/hooks/useUploadedStatus";
-import { useCloudSync } from "@/hooks/useCloudSync";
-import { useYouTubeSearch } from "@/hooks/useYouTubeSearch";
-import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
+"use client"
+
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import {
+  Search,
+  Play,
+  X,
+  Clock,
+  TrendingUp,
+  Disc3,
+  User,
+  Music,
+  Loader2,
+  Sparkles,
+  History,
+  ChevronRight,
+  Pause,
+} from "lucide-react"
+import type { Track } from "@/types/music"
+import { cn } from "@/lib/utils"
+import { getCoverUrl } from "@/lib/audio"
+import { Input } from "@/components/ui/input"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { TrackContextMenu } from "@/components/TrackContextMenu"
+import { usePlaylists } from "@/hooks/usePlaylists"
+import { useFavorites } from "@/hooks/useFavorites"
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload"
+import { useBunnyUpload } from "@/hooks/useBunnyUpload"
+import { useNexusUpload } from "@/hooks/useNexusUpload"
+import { useUploadedStatus } from "@/hooks/useUploadedStatus"
+import { useCloudSync } from "@/hooks/useCloudSync"
+import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
+import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
+import { Button } from "@/components/ui/button"
 
 interface SearchViewProps {
   tracks: Track[];
@@ -33,12 +46,170 @@ interface SearchViewProps {
 }
 
 const formatTime = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-};
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, "0")}`
+}
 
-const MAX_HISTORY = 8;
+const MAX_HISTORY = 8
+
+// Browse category card
+const CategoryCard = ({
+  name,
+  color,
+  onClick,
+}: {
+  name: string
+  color: string
+  onClick?: () => void
+}) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      "group relative h-24 rounded-2xl overflow-hidden",
+      "transition-all duration-300 ease-out",
+      "hover:scale-[1.03] hover:shadow-xl",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+    )}
+  >
+    <div className={cn("absolute inset-0", color)} />
+    <div
+      className="absolute inset-0 opacity-20"
+      style={{
+        backgroundImage: `radial-gradient(circle at 80% 20%, white 0%, transparent 50%)`,
+      }}
+    />
+    <div className="relative h-full flex items-end p-4">
+      <h3 className="font-display font-bold text-white text-base">{name}</h3>
+    </div>
+  </button>
+)
+
+// Search result track item
+const SearchTrackItem = ({
+  track,
+  isPlaying,
+  isCurrent,
+  onPlay,
+  isYouTube = false,
+}: {
+  track: Track
+  isPlaying: boolean
+  isCurrent: boolean
+  onPlay: () => void
+  isYouTube?: boolean
+}) => (
+  <div
+    onClick={onPlay}
+    className={cn(
+      "group flex items-center gap-4 p-3 rounded-xl cursor-pointer",
+      "transition-all duration-300 ease-out",
+      "hover:bg-white/10",
+      isCurrent && "bg-primary/10",
+    )}
+  >
+    {/* Album art */}
+    <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-white/10 group-hover:ring-primary/30 transition-all">
+      <img
+        src={getCoverUrl(track.coverUrl) || "/placeholder.svg"}
+        alt={track.album || track.title}
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+      />
+      <div
+        className={cn(
+          "absolute inset-0 flex items-center justify-center bg-black/50",
+          "opacity-0 group-hover:opacity-100 transition-opacity duration-300",
+        )}
+      >
+        {isCurrent && isPlaying ? (
+          <Pause className="w-5 h-5 text-white fill-current" />
+        ) : (
+          <Play className="w-5 h-5 text-white fill-current" />
+        )}
+      </div>
+      {/* YouTube badge */}
+      {isYouTube && (
+        <div className="absolute top-1 right-1 px-1 py-0.5 bg-red-600 rounded text-[8px] font-bold text-white">YT</div>
+      )}
+      {/* Now playing indicator */}
+      {isCurrent && isPlaying && (
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-0.5 h-3">
+          <div className="w-0.5 bg-primary rounded-full animate-wave" style={{ height: "100%" }} />
+          <div
+            className="w-0.5 bg-primary rounded-full animate-wave"
+            style={{ animationDelay: "0.1s", height: "70%" }}
+          />
+          <div
+            className="w-0.5 bg-primary rounded-full animate-wave"
+            style={{ animationDelay: "0.2s", height: "85%" }}
+          />
+        </div>
+      )}
+    </div>
+
+    {/* Info */}
+    <div className="flex-1 min-w-0">
+      <p className={cn("text-sm font-medium truncate", isCurrent ? "text-primary" : "text-foreground")}>
+        {track.title}
+      </p>
+      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+    </div>
+
+    {/* Duration */}
+    <span className="text-xs text-muted-foreground font-mono">{formatTime(track.duration)}</span>
+
+    {/* Play button */}
+    <div
+      className={cn(
+        "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0",
+        "bg-primary shadow-lg shadow-primary/20",
+        "opacity-0 group-hover:opacity-100",
+        "scale-75 group-hover:scale-100",
+        "transition-all duration-300",
+      )}
+    >
+      {isCurrent && isPlaying ? (
+        <Pause className="w-4 h-4 text-primary-foreground fill-current" />
+      ) : (
+        <Play className="w-4 h-4 text-primary-foreground fill-current ml-0.5" />
+      )}
+    </div>
+  </div>
+)
+
+// History item chip
+const HistoryChip = ({
+  term,
+  onSelect,
+  onRemove,
+}: {
+  term: string
+  onSelect: () => void
+  onRemove: () => void
+}) => (
+  <div
+    className={cn(
+      "group flex items-center gap-2 px-3 py-1.5 rounded-full",
+      "bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/30",
+      "transition-all duration-300 cursor-pointer",
+    )}
+  >
+    <Clock className="w-3 h-3 text-muted-foreground" />
+    <span onClick={onSelect} className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+      {term}
+    </span>
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        onRemove()
+      }}
+      className="opacity-0 group-hover:opacity-100 p-0.5 rounded-full hover:bg-white/10 transition-all"
+      title="Supprimer de l'historique"
+    >
+      <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+    </button>
+  </div>
+)
 
 export const SearchView = ({
   tracks,
@@ -51,603 +222,523 @@ export const SearchView = ({
   onAddToPlaylist,
   loading = false,
 }: SearchViewProps) => {
-  const [query, setQuery] = useState("");
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const [youtubeTracks, setYoutubeTracks] = useState<Track[]>([]);
-  const youtubeSearchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [query, setQuery] = useState("")
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [youtubeTracks, setYoutubeTracks] = useState<Track[]>([])
+  const [isFocused, setIsFocused] = useState(false)
+  const youtubeSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   
   // Hooks for context menu
-  const playlistsResult = usePlaylists();
-  const playlists = playlistsResult?.playlists ?? [];
-  const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
-  const { isFavorite, toggleFavorite } = useFavorites();
-  const { uploadTrack, getTrackProgress } = useCloudinaryUpload();
-  const { uploadTrack: uploadTrackToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
-  const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
-  const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
-  const { isUploaded, getUploadedProvider } = useUploadedStatus();
-  // Free users: Cloudinary only (serveur 0)
-  // Pro users: Bunny (serveur 1) and PlanetHoster/Nexus (serveur 2)
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro; // Free only
-  const canUploadToBunny = nexusIsPro && nexusAuthenticated; // Pro only (serveur 1)
-  const canUploadToNexus = nexusIsPro && nexusAuthenticated; // Pro only (serveur 2)
-  
+  const playlistsResult = usePlaylists()
+  const playlists = playlistsResult?.playlists ?? []
+  const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null)
+  const { isFavorite, toggleFavorite } = useFavorites()
+  const { uploadTrack, getTrackProgress } = useCloudinaryUpload()
+  const { uploadTrack: uploadTrackToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload()
+  const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload()
+  const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync()
+  const { isUploaded, getUploadedProvider } = useUploadedStatus()
+  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated
+
   // YouTube search hook
-  const { results: youtubeResults, loading: youtubeLoading, search: searchYouTube, error: youtubeError } = useYouTubeSearch();
+  const {
+    results: youtubeResults,
+    loading: youtubeLoading,
+    search: searchYouTube,
+    error: youtubeError,
+  } = useYouTubeSearch()
 
   // Load search history from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("nexus-search-history");
+    const saved = localStorage.getItem("nexus-search-history")
     if (saved) {
       try {
-        setSearchHistory(JSON.parse(saved));
+        setSearchHistory(JSON.parse(saved))
       } catch {
-        setSearchHistory([]);
+        setSearchHistory([])
       }
     }
-  }, []);
+  }, [])
 
   // Save search history
   const saveToHistory = (term: string) => {
-    if (!term.trim()) return;
-    const newHistory = [term, ...searchHistory.filter(h => h !== term)].slice(0, MAX_HISTORY);
-    setSearchHistory(newHistory);
-    localStorage.setItem("nexus-search-history", JSON.stringify(newHistory));
-    
-    // Sync to Firebase
-    (async () => {
-      try {
-        const { firebaseSyncService } = await import('@/services/firebase-sync');
-        firebaseSyncService.queueSync('searchHistory', newHistory);
-      } catch (error) {
-        // Silently fail if Firebase sync is not available
-      }
-    })();
-  };
+    if (!term.trim()) return
+    const newHistory = [term, ...searchHistory.filter((h) => h !== term)].slice(0, MAX_HISTORY)
+    setSearchHistory(newHistory)
+    localStorage.setItem("nexus-search-history", JSON.stringify(newHistory))
+  }
 
   const clearHistory = () => {
-    setSearchHistory([]);
-    localStorage.removeItem("nexus-search-history");
-    
-    // Sync to Firebase
-    (async () => {
-      try {
-        const { firebaseSyncService } = await import('@/services/firebase-sync');
-        firebaseSyncService.queueSync('searchHistory', []);
-      } catch (error) {
-        // Silently fail if Firebase sync is not available
-      }
-    })();
-  };
+    setSearchHistory([])
+    localStorage.removeItem("nexus-search-history")
+  }
 
   const removeFromHistory = (term: string) => {
-    const newHistory = searchHistory.filter(h => h !== term);
-    setSearchHistory(newHistory);
-    localStorage.setItem("nexus-search-history", JSON.stringify(newHistory));
-    
-    // Sync to Firebase
-    (async () => {
-      try {
-        const { firebaseSyncService } = await import('@/services/firebase-sync');
-        firebaseSyncService.queueSync('searchHistory', newHistory);
-      } catch (error) {
-        // Silently fail if Firebase sync is not available
-      }
-    })();
-  };
+    const newHistory = searchHistory.filter((h) => h !== term)
+    setSearchHistory(newHistory)
+    localStorage.setItem("nexus-search-history", JSON.stringify(newHistory))
+  }
 
-  // Utility function to remove duplicates
   const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
-    const seen = new Set<string>();
-    return trackList.filter(track => {
+    const seen = new Set<string>()
+    return trackList.filter((track) => {
       if (seen.has(track.id)) {
-        return false;
+        return false
       }
-      seen.add(track.id);
-      return true;
-    });
-  }, []);
+      seen.add(track.id)
+      return true
+    })
+  }, [])
 
   // Effect to search YouTube when query changes (with debounce)
   useEffect(() => {
-    // Clear previous timer
     if (youtubeSearchTimerRef.current) {
-      clearTimeout(youtubeSearchTimerRef.current);
+      clearTimeout(youtubeSearchTimerRef.current)
     }
 
     if (query.trim() && query.length >= 2) {
-      // Debounce de 500ms pour éviter trop de requêtes
       youtubeSearchTimerRef.current = setTimeout(() => {
-        console.log('[SearchView] Recherche YouTube pour:', query);
-        searchYouTube(query);
-      }, 500);
+        searchYouTube(query)
+      }, 500)
     } else {
-      setYoutubeTracks([]);
+      setYoutubeTracks([])
     }
 
-    // Cleanup
     return () => {
       if (youtubeSearchTimerRef.current) {
-        clearTimeout(youtubeSearchTimerRef.current);
+        clearTimeout(youtubeSearchTimerRef.current)
       }
-    };
-  }, [query, searchYouTube]);
+    }
+  }, [query, searchYouTube])
 
   // Convert YouTube results to tracks
   useEffect(() => {
     if (youtubeResults.length > 0) {
-      console.log('[SearchView] Conversion de', youtubeResults.length, 'résultats YouTube en tracks');
       const converted = youtubeResults
-        .filter(result => result.videoId && result.videoId !== 'undefined' && result.videoId.trim() !== '')
-        .map(result => youtubeVideoToTrack(result));
-      setYoutubeTracks(converted);
-      console.log('[SearchView] ✅', converted.length, 'tracks YouTube créés');
+        .filter((result) => result.videoId && result.videoId !== "undefined" && result.videoId.trim() !== "")
+        .map((result) => youtubeVideoToTrack(result))
+      setYoutubeTracks(converted)
     } else {
-      setYoutubeTracks([]);
+      setYoutubeTracks([])
     }
-  }, [youtubeResults]);
+  }, [youtubeResults])
 
   // Search results (local + YouTube)
   const searchResults = useMemo(() => {
-    if (!query.trim()) return { tracks: [], albums: [], artists: [] };
+    if (!query.trim()) return { tracks: [], albums: [], artists: [] }
 
-    const q = query.toLowerCase();
-    
+    const q = query.toLowerCase()
+
     // Local tracks
-    const matchedTracks = tracks.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      t.artist.toLowerCase().includes(q) ||
-      t.album.toLowerCase().includes(q)
-    );
-    
+    const matchedTracks = tracks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.album.toLowerCase().includes(q),
+    )
+
     // Combine local and YouTube tracks
-    const allTracks = [...matchedTracks, ...youtubeTracks];
-    
-    // Remove duplicates (by id)
-    const uniqueMatchedTracks = getUniqueTracks(allTracks);
+    const allTracks = [...matchedTracks, ...youtubeTracks]
+    const uniqueMatchedTracks = getUniqueTracks(allTracks)
 
-    // Group by album (only for local tracks, not YouTube)
-    const albumsMap = new Map<string, { name: string; artist: string; coverUrl: string; count: number }>();
-    matchedTracks.forEach(t => {
-      const key = `${t.album}-${t.artist}`;
+    // Group by album
+    const albumsMap = new Map<string, { name: string; artist: string; coverUrl: string; count: number }>()
+    matchedTracks.forEach((t) => {
+      const key = `${t.album}-${t.artist}`
       if (!albumsMap.has(key)) {
-        albumsMap.set(key, { name: t.album, artist: t.artist, coverUrl: t.coverUrl, count: 0 });
+        albumsMap.set(key, { name: t.album, artist: t.artist, coverUrl: t.coverUrl, count: 0 })
       }
-      albumsMap.get(key)!.count++;
-    });
+      albumsMap.get(key)!.count++
+    })
 
-    // Group by artist (only for local tracks, not YouTube)
-    const artistsMap = new Map<string, { name: string; coverUrl: string; count: number }>();
-    matchedTracks.forEach(t => {
+    // Group by artist
+    const artistsMap = new Map<string, { name: string; coverUrl: string; count: number }>()
+    matchedTracks.forEach((t) => {
       if (!artistsMap.has(t.artist)) {
-        artistsMap.set(t.artist, { name: t.artist, coverUrl: t.coverUrl, count: 0 });
+        artistsMap.set(t.artist, { name: t.artist, coverUrl: t.coverUrl, count: 0 })
       }
-      artistsMap.get(t.artist)!.count++;
-    });
+      artistsMap.get(t.artist)!.count++
+    })
 
     return {
       tracks: uniqueMatchedTracks,
       albums: Array.from(albumsMap.values()).slice(0, 6),
-      artists: Array.from(artistsMap.values()).slice(0, 6)
-    };
-  }, [query, tracks, youtubeTracks, getUniqueTracks]);
+      artists: Array.from(artistsMap.values()).slice(0, 6),
+    }
+  }, [query, tracks, youtubeTracks, getUniqueTracks])
 
   // Get unique genres from tracks
   const genres = useMemo(() => {
-    const genreSet = new Set<string>();
-    tracks.forEach(t => {
-      if (t.genre) genreSet.add(t.genre);
-    });
-    return Array.from(genreSet).slice(0, 6);
-  }, [tracks]);
+    const genreSet = new Set<string>()
+    tracks.forEach((t) => {
+      if (t.genre) genreSet.add(t.genre)
+    })
+    return Array.from(genreSet).slice(0, 6)
+  }, [tracks])
 
-  // Default categories if no genres
-  const defaultCategories = [
-    { name: "Électronique", color: "from-cyan-500 to-blue-600" },
-    { name: "Synthwave", color: "from-pink-500 to-purple-600" },
-    { name: "Ambient", color: "from-green-500 to-teal-600" },
-    { name: "Cyberpunk", color: "from-yellow-500 to-orange-600" },
-    { name: "Lo-Fi", color: "from-indigo-500 to-purple-600" },
-    { name: "Techno", color: "from-red-500 to-pink-600" },
-  ];
+  // Browse categories
+  const browseCategories = [
+    { name: "Électronique", color: "bg-gradient-to-br from-cyan-500 to-blue-600" },
+    { name: "Synthwave", color: "bg-gradient-to-br from-pink-500 to-purple-600" },
+    { name: "Ambient", color: "bg-gradient-to-br from-emerald-500 to-teal-600" },
+    { name: "Cyberpunk", color: "bg-gradient-to-br from-amber-500 to-orange-600" },
+    { name: "Lo-Fi", color: "bg-gradient-to-br from-indigo-500 to-violet-600" },
+    { name: "Techno", color: "bg-gradient-to-br from-rose-500 to-pink-600" },
+    { name: "Rock", color: "bg-gradient-to-br from-red-500 to-rose-600" },
+    { name: "Hip Hop", color: "bg-gradient-to-br from-yellow-500 to-amber-600" },
+  ]
 
   const handleSearch = (term: string) => {
-    setQuery(term);
-    saveToHistory(term);
-  };
+    setQuery(term)
+    saveToHistory(term)
+  }
 
-  const hasResults = query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0);
+  const hasResults =
+    query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0)
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in duration-200">
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-4 space-y-6">
-          {/* Header */}
-          <PageHeader
-            title="Recherche"
-            subtitle={searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0 ? `${searchResults.tracks.length + searchResults.albums.length + searchResults.artists.length} résultat(s) trouvé(s)` : "Recherchez dans votre bibliothèque"}
-          />
+    <TooltipProvider>
+      <div className="h-full flex flex-col animate-in fade-in duration-500">
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-6 space-y-8">
+            {/* Search Header */}
+            <div>
+              <h1 className="font-display text-3xl font-bold tracking-tight mb-2">
+                <span className="text-gradient">Recherche</span>
+              </h1>
+              <p className="text-muted-foreground">
+                Explorez votre bibliothèque et découvrez de nouvelles pistes sur YouTube
+              </p>
+            </div>
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Rechercher des titres, artistes ou albums..."
-              value={query}
-              onChange={(e) => {
-                const value = e.target.value;
-                setQuery(value);
-                if (value.trim()) saveToHistory(value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && query.trim()) {
-                  saveToHistory(query.trim());
-                }
-              }}
-              className="pl-10 pr-10 py-6 text-lg bg-card/50 border-border/50 focus:border-primary focus:ring-primary transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-primary/50"
-            />
-            {query && (
-              <Tooltip>
-                <TooltipTrigger asChild>
+            {/* Search Bar - Enhanced */}
+            <div className="relative">
+              <div
+                className={cn(
+                  "relative flex items-center rounded-2xl overflow-hidden",
+                  "bg-white/5 border border-white/10",
+                  "transition-all duration-300",
+                  isFocused && "border-primary/50 bg-white/10 shadow-lg shadow-primary/10",
+                )}
+              >
+                <div className="pl-4">
+                  <Search
+                    className={cn(
+                      "w-5 h-5 transition-colors duration-300",
+                      isFocused ? "text-primary" : "text-muted-foreground",
+                    )}
+                  />
+                </div>
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Artistes, titres ou albums..."
+                  value={query}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setQuery(value)
+                    if (value.trim()) saveToHistory(value)
+                  }}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && query.trim()) {
+                      saveToHistory(query.trim())
+                    }
+                  }}
+                  className={cn(
+                    "flex-1 border-0 bg-transparent py-4 text-base",
+                    "focus-visible:ring-0 focus-visible:ring-offset-0",
+                    "placeholder:text-muted-foreground/50",
+                  )}
+                />
+                {query && (
                   <button
                     onClick={() => setQuery("")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                    aria-label="Effacer la recherche"
+                    className={cn(
+                      "mr-3 p-1.5 rounded-full",
+                      "hover:bg-white/10 transition-all duration-200",
+                      "text-muted-foreground hover:text-foreground",
+                    )}
+                    title="Effacer la recherche"
                   >
-                    <X className="w-4 h-4 text-muted-foreground hover:scale-105 transition-transform duration-200 ease-out" />
+                    <X className="w-4 h-4" />
                   </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm">Effacer la recherche</div>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-
-      {query ? (
-        /* Search Results */
-        <div className="space-y-6">
-          {/* Artists Results */}
-          {searchResults.artists.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <User className="w-5 h-5 text-primary" />
-                <h2 className="font-display text-lg tracking-wider">ARTISTES</h2>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {searchResults.artists.map((artist) => (
-                  <Tooltip key={artist.name}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleSearch(artist.name)}
-                        className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-95 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                      >
-                        <div className="w-24 h-24 rounded-full overflow-hidden mx-auto mb-2 bg-gradient-to-br from-primary/20 to-secondary/20">
-                          <img src={getCoverUrl(artist.coverUrl)} alt={artist.name} className="w-full h-full object-cover" />
-                        </div>
-                        <p className="text-sm font-medium truncate w-24">{artist.name}</p>
-                        <p className="text-xs text-muted-foreground">{artist.count} titres</p>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-sm font-medium">{artist.name}</div>
-                      <div className="text-xs text-muted-foreground">{artist.count} titre{artist.count > 1 ? 's' : ''}</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
+                )}
+                {youtubeLoading && (
+                  <div className="mr-4">
+                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                  </div>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Albums Results */}
-          {searchResults.albums.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Disc3 className="w-5 h-5 text-primary" />
-                <h2 className="font-display text-lg tracking-wider">ALBUMS</h2>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {searchResults.albums.map((album) => (
-                  <Tooltip key={`${album.name}-${album.artist}`}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleSearch(album.name)}
-                        className="p-3 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-95 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                      >
-                        <div className="aspect-square rounded-lg overflow-hidden mb-2 shadow-lg">
-                          <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
-                        </div>
-                        <p className="text-sm font-medium truncate">{album.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-sm font-medium">{album.name}</div>
-                      <div className="text-xs text-muted-foreground">{album.artist}</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tracks Results */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Music className="w-5 h-5 text-primary" />
-              <h2 className="font-display text-lg tracking-wider">
-                TITRES ({searchResults.tracks.length})
-              </h2>
-              {youtubeLoading && (
-                <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
-              )}
-            </div>
-            {youtubeError && (
-              <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
-                <p className="text-sm text-muted-foreground">{youtubeError}</p>
-              </div>
-            )}
-            {searchResults.tracks.length === 0 && !youtubeLoading ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground">
-                  Aucun résultat pour "{query}"
-                </p>
-              </div>
-            ) : (
-              <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 divide-y divide-border/30">
-                {searchResults.tracks.slice(0, 50).map((track) => {
-                  // For YouTube tracks, find index in combined array (local + YouTube)
-                  // For local tracks, find in original tracks array
-                  const isYouTubeTrack = track.mediaSource === 'youtube';
-                  let actualIndex: number;
-                  
-                  if (isYouTubeTrack) {
-                    // For YouTube tracks, we need to find them in the combined array
-                    // Since they're not in the original tracks array, we'll use a special handling
-                    // We'll pass the track directly to onTrackSelect via a callback
-                    actualIndex = -1; // Mark as YouTube track
-                  } else {
-                    actualIndex = tracks.findIndex((t) => t.id === track.id);
-                  }
-                  
-                  const isCurrentTrack = !isYouTubeTrack && currentTrackIndex === actualIndex;
-
-                  return (
-                    <TrackContextMenu
-                      key={track.id}
-                      track={track}
-                      playlists={playlists}
-                      isFavorite={isFavorite(track.id)}
-                      onPlay={() => {
-                        if (isYouTubeTrack && onPlayTrack) {
-                          onPlayTrack(track);
-                        } else if (!isYouTubeTrack) {
-                          onTrackSelect(actualIndex);
-                        } else {
-                          onAddToQueue?.(track);
-                        }
-                      }}
-                      onPlayNext={() => onPlayNext?.(track)}
-                      onAddToQueue={() => onAddToQueue?.(track)}
-                      onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                      onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
-                      onToggleFavorite={() => toggleFavorite(track.id)}
-                      onUploadToCloudinary={() => uploadTrack?.(track)}
-                      canUploadToCloudinary={canUploadToCloudinary && !!track.filePath && !isYouTubeTrack}
-                      isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-                      onUploadToBunny={() => uploadTrackToBunny?.(track)}
-                      canUploadToBunny={canUploadToBunny && !!track.filePath && !isYouTubeTrack}
-                      isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
-                      onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                      canUploadToNexus={canUploadToNexus && !!track.filePath && !isYouTubeTrack}
-                      isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                    >
-                      <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          onClick={() => {
-                            if (isYouTubeTrack && onPlayTrack) {
-                              onPlayTrack(track);
-                            } else if (!isYouTubeTrack) {
-                              onTrackSelect(actualIndex);
-                            } else {
-                              onAddToQueue?.(track);
-                            }
-                          }}
+            {query ? (
+              /* Search Results */
+              <div className="space-y-8">
+                {/* Artists Results */}
+                {searchResults.artists.length > 0 && (
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                      <User className="w-5 h-5 text-primary" />
+                      <h2 className="font-display text-lg font-semibold">Artistes</h2>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                      {searchResults.artists.map((artist) => (
+                        <button
+                          key={artist.name}
+                          onClick={() => handleSearch(artist.name)}
                           className={cn(
-                            "flex items-center gap-4 px-3 py-2.5 cursor-pointer transition-all duration-200 ease-out group",
-                            isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+                            "flex-shrink-0 flex flex-col items-center gap-3 p-4",
+                            "transition-all duration-300 ease-out",
+                            "hover:scale-105",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                           )}
                         >
-                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 relative">
-                        <img
-                          src={getCoverUrl(track.coverUrl)}
-                          alt={track.album}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                          <Play className="w-5 h-5 text-white fill-current" />
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                        <p className={cn(
-                          "text-sm font-medium truncate",
-                          isCurrentTrack ? "text-primary" : "text-foreground"
-                        )}>
-                          {track.title}
-                        </p>
-                                {isYouTubeTrack && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium">
-                                    YT
-                                  </span>
-                                )}
-                                {isUploaded(track.id) && (
-                                  <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
-                                )}
-                              </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {track.artist} • {track.album}
-                        </p>
-                      </div>
-                      <span className="text-sm text-muted-foreground font-mono">
-                        {formatTime(track.duration)}
+                          <div
+                            className={cn(
+                              "w-24 h-24 rounded-full overflow-hidden",
+                              "ring-2 ring-white/10 hover:ring-primary/50",
+                              "transition-all duration-300",
+                            )}
+                          >
+                            <img
+                              src={getCoverUrl(artist.coverUrl) || "/placeholder.svg"}
+                              alt={artist.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-medium truncate max-w-[100px]">{artist.name}</p>
+                            <p className="text-xs text-muted-foreground">{artist.count} titres</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Albums Results */}
+                {searchResults.albums.length > 0 && (
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Disc3 className="w-5 h-5 text-primary" />
+                      <h2 className="font-display text-lg font-semibold">Albums</h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {searchResults.albums.map((album) => (
+                        <button
+                          key={`${album.name}-${album.artist}`}
+                          onClick={() => handleSearch(album.name)}
+                          className={cn(
+                            "group text-left rounded-xl overflow-hidden",
+                            "bg-white/5 hover:bg-white/10",
+                            "transition-all duration-300",
+                            "hover:scale-[1.03] hover:shadow-xl hover:shadow-primary/10",
+                          )}
+                        >
+                          <div className="relative aspect-square overflow-hidden">
+                            <img
+                              src={getCoverUrl(album.coverUrl) || "/placeholder.svg"}
+                              alt={album.name}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                          </div>
+                          <div className="p-3">
+                            <p className="text-sm font-medium truncate">{album.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Tracks Results */}
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Music className="w-5 h-5 text-primary" />
+                    <h2 className="font-display text-lg font-semibold">
+                      Titres
+                      <span className="ml-2 text-sm text-muted-foreground font-normal">
+                        ({searchResults.tracks.length})
                       </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
+                    </h2>
+                  </div>
+
+                  {youtubeError && (
+                    <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                      <p className="text-sm text-rose-400">{youtubeError}</p>
+                    </div>
+                  )}
+
+                  {searchResults.tracks.length === 0 && !youtubeLoading ? (
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                        <Search className="w-10 h-10 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-lg font-medium mb-1">Aucun résultat</p>
+                      <p className="text-muted-foreground text-sm">Essayez avec d'autres mots-clés</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 bg-white/5 rounded-2xl p-2">
+                      {searchResults.tracks.slice(0, 50).map((track) => {
+                        const isYouTubeTrack = track.mediaSource === "youtube"
+                        let actualIndex: number
+
+                        if (isYouTubeTrack) {
+                          actualIndex = -1
+                        } else {
+                          actualIndex = tracks.findIndex((t) => t.id === track.id)
+                        }
+
+                        const isCurrentTrack = !isYouTubeTrack && currentTrackIndex === actualIndex
+
+                        return (
+                          <TrackContextMenu
+                            key={track.id}
+                            track={track}
+                            playlists={playlists}
+                            isFavorite={isFavorite(track.id)}
+                            onPlay={() => {
+                              if (isYouTubeTrack && onPlayTrack) {
+                                onPlayTrack(track)
+                              } else if (!isYouTubeTrack) {
+                                onTrackSelect(actualIndex)
+                              } else {
+                                onAddToQueue?.(track)
+                              }
+                            }}
+                            onPlayNext={() => onPlayNext?.(track)}
+                            onAddToQueue={() => onAddToQueue?.(track)}
+                            onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                            onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                            onToggleFavorite={() => toggleFavorite(track.id)}
+                            onUploadToCloudinary={() => uploadTrack?.(track)}
+                            canUploadToCloudinary={canUploadToCloudinary && !!track.filePath && !isYouTubeTrack}
+                            isUploading={getTrackProgress?.(track.id)?.status === "uploading"}
+                            onUploadToBunny={() => uploadTrackToBunny?.(track)}
+                            canUploadToBunny={canUploadToBunny && !!track.filePath && !isYouTubeTrack}
+                            isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === "uploading"}
+                            onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                            canUploadToNexus={canUploadToNexus && !!track.filePath && !isYouTubeTrack}
+                            isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === "uploading"}
+                          >
+                            <SearchTrackItem
+                              track={track}
+                              isPlaying={isPlaying}
+                              isCurrent={isCurrentTrack}
+                              onPlay={() => {
+                                if (isYouTubeTrack && onPlayTrack) {
+                                  onPlayTrack(track)
+                                } else if (!isYouTubeTrack) {
+                                  onTrackSelect(actualIndex)
+                                } else {
+                                  onAddToQueue?.(track)
+                                }
                               }}
-                              className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                              aria-label="Options"
-                            >
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
+                              isYouTube={isYouTubeTrack}
+                            />
+                          </TrackContextMenu>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              </div>
+            ) : (
+              /* Browse Mode - No Search */
+              <div className="space-y-10">
+                {/* Search History */}
+                {searchHistory.length > 0 && (
+                  <section>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <History className="w-5 h-5 text-muted-foreground" />
+                        <h2 className="font-display text-lg font-semibold">Recherches récentes</h2>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearHistory}
+                        className="text-xs text-muted-foreground"
+                      >
+                        Effacer tout
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {searchHistory.map((term) => (
+                        <HistoryChip
+                          key={term}
+                          term={term}
+                          onSelect={() => handleSearch(term)}
+                          onRemove={() => removeFromHistory(term)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Browse Categories */}
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <h2 className="font-display text-lg font-semibold">Explorer par genre</h2>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {browseCategories.map((cat) => (
+                      <CategoryCard
+                        key={cat.name}
+                        name={cat.name}
+                        color={cat.color}
+                        onClick={() => handleSearch(cat.name)}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                {/* Trending / Popular suggestion */}
+                <section>
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    <h2 className="font-display text-lg font-semibold">Suggestions de recherche</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[
+                      "Daft Punk",
+                      "Synthwave Mix",
+                      "Ambient Music",
+                      "Electronic Dance",
+                      "Chill Beats",
+                      "Night Drive",
+                    ].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        onClick={() => handleSearch(suggestion)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-xl",
+                          "bg-white/5 hover:bg-white/10 border border-white/5 hover:border-primary/20",
+                          "transition-all duration-300",
+                          "text-left group",
+                        )}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center flex-shrink-0">
+                          <Search className="w-4 h-4 text-primary" />
                         </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-sm font-medium">{track.title}</div>
-                        <div className="text-xs text-muted-foreground">{track.artist}</div>
-                        {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
-                        <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
-                      </TooltipContent>
-                    </Tooltip>
-                    </TrackContextMenu>
-                  );
-                })}
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                          {suggestion}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    ))}
+                  </div>
+                </section>
               </div>
             )}
           </div>
         </div>
-      ) : (
-        /* Browse View */
-        <div className="space-y-6">
-          {/* Search History */}
-          {searchHistory.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-muted-foreground" />
-                  <h2 className="font-display text-lg tracking-wider">RECHERCHES RÉCENTES</h2>
-                </div>
-                <button
-                  onClick={clearHistory}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
-                >
-                  Effacer tout
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {searchHistory.map((term) => (
-                  <Tooltip key={term}>
-                    <TooltipTrigger asChild>
-                      <div className="group flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 hover:bg-card transition-all duration-200 ease-out">
-                        <button
-                          onClick={() => setQuery(term)}
-                          className="text-sm text-foreground transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
-                        >
-                          {term}
-                        </button>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeFromHistory(term);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
-                              aria-label="Supprimer de l'historique"
-                            >
-                              <X className="w-3 h-3 text-muted-foreground hover:text-foreground hover:scale-105 transition-all duration-200 ease-out" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-sm">Supprimer de l'historique</div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="text-sm">Rechercher "{term}"</div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Browse by Genre */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <h2 className="font-display text-lg tracking-wider">
-                {genres.length > 0 ? "VOS GENRES" : "PARCOURIR LES GENRES"}
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {(genres.length > 0 ? genres.map((g, i) => ({ 
-                name: g, 
-                color: defaultCategories[i % defaultCategories.length].color 
-              })) : defaultCategories).map((category) => (
-                <button
-                  key={category.name}
-                  onClick={() => handleSearch(category.name)}
-                  className={cn(
-                    "relative h-28 rounded-xl overflow-hidden group transition-all duration-200 ease-out active:scale-95",
-                    "bg-gradient-to-br",
-                    category.color,
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                  )}
-                >
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-200 ease-out" />
-                  <div className="absolute inset-0 flex items-end p-4">
-                    <h3 className="font-display text-xl font-bold text-white">
-                      {category.name}
-                    </h3>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Access - Top Artists */}
-          {tracks.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <User className="w-5 h-5 text-secondary" />
-                <h2 className="font-display text-lg tracking-wider">ARTISTES POPULAIRES</h2>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {Array.from(new Set(tracks.map(t => t.artist))).slice(0, 8).map((artist) => {
-                  const artistTrack = tracks.find(t => t.artist === artist);
-                  return (
-                    <button
-                      key={artist}
-                      onClick={() => handleSearch(artist)}
-                      className="flex-shrink-0 p-4 rounded-xl hover:bg-card/50 transition-all duration-200 ease-out active:scale-95 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                    >
-                      <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-2 shadow-lg">
-                        <img 
-                          src={getCoverUrl(artistTrack?.coverUrl)} 
-                          alt={artist} 
-                          className="w-full h-full object-cover" 
-                        />
-                      </div>
-                      <p className="text-sm font-medium truncate w-20">{artist}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-        </div>
       </div>
-    </div>
-  );
-};
+    </TooltipProvider>
+  )
+}
