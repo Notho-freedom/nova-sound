@@ -315,7 +315,7 @@ export const HomeView = memo(({
             {getGreeting()}{userName ? `, ${userName}` : ""}
           </h2>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
             {quickPlayItems.map((track) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;

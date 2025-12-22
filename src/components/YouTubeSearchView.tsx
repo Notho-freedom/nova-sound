@@ -536,17 +536,73 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     }
   }, [loadArtistSuggestions, searchQuery]);
 
+  // Ref pour le debounce de la recherche automatique
+  const autoSearchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Mettre à jour les suggestions quand la requête change
   useEffect(() => {
     if (searchQuery.trim() && searchQuery.length >= 2) {
       searchSuggestions(searchQuery);
       setShowSuggestions(true);
+      
+      // Déclencher automatiquement la recherche après 800ms d'inactivité
+      if (autoSearchTimerRef.current) {
+        clearTimeout(autoSearchTimerRef.current);
+      }
+      
+      autoSearchTimerRef.current = setTimeout(async () => {
+        console.log('[YouTubeSearchView] 🔍 Recherche automatique déclenchée pour:', searchQuery);
+        try {
+          await search(searchQuery);
+          console.log('[YouTubeSearchView] ✅ Recherche terminée');
+        } catch (error) {
+          console.error('[YouTubeSearchView] ❌ Erreur lors de la recherche automatique:', error);
+        }
+        
+        // Rechercher aussi les playlists
+        setLoadingPlaylists(true);
+        searchYouTubePlaylists(searchQuery, 10)
+          .then(foundPlaylists => {
+            const convertedPlaylists: YouTubeSearchResult[] = foundPlaylists.map(playlist => ({
+              videoId: playlist.videoId,
+              title: playlist.title,
+              description: playlist.description,
+              thumbnailUrl: playlist.thumbnailUrl,
+              channelTitle: playlist.channelTitle,
+              publishedAt: playlist.publishedAt,
+              duration: playlist.duration ? `PT${Math.floor(playlist.duration / 3600)}H${Math.floor((playlist.duration % 3600) / 60)}M${playlist.duration % 60}S` : undefined,
+              viewCount: playlist.viewCount?.toString(),
+            }));
+            setPlaylists(convertedPlaylists);
+            console.log('[YouTubeSearchView] ✅ Playlists trouvées:', convertedPlaylists.length);
+          })
+          .catch(error => {
+            console.error('[YouTubeSearchView] ❌ Erreur recherche playlists:', error);
+            setPlaylists([]);
+          })
+          .finally(() => {
+            setLoadingPlaylists(false);
+          });
+      }, 800);
     } else {
       clearSuggestions();
       setShowSuggestions(false);
       // Si la recherche est vide, on affiche l'historique et les suggestions
       clearResults();
+      setPlaylists([]);
+      
+      // Annuler la recherche automatique en cours
+      if (autoSearchTimerRef.current) {
+        clearTimeout(autoSearchTimerRef.current);
+      }
     }
+    
+    // Cleanup
+    return () => {
+      if (autoSearchTimerRef.current) {
+        clearTimeout(autoSearchTimerRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
@@ -1086,15 +1142,20 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
               </div>
             ))}
           </div>
-            ) : (
+            ) : !loading ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <Search className="w-16 h-16 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">Aucun résultat</h3>
                 <p className="text-sm text-muted-foreground max-w-md">
                   Aucune vidéo trouvée pour "{searchQuery}". Essayez avec d'autres mots-clés.
                 </p>
+                {error && (
+                  <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
               </div>
-            )}
+            ) : null}
             </div>
 
             {/* Colonne latérale : Playlists */}

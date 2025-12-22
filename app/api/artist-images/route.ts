@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('query');
     const limit = parseInt(searchParams.get('limit') || '10', 10);
     const random = searchParams.get('random') === 'true';
+    const width = searchParams.get('width') ? parseInt(searchParams.get('width')!, 10) : undefined;
+    const height = searchParams.get('height') ? parseInt(searchParams.get('height')!, 10) : undefined;
+    const orientation = searchParams.get('orientation') as 'landscape' | 'portrait' | 'squarish' | undefined;
 
     if (!query) {
       return NextResponse.json(
@@ -43,25 +46,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (random) {
-      // Récupérer une image aléatoire
-      const image = await provider.getRandomImage(query);
-      
-      if (!image) {
-        return NextResponse.json(
-          { error: 'Aucune image trouvée' },
-          { status: 404 }
-        );
-      }
+    // Options de recherche avec dimensions et orientation
+    const searchOptions: any = {
+      query,
+      limit: Math.min(limit, 50),
+    };
 
-      return NextResponse.json({ image });
+    if (width) searchOptions.width = width;
+    if (height) searchOptions.height = height;
+    if (orientation) searchOptions.orientation = orientation;
+
+    if (random) {
+      // Récupérer une image aléatoire avec les options
+      const result = await provider.search(searchOptions);
+      if (result.images.length > 0) {
+        // Sélectionner une image aléatoire parmi les résultats
+        const randomIndex = Math.floor(Math.random() * result.images.length);
+        return NextResponse.json({ image: result.images[randomIndex] });
+      }
+      
+      return NextResponse.json(
+        { error: 'Aucune image trouvée' },
+        { status: 404 }
+      );
     }
 
     // Recherche normale
-    const result = await provider.search({
-      query,
-      limit: Math.min(limit, 50),
-    });
+    const result = await provider.search(searchOptions);
 
     return NextResponse.json(result);
   } catch (error) {

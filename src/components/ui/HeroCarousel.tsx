@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Play, Pause, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { motion, AnimatePresence } from "framer-motion";
+import type { ArtistImage } from "@/types/artist-image";
 
 interface CarouselSlide {
   id: string;
@@ -38,32 +39,121 @@ export const HeroCarousel = memo(({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [direction, setDirection] = useState(0);
+  const [enhancedSlides, setEnhancedSlides] = useState<CarouselSlide[]>(slides);
+  const [imageCache, setImageCache] = useState<Map<string, string>>(new Map());
 
   const goToNext = useCallback(() => {
     setDirection(1);
-    setCurrentIndex((prev) => (prev + 1) % slides.length);
-  }, [slides.length]);
+    setCurrentIndex((prev) => (prev + 1) % enhancedSlides.length);
+  }, [enhancedSlides.length]);
 
   const goToPrevious = useCallback(() => {
     setDirection(-1);
-    setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
-  }, [slides.length]);
+    setCurrentIndex((prev) => (prev - 1 + enhancedSlides.length) % enhancedSlides.length);
+  }, [enhancedSlides.length]);
 
   const goToSlide = useCallback((index: number) => {
     setDirection(index > currentIndex ? 1 : -1);
     setCurrentIndex(index);
   }, [currentIndex]);
 
+  // Dimensions optimales pour le HeroCarousel
+  // Hauteur: 400px (mobile), 480px (md), 520px (lg)
+  // Largeur: pleine largeur (généralement 1920px+ pour desktop)
+  // Ratio: ~16:9 ou landscape pour un meilleur rendu
+  const getOptimalImageDimensions = useCallback(() => {
+    // Pour un carousel hero, on veut des images larges en format paysage
+    // Dimensions cibles: 1920x1080 (Full HD) ou plus pour un meilleur rendu
+    const width = 1920; // Largeur optimale pour desktop
+    const height = 1080; // Hauteur optimale (ratio 16:9)
+    
+    return { width, height };
+  }, []);
+
+  // Fonction pour récupérer une image améliorée depuis le service d'image
+  const fetchEnhancedImage = useCallback(async (query: string): Promise<string | null> => {
+    // Vérifier le cache d'abord
+    if (imageCache.has(query)) {
+      return imageCache.get(query) || null;
+    }
+
+    try {
+      const { width, height } = getOptimalImageDimensions();
+      // Recherche avec dimensions spécifiques et orientation landscape
+      const params = new URLSearchParams({
+        query: query,
+        limit: '1',
+        random: 'true',
+        width: width.toString(),
+        height: height.toString(),
+        orientation: 'landscape', // Format paysage pour le hero
+      });
+
+      const response = await fetch(`/api/artist-images?${params.toString()}`);
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      if (data.image?.url) {
+        const imageUrl = data.image.url;
+        setImageCache(prev => new Map(prev).set(query, imageUrl));
+        return imageUrl;
+      }
+    } catch (error) {
+      console.warn(`[HeroCarousel] Erreur lors de la récupération d'image pour "${query}":`, error);
+    }
+
+    return null;
+  }, [imageCache, getOptimalImageDimensions]);
+
+  // Enrichir les slides avec de meilleures images
   useEffect(() => {
-    if (!autoPlay || isPaused || slides.length <= 1) return;
+    const enhanceSlides = async () => {
+      const updatedSlides = await Promise.all(
+        slides.map(async (slide) => {
+          // Si l'image actuelle est une image par défaut ou manquante, essayer d'en trouver une meilleure
+          const isDefaultImage = !slide.imageUrl || 
+            slide.imageUrl.includes('placeholder') || 
+            slide.imageUrl.includes('default') ||
+            slide.imageUrl === '/placeholder.svg';
+
+          if (isDefaultImage && slide.title) {
+            // Essayer de trouver une image basée sur le titre (artiste, album, etc.)
+            const enhancedImage = await fetchEnhancedImage(slide.title);
+            if (enhancedImage) {
+              return { ...slide, imageUrl: enhancedImage };
+            }
+          }
+
+          // Si c'est un slide d'artiste, essayer d'améliorer l'image
+          if (slide.subtitle?.includes('Artiste') && slide.title) {
+            const enhancedImage = await fetchEnhancedImage(slide.title);
+            if (enhancedImage) {
+              return { ...slide, imageUrl: enhancedImage };
+            }
+          }
+
+          return slide;
+        })
+      );
+
+      setEnhancedSlides(updatedSlides);
+    };
+
+    enhanceSlides();
+  }, [slides, fetchEnhancedImage]);
+
+  useEffect(() => {
+    if (!autoPlay || isPaused || enhancedSlides.length <= 1) return;
 
     const timer = setInterval(goToNext, interval);
     return () => clearInterval(timer);
-  }, [autoPlay, isPaused, interval, goToNext, slides.length]);
+  }, [autoPlay, isPaused, interval, goToNext, enhancedSlides.length]);
 
-  if (slides.length === 0) return null;
+  if (enhancedSlides.length === 0) return null;
 
-  const currentSlide = slides[currentIndex];
+  const currentSlide = enhancedSlides[currentIndex];
 
   const slideVariants = {
     enter: (direction: number) => ({
@@ -110,11 +200,36 @@ export const HeroCarousel = memo(({
           }}
           className="absolute inset-0"
         >
-          {/* Image */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transform scale-105 transition-transform duration-[8s] group-hover:scale-110"
-            style={{ backgroundImage: `url(${currentSlide.imageUrl})` }}
-          />
+          {/* Image - Optimisée pour le format hero avec dimensions sur mesure */}
+          <div className="absolute inset-0 overflow-hidden">
+            <img
+              src={currentSlide.imageUrl}
+              alt={currentSlide.title}
+              className="absolute inset-0 w-full h-full object-cover transform scale-105 transition-transform duration-[8s] group-hover:scale-90"
+              style={{
+                minWidth: '100%',
+                minHeight: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center',
+              }}
+              loading="eager"
+              decoding="async"
+              width={1920}
+              height={1080}
+              onError={(e) => {
+                // Fallback si l'image ne charge pas
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                // Utiliser un background fallback
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.style.backgroundImage = `url(${currentSlide.imageUrl})`;
+                  parent.style.backgroundSize = 'cover';
+                  parent.style.backgroundPosition = 'center';
+                }
+              }}
+            />
+          </div>
 
           {/* Overlay gradients */}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
@@ -210,10 +325,12 @@ export const HeroCarousel = memo(({
       </div>
 
       {/* Navigation arrows */}
-      {slides.length > 1 && (
+      {enhancedSlides.length > 1 && (
         <>
           <button
             onClick={goToPrevious}
+            aria-label="Slide précédent"
+            title="Slide précédent"
             className={cn(
               "absolute left-4 top-1/2 -translate-y-1/2 z-20",
               "w-12 h-12 rounded-full flex items-center justify-center",
@@ -227,6 +344,8 @@ export const HeroCarousel = memo(({
           </button>
           <button
             onClick={goToNext}
+            aria-label="Slide suivant"
+            title="Slide suivant"
             className={cn(
               "absolute right-4 top-1/2 -translate-y-1/2 z-20",
               "w-12 h-12 rounded-full flex items-center justify-center",
@@ -242,12 +361,14 @@ export const HeroCarousel = memo(({
       )}
 
       {/* Dots indicator */}
-      {slides.length > 1 && (
+      {enhancedSlides.length > 1 && (
         <div className="absolute bottom-6 right-8 z-20 flex items-center gap-2">
-          {slides.map((_, index) => (
+          {enhancedSlides.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
+              aria-label={`Aller au slide ${index + 1}`}
+              title={`Slide ${index + 1}`}
               className={cn(
                 "transition-all duration-300",
                 index === currentIndex
@@ -260,7 +381,7 @@ export const HeroCarousel = memo(({
       )}
 
       {/* Progress bar */}
-      {autoPlay && !isPaused && slides.length > 1 && (
+      {autoPlay && !isPaused && enhancedSlides.length > 1 && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
           <motion.div
             key={currentIndex}
