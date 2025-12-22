@@ -142,10 +142,10 @@ export class BrowserAudioAnalyzer {
       }
 
       // Obtenir les données de fréquence
-      this.analyser.getFloatFrequencyData(this.frequencyData);
+      this.analyser.getFloatFrequencyData(this.frequencyData as Float32Array<ArrayBuffer>);
       
       // Obtenir les données de forme d'onde
-      this.analyser.getFloatTimeDomainData(this.waveformData);
+      this.analyser.getFloatTimeDomainData(this.waveformData as Float32Array<ArrayBuffer>);
 
       // Calculer les métriques
       const analysis = this.computeAnalysis();
