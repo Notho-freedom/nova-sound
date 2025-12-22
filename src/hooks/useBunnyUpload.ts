@@ -94,35 +94,13 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       };
       setUploadProgress(prev => new Map(prev).set(track.id, progress));
 
-      // Read file as base64 from Electron
-      const base64Data = await window.electronAPI.readFileAsBase64(track.filePath!);
-      
-      // Convert base64 to blob
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      
-      // Determine MIME type from file extension
-      const ext = track.filePath.split('.').pop()?.toLowerCase();
-      const mimeTypes: Record<string, string> = {
-        'mp3': 'audio/mpeg',
-        'flac': 'audio/flac',
-        'ogg': 'audio/ogg',
-        'wav': 'audio/wav',
-        'm4a': 'audio/mp4',
-        'aac': 'audio/aac',
-        'opus': 'audio/opus',
-        'wma': 'audio/x-ms-wma',
-        'aiff': 'audio/aiff',
-      };
-      const mimeType = mimeTypes[ext || ''] || 'audio/mpeg';
-      
-      const blob = new Blob([byteArray], { type: mimeType });
-      
+      // Get file info to check size
+      const fileInfo = await window.electronAPI.getFileInfo?.(track.filePath!);
+      const fileSizeMB = fileInfo ? fileInfo.size / (1024 * 1024) : 0;
+      const FILE_SIZE_LIMIT_MB = 100; // 100MB limit for base64
+
       // Generate filename
+      const ext = track.filePath.split('.').pop()?.toLowerCase();
       const fileName = `${track.artist} - ${track.title}.${ext || 'mp3'}`;
 
       // Get access token
@@ -139,6 +117,174 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       if (!accessToken) {
         throw new Error('Not authenticated - no token available');
       }
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
+      // Use streaming upload for large files (> 100MB)
+      if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
+        console.log(`[BunnyUpload] File too large (${fileSizeMB.toFixed(2)} MB), using streaming upload`);
+        
+        const result = await window.electronAPI.uploadToNexus({
+          filePath: track.filePath!,
+          apiUrl: `${API_BASE_URL}/api/storage/upload-bunny`,
+          accessToken,
+          fileName,
+          onProgress: (progressValue) => {
+            setUploadProgress(prev => {
+              const updated = new Map(prev);
+              const current = updated.get(track.id);
+              if (current) {
+                updated.set(track.id, {
+                  ...current,
+                  progress: progressValue,
+                });
+              }
+              return updated;
+            });
+          },
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        // Track uploaded media for sync
+        (async () => {
+          try {
+            const { firebaseSyncService } = await import('@/services/firebase-sync');
+            const { getUserStorageKey } = await import('@/lib/storage-utils');
+            
+            const storageKey = await getUserStorageKey('nexus-uploaded-media');
+            const saved = localStorage.getItem(storageKey);
+            const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
+            
+            uploadedMedia.push({
+              id: result.id || track.id,
+              name: fileName,
+              uploadedAt: new Date().toISOString(),
+              cloudProvider: 'bunny',
+              url: result.url,
+              size: result.size || fileInfo?.size,
+            });
+            
+            localStorage.setItem(storageKey, JSON.stringify(uploadedMedia));
+            window.dispatchEvent(new CustomEvent('uploadedMediaChanged'));
+          } catch (error) {
+            console.error('Failed to track uploaded media:', error);
+          }
+        })();
+
+        // Mark as completed
+        setUploadProgress(prev => {
+          const updated = new Map(prev);
+          const current = updated.get(track.id);
+          if (current) {
+            updated.set(track.id, {
+              ...current,
+              progress: 100,
+              status: 'completed',
+            });
+          }
+          return updated;
+        });
+
+        notificationService.uploadCompleted(track.title, 'Bunny CDN (Serveur 1)');
+
+        // Remove progress after 3 seconds
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const updated = new Map(prev);
+            updated.delete(track.id);
+            return updated;
+          });
+        }, 3000);
+
+        return;
+      }
+
+      // For smaller files, use base64 method
+      let base64Data: string;
+      try {
+        base64Data = await window.electronAPI.readFileAsBase64(track.filePath!);
+      } catch (error: any) {
+        if (error.message?.includes('File too large')) {
+          // Fallback to streaming if base64 fails
+          if (window.electronAPI.uploadToNexus) {
+            const result = await window.electronAPI.uploadToNexus({
+              filePath: track.filePath!,
+              apiUrl: `${API_BASE_URL}/api/storage/upload-bunny`,
+              accessToken,
+              fileName,
+              onProgress: (progressValue) => {
+                setUploadProgress(prev => {
+                  const updated = new Map(prev);
+                  const current = updated.get(track.id);
+                  if (current) {
+                    updated.set(track.id, {
+                      ...current,
+                      progress: progressValue,
+                    });
+                  }
+                  return updated;
+                });
+              },
+            });
+
+            if (!result.success) {
+              throw new Error(result.error || 'Upload failed');
+            }
+
+            setUploadProgress(prev => {
+              const updated = new Map(prev);
+              const current = updated.get(track.id);
+              if (current) {
+                updated.set(track.id, {
+                  ...current,
+                  progress: 100,
+                  status: 'completed',
+                });
+              }
+              return updated;
+            });
+
+            notificationService.uploadCompleted(track.title, 'Bunny CDN (Serveur 1)');
+            setTimeout(() => {
+              setUploadProgress(prev => {
+                const updated = new Map(prev);
+                updated.delete(track.id);
+                return updated;
+              });
+            }, 3000);
+
+            return;
+          }
+        }
+        throw error;
+      }
+      
+      // Convert base64 to blob
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      
+      // Determine MIME type from file extension
+      const mimeTypes: Record<string, string> = {
+        'mp3': 'audio/mpeg',
+        'flac': 'audio/flac',
+        'ogg': 'audio/ogg',
+        'wav': 'audio/wav',
+        'm4a': 'audio/mp4',
+        'aac': 'audio/aac',
+        'opus': 'audio/opus',
+        'wma': 'audio/x-ms-wma',
+        'aiff': 'audio/aiff',
+      };
+      const mimeType = mimeTypes[ext || ''] || 'audio/mpeg';
+      
+      const blob = new Blob([byteArray], { type: mimeType });
 
       // Create form data
       const formData = new FormData();

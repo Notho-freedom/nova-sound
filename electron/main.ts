@@ -801,6 +801,98 @@ ipcMain.handle('file:uploadToCloud', async (_event, options: {
   });
 });
 
+// Upload file directly to Nexus API (streaming for large files)
+ipcMain.handle('file:uploadToNexus', async (_event, options: {
+  filePath: string;
+  apiUrl: string;
+  accessToken: string;
+  fileName?: string;
+  onProgress?: (progress: number) => void;
+}) => {
+  const { filePath, apiUrl, accessToken, fileName: providedFileName, onProgress } = options;
+  const FormData = (await import('form-data')).default;
+  const https = (await import('https')).default;
+  const http = (await import('http')).default;
+  const { URL } = await import('url');
+  
+  return new Promise((resolve, reject) => {
+    try {
+      const stats = fs.statSync(filePath);
+      const fileName = providedFileName || path.basename(filePath);
+      const fileSize = stats.size;
+      
+      const url = new URL(apiUrl);
+      const isHttps = url.protocol === 'https:';
+      const client = isHttps ? https : http;
+      
+      const form = new FormData();
+      form.append('file', fs.createReadStream(filePath), fileName);
+      
+      // Track upload progress
+      let uploadedBytes = 0;
+      const fileStream = fs.createReadStream(filePath);
+      
+      fileStream.on('data', (chunk: Buffer) => {
+        uploadedBytes += chunk.length;
+        if (onProgress && fileSize > 0) {
+          const progress = Math.round((uploadedBytes / fileSize) * 100);
+          onProgress(progress);
+        }
+      });
+      
+      const req = client.request({
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          ...form.getHeaders(),
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              const json = JSON.parse(data);
+              resolve({
+                success: true,
+                url: json.url,
+                id: json.id,
+                size: json.size,
+              });
+            } else {
+              try {
+                const error = JSON.parse(data);
+                resolve({
+                  success: false,
+                  error: error.message || error.error || `HTTP ${res.statusCode}`,
+                });
+              } catch {
+                resolve({
+                  success: false,
+                  error: `HTTP ${res.statusCode}: ${res.statusMessage || 'Unknown error'}`,
+                });
+              }
+            }
+          } catch (e) {
+            resolve({ success: false, error: 'Failed to parse response' });
+          }
+        });
+      });
+      
+      req.on('error', (e) => {
+        resolve({ success: false, error: e.message });
+      });
+      
+      form.pipe(req);
+    } catch (error: any) {
+      resolve({ success: false, error: error.message });
+    }
+  });
+});
+
 ipcMain.handle('dialog:openPlaylist', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],

@@ -117,6 +117,19 @@ export interface ElectronAPI {
     bytes?: number;
     error?: string;
   }>;
+  uploadToNexus?: (options: {
+    filePath: string;
+    apiUrl: string;
+    accessToken: string;
+    fileName?: string;
+    onProgress?: (progress: number) => void;
+  }) => Promise<{
+    success: boolean;
+    url?: string;
+    id?: string;
+    size?: number;
+    error?: string;
+  }>;
   
   // File open event (from "Open with..." or command line)
   onFileOpen: (callback: (filePath: string) => void) => () => void;

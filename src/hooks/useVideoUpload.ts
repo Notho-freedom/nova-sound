@@ -173,7 +173,46 @@ export function useVideoUpload(): UseVideoUploadReturn {
         result = uploadResult;
       } else if (fileSizeMB <= 100) {
         // For smaller files (< 100MB), use base64 method
-        const base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+        let base64Data: string;
+        try {
+          base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+        } catch (error: any) {
+          if (error.message?.includes('File too large')) {
+            // Fallback to streaming if base64 fails
+            if (window.electronAPI.uploadToCloud) {
+              updateCloudinaryProgress(video.id, { progress: 10 });
+              const uploadResult = await window.electronAPI.uploadToCloud({
+                filePath: video.filePath,
+                cloudName: config.cloudName,
+                uploadPreset: config.uploadPreset,
+                resourceType: 'video',
+                publicId: `nexus-videos/${video.id}`,
+              });
+              result = uploadResult;
+              // Skip to result handling
+              if (result.success) {
+                updateCloudinaryProgress(video.id, {
+                  status: 'completed',
+                  progress: 100,
+                  cloudUrl: result.url,
+                  publicId: result.publicId,
+                  completedAt: new Date().toISOString(),
+                });
+                saveUploadedVideo(video, 'cloudinary', result.url!);
+                toast.success('Upload terminé', {
+                  description: `"${video.title}" a été uploadé sur Cloudinary.`,
+                });
+                return;
+              } else {
+                throw new Error(result.error || 'Upload failed');
+              }
+            } else {
+              throw new Error(`Le fichier est trop volumineux (${fileSizeMB.toFixed(0)} MB). Maximum: 100 MB pour les fichiers sans streaming.`);
+            }
+          } else {
+            throw error;
+          }
+        }
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -316,10 +355,90 @@ export function useVideoUpload(): UseVideoUploadReturn {
         throw new Error('Not authenticated - no token available');
       }
 
-      // Read file as base64
-      const base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+      // Get file info to check size
+      const fileInfo = await window.electronAPI.getFileInfo?.(video.filePath);
+      const fileSizeMB = fileInfo ? fileInfo.size / (1024 * 1024) : 0;
+      const FILE_SIZE_LIMIT_MB = 100; // 100MB limit for base64
+
       const mimeType = getMimeType(video.filePath);
       const fileName = video.filePath.split(/[\\/]/).pop() || `video_${video.id}`;
+
+      // Use streaming upload for large files (> 100MB)
+      if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
+        console.log(`[BunnyVideoUpload] File too large (${fileSizeMB.toFixed(2)} MB), using streaming upload`);
+        
+        const result = await window.electronAPI.uploadToNexus({
+          filePath: video.filePath,
+          apiUrl: `${API_BASE_URL}/api/storage/upload-bunny`,
+          accessToken,
+          fileName,
+          onProgress: (progressValue) => {
+            updateBunnyProgress(video.id, { progress: progressValue });
+          },
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        updateBunnyProgress(video.id, {
+          status: 'completed',
+          progress: 100,
+          cloudUrl: result.url,
+          cloudId: result.id,
+          completedAt: new Date().toISOString(),
+        });
+
+        saveUploadedVideo(video, 'bunny', result.url!, result.id);
+
+        toast.success('Upload terminé', {
+          description: `"${video.title}" a été uploadé sur Bunny.`,
+        });
+
+        return;
+      }
+
+      // For smaller files, use base64 method
+      let base64Data: string;
+      try {
+        base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+      } catch (error: any) {
+        if (error.message?.includes('File too large')) {
+          // Fallback to streaming if base64 fails
+          if (window.electronAPI.uploadToNexus) {
+            const result = await window.electronAPI.uploadToNexus({
+              filePath: video.filePath,
+              apiUrl: `${API_BASE_URL}/api/storage/upload-bunny`,
+              accessToken,
+              fileName,
+              onProgress: (progressValue) => {
+                updateBunnyProgress(video.id, { progress: progressValue });
+              },
+            });
+
+            if (!result.success) {
+              throw new Error(result.error || 'Upload failed');
+            }
+
+            updateBunnyProgress(video.id, {
+              status: 'completed',
+              progress: 100,
+              cloudUrl: result.url,
+              cloudId: result.id,
+              completedAt: new Date().toISOString(),
+            });
+
+            saveUploadedVideo(video, 'bunny', result.url!, result.id);
+
+            toast.success('Upload terminé', {
+              description: `"${video.title}" a été uploadé sur Bunny.`,
+            });
+
+            return;
+          }
+        }
+        throw error;
+      }
 
       // Convert base64 to blob
       const byteCharacters = atob(base64Data);
@@ -447,8 +566,11 @@ export function useVideoUpload(): UseVideoUploadReturn {
         description: `Upload de "${video.title}" vers Nexus...`,
       });
 
-      // Read file as base64
-      const base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+      // Get file info to check size
+      const fileInfo = await window.electronAPI.getFileInfo?.(video.filePath);
+      const fileSizeMB = fileInfo ? fileInfo.size / (1024 * 1024) : 0;
+      const FILE_SIZE_LIMIT_MB = 100; // 100MB limit for base64
+
       const mimeType = getMimeType(video.filePath);
       const fileName = video.filePath.split(/[\\/]/).pop() || `video_${video.id}`;
 
@@ -465,6 +587,85 @@ export function useVideoUpload(): UseVideoUploadReturn {
 
       if (!accessToken) {
         throw new Error('Not authenticated - no token available');
+      }
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
+      // Use streaming upload for large files (> 100MB)
+      if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
+        console.log(`[VideoUpload] File too large (${fileSizeMB.toFixed(2)} MB), using streaming upload`);
+        
+        const result = await window.electronAPI.uploadToNexus({
+          filePath: video.filePath,
+          apiUrl: `${API_BASE_URL}/api/storage/upload`,
+          accessToken,
+          fileName,
+          onProgress: (progressValue) => {
+            updateNexusProgress(video.id, { progress: progressValue });
+          },
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        updateNexusProgress(video.id, {
+          status: 'completed',
+          progress: 100,
+          cloudUrl: result.url,
+          cloudId: result.id,
+          completedAt: new Date().toISOString(),
+        });
+
+        saveUploadedVideo(video, 'nexus', result.url!, result.id);
+
+        toast.success('Upload terminé', {
+          description: `"${video.title}" a été uploadé sur Nexus.`,
+        });
+
+        return;
+      }
+
+      // For smaller files, use base64 method
+      let base64Data: string;
+      try {
+        base64Data = await window.electronAPI.readFileAsBase64(video.filePath);
+      } catch (error: any) {
+        if (error.message?.includes('File too large')) {
+          // Fallback to streaming if base64 fails
+          if (window.electronAPI.uploadToNexus) {
+            const result = await window.electronAPI.uploadToNexus({
+              filePath: video.filePath,
+              apiUrl: `${API_BASE_URL}/api/storage/upload`,
+              accessToken,
+              fileName,
+              onProgress: (progressValue) => {
+                updateNexusProgress(video.id, { progress: progressValue });
+              },
+            });
+
+            if (!result.success) {
+              throw new Error(result.error || 'Upload failed');
+            }
+
+            updateNexusProgress(video.id, {
+              status: 'completed',
+              progress: 100,
+              cloudUrl: result.url,
+              cloudId: result.id,
+              completedAt: new Date().toISOString(),
+            });
+
+            saveUploadedVideo(video, 'nexus', result.url!, result.id);
+
+            toast.success('Upload terminé', {
+              description: `"${video.title}" a été uploadé sur Nexus.`,
+            });
+
+            return;
+          }
+        }
+        throw error;
       }
 
       // Create FormData with base64 data

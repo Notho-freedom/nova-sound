@@ -19,6 +19,7 @@ import {
   Bell,
   Settings,
   Play,
+  Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -42,6 +43,7 @@ export type ViewType =
   | "videos"
   | "local"
   | "downloads"
+  | "cloud"
   | "settings"
   | "audio-senses"
   | "album-detail"
@@ -82,6 +84,7 @@ const mediaItems = [
 const localItems = [
   { id: "local" as ViewType, icon: FolderOpen, label: "Fichiers Locaux" },
   { id: "downloads" as ViewType, icon: Download, label: "Téléchargements" },
+  { id: "cloud" as ViewType, icon: Cloud, label: "Cloud Storage", color: "text-cyan-400" },
 ];
 
 interface NavItemProps {

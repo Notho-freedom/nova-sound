@@ -96,8 +96,147 @@ export function useNexusUpload(): UseNexusUploadReturn {
       };
       setUploadProgress(prev => new Map(prev).set(track.id, progress));
 
-      // Read file as base64 from Electron
-      const base64Data = await window.electronAPI.readFileAsBase64(track.filePath!);
+      // Get file info to check size
+      const fileInfo = await window.electronAPI.getFileInfo?.(track.filePath!);
+      const fileSizeMB = fileInfo ? fileInfo.size / (1024 * 1024) : 0;
+      const FILE_SIZE_LIMIT_MB = 100; // 100MB limit for base64
+
+      // Generate filename
+      const ext = track.filePath.split('.').pop()?.toLowerCase();
+      const fileName = `${track.artist} - ${track.title}.${ext || 'mp3'}`;
+
+      // Get access token
+      let accessToken: string | null = null;
+      try {
+        const { firebaseService } = await import('@/services/firebase');
+        if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+          accessToken = await firebaseService.getIdToken();
+        }
+      } catch (error) {
+        console.error('Failed to get Firebase token:', error);
+      }
+
+      if (!accessToken) {
+        throw new Error('Not authenticated - no token available');
+      }
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
+      // Use streaming upload for large files (> 100MB)
+      if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
+        console.log(`[NexusUpload] File too large (${fileSizeMB.toFixed(2)} MB), using streaming upload`);
+        
+        const result = await window.electronAPI.uploadToNexus({
+          filePath: track.filePath!,
+          apiUrl: `${API_BASE_URL}/api/storage/upload`,
+          accessToken,
+          fileName,
+          onProgress: (progressValue) => {
+            setUploadProgress(prev => {
+              const updated = new Map(prev);
+              const current = updated.get(track.id);
+              if (current) {
+                updated.set(track.id, {
+                  ...current,
+                  progress: progressValue,
+                });
+              }
+              return updated;
+            });
+          },
+        });
+
+        if (!result.success) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        // Mark as completed
+        setUploadProgress(prev => {
+          const updated = new Map(prev);
+          const current = updated.get(track.id);
+          if (current) {
+            updated.set(track.id, {
+              ...current,
+              progress: 100,
+              status: 'completed',
+            });
+          }
+          return updated;
+        });
+
+        notificationService.uploadCompleted(track.title, 'PlanetHoster/Nexus (Serveur 2)');
+
+        // Remove progress after 3 seconds
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const updated = new Map(prev);
+            updated.delete(track.id);
+            return updated;
+          });
+        }, 3000);
+
+        return;
+      }
+
+      // For smaller files, use base64 method
+      let base64Data: string;
+      try {
+        base64Data = await window.electronAPI.readFileAsBase64(track.filePath!);
+      } catch (error: any) {
+        if (error.message?.includes('File too large')) {
+          // Fallback to streaming if base64 fails
+          if (window.electronAPI.uploadToNexus) {
+            const result = await window.electronAPI.uploadToNexus({
+              filePath: track.filePath!,
+              apiUrl: `${API_BASE_URL}/api/storage/upload`,
+              accessToken,
+              fileName,
+              onProgress: (progressValue) => {
+                setUploadProgress(prev => {
+                  const updated = new Map(prev);
+                  const current = updated.get(track.id);
+                  if (current) {
+                    updated.set(track.id, {
+                      ...current,
+                      progress: progressValue,
+                    });
+                  }
+                  return updated;
+                });
+              },
+            });
+
+            if (!result.success) {
+              throw new Error(result.error || 'Upload failed');
+            }
+
+            setUploadProgress(prev => {
+              const updated = new Map(prev);
+              const current = updated.get(track.id);
+              if (current) {
+                updated.set(track.id, {
+                  ...current,
+                  progress: 100,
+                  status: 'completed',
+                });
+              }
+              return updated;
+            });
+
+            notificationService.uploadCompleted(track.title, 'PlanetHoster/Nexus (Serveur 2)');
+            setTimeout(() => {
+              setUploadProgress(prev => {
+                const updated = new Map(prev);
+                updated.delete(track.id);
+                return updated;
+              });
+            }, 3000);
+
+            return;
+          }
+        }
+        throw error;
+      }
       
       // Convert base64 to blob
       const byteCharacters = atob(base64Data);
@@ -108,7 +247,6 @@ export function useNexusUpload(): UseNexusUploadReturn {
       const byteArray = new Uint8Array(byteNumbers);
       
       // Determine MIME type from file extension
-      const ext = track.filePath.split('.').pop()?.toLowerCase();
       const mimeTypes: Record<string, string> = {
         'mp3': 'audio/mpeg',
         'flac': 'audio/flac',
@@ -123,9 +261,6 @@ export function useNexusUpload(): UseNexusUploadReturn {
       const mimeType = mimeTypes[ext || ''] || 'audio/mpeg';
       
       const blob = new Blob([byteArray], { type: mimeType });
-      
-      // Generate filename
-      const fileName = `${track.artist} - ${track.title}.${ext || 'mp3'}`;
 
       // Upload to Nexus/Bunny
       await nexusServerService.uploadFile(blob, fileName, (progressValue) => {

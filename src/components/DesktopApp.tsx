@@ -19,6 +19,7 @@ import { NotificationsView } from "./views/NotificationsView";
 // Lazy load heavy components
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
 const DownloadsView = lazy(() => import("./views/DownloadsView").then(m => ({ default: m.DownloadsView })));
+const CloudView = lazy(() => import("./views/CloudView").then(m => ({ default: m.CloudView })));
 const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })));
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1545,6 +1546,12 @@ export const DesktopApp = () => {
         return (
           <Suspense fallback={<div className="p-6">Chargement des téléchargements...</div>}>
             <DownloadsView />
+          </Suspense>
+        );
+      case "cloud":
+        return (
+          <Suspense fallback={<div className="p-6">Chargement du cloud...</div>}>
+            <CloudView />
           </Suspense>
         );
       case "audio-senses":
