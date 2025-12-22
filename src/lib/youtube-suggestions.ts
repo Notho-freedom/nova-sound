@@ -532,7 +532,7 @@ export async function fetchYouTubeSuggestionsFromHistory(
           // Utiliser batch service pour récupérer les détails (durée, vues) en une seule requête
           try {
             const { youtubeBatchService } = await import('@/services/youtube-batch');
-            const batchVideos = await youtubeBatchService.getVideosBatch(videoIds);
+            const batchVideos = await youtubeBatchService.batchGetVideos(videoIds);
             
             // Mapper les résultats avec les détails complets
             return data.items.map((item: any) => {
@@ -547,8 +547,8 @@ export async function fetchYouTubeSuggestionsFromHistory(
                 thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
                 channelTitle: item.snippet?.channelTitle || "",
                 publishedAt: item.snippet?.publishedAt || "",
-                duration: batchVideo?.duration || batchVideo?.contentDetails?.duration ? parseDuration(batchVideo.contentDetails.duration) : undefined,
-                viewCount: batchVideo?.viewCount || (batchVideo?.statistics?.viewCount ? parseInt(batchVideo.statistics.viewCount) : undefined),
+                duration: batchVideo?.duration || undefined,
+                viewCount: batchVideo?.viewCount || undefined,
               };
             });
           } catch (batchError) {
