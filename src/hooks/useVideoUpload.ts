@@ -452,9 +452,21 @@ export function useVideoUpload(): UseVideoUploadReturn {
       const mimeType = getMimeType(video.filePath);
       const fileName = video.filePath.split(/[\\/]/).pop() || `video_${video.id}`;
 
-      // Prepare form data for Nexus upload
-      const nexusUrl = process.env.NEXT_PUBLIC_NEXUS_API_URL || 'http://localhost:3001';
-      
+      // Get access token (same as Bunny)
+      let accessToken: string | null = null;
+      try {
+        const { firebaseService } = await import('@/services/firebase');
+        if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+          accessToken = await firebaseService.getIdToken();
+        }
+      } catch (error) {
+        console.error('Failed to get Firebase token:', error);
+      }
+
+      if (!accessToken) {
+        throw new Error('Not authenticated - no token available');
+      }
+
       // Create FormData with base64 data
       const formData = new FormData();
       const byteCharacters = atob(base64Data);
@@ -465,35 +477,43 @@ export function useVideoUpload(): UseVideoUploadReturn {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: mimeType });
       formData.append('file', blob, fileName);
-      formData.append('type', 'video');
-      formData.append('metadata', JSON.stringify({
-        id: video.id,
-        title: video.title,
-        duration: video.duration,
-        width: video.width,
-        height: video.height,
-      }));
+
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
       // Upload with progress tracking
-      const xhr = new XMLHttpRequest();
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const progress = Math.round((e.loaded / e.total) * 100);
-          updateNexusProgress(video.id, { progress });
-        }
-      };
-
       const result = await new Promise<{ success: boolean; url?: string; id?: string; error?: string }>((resolve) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const response = JSON.parse(xhr.responseText);
-            resolve({ success: true, url: response.url, id: response.id });
-          } else {
-            resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            updateNexusProgress(video.id, { progress });
           }
         };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve({ success: true, url: response.url, id: response.id });
+            } catch {
+              resolve({ success: false, error: 'Invalid response from server' });
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              resolve({ success: false, error: error.message || error.error || `HTTP ${xhr.status}` });
+            } catch {
+              resolve({ success: false, error: `HTTP ${xhr.status}: ${xhr.statusText}` });
+            }
+          }
+        };
+
         xhr.onerror = () => resolve({ success: false, error: 'Network error' });
-        xhr.open('POST', `${nexusUrl}/api/storage/upload`);
+        xhr.onabort = () => resolve({ success: false, error: 'Upload aborted' });
+
+        xhr.open('POST', `${API_BASE_URL}/api/storage/upload`);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
         xhr.send(formData);
       });
 

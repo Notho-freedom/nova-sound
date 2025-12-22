@@ -250,7 +250,7 @@ export const Sidebar = ({
         <div
           className={cn(
             "relative flex items-center border-b border-white/5 transition-all duration-500",
-            collapsed ? "px-3 py-4 justify-center" : "px-4 py-5",
+            collapsed ? "px-3 py-4 justify-center hidden" : "px-4 py-5",
           )}
         >
           <div className="flex items-center gap-3">

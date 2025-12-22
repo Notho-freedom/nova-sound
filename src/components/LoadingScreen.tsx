@@ -175,14 +175,12 @@ export const LoadingScreen = ({ onLoadComplete, minDuration = 2200 }: LoadingScr
               
               {/* Conteneur de l'icône avec gradient et lueur */}
               <div 
-                className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-secondary/10 backdrop-blur-sm flex items-center justify-center transition-all duration-500"
-                style={{
-                  boxShadow: `0 0 20px hsl(var(--primary) / 0.5), 0 0 40px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.1)`,
-                  animation: 'pulse 2s ease-in-out infinite'
-                }}
+                className="w-16 h-16 backdrop-blur-sm flex items-center justify-center transition-all duration-500"
               >
-                <Music 
-                  className="w-8 h-8 text-primary transition-colors duration-500" 
+                <img 
+                  src="/icon.png" 
+                  alt="NEXUS" 
+                  className={cn("object-contain transition-all duration-500",  "w-15 h-15")}
                   style={{
                     filter: `drop-shadow(0 0 8px hsl(var(--primary) / 0.8))`
                   }}
@@ -195,7 +193,7 @@ export const LoadingScreen = ({ onLoadComplete, minDuration = 2200 }: LoadingScr
         {/* Title with gradient text */}
         <div className="text-center mb-12">
           <h1 className="font-display text-5xl font-bold tracking-tight mb-2">
-            <span className="bg-gradient-to-r from-primary via-primary to-secondary bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary via-foreground to-secondary bg-clip-text text-transparent">
               NEXUS
             </span>
           </h1>
@@ -203,6 +201,7 @@ export const LoadingScreen = ({ onLoadComplete, minDuration = 2200 }: LoadingScr
             AUDIO SYSTEM
           </p>
         </div>
+
 
         {/* Indicateur de progression connecté au système d'initialisation réel */}
         <div className="w-full mb-8">

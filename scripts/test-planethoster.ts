@@ -80,9 +80,10 @@ async function testPlanetHosterSFTP() {
 
   // Warn about port 21 (FTP) vs 22 (SFTP)
   if (PLANETHOSTER_SFTP_PORT === '21') {
-    log('\n⚠️  Warning: Port 21 is typically for FTP, not SFTP!', 'yellow');
-    log('   SFTP usually uses port 22. Please verify your configuration.', 'yellow');
-    log('   If you need SFTP, set PLANETHOSTER_SFTP_PORT=22', 'yellow');
+    log('\n⚠️  WARNING: Port 21 is typically for FTP, not SFTP!', 'yellow');
+    log('   SFTP usually uses port 22. Using port 21 may cause connection issues.', 'yellow');
+    log('   If you need SFTP, verify with PlanetHoster support and set PLANETHOSTER_SFTP_PORT=22', 'yellow');
+    log('   Continuing with port 21 as configured...', 'yellow');
   }
 
   log('\n✅ PlanetHoster SFTP is configured', 'green');
@@ -189,10 +190,22 @@ async function testPlanetHosterSFTP() {
       log(`\n💡 Connection Refused:`, 'yellow');
       log(`   - The server refused the connection`, 'yellow');
       log(`   - Check if PLANETHOSTER_SFTP_HOST and PLANETHOSTER_SFTP_PORT are correct`, 'yellow');
+      if (PLANETHOSTER_SFTP_PORT === '21') {
+        log(`   - ⚠️  Port 21 is for FTP, not SFTP. Try port 22 for SFTP.`, 'yellow');
+      }
     } else if (error.message.includes('ENOTFOUND')) {
       log(`\n💡 Host Not Found:`, 'yellow');
       log(`   - The hostname could not be resolved`, 'yellow');
       log(`   - Check if PLANETHOSTER_SFTP_HOST is correct`, 'yellow');
+    }
+    
+    // Additional troubleshooting for port 21
+    if (PLANETHOSTER_SFTP_PORT === '21' && error.message.includes('timeout')) {
+      log(`\n💡 Port 21 Troubleshooting:`, 'yellow');
+      log(`   - Port 21 is typically for FTP (not SFTP)`, 'yellow');
+      log(`   - SFTP uses SSH protocol and requires port 22`, 'yellow');
+      log(`   - If PlanetHoster uses SFTP, verify the correct port with support`, 'yellow');
+      log(`   - Try setting PLANETHOSTER_SFTP_PORT=22 in your .env file`, 'yellow');
     }
     
     process.exit(1);
