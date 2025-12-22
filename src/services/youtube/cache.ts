@@ -19,10 +19,10 @@ interface CacheConfig {
 }
 
 const DEFAULT_CONFIG: CacheConfig = {
-  memoryTTL: 5 * 60 * 1000,        // 5 minutes
-  storageTTL: 24 * 60 * 60 * 1000, // 24 heures
-  maxMemoryItems: 100,
-  maxStorageItems: 500,
+  memoryTTL: 10 * 60 * 1000,       // 10 minutes (augmenté)
+  storageTTL: 7 * 24 * 60 * 60 * 1000, // 7 jours (augmenté)
+  maxMemoryItems: 200,             // Augmenté
+  maxStorageItems: 1000,           // Augmenté
 };
 
 class YouTubeCache {

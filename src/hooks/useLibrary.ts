@@ -1,4 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+/**
+ * Hook optimisé pour la bibliothèque
+ * Optimisations: déduplication en O(1), batch updates, mémorisation
+ */
+
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Track, ScanProgress } from "@/types/music";
 
 interface UseLibraryReturn {
@@ -10,6 +15,9 @@ interface UseLibraryReturn {
   scanLibrary: (directories?: string[]) => Promise<void>;
   selectMusicFolders: () => Promise<string[]>;
   refreshLibrary: () => Promise<void>;
+  getTrackById: (id: string) => Track | undefined;
+  getTracksByAlbum: (album: string, artist?: string) => Track[];
+  getTracksByArtist: (artist: string) => Track[];
 }
 
 export function useLibrary(): UseLibraryReturn {
@@ -18,17 +26,65 @@ export function useLibrary(): UseLibraryReturn {
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Maps d'index pour recherche O(1)
+  const tracksByIdRef = useRef<Map<string, Track>>(new Map());
+  const tracksByAlbumRef = useRef<Map<string, Track[]>>(new Map());
+  const tracksByArtistRef = useRef<Map<string, Track[]>>(new Map());
 
-  // Check if running in Electron - use reliable detection
   const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
+
+  // Indexation optimisée des tracks
+  const indexTracks = useCallback((trackList: Track[]) => {
+    const byId = new Map<string, Track>();
+    const byAlbum = new Map<string, Track[]>();
+    const byArtist = new Map<string, Track[]>();
+
+    for (const track of trackList) {
+      byId.set(track.id, track);
+
+      if (track.album) {
+        const key = `${track.album}:${track.artist || ''}`;
+        const existing = byAlbum.get(key) || [];
+        existing.push(track);
+        byAlbum.set(key, existing);
+      }
+
+      if (track.artist) {
+        const existing = byArtist.get(track.artist) || [];
+        existing.push(track);
+        byArtist.set(track.artist, existing);
+      }
+    }
+
+    tracksByIdRef.current = byId;
+    tracksByAlbumRef.current = byAlbum;
+    tracksByArtistRef.current = byArtist;
+  }, []);
+
+  // Déduplication optimisée O(n)
+  const deduplicateTracks = useCallback((trackList: Track[]): Track[] => {
+    const seen = new Set<string>();
+    const result: Track[] = [];
+    
+    for (const track of trackList) {
+      if (!seen.has(track.id)) {
+        seen.add(track.id);
+        result.push(track);
+      }
+    }
+    
+    return result;
+  }, []);
 
   // Load library on mount
   useEffect(() => {
     const loadLibrary = async () => {
       if (!isElectron) {
-        // Use demo tracks in web mode
         const { demoTracks } = await import("@/data/tracks");
-        setTracks(demoTracks);
+        const uniqueTracks = deduplicateTracks(demoTracks);
+        indexTracks(uniqueTracks);
+        setTracks(uniqueTracks);
         setLoading(false);
         return;
       }
@@ -40,10 +96,8 @@ export function useLibrary(): UseLibraryReturn {
           return;
         }
         const library = await window.electronAPI.getLibrary();
-        // Remove duplicates by ID (additional safety check)
-        const uniqueTracks = library.filter((track, index, self) => 
-          index === self.findIndex(t => t.id === track.id)
-        );
+        const uniqueTracks = deduplicateTracks(library);
+        indexTracks(uniqueTracks);
         setTracks(uniqueTracks);
       } catch (err) {
         console.error("Failed to load library:", err);
@@ -54,7 +108,7 @@ export function useLibrary(): UseLibraryReturn {
     };
 
     loadLibrary();
-  }, [isElectron]);
+  }, [isElectron, deduplicateTracks, indexTracks]);
 
   // Listen for scan progress
   useEffect(() => {
@@ -65,48 +119,48 @@ export function useLibrary(): UseLibraryReturn {
       if (progress.phase === "complete") {
         setScanning(false);
         setScanProgress(null);
-        // Final reload to ensure everything is synced
         window.electronAPI?.getLibrary().then((library) => {
-          // Additional safety check to remove duplicates
-          const uniqueTracks = library.filter((track, index, self) => 
-            index === self.findIndex(t => t.id === track.id)
-          );
+          const uniqueTracks = deduplicateTracks(library);
+          indexTracks(uniqueTracks);
           setTracks(uniqueTracks);
         });
       }
     });
 
     return unsubscribe;
-  }, [isElectron]);
+  }, [isElectron, deduplicateTracks, indexTracks]);
 
-  // Listen for real-time track updates during scan
+  // Listen for real-time track updates
   useEffect(() => {
-    if (!isElectron || !window.electronAPI!.onTrackAdded) return;
+    if (!isElectron || !window.electronAPI?.onTrackAdded) return;
 
-    // Track added - add to library in real-time
-    const unsubscribeAdded = window.electronAPI!.onTrackAdded((track: Track) => {
+    const unsubscribeAdded = window.electronAPI.onTrackAdded((track: Track) => {
       setTracks(prev => {
-        // Check if track already exists (by ID or filePath)
-        const exists = prev.some(t => t.id === track.id || t.filePath === track.filePath);
-        if (exists) {
-          // Update existing track
-          return prev.map(t => (t.id === track.id || t.filePath === track.filePath) ? track : t);
+        if (tracksByIdRef.current.has(track.id)) {
+          // Update existing
+          return prev.map(t => t.id === track.id ? track : t);
         }
-        // Add new track
-        return [...prev, track];
+        // Add new
+        const updated = [...prev, track];
+        indexTracks(updated);
+        return updated;
       });
     });
 
-    // Track removed - remove from library in real-time
     const unsubscribeRemoved = window.electronAPI?.onTrackRemoved?.((filePath: string) => {
-      setTracks(prev => prev.filter(t => t.filePath !== filePath));
+      setTracks(prev => {
+        const updated = prev.filter(t => t.filePath !== filePath);
+        indexTracks(updated);
+        return updated;
+      });
     });
 
-    // Track updated - update in library in real-time
     const unsubscribeUpdated = window.electronAPI?.onTrackUpdated?.((track: Track) => {
-      setTracks(prev => prev.map(t => 
-        (t.id === track.id || t.filePath === track.filePath) ? track : t
-      ));
+      setTracks(prev => {
+        const updated = prev.map(t => t.id === track.id ? track : t);
+        indexTracks(updated);
+        return updated;
+      });
     });
 
     return () => {
@@ -114,57 +168,36 @@ export function useLibrary(): UseLibraryReturn {
       unsubscribeRemoved?.();
       unsubscribeUpdated?.();
     };
-  }, [isElectron]);
+  }, [isElectron, indexTracks]);
 
-  // Select music folders
   const selectMusicFolders = useCallback(async (): Promise<string[]> => {
     if (!isElectron || !window.electronAPI) return [];
-
     try {
-      const folders = await window.electronAPI.openDirectory();
-      return folders;
-    } catch (err) {
-      console.error("Failed to select folders:", err);
+      return await window.electronAPI.openDirectory();
+    } catch {
       return [];
     }
   }, [isElectron]);
 
-  // Scan library
   const scanLibrary = useCallback(async (directories?: string[]) => {
-    if (!isElectron) return;
+    if (!isElectron || !window.electronAPI) return;
 
     setScanning(true);
     setError(null);
-    setScanProgress({
-      current: 0,
-      total: 0,
-      file: "",
-      phase: "scanning",
-    });
+    setScanProgress({ current: 0, total: 0, file: "", phase: "scanning" });
 
     try {
       let foldersToScan = directories;
 
-      if (!window.electronAPI) {
-        setScanning(false);
-        setScanProgress(null);
-        return;
-      }
-
-      if (!foldersToScan || foldersToScan.length === 0) {
-        // Get folders from settings
+      if (!foldersToScan?.length) {
         const settings = await window.electronAPI.getSettings();
         foldersToScan = settings.musicDirectories;
       }
 
-      if (foldersToScan.length === 0) {
-        // Ask user to select folders
+      if (!foldersToScan?.length) {
         foldersToScan = await selectMusicFolders();
         if (foldersToScan.length > 0) {
-          // Save selected folders to settings
-          await window.electronAPI.updateSettings({
-            musicDirectories: foldersToScan,
-          });
+          await window.electronAPI.updateSettings({ musicDirectories: foldersToScan });
         }
       }
 
@@ -182,17 +215,14 @@ export function useLibrary(): UseLibraryReturn {
     }
   }, [isElectron, selectMusicFolders]);
 
-  // Refresh library
   const refreshLibrary = useCallback(async () => {
     if (!isElectron || !window.electronAPI) return;
 
     setLoading(true);
     try {
       const library = await window.electronAPI.getLibrary();
-      // Remove duplicates by ID (additional safety check)
-      const uniqueTracks = library.filter((track, index, self) => 
-        index === self.findIndex(t => t.id === track.id)
-      );
+      const uniqueTracks = deduplicateTracks(library);
+      indexTracks(uniqueTracks);
       setTracks(uniqueTracks);
     } catch (err) {
       console.error("Failed to refresh library:", err);
@@ -200,7 +230,21 @@ export function useLibrary(): UseLibraryReturn {
     } finally {
       setLoading(false);
     }
-  }, [isElectron]);
+  }, [isElectron, deduplicateTracks, indexTracks]);
+
+  // Méthodes de recherche O(1)
+  const getTrackById = useCallback((id: string): Track | undefined => {
+    return tracksByIdRef.current.get(id);
+  }, []);
+
+  const getTracksByAlbum = useCallback((album: string, artist?: string): Track[] => {
+    const key = `${album}:${artist || ''}`;
+    return tracksByAlbumRef.current.get(key) || [];
+  }, []);
+
+  const getTracksByArtist = useCallback((artist: string): Track[] => {
+    return tracksByArtistRef.current.get(artist) || [];
+  }, []);
 
   return {
     tracks,
@@ -211,6 +255,8 @@ export function useLibrary(): UseLibraryReturn {
     scanLibrary,
     selectMusicFolders,
     refreshLibrary,
+    getTrackById,
+    getTracksByAlbum,
+    getTracksByArtist,
   };
 }
-
