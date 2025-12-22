@@ -1,7 +1,8 @@
 "use client";
 
+import { memo, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { SimpleTooltip } from "@/components/ui/tooltip";
 
 interface GenreCardProps {
   name: string;
@@ -49,24 +50,34 @@ const genreGradients: Record<string, string> = {
   default: "from-primary/80 to-secondary/80",
 };
 
-export const GenreCard = ({
-  name,
-  trackCount,
-  gradient,
-  icon,
-  imageUrl,
-  onClick,
-  className,
-}: GenreCardProps) => {
-  // Get gradient based on genre name or use provided/default
-  const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const effectiveGradient = gradient || genreGradients[normalizedName] || genreGradients.default;
+export const GenreCard = memo(
+  ({ name, trackCount, gradient, icon, imageUrl, onClick, className }: GenreCardProps) => {
+    const handleClick = useCallback(() => {
+      onClick?.();
+    }, [onClick]);
 
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+    // Get gradient based on genre name or use provided/default
+    const effectiveGradient = useMemo(() => {
+      if (gradient) return gradient;
+      const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return genreGradients[normalizedName] || genreGradients.default;
+    }, [gradient, name]);
+
+    const tooltipContent = (
+      <div>
+        <div className="text-sm font-medium capitalize">{name}</div>
+        {trackCount !== undefined && (
+          <div className="text-xs text-muted-foreground">
+            {trackCount} titre{trackCount > 1 ? "s" : ""}
+          </div>
+        )}
+      </div>
+    );
+
+    return (
+      <SimpleTooltip content={tooltipContent}>
         <button
-          onClick={onClick}
+          onClick={handleClick}
           className={cn(
             "group relative overflow-hidden rounded-xl",
             "aspect-[2/1] min-h-[80px]",
@@ -74,7 +85,7 @@ export const GenreCard = ({
             "hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
             "text-left w-full",
-            className
+            className,
           )}
         >
           {/* Background image if provided */}
@@ -83,23 +94,25 @@ export const GenreCard = ({
               src={imageUrl}
               alt=""
               loading="lazy"
+              decoding="async"
               className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 transition-opacity"
             />
           )}
-          
+
           {/* Gradient background */}
           <div className={cn("absolute inset-0 bg-gradient-to-br", effectiveGradient)} />
 
           {/* Decorative element */}
-          <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-300" />
+          <div
+            className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-300"
+            aria-hidden="true"
+          />
 
           {/* Content */}
           <div className="relative h-full p-4 flex flex-col justify-end">
             <div className="flex items-center gap-2">
               {icon && <div className="text-white/90">{icon}</div>}
-              <h3 className="font-display text-lg font-bold text-white drop-shadow-lg capitalize">
-                {name}
-              </h3>
+              <h3 className="font-display text-lg font-bold text-white drop-shadow-lg capitalize">{name}</h3>
             </div>
             {trackCount !== undefined && (
               <p className="text-white/70 text-xs mt-0.5">
@@ -108,16 +121,12 @@ export const GenreCard = ({
             )}
           </div>
         </button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <div className="text-sm font-medium capitalize">{name}</div>
-        {trackCount !== undefined && (
-          <div className="text-xs text-muted-foreground">{trackCount} titre{trackCount > 1 ? "s" : ""}</div>
-        )}
-      </TooltipContent>
-    </Tooltip>
-  );
-};
+      </SimpleTooltip>
+    );
+  },
+);
+
+GenreCard.displayName = "GenreCard";
 
 // Export gradients for external use
 export { genreGradients };
