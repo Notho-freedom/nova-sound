@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     const contentType = contentTypeMap[extension || ''] || 'application/octet-stream';
 
     // Retourner le fichier avec les headers appropriés
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
