@@ -1,5 +1,27 @@
-import { useState, useMemo, useCallback } from "react";
-import { Plus, Music, ListMusic, Trash2, Edit, Play, Shuffle, X, Search, ArrowLeft, Check, ArrowUpDown, Filter, ChevronUp, ChevronDown, Grid, List } from "lucide-react";
+import { useState, useMemo, useCallback, memo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Plus, 
+  Music, 
+  ListMusic, 
+  Trash2, 
+  Edit, 
+  Play, 
+  Shuffle, 
+  X, 
+  Search, 
+  ArrowLeft, 
+  Check, 
+  ChevronUp, 
+  ChevronDown, 
+  Grid, 
+  List,
+  Filter,
+  Heart,
+  Clock,
+  Sparkles,
+  MoreHorizontal,
+} from "lucide-react";
 import { Track, Playlist } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl, formatDuration } from "@/lib/audio";
@@ -11,7 +33,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { TrackGridView } from "@/components/TrackGridView";
 import { TrackListView } from "@/components/TrackListView";
-import { PageHeader } from "@/components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -22,6 +43,8 @@ import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { AlbumGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
+import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/PageLayout";
+import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
 
 interface PlaylistViewProps {
   tracks: Track[];
@@ -42,7 +65,141 @@ interface PlaylistViewProps {
 type ViewMode = "grid" | "list";
 type PageMode = "list" | "create" | "detail" | "edit";
 
-export const PlaylistView = ({
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1 }
+};
+
+// Memoized Playlist Card
+const PlaylistCard = memo(({ 
+  playlist, 
+  tracks,
+  onSelect, 
+  onPlay,
+  onShuffle,
+  onEdit,
+  onDelete,
+  canUpload,
+  onUpload,
+}: { 
+  playlist: Playlist;
+  tracks: Track[];
+  onSelect: () => void;
+  onPlay: () => void;
+  onShuffle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  canUpload?: boolean;
+  onUpload?: () => void;
+}) => {
+  const playlistTracks = useMemo(() => 
+    playlist.trackIds
+      .map((id) => tracks.find((t) => t.id === id))
+      .filter((t): t is Track => !!t),
+    [playlist.trackIds, tracks]
+  );
+  
+  const coverUrl = playlistTracks[0]?.coverUrl ? getCoverUrl(playlistTracks[0].coverUrl) : null;
+  const totalDuration = playlistTracks.reduce((acc, t) => acc + t.duration, 0);
+  
+  return (
+    <PlaylistContextMenu
+      playlist={playlist}
+      onPlay={onPlay}
+      onShuffle={onShuffle}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onView={onSelect}
+      onUploadToCloudinary={onUpload}
+      canUploadToCloudinary={canUpload}
+    >
+      <motion.div
+        variants={itemVariants}
+        whileHover={{ scale: 1.02, y: -4 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onSelect}
+        className="group relative cursor-pointer"
+      >
+        {/* Cover */}
+        <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-primary/30 to-accent/30 shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
+          {coverUrl ? (
+            <div className="relative w-full h-full">
+              <img
+                src={coverUrl}
+                alt={playlist.name}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </div>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/30">
+              <ListMusic className="w-12 h-12 text-primary/50" />
+            </div>
+          )}
+          
+          {/* Play Button Overlay */}
+          <motion.button
+            initial={{ scale: 0 }}
+            whileHover={{ scale: 1.1 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay();
+            }}
+            className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300"
+          >
+            <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+          </motion.button>
+        </div>
+        
+        {/* Info */}
+        <div>
+          <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+            {playlist.name}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""} • {formatDuration(totalDuration)}
+          </p>
+        </div>
+      </motion.div>
+    </PlaylistContextMenu>
+  );
+});
+PlaylistCard.displayName = "PlaylistCard";
+
+// Stat Card
+const StatCard = memo(({ icon: Icon, label, value, color }: { 
+  icon: typeof Music; 
+  label: string; 
+  value: string | number;
+  color: string;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="flex items-center gap-3 p-4 rounded-xl bg-card/50 backdrop-blur-sm border border-border/30"
+  >
+    <div className={cn("p-2.5 rounded-lg", color)}>
+      <Icon className="w-5 h-5" />
+    </div>
+    <div>
+      <p className="text-2xl font-bold font-display">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  </motion.div>
+));
+StatCard.displayName = "StatCard";
+
+export const PlaylistView = memo(({
   tracks,
   playlists,
   currentTrackIndex,
@@ -68,18 +225,15 @@ export const PlaylistView = ({
   
   // Upload hooks
   const { uploadPlaylist, uploadTrack, getTrackProgress } = useCloudinaryUpload();
-  const { uploadPlaylist: uploadPlaylistToBunny, uploadTrack: uploadTrackToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
+  const { uploadPlaylist: uploadPlaylistToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
   const { uploadPlaylist: uploadPlaylistToNexus, uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   
-  // Free users: Cloudinary only (serveur 0)
-  // Pro users: Bunny (serveur 1) and PlanetHoster/Nexus (serveur 2)
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro; // Free only
-  const canUploadToBunny = nexusIsPro && nexusAuthenticated; // Pro only (serveur 1)
-  const canUploadToNexus = nexusIsPro && nexusAuthenticated; // Pro only (serveur 2)
+  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+  const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
-  // Table state for create/edit pages
+  // Table state
   const [tableSearchQuery, setTableSearchQuery] = useState("");
   const [tableSortBy, setTableSortBy] = useState<"title" | "artist" | "album" | "duration">("title");
   const [tableSortOrder, setTableSortOrder] = useState<"asc" | "desc">("asc");
@@ -87,9 +241,10 @@ export const PlaylistView = ({
   const [filterAlbum, setFilterAlbum] = useState<string | null>(null);
 
   // Get selected playlist
-  const selectedPlaylist = useMemo(() => {
-    return playlists.find((p) => p.id === selectedPlaylistId) || null;
-  }, [playlists, selectedPlaylistId]);
+  const selectedPlaylist = useMemo(() => 
+    playlists.find((p) => p.id === selectedPlaylistId) || null,
+    [playlists, selectedPlaylistId]
+  );
 
   // Get tracks for selected playlist
   const playlistTracks = useMemo(() => {
@@ -99,30 +254,26 @@ export const PlaylistView = ({
       .filter((t): t is Track => !!t);
   }, [selectedPlaylist, tracks]);
 
-  // Filter playlists by search query
+  // Filter playlists
   const filteredPlaylists = useMemo(() => {
     if (!searchQuery.trim()) return playlists;
     const query = searchQuery.toLowerCase();
     return playlists.filter(
-      (p) =>
-        p.name.toLowerCase().includes(query) ||
-        p.description?.toLowerCase().includes(query)
+      (p) => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query)
     );
   }, [playlists, searchQuery]);
 
-  // Filter tracks for add/remove modals
+  // Available tracks (not in current playlist)
   const availableTracks = useMemo(() => {
     if (!selectedPlaylist) return tracks;
     return tracks.filter((t) => !selectedPlaylist.trackIds.includes(t.id));
   }, [tracks, selectedPlaylist]);
 
-  // Deduplicate tracks by ID for modals to avoid duplicate keys
+  // Unique tracks
   const uniqueTracks = useMemo(() => {
     const seen = new Set<string>();
     return tracks.filter((track) => {
-      if (seen.has(track.id)) {
-        return false;
-      }
+      if (seen.has(track.id)) return false;
       seen.add(track.id);
       return true;
     });
@@ -131,36 +282,29 @@ export const PlaylistView = ({
   const uniqueAvailableTracks = useMemo(() => {
     const seen = new Set<string>();
     return availableTracks.filter((track) => {
-      if (seen.has(track.id)) {
-        return false;
-      }
+      if (seen.has(track.id)) return false;
       seen.add(track.id);
       return true;
     });
   }, [availableTracks]);
 
-  // Get unique artists and albums for filters
+  // Unique artists and albums
   const uniqueArtists = useMemo(() => {
     const artists = new Set<string>();
-    uniqueTracks.forEach(track => {
-      if (track.artist) artists.add(track.artist);
-    });
+    uniqueTracks.forEach(track => track.artist && artists.add(track.artist));
     return Array.from(artists).sort();
   }, [uniqueTracks]);
 
   const uniqueAlbums = useMemo(() => {
     const albums = new Set<string>();
-    uniqueTracks.forEach(track => {
-      if (track.album) albums.add(track.album);
-    });
+    uniqueTracks.forEach(track => track.album && albums.add(track.album));
     return Array.from(albums).sort();
   }, [uniqueTracks]);
 
-  // Filtered and sorted tracks for table
+  // Filtered and sorted tracks
   const filteredAndSortedTracks = useMemo(() => {
     let filtered = uniqueTracks;
 
-    // Apply search filter
     if (tableSearchQuery.trim()) {
       const query = tableSearchQuery.toLowerCase();
       filtered = filtered.filter(track =>
@@ -170,98 +314,33 @@ export const PlaylistView = ({
       );
     }
 
-    // Apply artist filter
-    if (filterArtist) {
-      filtered = filtered.filter(track => track.artist === filterArtist);
-    }
+    if (filterArtist) filtered = filtered.filter(track => track.artist === filterArtist);
+    if (filterAlbum) filtered = filtered.filter(track => track.album === filterAlbum);
 
-    // Apply album filter
-    if (filterAlbum) {
-      filtered = filtered.filter(track => track.album === filterAlbum);
-    }
-
-    // Apply sorting
-    const sorted = [...filtered].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       let comparison = 0;
       switch (tableSortBy) {
-        case "title":
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case "artist":
-          comparison = a.artist.localeCompare(b.artist);
-          break;
-        case "album":
-          comparison = a.album.localeCompare(b.album);
-          break;
-        case "duration":
-          comparison = a.duration - b.duration;
-          break;
+        case "title": comparison = a.title.localeCompare(b.title); break;
+        case "artist": comparison = a.artist.localeCompare(b.artist); break;
+        case "album": comparison = a.album.localeCompare(b.album); break;
+        case "duration": comparison = a.duration - b.duration; break;
       }
       return tableSortOrder === "asc" ? comparison : -comparison;
     });
-
-    return sorted;
   }, [uniqueTracks, tableSearchQuery, filterArtist, filterAlbum, tableSortBy, tableSortOrder]);
 
-  // Filtered tracks for edit page
-  const filteredAndSortedEditTracks = useMemo(() => {
-    const tracksToFilter = pageMode === "edit" && selectedPlaylist
-      ? (selectedTracksForPlaylist.length > 0 && 
-         selectedTracksForPlaylist.every(id => playlistTracks.some(t => t.id === id))
-         ? playlistTracks 
-         : uniqueAvailableTracks)
-      : uniqueTracks;
+  // Stats
+  const totalTracks = useMemo(() => 
+    playlists.reduce((acc, p) => acc + p.trackIds.length, 0),
+    [playlists]
+  );
 
-    let filtered = tracksToFilter;
-
-    // Apply search filter
-    if (tableSearchQuery.trim()) {
-      const query = tableSearchQuery.toLowerCase();
-      filtered = filtered.filter(track =>
-        track.title.toLowerCase().includes(query) ||
-        track.artist.toLowerCase().includes(query) ||
-        track.album.toLowerCase().includes(query)
-      );
-    }
-
-    // Apply artist filter
-    if (filterArtist) {
-      filtered = filtered.filter(track => track.artist === filterArtist);
-    }
-
-    // Apply album filter
-    if (filterAlbum) {
-      filtered = filtered.filter(track => track.album === filterAlbum);
-    }
-
-    // Apply sorting
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
-      switch (tableSortBy) {
-        case "title":
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case "artist":
-          comparison = a.artist.localeCompare(b.artist);
-          break;
-        case "album":
-          comparison = a.album.localeCompare(b.album);
-          break;
-        case "duration":
-          comparison = a.duration - b.duration;
-          break;
-      }
-      return tableSortOrder === "asc" ? comparison : -comparison;
-    });
-
-    return sorted;
-  }, [pageMode, selectedPlaylist, playlistTracks, uniqueAvailableTracks, uniqueTracks, selectedTracksForPlaylist, tableSearchQuery, filterArtist, filterAlbum, tableSortBy, tableSortOrder]);
-
+  // Handlers
   const handleCreatePlaylist = async () => {
     if (!newPlaylistName.trim()) return;
     const playlist = await onCreatePlaylist(newPlaylistName.trim(), selectedTracksForPlaylist);
     if (playlist) {
-      toast.success("Playlist créée");
+      toast.success("Playlist créée avec succès");
       setPageMode("list");
       setNewPlaylistName("");
       setSelectedTracksForPlaylist([]);
@@ -270,12 +349,11 @@ export const PlaylistView = ({
   };
 
   const handleDeletePlaylist = async (id: string) => {
-    if (confirm(`Supprimer la playlist "${playlists.find((p) => p.id === id)?.name}" ?`)) {
+    const playlist = playlists.find((p) => p.id === id);
+    if (confirm(`Supprimer la playlist "${playlist?.name}" ?`)) {
       await onDeletePlaylist(id);
       toast.success("Playlist supprimée");
-      if (selectedPlaylistId === id) {
-        setSelectedPlaylistId(null);
-      }
+      if (selectedPlaylistId === id) setSelectedPlaylistId(null);
     }
   };
 
@@ -294,19 +372,19 @@ export const PlaylistView = ({
     setSelectedTracksForPlaylist([]);
   };
 
-  const handlePlayPlaylist = (playlistId: string) => {
+  const handlePlayPlaylist = useCallback((playlistId: string) => {
     const playlist = playlists.find((p) => p.id === playlistId);
     if (playlist && playlist.trackIds.length > 0 && onPlayTracks) {
       onPlayTracks(playlist.trackIds);
     }
-  };
+  }, [playlists, onPlayTracks]);
 
-  const handleShufflePlaylist = (playlistId: string) => {
+  const handleShufflePlaylist = useCallback((playlistId: string) => {
     const playlist = playlists.find((p) => p.id === playlistId);
     if (playlist && playlist.trackIds.length > 0 && onShuffleTracks) {
       onShuffleTracks(playlist.trackIds);
     }
-  };
+  }, [playlists, onShuffleTracks]);
 
   const handleEditPlaylist = (playlist: Playlist) => {
     setEditingPlaylistId(playlist.id);
@@ -321,7 +399,6 @@ export const PlaylistView = ({
     setEditingPlaylistName("");
   };
 
-  // Helper function to toggle sort
   const toggleSort = (column: typeof tableSortBy) => {
     if (tableSortBy === column) {
       setTableSortOrder(tableSortOrder === "asc" ? "desc" : "asc");
@@ -331,7 +408,6 @@ export const PlaylistView = ({
     }
   };
 
-  // Helper function to select/deselect all
   const toggleSelectAll = () => {
     if (selectedTracksForPlaylist.length === filteredAndSortedTracks.length) {
       setSelectedTracksForPlaylist([]);
@@ -340,584 +416,407 @@ export const PlaylistView = ({
     }
   };
 
-  // Show create playlist page with advanced table
+  const resetFilters = () => {
+    setTableSearchQuery("");
+    setFilterArtist(null);
+    setFilterAlbum(null);
+  };
+
+  // Create Playlist Page
   if (pageMode === "create") {
     const allSelected = filteredAndSortedTracks.length > 0 && 
       selectedTracksForPlaylist.length === filteredAndSortedTracks.length;
-    const someSelected = selectedTracksForPlaylist.length > 0 && !allSelected;
 
     return (
-      <div className="h-full flex flex-col animate-in fade-in duration-300">
-        <div className="p-6 border-b border-border/50">
-          <div className="flex items-center gap-4 mb-4">
+      <PageContainer>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          {/* Header */}
+          <div className="flex items-center gap-4">
             <Button
               variant="ghost"
+              size="icon"
               onClick={() => {
                 setPageMode("list");
                 setNewPlaylistName("");
                 setSelectedTracksForPlaylist([]);
-                setTableSearchQuery("");
-                setFilterArtist(null);
-                setFilterAlbum(null);
+                resetFilters();
               }}
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Retour
+              <ArrowLeft className="w-5 h-5" />
             </Button>
+            <div>
+              <h1 className="text-2xl font-bold font-display">Nouvelle playlist</h1>
+              <p className="text-sm text-muted-foreground">Créez une playlist personnalisée</p>
+            </div>
           </div>
-          <PageHeader
-            title="Créer une nouvelle playlist"
-            subtitle="Donnez un nom à votre playlist et ajoutez des titres"
-          />
-        </div>
-        <div className="flex-1 overflow-auto">
-          <div className="p-6 space-y-6">
-            {/* Playlist Name Input */}
-            <div className="space-y-2">
-              <Label htmlFor="playlist-name">Nom de la playlist</Label>
-              <Input
-                id="playlist-name"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                placeholder="Ma nouvelle playlist"
-                autoFocus
-                className="text-lg max-w-md"
+
+          {/* Playlist Name */}
+          <GlassCard className="p-6">
+            <Label htmlFor="playlist-name" className="text-sm font-medium mb-2 block">
+              Nom de la playlist
+            </Label>
+            <Input
+              id="playlist-name"
+              value={newPlaylistName}
+              onChange={(e) => setNewPlaylistName(e.target.value)}
+              placeholder="Ma nouvelle playlist"
+              autoFocus
+              className="text-lg max-w-md"
+            />
+          </GlassCard>
+
+          {/* Track Selection */}
+          <GlassCard className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Sélectionner des titres</h2>
+              <Badge variant="secondary">
+                {selectedTracksForPlaylist.length} sélectionné{selectedTracksForPlaylist.length > 1 ? "s" : ""}
+              </Badge>
+            </div>
+
+            {/* Filters */}
+            <Toolbar>
+              <SearchBar
+                value={tableSearchQuery}
+                onChange={setTableSearchQuery}
+                placeholder="Rechercher..."
               />
-            </div>
+              
+              <Select value={filterArtist || "__all__"} onValueChange={(v) => setFilterArtist(v === "__all__" ? null : v)}>
+                <SelectTrigger className="w-[160px]">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Artiste" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tous</SelectItem>
+                  {uniqueArtists.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
 
-            {/* Filters and Search Bar */}
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-4">
-                {/* Search */}
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher..."
-                    value={tableSearchQuery}
-                    onChange={(e) => setTableSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+              <Select value={filterAlbum || "__all__"} onValueChange={(v) => setFilterAlbum(v === "__all__" ? null : v)}>
+                <SelectTrigger className="w-[160px]">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Album" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tous</SelectItem>
+                  {uniqueAlbums.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
 
-                {/* Artist Filter */}
-                <Select value={filterArtist || "__all__"} onValueChange={(value) => setFilterArtist(value === "__all__" ? null : value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Artiste" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Tous les artistes</SelectItem>
-                    {uniqueArtists.map(artist => (
-                      <SelectItem key={artist} value={artist}>{artist}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Album Filter */}
-                <Select value={filterAlbum || "__all__"} onValueChange={(value) => setFilterAlbum(value === "__all__" ? null : value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Album" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Tous les albums</SelectItem>
-                    {uniqueAlbums.map(album => (
-                      <SelectItem key={album} value={album}>{album}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Clear Filters */}
-                {(filterArtist || filterAlbum || tableSearchQuery) && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setTableSearchQuery("");
-                      setFilterArtist(null);
-                      setFilterAlbum(null);
-                    }}
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Réinitialiser
-                  </Button>
-                )}
-              </div>
-
-              {/* Selection Info */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {selectedTracksForPlaylist.length} sélectionné{selectedTracksForPlaylist.length > 1 ? "s" : ""}
-                  </Badge>
-                  {filteredAndSortedTracks.length !== uniqueTracks.length && (
-                    <Badge variant="outline">
-                      {filteredAndSortedTracks.length} résultat{filteredAndSortedTracks.length > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleSelectAll}
-                >
-                  {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              {(filterArtist || filterAlbum || tableSearchQuery) && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  <X className="w-4 h-4 mr-1" />
+                  Réinitialiser
                 </Button>
-              </div>
-            </div>
+              )}
 
-            {/* Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-450px)]">
-                <table className="w-full">
-                  <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
-                    <tr>
-                      <th className="px-4 py-3 text-left w-12 bg-muted/50">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={toggleSelectAll}
-                          className={cn(someSelected && "data-[state=checked]:bg-primary/50")}
-                        />
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
-                        onClick={() => toggleSort("title")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Titre
-                          {tableSortBy === "title" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
-                        onClick={() => toggleSort("artist")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Artiste
-                          {tableSortBy === "artist" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors hidden md:table-cell bg-muted/50"
-                        onClick={() => toggleSort("album")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Album
-                          {tableSortBy === "album" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
-                        onClick={() => toggleSort("duration")}
-                      >
-                        <div className="flex items-center justify-end gap-2">
-                          Durée
-                          {tableSortBy === "duration" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAndSortedTracks.map((track) => (
-                      <tr
-                        key={track.id}
-                        className={cn(
-                          "border-b border-border/30 hover:bg-muted/30 transition-colors",
-                          selectedTracksForPlaylist.includes(track.id) && "bg-primary/5"
+              <Button variant="outline" size="sm" onClick={toggleSelectAll}>
+                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              </Button>
+            </Toolbar>
+
+            {/* Track Table */}
+            <ScrollArea className="h-[400px] rounded-lg border border-border/30">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-background/95 backdrop-blur-md z-10">
+                  <tr className="border-b border-border/30">
+                    <th className="px-4 py-3 w-12">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => toggleSort("title")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Titre
+                        {tableSortBy === "title" && (
+                          tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                         )}
-                      >
-                        <td className="px-4 py-3">
-                          <Checkbox
-                            checked={selectedTracksForPlaylist.includes(track.id)}
-                            onCheckedChange={() => {
-                              setSelectedTracksForPlaylist((prev) =>
-                                prev.includes(track.id)
-                                  ? prev.filter((id) => id !== track.id)
-                                  : [...prev, track.id]
-                              );
-                            }}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                              <img
-                                src={getCoverUrl(track.coverUrl)}
-                                alt={track.album}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{track.title}</p>
-                            </div>
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => toggleSort("artist")}
+                    >
+                      <div className="flex items-center gap-2">
+                        Artiste
+                        {tableSortBy === "artist" && (
+                          tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                        )}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:text-foreground hidden md:table-cell"
+                      onClick={() => toggleSort("duration")}
+                    >
+                      <div className="flex items-center justify-end gap-2">
+                        Durée
+                        {tableSortBy === "duration" && (
+                          tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                        )}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAndSortedTracks.map((track) => (
+                    <motion.tr
+                      key={track.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={cn(
+                        "border-b border-border/20 hover:bg-muted/30 transition-colors cursor-pointer",
+                        selectedTracksForPlaylist.includes(track.id) && "bg-primary/10"
+                      )}
+                      onClick={() => {
+                        setSelectedTracksForPlaylist(prev =>
+                          prev.includes(track.id)
+                            ? prev.filter(id => id !== track.id)
+                            : [...prev, track.id]
+                        );
+                      }}
+                    >
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedTracksForPlaylist.includes(track.id)}
+                          onCheckedChange={() => {
+                            setSelectedTracksForPlaylist(prev =>
+                              prev.includes(track.id)
+                                ? prev.filter(id => id !== track.id)
+                                : [...prev, track.id]
+                            );
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-muted/30">
+                            <img
+                              src={getCoverUrl(track.coverUrl)}
+                              alt={track.album}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          <p className="text-sm text-muted-foreground truncate">{track.album}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm text-muted-foreground font-mono">{formatDuration(track.duration)}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          <p className="font-medium text-sm truncate">{track.title}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground truncate">{track.artist}</td>
+                      <td className="px-4 py-3 text-right text-sm text-muted-foreground font-mono hidden md:table-cell">
+                        {formatDuration(track.duration)}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
               {filteredAndSortedTracks.length === 0 && (
                 <div className="p-8 text-center text-muted-foreground">
                   Aucun titre trouvé
                 </div>
               )}
-            </div>
+            </ScrollArea>
+          </GlassCard>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPageMode("list");
-                  setNewPlaylistName("");
-                  setSelectedTracksForPlaylist([]);
-                  setTableSearchQuery("");
-                  setFilterArtist(null);
-                  setFilterAlbum(null);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={handleCreatePlaylist}
-                disabled={!newPlaylistName.trim()}
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Créer la playlist
-              </Button>
-            </div>
+          {/* Actions */}
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPageMode("list");
+                setNewPlaylistName("");
+                setSelectedTracksForPlaylist([]);
+                resetFilters();
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleCreatePlaylist}
+              disabled={!newPlaylistName.trim()}
+              className="gap-2"
+            >
+              <Check className="w-4 h-4" />
+              Créer la playlist
+            </Button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </PageContainer>
     );
   }
 
-  // Show edit tracks page (add/remove) with advanced table
+  // Edit Tracks Page
   if (pageMode === "edit" && selectedPlaylist) {
     const isRemoving = selectedTracksForPlaylist.length > 0 && 
       selectedTracksForPlaylist.every(id => playlistTracks.some(t => t.id === id));
     
-    // Get unique artists and albums for edit page filters
-    const editUniqueArtists = useMemo(() => {
-      const artists = new Set<string>();
-      filteredAndSortedEditTracks.forEach(track => {
-        if (track.artist) artists.add(track.artist);
-      });
-      return Array.from(artists).sort();
-    }, [filteredAndSortedEditTracks]);
+    const tracksToShow = isRemoving ? playlistTracks : uniqueAvailableTracks;
+    
+    let filteredEditTracks = tracksToShow;
+    if (tableSearchQuery.trim()) {
+      const query = tableSearchQuery.toLowerCase();
+      filteredEditTracks = filteredEditTracks.filter(track =>
+        track.title.toLowerCase().includes(query) ||
+        track.artist.toLowerCase().includes(query)
+      );
+    }
 
-    const editUniqueAlbums = useMemo(() => {
-      const albums = new Set<string>();
-      filteredAndSortedEditTracks.forEach(track => {
-        if (track.album) albums.add(track.album);
-      });
-      return Array.from(albums).sort();
-    }, [filteredAndSortedEditTracks]);
-
-    const allSelected = filteredAndSortedEditTracks.length > 0 && 
-      selectedTracksForPlaylist.length === filteredAndSortedEditTracks.length;
-    const someSelected = selectedTracksForPlaylist.length > 0 && !allSelected;
-
-    const toggleSelectAllEdit = () => {
-      if (allSelected) {
-        setSelectedTracksForPlaylist([]);
-      } else {
-        setSelectedTracksForPlaylist(filteredAndSortedEditTracks.map(t => t.id));
-      }
-    };
+    const allSelected = filteredEditTracks.length > 0 && 
+      selectedTracksForPlaylist.length === filteredEditTracks.length;
 
     return (
-      <div className="h-full flex flex-col animate-in fade-in duration-300">
-        <div className="p-6 border-b border-border/50">
-          <div className="flex items-center gap-4 mb-4">
+      <PageContainer>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          {/* Header */}
+          <div className="flex items-center gap-4">
             <Button
               variant="ghost"
+              size="icon"
               onClick={() => {
-                setPageMode("list");
+                setPageMode("detail");
                 setSelectedTracksForPlaylist([]);
-                setTableSearchQuery("");
-                setFilterArtist(null);
-                setFilterAlbum(null);
+                resetFilters();
               }}
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Retour
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold font-display">
+                {isRemoving ? "Retirer des titres" : "Ajouter des titres"}
+              </h1>
+              <p className="text-sm text-muted-foreground">{selectedPlaylist.name}</p>
+            </div>
+          </div>
+
+          <GlassCard className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <Badge variant={isRemoving ? "destructive" : "secondary"}>
+                {selectedTracksForPlaylist.length} sélectionné{selectedTracksForPlaylist.length > 1 ? "s" : ""}
+              </Badge>
+              <Button variant="outline" size="sm" onClick={() => {
+                if (allSelected) {
+                  setSelectedTracksForPlaylist([]);
+                } else {
+                  setSelectedTracksForPlaylist(filteredEditTracks.map(t => t.id));
+                }
+              }}>
+                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              </Button>
+            </div>
+
+            <SearchBar
+              value={tableSearchQuery}
+              onChange={setTableSearchQuery}
+              placeholder="Rechercher..."
+            />
+
+            <ScrollArea className="h-[400px] rounded-lg border border-border/30">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-background/95 backdrop-blur-md z-10">
+                  <tr className="border-b border-border/30">
+                    <th className="px-4 py-3 w-12">
+                      <Checkbox checked={allSelected} onCheckedChange={() => {
+                        if (allSelected) {
+                          setSelectedTracksForPlaylist([]);
+                        } else {
+                          setSelectedTracksForPlaylist(filteredEditTracks.map(t => t.id));
+                        }
+                      }} />
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Artiste</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEditTracks.map((track) => (
+                    <tr
+                      key={track.id}
+                      className={cn(
+                        "border-b border-border/20 hover:bg-muted/30 transition-colors cursor-pointer",
+                        selectedTracksForPlaylist.includes(track.id) && (isRemoving ? "bg-destructive/10" : "bg-primary/10")
+                      )}
+                      onClick={() => {
+                        setSelectedTracksForPlaylist(prev =>
+                          prev.includes(track.id)
+                            ? prev.filter(id => id !== track.id)
+                            : [...prev, track.id]
+                        );
+                      }}
+                    >
+                      <td className="px-4 py-3">
+                        <Checkbox checked={selectedTracksForPlaylist.includes(track.id)} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden">
+                            <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <p className="font-medium text-sm truncate">{track.title}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{track.artist}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollArea>
+          </GlassCard>
+
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => {
+              setPageMode("detail");
+              setSelectedTracksForPlaylist([]);
+              resetFilters();
+            }}>
+              Annuler
+            </Button>
+            <Button
+              variant={isRemoving ? "destructive" : "default"}
+              onClick={isRemoving ? handleRemoveTracks : handleAddTracks}
+              disabled={selectedTracksForPlaylist.length === 0}
+              className="gap-2"
+            >
+              {isRemoving ? <Trash2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isRemoving ? "Retirer" : "Ajouter"}
             </Button>
           </div>
-          <PageHeader
-            title={isRemoving ? "Retirer des titres" : "Ajouter des titres"}
-            subtitle={`${isRemoving ? "Retirer" : "Ajouter"} des titres à "${selectedPlaylist.name}"`}
-          />
-        </div>
-        <div className="flex-1 overflow-auto">
-          <div className="p-6 space-y-6">
-            {/* Filters and Search Bar */}
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-4">
-                {/* Search */}
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Rechercher..."
-                    value={tableSearchQuery}
-                    onChange={(e) => setTableSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-                {/* Artist Filter */}
-                <Select value={filterArtist || "__all__"} onValueChange={(value) => setFilterArtist(value === "__all__" ? null : value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Artiste" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Tous les artistes</SelectItem>
-                    {editUniqueArtists.map(artist => (
-                      <SelectItem key={artist} value={artist}>{artist}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Album Filter */}
-                <Select value={filterAlbum || "__all__"} onValueChange={(value) => setFilterAlbum(value === "__all__" ? null : value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Album" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Tous les albums</SelectItem>
-                    {editUniqueAlbums.map(album => (
-                      <SelectItem key={album} value={album}>{album}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Clear Filters */}
-                {(filterArtist || filterAlbum || tableSearchQuery) && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setTableSearchQuery("");
-                      setFilterArtist(null);
-                      setFilterAlbum(null);
-                    }}
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Réinitialiser
-                  </Button>
-                )}
-              </div>
-
-              {/* Selection Info */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant={isRemoving ? "destructive" : "secondary"}>
-                    {selectedTracksForPlaylist.length} sélectionné{selectedTracksForPlaylist.length > 1 ? "s" : ""}
-                  </Badge>
-                  {filteredAndSortedEditTracks.length !== (isRemoving ? playlistTracks.length : uniqueAvailableTracks.length) && (
-                    <Badge variant="outline">
-                      {filteredAndSortedEditTracks.length} résultat{filteredAndSortedEditTracks.length > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleSelectAllEdit}
-                >
-                  {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-450px)]">
-                <table className="w-full">
-                  <thead className="bg-muted/50 sticky top-0 z-10 backdrop-blur-sm">
-                    <tr>
-                      <th className="px-4 py-3 text-left w-12 bg-muted/50">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={toggleSelectAllEdit}
-                          className={cn(someSelected && "data-[state=checked]:bg-primary/50")}
-                        />
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
-                        onClick={() => toggleSort("title")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Titre
-                          {tableSortBy === "title" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
-                        onClick={() => toggleSort("artist")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Artiste
-                          {tableSortBy === "artist" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors hidden md:table-cell bg-muted/50"
-                        onClick={() => toggleSort("album")}
-                      >
-                        <div className="flex items-center gap-2">
-                          Album
-                          {tableSortBy === "album" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground cursor-pointer hover:bg-muted/70 transition-colors bg-muted/50"
-                        onClick={() => toggleSort("duration")}
-                      >
-                        <div className="flex items-center justify-end gap-2">
-                          Durée
-                          {tableSortBy === "duration" && (
-                            tableSortOrder === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-                          )}
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAndSortedEditTracks.map((track) => (
-                      <tr
-                        key={track.id}
-                        className={cn(
-                          "border-b border-border/30 hover:bg-muted/30 transition-colors",
-                          selectedTracksForPlaylist.includes(track.id) && (isRemoving ? "bg-destructive/5" : "bg-primary/5")
-                        )}
-                      >
-                        <td className="px-4 py-3">
-                          <Checkbox
-                            checked={selectedTracksForPlaylist.includes(track.id)}
-                            onCheckedChange={() => {
-                              setSelectedTracksForPlaylist((prev) =>
-                                prev.includes(track.id)
-                                  ? prev.filter((id) => id !== track.id)
-                                  : [...prev, track.id]
-                              );
-                            }}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                              <img
-                                src={getCoverUrl(track.coverUrl)}
-                                alt={track.album}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{track.title}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          <p className="text-sm text-muted-foreground truncate">{track.album}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm text-muted-foreground font-mono">{formatDuration(track.duration)}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {filteredAndSortedEditTracks.length === 0 && (
-                <div className="p-8 text-center text-muted-foreground">
-                  Aucun titre trouvé
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPageMode("list");
-                  setSelectedTracksForPlaylist([]);
-                  setTableSearchQuery("");
-                  setFilterArtist(null);
-                  setFilterAlbum(null);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button
-                variant={isRemoving ? "destructive" : "default"}
-                onClick={isRemoving ? handleRemoveTracks : handleAddTracks}
-                disabled={selectedTracksForPlaylist.length === 0}
-              >
-                {isRemoving ? (
-                  <>
-                    <X className="w-4 h-4 mr-2" />
-                    Retirer {selectedTracksForPlaylist.length > 0 && `(${selectedTracksForPlaylist.length})`}
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Ajouter {selectedTracksForPlaylist.length > 0 && `(${selectedTracksForPlaylist.length})`}
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+        </motion.div>
+      </PageContainer>
     );
   }
 
-  // If a playlist is selected, show its tracks
+  // Playlist Detail View
   if (selectedPlaylist) {
     return (
-      <div className="h-full flex flex-col animate-in fade-in duration-300">
-        {/* Playlist Header */}
-        <div className="p-6 border-b border-border/50">
-          <div className="flex items-center gap-4 mb-4">
-            <button
+      <PageContainer>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="space-y-6"
+        >
+          {/* Header */}
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSelectedPlaylistId(null)}
-              className="p-2 hover:bg-muted rounded-lg transition-colors"
-              aria-label="Retour aux playlists"
             >
-              <X className="w-5 h-5" />
-            </button>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
             <div className="flex-1">
-              <div className="flex items-center gap-3">
-                {editingPlaylistId === selectedPlaylist.id ? (
+              {editingPlaylistId === selectedPlaylist.id ? (
+                <div className="flex items-center gap-3">
                   <Input
                     value={editingPlaylistName}
                     onChange={(e) => setEditingPlaylistName(e.target.value)}
@@ -928,431 +827,296 @@ export const PlaylistView = ({
                         setEditingPlaylistName("");
                       }
                     }}
-                    className="text-2xl font-bold"
+                    className="text-xl font-bold max-w-md"
                     autoFocus
                   />
-                ) : (
+                  <Button size="sm" onClick={handleSaveEdit}>Enregistrer</Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setEditingPlaylistId(null);
+                    setEditingPlaylistName("");
+                  }}>
+                    Annuler
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold font-display">{selectedPlaylist.name}</h1>
-                )}
-                {editingPlaylistId === selectedPlaylist.id ? (
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleSaveEdit}>
-                      Enregistrer
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEditingPlaylistId(null);
-                        setEditingPlaylistName("");
-                      }}
-                    >
-                      Annuler
-                    </Button>
-                  </div>
-                ) : (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleEditPlaylist(selectedPlaylist)}
-                    className="p-1 hover:bg-muted rounded transition-colors"
-                    aria-label="Renommer la playlist"
                   >
                     <Edit className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+                  </Button>
+                </div>
+              )}
               {selectedPlaylist.description && (
                 <p className="text-muted-foreground mt-1">{selectedPlaylist.description}</p>
               )}
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                <Music className="w-4 h-4" />
                 {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
+                <span className="mx-1">•</span>
+                <Clock className="w-4 h-4" />
+                {formatDuration(playlistTracks.reduce((a, t) => a + t.duration, 0))}
               </p>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => handlePlayPlaylist(selectedPlaylist.id)}
-              disabled={playlistTracks.length === 0}
-            >
-              <Play className="w-4 h-4 mr-2" />
-              Lire
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => handlePlayPlaylist(selectedPlaylist.id)} disabled={playlistTracks.length === 0} className="gap-2">
+              <Play className="w-4 h-4 fill-current" />
+              Lecture
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleShufflePlaylist(selectedPlaylist.id)}
-              disabled={playlistTracks.length === 0}
-            >
-              <Shuffle className="w-4 h-4 mr-2" />
+            <Button variant="outline" onClick={() => handleShufflePlaylist(selectedPlaylist.id)} disabled={playlistTracks.length === 0} className="gap-2">
+              <Shuffle className="w-4 h-4" />
               Mélanger
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelectedTracksForPlaylist([]);
-                setPageMode("edit");
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter des titres
+            <Button variant="outline" onClick={() => {
+              setSelectedTracksForPlaylist([]);
+              setPageMode("edit");
+            }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Ajouter
             </Button>
             {playlistTracks.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedTracksForPlaylist(playlistTracks.map((t) => t.id));
-                  setPageMode("edit");
-                }}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Retirer des titres
+              <Button variant="outline" onClick={() => {
+                setSelectedTracksForPlaylist(playlistTracks.map(t => t.id));
+                setPageMode("edit");
+              }} className="gap-2">
+                <X className="w-4 h-4" />
+                Retirer
               </Button>
             )}
-            <Button
-              variant="destructive"
-              onClick={() => handleDeletePlaylist(selectedPlaylist.id)}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Supprimer
+            <Button variant="destructive" onClick={() => handleDeletePlaylist(selectedPlaylist.id)} className="gap-2">
+              <Trash2 className="w-4 h-4" />
             </Button>
           </div>
-        </div>
 
-        {/* Playlist Tracks */}
-        <div className="flex-1 overflow-auto">
-          {playlistTracks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8">
-              <Music className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Playlist vide</h3>
-              <p className="text-muted-foreground mb-4">
-                Ajoutez des titres à cette playlist pour commencer.
-              </p>
-              <Button onClick={() => setPageMode("edit")}>
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter des titres
-              </Button>
-            </div>
-          ) : (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={cn(
-                      "p-2 rounded-lg transition-colors",
-                      viewMode === "list"
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
-                    )}
-                    aria-label="Vue liste"
-                  >
-                    <ListMusic className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={cn(
-                      "p-2 rounded-lg transition-colors",
-                      viewMode === "grid"
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
-                    )}
-                    aria-label="Vue grille"
-                  >
-                    <Music className="w-4 h-4" />
-                  </button>
+          {/* Tracks */}
+          <GlassCard className="overflow-hidden">
+            {playlistTracks.length === 0 ? (
+              <EmptyState
+                icon={Music}
+                title="Playlist vide"
+                description="Ajoutez des titres pour commencer"
+                action={
+                  <Button onClick={() => setPageMode("edit")} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Ajouter des titres
+                  </Button>
+                }
+              />
+            ) : (
+              <>
+                <div className="p-4 border-b border-border/30">
+                  <ViewToggle value={viewMode} onChange={setViewMode} />
                 </div>
-              </div>
-
-              {viewMode === "grid" ? (
-                <TrackGridView
-                  tracks={playlistTracks}
-                  currentTrackIndex={currentTrackIndex}
-                  isPlaying={isPlaying}
-                  onTrackSelect={(index) => {
-                    const track = playlistTracks[index];
-                    const realIndex = tracks.findIndex((t) => t.id === track.id);
-                    if (realIndex !== -1) onTrackSelect(realIndex);
-                  }}
-                  onAddToPlaylist={(playlistId, track) => {
-                    onAddTracksToPlaylist(playlistId, [track.id]);
-                  }}
-                  createPlaylist={onCreatePlaylist}
-                />
-              ) : (
-                <TrackListView
-                  tracks={playlistTracks}
-                  currentTrackIndex={currentTrackIndex}
-                  isPlaying={isPlaying}
-                  onTrackSelect={(index) => {
-                    const track = playlistTracks[index];
-                    const realIndex = tracks.findIndex((t) => t.id === track.id);
-                    if (realIndex !== -1) onTrackSelect(realIndex);
-                  }}
-                  onAddToPlaylist={(playlistId, track) => {
-                    onAddTracksToPlaylist(playlistId, [track.id]);
-                  }}
-                  createPlaylist={onCreatePlaylist}
-                  showRemoveFromPlaylist
-                  onRemoveFromPlaylist={(track) => {
-                    onRemoveTracksFromPlaylist(selectedPlaylist.id, [track.id]);
-                  }}
-                  uploadTrack={uploadTrack}
-                  getTrackProgress={(trackId) => getTrackProgress(trackId) ?? null}
-                  canUploadToCloudinary={canUploadToCloudinary}
-                  uploadTrackToNexus={uploadTrackToNexus}
-                  getNexusTrackProgress={(trackId) => getNexusTrackProgress(trackId) ?? null}
-                  canUploadToNexus={canUploadToNexus}
-                  isUploaded={isUploaded}
-                  getUploadedProvider={getUploadedProvider}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+                <div className="p-4">
+                  {viewMode === "grid" ? (
+                    <TrackGridView
+                      tracks={playlistTracks}
+                      currentTrackIndex={currentTrackIndex}
+                      isPlaying={isPlaying}
+                      onTrackSelect={(idx) => {
+                        const track = playlistTracks[idx];
+                        const realIdx = tracks.findIndex(t => t.id === track.id);
+                        if (realIdx !== -1) onTrackSelect(realIdx);
+                      }}
+                      onAddToPlaylist={(pId, track) => onAddTracksToPlaylist(pId, [track.id])}
+                      createPlaylist={onCreatePlaylist}
+                    />
+                  ) : (
+                    <TrackListView
+                      tracks={playlistTracks}
+                      currentTrackIndex={currentTrackIndex}
+                      isPlaying={isPlaying}
+                      onTrackSelect={(idx) => {
+                        const track = playlistTracks[idx];
+                        const realIdx = tracks.findIndex(t => t.id === track.id);
+                        if (realIdx !== -1) onTrackSelect(realIdx);
+                      }}
+                      onAddToPlaylist={(pId, track) => onAddTracksToPlaylist(pId, [track.id])}
+                      createPlaylist={onCreatePlaylist}
+                      showRemoveFromPlaylist
+                      onRemoveFromPlaylist={(track) => onRemoveTracksFromPlaylist(selectedPlaylist.id, [track.id])}
+                      uploadTrack={uploadTrack}
+                      getTrackProgress={(id) => getTrackProgress(id) ?? null}
+                      canUploadToCloudinary={canUploadToCloudinary}
+                      uploadTrackToNexus={uploadTrackToNexus}
+                      getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
+                      canUploadToNexus={canUploadToNexus}
+                      isUploaded={isUploaded}
+                      getUploadedProvider={getUploadedProvider}
+                    />
+                  )}
+                </div>
+              </>
+            )}
+          </GlassCard>
+        </motion.div>
+      </PageContainer>
     );
   }
 
-  // Show playlists grid/list
+  // Playlists List (Main View)
   return (
-    <div className="h-full flex flex-col animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="p-6 border-b border-border/50">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold font-display mb-1">Playlists</h1>
-            <p className="text-muted-foreground">
-              {playlists.length} playlist{playlists.length > 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* View Mode Toggle */}
-            <div className="flex rounded-lg bg-muted/30 p-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={cn(
-                      "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
-                      viewMode === "grid"
-                        ? "bg-primary/20 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    aria-label="Vue grille"
-                  >
-                    <Grid className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm">Vue grille</div>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={cn(
-                      "p-2 rounded transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
-                      viewMode === "list"
-                        ? "bg-primary/20 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    aria-label="Vue liste"
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm">Vue liste</div>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <Button onClick={() => setPageMode("create")}>
-              <Plus className="w-4 h-4 mr-2" />
-              Créer une playlist
-            </Button>
-          </div>
-        </div>
+    <PageContainer>
+      {/* Hero */}
+      <PageHero
+        title="Playlists"
+        subtitle={`${playlists.length} playlist${playlists.length > 1 ? "s" : ""} • ${totalTracks} titres au total`}
+        icon={ListMusic}
+        gradient="from-pink-500/20 via-rose-500/10 to-red-500/20"
+        actions={
+          <Button onClick={() => setPageMode("create")} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nouvelle playlist
+          </Button>
+        }
+      />
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher une playlist..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        <StatCard icon={ListMusic} label="Playlists" value={playlists.length} color="bg-pink-500/20 text-pink-400" />
+        <StatCard icon={Music} label="Titres" value={totalTracks} color="bg-purple-500/20 text-purple-400" />
+        <StatCard icon={Heart} label="Favoris" value={playlists.filter(p => p.trackIds.length > 5).length} color="bg-red-500/20 text-red-400" />
       </div>
 
-      {/* Playlists Grid */}
-      <ScrollArea className="flex-1">
-        <div className="p-6">
-          {loading ? (
-            viewMode === "grid" ? (
-              <AlbumGridSkeleton count={12} />
-            ) : (
-              <TrackTableSkeleton count={8} />
-            )
-          ) : filteredPlaylists.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[400px] text-center">
-              <Music className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">
-                {searchQuery ? "Aucune playlist trouvée" : "Aucune playlist"}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery
-                  ? "Essayez une autre recherche"
-                  : "Créez votre première playlist pour commencer"}
-              </p>
-              {!searchQuery && (
-                <Button onClick={() => setPageMode("create")}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Créer une playlist
-                </Button>
-              )}
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-              {filteredPlaylists.map((playlist) => {
-                const playlistTracks = playlist.trackIds
-                  .map((id) => tracks.find((t) => t.id === id))
-                  .filter((t): t is Track => !!t);
-                const coverUrl =
-                  playlistTracks.length > 0
-                    ? getCoverUrl(playlistTracks[0].coverUrl)
-                    : undefined;
+      {/* Toolbar */}
+      <Toolbar className="mb-6">
+        <SearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Rechercher une playlist..."
+        />
+        <ViewToggle value={viewMode} onChange={setViewMode} />
+      </Toolbar>
 
-                return (
-                  <PlaylistContextMenu
-                    key={playlist.id}
-                    playlist={playlist}
-                    onPlay={() => handlePlayPlaylist(playlist.id)}
-                    onShuffle={() => handleShufflePlaylist(playlist.id)}
-                    onEdit={() => handleEditPlaylist(playlist)}
-                    onDelete={() => handleDeletePlaylist(playlist.id)}
-                    onView={() => setSelectedPlaylistId(playlist.id)}
-                    onUploadToCloudinary={() => {
-                      const playlistTracks = playlist.trackIds
-                        .map((id) => tracks.find((t) => t.id === id))
-                        .filter((t): t is Track => !!t);
-                      uploadPlaylist(playlistTracks);
-                    }}
-                    canUploadToCloudinary={canUploadToCloudinary && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
-                    onUploadToNexus={() => {
-                      const playlistTracks = playlist.trackIds
-                        .map((id) => tracks.find((t) => t.id === id))
-                        .filter((t): t is Track => !!t);
-                      uploadPlaylistToNexus(playlistTracks);
-                    }}
-                    canUploadToNexus={canUploadToNexus && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
+      {/* Loading */}
+      {loading ? (
+        viewMode === "grid" ? <AlbumGridSkeleton count={12} /> : <TrackTableSkeleton count={8} />
+      ) : filteredPlaylists.length === 0 ? (
+        <EmptyState
+          icon={ListMusic}
+          title={searchQuery ? "Aucune playlist trouvée" : "Aucune playlist"}
+          description={searchQuery ? "Essayez une autre recherche" : "Créez votre première playlist"}
+          action={
+            !searchQuery && (
+              <Button onClick={() => setPageMode("create")} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Créer une playlist
+              </Button>
+            )
+          }
+        />
+      ) : viewMode === "grid" ? (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+        >
+          <AnimatePresence mode="popLayout">
+            {filteredPlaylists.map((playlist) => (
+              <PlaylistCard
+                key={playlist.id}
+                playlist={playlist}
+                tracks={tracks}
+                onSelect={() => setSelectedPlaylistId(playlist.id)}
+                onPlay={() => handlePlayPlaylist(playlist.id)}
+                onShuffle={() => handleShufflePlaylist(playlist.id)}
+                onEdit={() => handleEditPlaylist(playlist)}
+                onDelete={() => handleDeletePlaylist(playlist.id)}
+                canUpload={canUploadToCloudinary}
+                onUpload={() => {
+                  const pTracks = playlist.trackIds
+                    .map(id => tracks.find(t => t.id === id))
+                    .filter((t): t is Track => !!t);
+                  uploadPlaylist(pTracks);
+                }}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      ) : (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-2"
+        >
+          {filteredPlaylists.map((playlist) => {
+            const pTracks = playlist.trackIds
+              .map(id => tracks.find(t => t.id === id))
+              .filter((t): t is Track => !!t);
+            const coverUrl = pTracks[0]?.coverUrl ? getCoverUrl(pTracks[0].coverUrl) : null;
+
+            return (
+              <motion.div
+                key={playlist.id}
+                variants={itemVariants}
+                whileHover={{ x: 4 }}
+              >
+                <PlaylistContextMenu
+                  playlist={playlist}
+                  onPlay={() => handlePlayPlaylist(playlist.id)}
+                  onShuffle={() => handleShufflePlaylist(playlist.id)}
+                  onEdit={() => handleEditPlaylist(playlist)}
+                  onDelete={() => handleDeletePlaylist(playlist.id)}
+                  onView={() => setSelectedPlaylistId(playlist.id)}
+                >
+                  <GlassCard
+                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                    onClick={() => setSelectedPlaylistId(playlist.id)}
                   >
-                    <div
-                      onClick={() => setSelectedPlaylistId(playlist.id)}
-                      className="group relative aspect-[3/4] rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 cursor-pointer transition-all hover:scale-105 hover:shadow-lg"
-                    >
+                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 flex-shrink-0">
                       {coverUrl ? (
-                        <img
-                          src={coverUrl}
-                          alt={playlist.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={coverUrl} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Music className="w-10 h-10 text-primary/50" />
+                          <ListMusic className="w-6 h-6 text-primary/50" />
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                        <h3 className="font-semibold truncate mb-0.5 text-sm">{playlist.name}</h3>
-                        <p className="text-xs text-white/80">
-                          {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
-                        </p>
-                      </div>
                     </div>
-                  </PlaylistContextMenu>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredPlaylists.map((playlist) => {
-                const playlistTracks = playlist.trackIds
-                  .map((id) => tracks.find((t) => t.id === id))
-                  .filter((t): t is Track => !!t);
-                const coverUrl =
-                  playlistTracks.length > 0
-                    ? getCoverUrl(playlistTracks[0].coverUrl)
-                    : undefined;
-
-                return (
-                  <PlaylistContextMenu
-                    key={playlist.id}
-                    playlist={playlist}
-                    onPlay={() => handlePlayPlaylist(playlist.id)}
-                    onShuffle={() => handleShufflePlaylist(playlist.id)}
-                    onEdit={() => handleEditPlaylist(playlist)}
-                    onDelete={() => handleDeletePlaylist(playlist.id)}
-                    onView={() => setSelectedPlaylistId(playlist.id)}
-                    onUploadToCloudinary={() => {
-                      const playlistTracks = playlist.trackIds
-                        .map((id) => tracks.find((t) => t.id === id))
-                        .filter((t): t is Track => !!t);
-                      uploadPlaylist(playlistTracks);
-                    }}
-                    canUploadToCloudinary={canUploadToCloudinary && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
-                    onUploadToNexus={() => {
-                      const playlistTracks = playlist.trackIds
-                        .map((id) => tracks.find((t) => t.id === id))
-                        .filter((t): t is Track => !!t);
-                      uploadPlaylistToNexus(playlistTracks);
-                    }}
-                    canUploadToNexus={canUploadToNexus && playlist.trackIds.some(id => tracks.find(t => t.id === id)?.filePath)}
-                  >
-                    <div
-                      onClick={() => setSelectedPlaylistId(playlist.id)}
-                      className="group flex items-center gap-4 p-3 rounded-lg bg-card/30 hover:bg-card/50 border border-border/30 cursor-pointer transition-all"
-                    >
-                      <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0 bg-gradient-to-br from-primary/20 to-secondary/20">
-                        {coverUrl ? (
-                          <img
-                            src={coverUrl}
-                            alt={playlist.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Music className="w-6 h-6 text-primary/50" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate mb-0.5">{playlist.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlayPlaylist(playlist.id);
-                          }}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{playlist.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {pTracks.length} titre{pTracks.length > 1 ? "s" : ""}
+                      </p>
                     </div>
-                  </PlaylistContextMenu>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayPlaylist(playlist.id);
+                        }}
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShufflePlaylist(playlist.id);
+                        }}
+                      >
+                        <Shuffle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </GlassCard>
+                </PlaylistContextMenu>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
+    </PageContainer>
   );
-};
+});
+
+PlaylistView.displayName = "PlaylistView";

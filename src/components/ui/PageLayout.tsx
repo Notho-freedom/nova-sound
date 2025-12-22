@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, ReactNode } from "react";
+import React, { memo, ReactNode } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,8 @@ interface PageHeroProps {
   children?: ReactNode;
   compact?: boolean;
   className?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  actions?: ReactNode;
 }
 
 export const PageHero = memo(({
