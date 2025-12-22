@@ -14,6 +14,7 @@
     "build": "next build",
     "build:electron": "npm run build && tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron')) { New-Item -ItemType Directory -Path 'dist-electron' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\"",
     "start": "next start",
+    "build:dev": "vite build --mode development",
     "electron": "npm run build:electron && powershell -Command \"$env:FORCE_PROD='true'; electron .\"",
     "package": "npm run build:electron && electron-builder",
     "package:win": "npm run build:electron && electron-builder --win",
