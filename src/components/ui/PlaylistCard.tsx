@@ -1,9 +1,10 @@
 "use client";
 
+import { memo, useCallback, useMemo } from "react";
 import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { SimpleTooltip } from "@/components/ui/tooltip";
 import type { Track } from "@/types/music";
 
 interface PlaylistCardProps {
@@ -18,31 +19,62 @@ interface PlaylistCardProps {
   maxThumbnails?: number;
 }
 
-export const PlaylistCard = ({
-  title,
-  subtitle,
-  description,
-  tracks,
-  gradient = "from-primary/80 via-primary/60 to-secondary/80",
-  icon,
-  onClick,
-  className,
-  maxThumbnails = 4,
-}: PlaylistCardProps) => {
-  const thumbnails = tracks.slice(0, maxThumbnails);
-  const extraCount = Math.max(0, tracks.length - maxThumbnails);
+// Memoized thumbnail component
+const TrackThumbnail = memo(({ track, index }: { track: Track; index: number }) => (
+  <div
+    className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
+    style={{ marginLeft: index > 0 ? "-8px" : 0, zIndex: 10 - index }}
+  >
+    <img
+      src={getCoverUrl(track.coverUrl)}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="w-full h-full object-cover"
+    />
+  </div>
+));
+TrackThumbnail.displayName = "TrackThumbnail";
 
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
+export const PlaylistCard = memo(
+  ({
+    title,
+    subtitle,
+    description,
+    tracks,
+    gradient = "from-primary/80 via-primary/60 to-secondary/80",
+    icon,
+    onClick,
+    className,
+    maxThumbnails = 4,
+  }: PlaylistCardProps) => {
+    const handleClick = useCallback(() => {
+      onClick?.();
+    }, [onClick]);
+
+    const thumbnails = useMemo(() => tracks.slice(0, maxThumbnails), [tracks, maxThumbnails]);
+    const extraCount = useMemo(() => Math.max(0, tracks.length - maxThumbnails), [tracks.length, maxThumbnails]);
+
+    const tooltipContent = (
+      <div>
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-muted-foreground">
+          {tracks.length} piste{tracks.length > 1 ? "s" : ""}
+        </div>
+        {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
+      </div>
+    );
+
+    return (
+      <SimpleTooltip content={tooltipContent}>
         <button
-          onClick={onClick}
+          onClick={handleClick}
           className={cn(
             "group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer",
             "shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
             "text-left w-full",
-            className
+            className,
           )}
         >
           {/* Background image from first track */}
@@ -51,15 +83,16 @@ export const PlaylistCard = ({
               src={getCoverUrl(tracks[0].coverUrl)}
               alt=""
               loading="lazy"
+              decoding="async"
               className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
             />
           )}
-          
+
           {/* Gradient overlay */}
           <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
 
           {/* Decorative pattern */}
-          <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0 opacity-20" aria-hidden="true">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
           </div>
@@ -70,27 +103,22 @@ export const PlaylistCard = ({
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  {icon && (
-                    <div className="text-white/90">{icon}</div>
-                  )}
-                  <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">
-                    {title}
-                  </h3>
+                  {icon && <div className="text-white/90">{icon}</div>}
+                  <h3 className="font-display text-xl font-bold text-white drop-shadow-lg">{title}</h3>
                 </div>
-                {subtitle && (
-                  <p className="text-white/80 text-sm font-medium">{subtitle}</p>
-                )}
-                {description && (
-                  <p className="text-white/60 text-xs mt-1">{description}</p>
-                )}
+                {subtitle && <p className="text-white/80 text-sm font-medium">{subtitle}</p>}
+                {description && <p className="text-white/60 text-xs mt-1">{description}</p>}
               </div>
-              
+
               {/* Play button */}
-              <div className={cn(
-                "w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center",
-                "opacity-0 group-hover:opacity-100 transition-all duration-300",
-                "group-hover:scale-110 group-hover:rotate-12"
-              )}>
+              <div
+                className={cn(
+                  "w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center",
+                  "opacity-0 group-hover:opacity-100 transition-all duration-300",
+                  "group-hover:scale-110 group-hover:rotate-12",
+                )}
+                aria-hidden="true"
+              >
                 <Play className="w-5 h-5 text-white fill-current ml-0.5" />
               </div>
             </div>
@@ -98,18 +126,7 @@ export const PlaylistCard = ({
             {/* Track thumbnails */}
             <div className="flex items-center gap-2">
               {thumbnails.map((track, i) => (
-                <div
-                  key={`${track.id}-${i}`}
-                  className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white/40 shadow-lg backdrop-blur-sm"
-                  style={{ marginLeft: i > 0 ? "-8px" : 0, zIndex: 10 - i }}
-                >
-                  <img
-                    src={getCoverUrl(track.coverUrl)}
-                    alt=""
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <TrackThumbnail key={`${track.id}-${i}`} track={track} index={i} />
               ))}
               {extraCount > 0 && (
                 <div
@@ -122,12 +139,9 @@ export const PlaylistCard = ({
             </div>
           </div>
         </button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-muted-foreground">{tracks.length} piste{tracks.length > 1 ? "s" : ""}</div>
-        {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
-      </TooltipContent>
-    </Tooltip>
-  );
-};
+      </SimpleTooltip>
+    );
+  },
+);
+
+PlaylistCard.displayName = "PlaylistCard";
