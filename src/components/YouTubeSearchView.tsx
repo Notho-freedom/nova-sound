@@ -613,7 +613,18 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       setLoadingPlaylists(true);
       try {
         const foundPlaylists = await searchYouTubePlaylists(searchQuery, 10);
-        setPlaylists(foundPlaylists);
+        // Convertir YouTubeSuggestion[] en YouTubeSearchResult[]
+        const convertedPlaylists: YouTubeSearchResult[] = foundPlaylists.map(playlist => ({
+          videoId: playlist.videoId,
+          title: playlist.title,
+          description: playlist.description,
+          thumbnailUrl: playlist.thumbnailUrl,
+          channelTitle: playlist.channelTitle,
+          publishedAt: playlist.publishedAt,
+          duration: playlist.duration ? `PT${Math.floor(playlist.duration / 3600)}H${Math.floor((playlist.duration % 3600) / 60)}M${playlist.duration % 60}S` : undefined,
+          viewCount: playlist.viewCount?.toString(),
+        }));
+        setPlaylists(convertedPlaylists);
       } catch (error) {
         console.error('[YouTubeSearchView] Erreur recherche playlists:', error);
         setPlaylists([]);
@@ -714,9 +725,20 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     setLoadingPlaylistVideos(prev => new Set(prev).add(playlistId));
     try {
       const videos = await fetchYouTubePlaylistVideos(playlistId, 50);
+      // Convertir YouTubeSuggestion[] en YouTubeSearchResult[]
+      const convertedVideos: YouTubeSearchResult[] = videos.map(video => ({
+        videoId: video.videoId,
+        title: video.title,
+        description: video.description,
+        thumbnailUrl: video.thumbnailUrl,
+        channelTitle: video.channelTitle,
+        publishedAt: video.publishedAt,
+        duration: video.duration ? `PT${Math.floor(video.duration / 3600)}H${Math.floor((video.duration % 3600) / 60)}M${video.duration % 60}S` : undefined,
+        viewCount: video.viewCount?.toString(),
+      }));
       setPlaylistVideos(prev => {
         const newMap = new Map(prev);
-        newMap.set(playlistId, videos);
+        newMap.set(playlistId, convertedVideos);
         return newMap;
       });
       setSelectedPlaylist(playlistId);
