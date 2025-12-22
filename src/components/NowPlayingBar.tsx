@@ -21,6 +21,7 @@ import {
   Disc3,
   Users,
   Airplay,
+  Sparkles,
 } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
@@ -37,6 +38,7 @@ import type { Track } from "@/types/music"
 import { toast } from "sonner"
 import { useNotifications } from "@/hooks/useNotifications"
 import { useState } from "react"
+import { ArtistInfoPanel } from "./ArtistInfoPanel"
 
 interface NowPlayingBarProps {
   currentTrack: Track
@@ -102,6 +104,7 @@ export const NowPlayingBar = ({
 }: NowPlayingBarProps) => {
   const [isHoveringProgress, setIsHoveringProgress] = useState(false)
   const [isHoveringVolume, setIsHoveringVolume] = useState(false)
+  const [isArtistInfoOpen, setIsArtistInfoOpen] = useState(false)
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2
 
@@ -372,6 +375,24 @@ export const NowPlayingBar = ({
 
             {/* Right: Secondary Controls */}
             <div className="flex items-center gap-1 w-[280px] justify-end flex-shrink-0">
+              {/* Artist Info */}
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setIsArtistInfoOpen(true)}
+                    className={cn(
+                      "p-2 rounded-full transition-all duration-300",
+                      "text-muted-foreground/50 hover:text-primary",
+                      "hover:bg-primary/10 active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    )}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Profil artiste</TooltipContent>
+              </Tooltip>
+
               {/* Lyrics */}
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
@@ -533,6 +554,13 @@ export const NowPlayingBar = ({
             </div>
           </div>
         </div>
+
+        {/* Artist Info Panel */}
+        <ArtistInfoPanel
+          isOpen={isArtistInfoOpen}
+          onClose={() => setIsArtistInfoOpen(false)}
+          currentTrack={currentTrack}
+        />
       </div>
     </TooltipProvider>
   )
