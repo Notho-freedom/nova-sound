@@ -12,6 +12,7 @@ release
 dist
 dist-ssr
 *.local
+updates-from-v0
 
 # Environment variables
 .env

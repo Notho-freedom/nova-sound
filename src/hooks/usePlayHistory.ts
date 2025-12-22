@@ -25,25 +25,91 @@ export function usePlayHistory(): UsePlayHistoryReturn {
 
   // Load history from localStorage and listen to Firebase sync updates
   useEffect(() => {
-    const stored = localStorage.getItem("nexus-play-history");
-    if (stored) {
-      try {
-        setHistory(JSON.parse(stored));
-      } catch {
-        setHistory([]);
+    // Charger depuis localStorage immédiatement
+    const loadFromLocalStorage = () => {
+      const stored = localStorage.getItem("nexus-play-history");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setHistory(parsed);
+            return;
+          }
+        } catch {
+          // Ignorer les erreurs de parsing
+        }
       }
-    }
+      setHistory([]);
+    };
 
-    // Listen to Firebase sync updates
+    loadFromLocalStorage();
+
+    // Écouter les mises à jour Firebase (qui peuvent arriver après le chargement initial)
     const handleSyncUpdate = (event: CustomEvent) => {
-      if (event.detail?.history) {
+      if (event.detail?.history && Array.isArray(event.detail.history)) {
+        console.log('[usePlayHistory] Mise à jour depuis Firebase (firebase-sync-update):', event.detail.history.length, 'entrées');
         setHistory(event.detail.history);
+        // Sauvegarder immédiatement dans localStorage
+        try {
+          localStorage.setItem("nexus-play-history", JSON.stringify(event.detail.history));
+        } catch (error) {
+          console.error("Failed to save history from Firebase to localStorage:", error);
+        }
+      }
+    };
+
+    // Écouter aussi l'événement spécifique pour l'historique
+    const handleHistoryUpdate = (event: CustomEvent) => {
+      if (event.detail?.history && Array.isArray(event.detail.history)) {
+        console.log('[usePlayHistory] Mise à jour depuis Firebase (firebase-history-update):', event.detail.history.length, 'entrées');
+        setHistory(event.detail.history);
+        // Sauvegarder immédiatement dans localStorage
+        try {
+          localStorage.setItem("nexus-play-history", JSON.stringify(event.detail.history));
+        } catch (error) {
+          console.error("Failed to save history from Firebase to localStorage:", error);
+        }
       }
     };
 
     window.addEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+    window.addEventListener('firebase-history-update', handleHistoryUpdate as EventListener);
+    
+    // Recharger depuis localStorage après un court délai pour capturer les mises à jour Firebase
+    // Firebase peut mettre à jour localStorage après le montage du hook
+    // Utiliser plusieurs tentatives pour s'assurer de capturer les données Firebase
+    const checkAndReload = () => {
+      const stored = localStorage.getItem("nexus-play-history");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setHistory(prev => {
+              // Utiliser les données Firebase si elles sont plus récentes ou plus complètes
+              if (prev.length === 0 || parsed.length > prev.length) {
+                console.log('[usePlayHistory] Rechargement depuis localStorage:', parsed.length, 'entrées');
+                return parsed;
+              }
+              return prev;
+            });
+          }
+        } catch {
+          // Ignorer les erreurs
+        }
+      }
+    };
+
+    // Vérifier immédiatement, puis après 1s, 3s et 5s pour capturer les mises à jour Firebase
+    const timeout1 = setTimeout(checkAndReload, 1000);
+    const timeout2 = setTimeout(checkAndReload, 3000);
+    const timeout3 = setTimeout(checkAndReload, 5000);
+
     return () => {
       window.removeEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+      window.removeEventListener('firebase-history-update', handleHistoryUpdate as EventListener);
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      clearTimeout(timeout3);
     };
   }, []);
 

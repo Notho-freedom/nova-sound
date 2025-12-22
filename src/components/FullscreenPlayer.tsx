@@ -381,27 +381,19 @@ useEffect(() => {
 
   // Fullscreen mode
   return (
-    <div className="fixed inset-0 z-[10000] bg-background flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-      <BackgroundEffects />
+    <div className={cn(
+      "fixed inset-0 z-[10000] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300",
+      isYouTube ? "bg-transparent" : "bg-background"
+    )}>
+      {!isYouTube && <BackgroundEffects />}
       
       {/* Main Panel - Background with album cover and FFT */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Player YouTube - visible pour les vidéos, masqué pour l'audio */}
-        {/* IMPORTANT: Ne jamais créer de nouveau player YouTube ici */}
-        {/* On utilise toujours le player persistant de DesktopApp via sharedYoutubePlayerRef */}
-        {/* Le player persistant est déjà rendu visible en fullscreen par DesktopApp */}
-        {isYouTube && youtubeVideoId && (
-          <div 
-            className="absolute inset-0 pointer-events-none" 
-            style={{ 
-              zIndex: 1,
-            }}
-          >
-            {/* Le player YouTube persistant est déjà rendu visible en fullscreen par DesktopApp */}
-            {/* Cet overlay permet juste de gérer les contrôles Nexus par-dessus */}
-            {/* Aucun nouveau player n'est créé ici pour éviter les doublures */}
-          </div>
-        )}
+        {/* Player YouTube - visible pour les vidéos YouTube en mode fullscreen */}
+        {/* Le player YouTube persistant de DesktopApp est déjà rendu visible en fullscreen */}
+        {/* Il est positionné en z-9998 dans DesktopApp, donc en dessous du FullscreenPlayer (z-10000) */}
+        {/* Mais on peut voir la vidéo à travers le fond transparent du FullscreenPlayer */}
+        {/* Pour s'assurer que la vidéo est bien visible, on masque le fond quand c'est YouTube */}
         
         {/* Album cover background - blurred and faded (seulement pour non-YouTube) */}
         {!isYouTube && (
@@ -435,7 +427,10 @@ useEffect(() => {
       {/* Le YouTubePlayer gère déjà l'overlay pour permettre le clic droit */}
 
       {/* Header */}
-      <div className="relative z-30 flex items-center justify-between p-6">
+      <div className={cn(
+        "relative z-30 flex items-center justify-between p-6",
+        isYouTube && "backdrop-blur-sm bg-black/20"
+      )}>
         <button
           onClick={onClose}
           className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground backdrop-blur-sm bg-background/30"
@@ -443,7 +438,10 @@ useEffect(() => {
           <ChevronDown className="w-6 h-6" />
         </button>
         <div className="text-center">
-          <p className="text-xs text-muted-foreground uppercase tracking-widest">
+          <p className={cn(
+            "text-xs uppercase tracking-widest",
+            isYouTube ? "text-white/90" : "text-muted-foreground"
+          )}>
             En Lecture
           </p>
         </div>
@@ -461,7 +459,10 @@ useEffect(() => {
       </div>
 
       {/* Panneau latéral avec tous les éléments */}
-      <div className="absolute right-0 top-0 bottom-0 z-30 w-96 backdrop-blur-xl bg-background/20 border-l border-border/30 p-6 flex flex-col">
+      <div className={cn(
+        "absolute right-0 top-0 bottom-0 z-30 w-96 backdrop-blur-xl border-l p-6 flex flex-col",
+        isYouTube ? "bg-black/40 border-white/20" : "bg-background/20 border-border/30"
+      )}>
         {/* Album Art */}
         <div className="flex items-center justify-center mb-6">
           <AlbumArt

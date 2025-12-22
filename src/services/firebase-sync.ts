@@ -418,8 +418,19 @@ class FirebaseSyncService {
         }
       }
 
-      if (data.history) {
+      if (data.history && Array.isArray(data.history) && data.history.length > 0) {
+        console.log('[FirebaseSync] Mise à jour historique depuis Firebase:', data.history.length, 'entrées');
         this.saveToLocalStorage('nexus-play-history', data.history);
+        // Émettre un événement spécifique pour l'historique pour forcer la mise à jour
+        window.dispatchEvent(new CustomEvent('firebase-history-update', { 
+          detail: { history: data.history } 
+        }));
+      } else if (data.history && Array.isArray(data.history) && data.history.length === 0) {
+        // Même si l'historique est vide, on le sauvegarde pour éviter les conflits
+        this.saveToLocalStorage('nexus-play-history', data.history);
+        window.dispatchEvent(new CustomEvent('firebase-history-update', { 
+          detail: { history: data.history } 
+        }));
       }
 
       if (data.theme) {
@@ -472,6 +483,13 @@ class FirebaseSyncService {
 
       // Dispatch custom events for UI updates
       window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: data }));
+      
+      // Émettre aussi un événement spécifique pour l'historique si présent
+      if (data.history && Array.isArray(data.history)) {
+        window.dispatchEvent(new CustomEvent('firebase-history-update', { 
+          detail: { history: data.history } 
+        }));
+      }
       
       // Silent sync - no console logs for normal operations
     } catch (error) {
