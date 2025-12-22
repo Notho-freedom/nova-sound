@@ -69,11 +69,14 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   useEffect(() => {
     const checkQuota = async () => {
       try {
-        const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
-        const canUse = youtubeQuotaManager.canUseAPI();
-        const message = youtubeQuotaManager.getUXMessage();
-        setQuotaExhausted(!canUse);
-        setQuotaMessage(message);
+        const { YouTube } = await import('@/services/youtube');
+        const quotaStatus = YouTube.getQuotaStatus();
+        setQuotaExhausted(quotaStatus.exhausted);
+        if (quotaStatus.exhausted) {
+          setQuotaMessage(`Quota API épuisé (${quotaStatus.used}/${quotaStatus.limit} unités). La lecture fonctionne toujours ✅`);
+        } else {
+          setQuotaMessage(null);
+        }
       } catch (error) {
         // Ignorer si le service n'est pas disponible
       }
@@ -116,15 +119,15 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     // Fonction pour charger les métadonnées YouTube de manière asynchrone
     const loadVideoMetadata = async (videoId: string): Promise<{ title: string; thumbnailUrl: string; description: string }> => {
       try {
-        // Essayer d'abord le cache (pas de quota)
-        const { youtubeProvider } = await import('@/services/youtube-provider');
-        const result = await youtubeProvider.getVideoMetadata(videoId);
+        // Utiliser le service YouTube unifié (cache automatique, pas de quota si caché)
+        const { YouTube } = await import('@/services/youtube');
+        const video = await YouTube.getVideo(videoId);
         
-        if (result.success && result.metadata) {
+        if (video) {
           return {
-            title: result.metadata.title,
-            thumbnailUrl: result.metadata.thumbnailUrl,
-            description: result.metadata.description || '',
+            title: video.title,
+            thumbnailUrl: video.thumbnailUrl,
+            description: video.description || '',
           };
         }
       } catch (error) {
@@ -250,25 +253,23 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
         if (!video.youtubeVideoId) return null;
         
         try {
-          const { youtubeProvider } = await import('@/services/youtube-provider');
-          const result = await youtubeProvider.getVideoMetadata(video.youtubeVideoId);
+          // Utiliser le service YouTube unifié
+          const { YouTube } = await import('@/services/youtube');
+          const videoData = await YouTube.getVideo(video.youtubeVideoId);
           
-          if (result.success && result.metadata) {
+          if (videoData) {
             return {
               videoId: video.id,
               metadata: {
-                title: result.metadata.title,
-                description: result.metadata.description || video.description,
-                thumbnailUrl: result.metadata.thumbnailUrl || video.thumbnailUrl,
-                thumbnailHighUrl: result.metadata.thumbnailHighUrl || video.thumbnailUrl,
-                duration: result.metadata.duration || video.duration,
-                channelTitle: result.metadata.channelTitle || video.channelTitle,
-                channelId: result.metadata.channelId || video.channelId,
-                publishedAt: result.metadata.publishedAt || video.addedAt,
-                viewCount: result.metadata.viewCount,
-                likeCount: result.metadata.likeCount,
-                tags: result.metadata.tags,
-                categoryId: result.metadata.categoryId,
+                title: videoData.title,
+                description: videoData.description || video.description,
+                thumbnailUrl: videoData.thumbnailUrl || video.thumbnailUrl,
+                thumbnailHighUrl: videoData.thumbnailHighUrl || video.thumbnailUrl,
+                duration: videoData.duration || video.duration,
+                channelTitle: videoData.channelTitle || video.channelTitle,
+                channelId: videoData.channelId || video.channelId,
+                publishedAt: videoData.publishedAt || video.addedAt,
+                viewCount: videoData.viewCount,
               },
             };
           }
@@ -441,8 +442,9 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       // Vérifier le circuit breaker AVANT d'appeler l'API
       let canUseAPI = true;
       try {
-        const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
-        canUseAPI = youtubeQuotaManager.canUseAPI();
+        const { YouTube } = await import('@/services/youtube');
+        const quotaStatus = YouTube.getQuotaStatus();
+        canUseAPI = !quotaStatus.exhausted && !quotaStatus.circuitBreakerOpen;
         if (!canUseAPI) {
           console.log('[YouTubeSearchView] Circuit breaker ouvert, utilisation uniquement du cache/local');
         }
