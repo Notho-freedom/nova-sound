@@ -23,6 +23,7 @@
     "lint": "eslint .",
     "preview": "next start",
     "test:api": "node scripts/test-api-routes.mjs",
+    "test:planethoster": "npx tsx scripts/test-planethoster.ts",
     "validate:env": "node scripts/validate-env.js",
     "validate:env:all": "node scripts/validate-env.js --check-all",
     "create:stripe-products": "npx tsx scripts/create-stripe-test-products.ts",

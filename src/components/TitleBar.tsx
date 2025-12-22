@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { Minus, Square, X, Music, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles } from "lucide-react"
+import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -80,8 +80,12 @@ export const TitleBar = ({
         >
           <div className="flex items-center gap-3">
             <div className="relative group">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-all duration-300">
-                <Music className="w-3.5 h-3.5 text-primary" />
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-all duration-300 overflow-hidden">
+                <img 
+                  src="/icon.png" 
+                  alt="NEXUS" 
+                  className="w-7 h-7 object-contain"
+                />
               </div>
               <div className="absolute inset-0 rounded-lg bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
             </div>

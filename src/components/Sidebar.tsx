@@ -18,7 +18,6 @@ import {
   Radio,
   Bell,
   Settings,
-  Sparkles,
   Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -255,15 +254,20 @@ export const Sidebar = ({
           )}
         >
           <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                "relative flex items-center justify-center rounded-xl transition-all duration-500",
-                "bg-gradient-to-br from-primary/20 to-secondary/20",
-                collapsed ? "w-10 h-10" : "w-9 h-9",
-              )}
-            >
-              <Sparkles className={cn("text-primary transition-all duration-500", collapsed ? "w-5 h-5" : "w-4 h-4")} />
-              <div className="absolute inset-0 rounded-xl bg-primary/20 blur-xl animate-pulse-glow" />
+            <div className="relative group">
+              <div
+                className={cn(
+                  "rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-all duration-300 overflow-hidden",
+                  collapsed ? "w-10 h-10" : "w-7 h-7",
+                )}
+              >
+                <img 
+                  src="/icon.png" 
+                  alt="NEXUS" 
+                  className={cn("object-contain", collapsed ? "w-10 h-10" : "w-7 h-7")}
+                />
+              </div>
+              <div className="absolute inset-0 rounded-lg bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
             </div>
             {!collapsed && (
               <div className="animate-in fade-in slide-in-from-left-2 duration-500">

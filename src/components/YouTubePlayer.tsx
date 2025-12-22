@@ -115,6 +115,26 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     onErrorRef.current = onError;
   }, [onReady, onStateChange, onTimeUpdate, onError]);
 
+  // Réagir aux changements de audioOnly pour forcer la visibilité de la vidéo
+  useEffect(() => {
+    if (!playerRef.current) return;
+    
+    const container = playerRef.current;
+    if (!audioOnly) {
+      // En mode vidéo, s'assurer que l'iframe est visible et correctement dimensionnée
+      container.style.opacity = '1';
+      container.style.pointerEvents = 'auto';
+      container.style.transform = 'none';
+      container.style.width = '100%';
+      container.style.height = '100%';
+    } else {
+      // En mode audio-only, masquer l'iframe
+      container.style.opacity = '0';
+      container.style.pointerEvents = 'none';
+      container.style.transform = 'scale(0.1)';
+    }
+  }, [audioOnly]);
+
   // Appeler les callbacks sans créer de dépendances
   useEffect(() => {
     if (isReady && onReadyRef.current) {
@@ -154,9 +174,20 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
         ref={playerRef}
         className={cn(
           "w-full h-full",
-          audioOnly && "absolute inset-0 opacity-0 pointer-events-none"
+          audioOnly && "absolute inset-0"
         )}
-        style={audioOnly ? { transform: 'scale(0.1)', transformOrigin: 'top left' } : undefined}
+        style={audioOnly ? { 
+          opacity: 0, 
+          pointerEvents: 'none',
+          transform: 'scale(0.1)', 
+          transformOrigin: 'top left' 
+        } : {
+          opacity: 1,
+          pointerEvents: 'auto',
+          transform: 'none',
+          width: '100%',
+          height: '100%'
+        }}
       />
       
       {/* Overlay transparent pour domination totale - permet le clic droit pour le menu contextuel */}

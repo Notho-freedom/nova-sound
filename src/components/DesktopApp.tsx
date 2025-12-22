@@ -1295,8 +1295,8 @@ export const DesktopApp = () => {
     return shuffled.slice(0, 20);
   }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
-  // Fonction pour rendre la vue actuelle
-  const renderView = () => {
+  // Calculer la vue actuelle directement (pas de fonction pour éviter les problèmes de hooks)
+  const currentViewContent = (() => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
@@ -1569,7 +1569,7 @@ export const DesktopApp = () => {
           </div>
         );
     }
-  };
+  })();
 
   // Show loading screen
   if (isLoading) {
@@ -1671,16 +1671,16 @@ export const DesktopApp = () => {
             )}>
               {showInlinePlayer ? (
                 <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
-                  {renderView()}
+                  {currentViewContent}
                 </div>
               ) : currentView === "videos" ? (
                 <div className="h-full w-full relative">
-                  {renderView()}
+                  {currentViewContent}
                 </div>
               ) : (
                 <ScrollArea className="h-full w-full">
                   <div className="animate-in fade-in duration-200">
-                    {renderView()}
+                    {currentViewContent}
                   </div>
                 </ScrollArea>
               )}
