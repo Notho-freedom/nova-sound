@@ -15,6 +15,7 @@ import type { Video, Track } from "@/types/music";
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
 import { extractYouTubeVideoId } from "@/lib/youtube";
+import { searchYouTubePlaylists, fetchYouTubePlaylistVideos } from "@/lib/youtube-playlists";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { toast } from "sonner";
 
@@ -54,6 +55,13 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   // État pour le circuit breaker (quota épuisé)
   const [quotaExhausted, setQuotaExhausted] = useState(false);
   const [quotaMessage, setQuotaMessage] = useState<string | null>(null);
+  
+  // État pour les playlists YouTube
+  const [playlists, setPlaylists] = useState<YouTubeSearchResult[]>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
+  const [playlistVideos, setPlaylistVideos] = useState<Map<string, YouTubeSearchResult[]>>(new Map());
+  const [loadingPlaylistVideos, setLoadingPlaylistVideos] = useState<Set<string>>(new Set());
   
   // Vérifier l'état du quota au montage et périodiquement
   useEffect(() => {
@@ -600,6 +608,22 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       setShowSuggestions(false);
       clearSuggestions();
       await search(searchQuery);
+      
+      // Rechercher aussi les playlists
+      setLoadingPlaylists(true);
+      try {
+        const foundPlaylists = await searchYouTubePlaylists(searchQuery, 10);
+        setPlaylists(foundPlaylists);
+      } catch (error) {
+        console.error('[YouTubeSearchView] Erreur recherche playlists:', error);
+        setPlaylists([]);
+      } finally {
+        setLoadingPlaylists(false);
+      }
+    } else {
+      setPlaylists([]);
+      setSelectedPlaylist(null);
+      setPlaylistVideos(new Map());
     }
   }, [searchQuery, search, clearSuggestions]);
 
@@ -678,6 +702,35 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       onAddToQueue(video);
     }
   }, [convertToVideo, onAddToQueue]);
+
+  // Charger les vidéos d'une playlist
+  const handleLoadPlaylistVideos = useCallback(async (playlistId: string) => {
+    if (playlistVideos.has(playlistId)) {
+      // Déjà chargé, juste sélectionner/désélectionner
+      setSelectedPlaylist(selectedPlaylist === playlistId ? null : playlistId);
+      return;
+    }
+
+    setLoadingPlaylistVideos(prev => new Set(prev).add(playlistId));
+    try {
+      const videos = await fetchYouTubePlaylistVideos(playlistId, 50);
+      setPlaylistVideos(prev => {
+        const newMap = new Map(prev);
+        newMap.set(playlistId, videos);
+        return newMap;
+      });
+      setSelectedPlaylist(playlistId);
+    } catch (error) {
+      console.error('[YouTubeSearchView] Erreur chargement vidéos playlist:', error);
+      toast.error('Impossible de charger les vidéos de la playlist');
+    } finally {
+      setLoadingPlaylistVideos(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(playlistId);
+        return newSet;
+      });
+    }
+  }, [playlistVideos, selectedPlaylist]);
 
   // Formater la durée YouTube (PT4M13S -> 4:13)
   const formatYouTubeDuration = (duration?: string): string => {
@@ -908,28 +961,30 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
         
         {/* Mode recherche active */}
         {searchQuery.trim() ? (
-          <>
-            {/* Message d'erreur */}
-            {error && (
-              <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-destructive mb-1">Erreur de recherche</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-line">{error}</p>
+          <div className="flex gap-6">
+            {/* Colonne principale : Vidéos */}
+            <div className="flex-1">
+              {/* Message d'erreur */}
+              {error && (
+                <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-destructive mb-1">Erreur de recherche</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">{error}</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Résultats de recherche */}
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : results.length > 0 ? (
+              {/* Résultats de recherche */}
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : results.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {results.map((result) => (
+            {results.map((result, index) => (
               <div
-                key={result.videoId}
+                key={result.videoId || `youtube-result-${index}`}
                 className="group relative bg-card rounded-lg overflow-hidden border border-border/50 hover:border-primary/50 transition-all duration-200 hover:shadow-lg"
               >
                 {/* Thumbnail */}
@@ -1016,7 +1071,138 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                 </p>
               </div>
             )}
-          </>
+            </div>
+
+            {/* Colonne latérale : Playlists */}
+            <div className="w-80 flex-shrink-0 border-l border-border/30 pl-6">
+              <div className="sticky top-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Music className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Playlists</h2>
+                </div>
+
+                {loadingPlaylists ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : playlists.length > 0 ? (
+                  <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+                    {playlists.map((playlist) => {
+                      const isSelected = selectedPlaylist === playlist.videoId;
+                      const videos = playlistVideos.get(playlist.videoId) || [];
+                      const isLoading = loadingPlaylistVideos.has(playlist.videoId);
+
+                      return (
+                        <div
+                          key={playlist.videoId}
+                          className={cn(
+                            "group relative bg-card rounded-lg overflow-hidden border transition-all duration-200",
+                            isSelected
+                              ? "border-primary shadow-lg"
+                              : "border-border/50 hover:border-primary/50"
+                          )}
+                        >
+                          {/* Thumbnail */}
+                          <div className="relative aspect-video bg-muted overflow-hidden">
+                            <img
+                              src={playlist.thumbnailUrl}
+                              alt={playlist.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                            <div className="absolute bottom-2 left-2 right-2">
+                              <h3 className="font-medium text-sm text-white line-clamp-2 mb-1">
+                                {playlist.title}
+                              </h3>
+                              <p className="text-xs text-white/80 line-clamp-1">
+                                {playlist.channelTitle}
+                              </p>
+                            </div>
+                            {playlist.viewCount && (
+                              <div className="absolute top-2 right-2 px-2 py-1 bg-black/80 rounded text-xs text-white font-medium">
+                                {playlist.viewCount} vidéos
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="p-3 space-y-2">
+                            <Button
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              className="w-full"
+                              onClick={() => handleLoadPlaylistVideos(playlist.videoId)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Chargement...
+                                </>
+                              ) : isSelected ? (
+                                <>
+                                  <X className="w-4 h-4 mr-2" />
+                                  Masquer
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronRight className="w-4 h-4 mr-2" />
+                                  Voir les vidéos
+                                </>
+                              )}
+                            </Button>
+
+                            {/* Vidéos de la playlist */}
+                            {isSelected && videos.length > 0 && (
+                              <div className="space-y-2 max-h-96 overflow-y-auto pt-2 border-t border-border/30">
+                                {videos.map((video, videoIndex) => (
+                                  <div
+                                    key={video.videoId || `playlist-video-${playlist.videoId}-${videoIndex}`}
+                                    className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 transition-colors cursor-pointer group/item"
+                                    onClick={() => handlePlay(video)}
+                                  >
+                                    <img
+                                      src={video.thumbnailUrl}
+                                      alt={video.title}
+                                      className="w-16 h-12 rounded object-cover flex-shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium line-clamp-2 group-hover/item:text-primary">
+                                        {video.title}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground line-clamp-1">
+                                        {video.channelTitle}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="w-8 h-8 flex-shrink-0 opacity-0 group-hover/item:opacity-100"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlay(video);
+                                      }}
+                                    >
+                                      <Play className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    Aucune playlist trouvée
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         ) : (
           /* Pas de recherche active : afficher historique et suggestions */
           <div className="space-y-8">
@@ -1100,9 +1286,9 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {artistSuggestions.map((result) => (
+                    {artistSuggestions.map((result, index) => (
                       <div
-                        key={result.videoId}
+                        key={result.videoId || `artist-suggestion-${index}`}
                         className="group relative bg-card rounded-lg overflow-hidden border border-border/50 hover:border-primary/50 transition-all duration-200 hover:shadow-lg"
                       >
                         <div className="relative aspect-video bg-muted overflow-hidden">

@@ -459,10 +459,15 @@ export function useYouTubeSearch(): UseYouTubeSearchReturn {
   // Convertir un résultat de recherche en Video
   const convertToVideo = useCallback((result: YouTubeSearchResult): Video => {
     // Convertir la durée ISO 8601 en secondes
-    const parseDuration = (duration?: string): number => {
+    const parseDuration = (duration?: string | number): number => {
       if (!duration) return 0;
+      // Si c'est déjà un nombre, le retourner directement
+      if (typeof duration === 'number') return duration;
+      // S'assurer que c'est une chaîne avant d'appeler .match()
+      const durationStr = String(duration);
+      if (!durationStr || typeof durationStr !== 'string') return 0;
       // Format: PT4M13S (4 minutes 13 secondes)
-      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      const match = durationStr.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
       if (!match) return 0;
       const hours = parseInt(match[1] || '0', 10);
       const minutes = parseInt(match[2] || '0', 10);

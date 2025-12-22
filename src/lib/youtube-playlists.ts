@@ -359,3 +359,110 @@ export async function fetchYouTubePlaylistVideos(
     return [];
   }
 }
+
+/**
+ * Recherche des playlists YouTube par requête
+ */
+export async function searchYouTubePlaylists(
+  query: string,
+  maxResults: number = 20
+): Promise<YouTubeSuggestion[]> {
+  const apiKey = getYouTubeApiKey();
+  
+  if (!apiKey) {
+    console.warn('[YouTube Playlists] Clé API YouTube non configurée');
+    return [];
+  }
+
+  // Vérifier le circuit breaker AVANT tout appel API
+  try {
+    const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+    if (!youtubeQuotaManager.canUseAPI() || !youtubeQuotaManager.canSearch()) {
+      console.log('[YouTube Playlists] Circuit breaker ouvert ou quota recherche épuisé, retour vide');
+      return [];
+    }
+  } catch (error) {
+    // Continuer si le service n'est pas disponible
+  }
+
+  try {
+    // Rechercher des playlists
+    const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+    searchUrl.searchParams.set("key", apiKey);
+    searchUrl.searchParams.set("part", "snippet");
+    searchUrl.searchParams.set("type", "playlist");
+    searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("maxResults", maxResults.toString());
+    searchUrl.searchParams.set("fields", "items(id(playlistId),snippet(title,description,publishedAt,thumbnails,channelTitle))");
+
+    const response = await fetch(searchUrl.toString());
+    
+    if (!response.ok) {
+      const isQuotaError = response.status === 403 || response.status === 429;
+      
+      if (isQuotaError) {
+        console.warn('[YouTube Playlists] Quota épuisé');
+        try {
+          const { youtubeQuotaManager } = await import('@/services/youtube-quota-manager');
+          youtubeQuotaManager.recordFailure();
+        } catch (error) {
+          // Ignorer
+        }
+      }
+      
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[YouTube Playlists] Erreur API:', response.status, errorData);
+      return [];
+    }
+
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      console.log(`[searchYouTubePlaylists] Aucune playlist trouvée pour "${query}"`);
+      return [];
+    }
+
+    console.log(`[searchYouTubePlaylists] ✅ ${data.items.length} playlists trouvées`);
+
+    // Récupérer les détails des playlists (nombre de vidéos)
+    const playlistIds = data.items.map((item: any) => item.id.playlistId).join(',');
+    const playlistsUrl = new URL("https://www.googleapis.com/youtube/v3/playlists");
+    playlistsUrl.searchParams.set("key", apiKey);
+    playlistsUrl.searchParams.set("part", "contentDetails");
+    playlistsUrl.searchParams.set("id", playlistIds);
+    playlistsUrl.searchParams.set("fields", "items(id,contentDetails(itemCount))");
+
+    const playlistsResponse = await fetch(playlistsUrl.toString());
+    const playlistsData = playlistsResponse.ok ? await playlistsResponse.json() : { items: [] };
+    const playlistsMap = new Map<string, number>();
+    
+    if (playlistsData.items) {
+      playlistsData.items.forEach((item: any) => {
+        playlistsMap.set(item.id, item.contentDetails?.itemCount ? parseInt(item.contentDetails.itemCount, 10) : 0);
+      });
+    }
+
+    // Convertir en YouTubeSuggestion
+    const suggestions: YouTubeSuggestion[] = data.items.map((item: any) => {
+      const thumbnails = item.snippet?.thumbnails || {};
+      const playlistId = item.id?.playlistId || '';
+      
+      return {
+        videoId: playlistId, // Utiliser l'ID de playlist comme videoId pour la compatibilité
+        title: item.snippet?.title || "",
+        description: item.snippet?.description || "",
+        thumbnailUrl: thumbnails.medium?.url || thumbnails.default?.url || "",
+        channelTitle: item.snippet?.channelTitle || "",
+        publishedAt: item.snippet?.publishedAt || "",
+        duration: 0, // Les playlists n'ont pas de durée
+        viewCount: playlistsMap.get(playlistId)?.toString(),
+      };
+    });
+
+    console.log(`[searchYouTubePlaylists] ✅ ${suggestions.length} suggestions créées`);
+    return suggestions;
+  } catch (error) {
+    console.error('[searchYouTubePlaylists] ❌ Erreur lors de la recherche:', error);
+    return [];
+  }
+}

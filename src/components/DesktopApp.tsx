@@ -238,7 +238,7 @@ export const DesktopApp = () => {
 
     // Pour les tracks YouTube, on ne peut pas utiliser l'élément audio HTML
     // Le player YouTube sera géré séparément via le composant YouTubePlayer
-    if (currentTrack.mediaSource === 'youtube') {
+    if ((currentTrack.mediaSource as string) === 'youtube') {
       console.log('Track YouTube détecté, le player YouTube sera utilisé');
       // Réinitialiser seulement la durée, currentTime sera géré par le player YouTube persistant
       setYoutubeDuration(0);
@@ -398,7 +398,7 @@ export const DesktopApp = () => {
         
         const elapsedTime = accumulatedPlaybackTimeRef.current;
         // Pour YouTube, utiliser youtubeDuration si disponible
-        const trackDuration = currentTrack.mediaSource === 'youtube' 
+        const trackDuration = (currentTrack.mediaSource as string) === 'youtube' 
           ? (youtubeDuration || currentTrack.duration || 0)
           : (currentTrack.duration || 0);
         const completedPercentage = trackDuration > 0
@@ -1233,7 +1233,7 @@ export const DesktopApp = () => {
       return [];
     }
     // Pour les tracks YouTube, pas d'album réel
-    if (currentTrack.mediaSource === 'youtube') return [];
+    if ((currentTrack.mediaSource as string) === 'youtube') return [];
     
     // Combiner libraryTracks et tracks de la queue pour chercher dans les deux sources
     const allTracks = [...libraryTracks];
@@ -1278,7 +1278,7 @@ export const DesktopApp = () => {
     if (!currentTrack) return [];
     
     // Pour les tracks YouTube, retourner un tableau vide (sera géré par QueuePanel)
-    if (currentTrack.mediaSource === 'youtube') {
+    if ((currentTrack.mediaSource as string) === 'youtube') {
       return [];
     }
     
@@ -1844,7 +1844,7 @@ export const DesktopApp = () => {
                 }
                 
                 // Suivre le temps d'écoute pour YouTube (comme pour les tracks locaux)
-                if (isPlaying && currentTrack && currentTrack.mediaSource === 'youtube' && 
+                if (isPlaying && currentTrack && (currentTrack.mediaSource as string) === 'youtube' && 
                     playbackStartTrackIdRef.current === currentTrack.id && 
                     playbackStartTimeRef.current !== null) {
                   const realTimeNow = Date.now();
