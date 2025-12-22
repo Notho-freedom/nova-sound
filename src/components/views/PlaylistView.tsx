@@ -21,6 +21,7 @@ import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { AlbumGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
 
 interface PlaylistViewProps {
   tracks: Track[];
@@ -1190,23 +1191,9 @@ export const PlaylistView = ({
         <div className="p-6">
           {loading ? (
             viewMode === "grid" ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-                {[...Array(12)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="aspect-[3/4] rounded-lg bg-muted animate-pulse"
-                  />
-                ))}
-              </div>
+              <AlbumGridSkeleton count={12} />
             ) : (
-              <div className="space-y-2">
-                {[...Array(8)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-16 rounded-lg bg-muted animate-pulse"
-                  />
-                ))}
-              </div>
+              <TrackTableSkeleton count={8} />
             )
           ) : filteredPlaylists.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[400px] text-center">

@@ -22,6 +22,8 @@ import { getCoverUrl } from "@/lib/audio"
 import { Input } from "@/components/ui/input"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { TrackContextMenu } from "@/components/TrackContextMenu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SearchResultsSkeleton, SearchTrackItemSkeleton, ArtistCircleSkeleton, SearchAlbumCardSkeleton } from "@/components/ui/skeletons"
 import { usePlaylists } from "@/hooks/usePlaylists"
 import { useFavorites } from "@/hooks/useFavorites"
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload"
@@ -477,8 +479,25 @@ export const SearchView = ({
             {query ? (
               /* Search Results */
               <div className="space-y-8">
+                {/* Loading State - Show skeletons while searching */}
+                {(youtubeLoading || loading) && searchResults.tracks.length === 0 && searchResults.artists.length === 0 && searchResults.albums.length === 0 && (
+                  <SearchResultsSkeleton />
+                )}
+
                 {/* Artists Results */}
-                {searchResults.artists.length > 0 && (
+                {(youtubeLoading || loading) && searchResults.artists.length === 0 ? (
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Skeleton className="w-5 h-5" />
+                      <Skeleton className="h-6 w-24" />
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <ArtistCircleSkeleton key={`artist-skeleton-${i}`} />
+                      ))}
+                    </div>
+                  </section>
+                ) : searchResults.artists.length > 0 && (
                   <section>
                     <div className="flex items-center gap-2 mb-4">
                       <User className="w-5 h-5 text-primary" />
@@ -520,7 +539,19 @@ export const SearchView = ({
                 )}
 
                 {/* Albums Results */}
-                {searchResults.albums.length > 0 && (
+                {(youtubeLoading || loading) && searchResults.albums.length === 0 ? (
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Skeleton className="w-5 h-5" />
+                      <Skeleton className="h-6 w-24" />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <SearchAlbumCardSkeleton key={`album-skeleton-${i}`} />
+                      ))}
+                    </div>
+                  </section>
+                ) : searchResults.albums.length > 0 && (
                   <section>
                     <div className="flex items-center gap-2 mb-4">
                       <Disc3 className="w-5 h-5 text-primary" />
@@ -573,7 +604,13 @@ export const SearchView = ({
                     </div>
                   )}
 
-                  {searchResults.tracks.length === 0 && !youtubeLoading ? (
+                  {youtubeLoading && searchResults.tracks.length === 0 ? (
+                    <div className="space-y-1 bg-white/5 rounded-2xl p-2">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <SearchTrackItemSkeleton key={`track-skeleton-${i}`} />
+                      ))}
+                    </div>
+                  ) : searchResults.tracks.length === 0 && !youtubeLoading ? (
                     <div className="text-center py-16">
                       <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
                         <Search className="w-10 h-10 text-muted-foreground/50" />
@@ -583,6 +620,14 @@ export const SearchView = ({
                     </div>
                   ) : (
                     <div className="space-y-1 bg-white/5 rounded-2xl p-2">
+                      {youtubeLoading && searchResults.tracks.length > 0 && (
+                        <div className="mb-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                            <span className="text-sm text-primary">Recherche YouTube en cours...</span>
+                          </div>
+                        </div>
+                      )}
                       {searchResults.tracks.slice(0, 50).map((track) => {
                         const isYouTubeTrack = track.mediaSource === "youtube"
                         let actualIndex: number

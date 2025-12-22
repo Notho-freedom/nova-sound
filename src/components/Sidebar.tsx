@@ -24,13 +24,6 @@ import {
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";

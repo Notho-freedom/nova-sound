@@ -291,3 +291,90 @@ export const VideoCarouselSkeleton = ({ count = 8 }: { count?: number }) => (
   </div>
 );
 
+/**
+ * Skeleton pour un artiste dans la recherche (cercle)
+ */
+export const ArtistCircleSkeleton = () => (
+  <div className="flex-shrink-0 flex flex-col items-center gap-3 p-4">
+    <Skeleton className="w-24 h-24 rounded-full" />
+    <div className="space-y-2 text-center">
+      <Skeleton className="h-4 w-20 mx-auto" />
+      <Skeleton className="h-3 w-12 mx-auto" />
+    </div>
+  </div>
+);
+
+/**
+ * Skeleton pour une ligne de résultat de recherche (piste)
+ */
+export const SearchTrackItemSkeleton = () => (
+  <div className="flex items-center gap-4 p-3 rounded-xl">
+    <Skeleton className="w-12 h-12 rounded-lg flex-shrink-0" />
+    <div className="flex-1 min-w-0 space-y-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-3 w-1/2" />
+    </div>
+    <Skeleton className="h-3 w-12" />
+    <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+  </div>
+);
+
+/**
+ * Skeleton pour une carte d'album dans la recherche
+ */
+export const SearchAlbumCardSkeleton = () => (
+  <div className="group text-left rounded-xl overflow-hidden bg-white/5">
+    <Skeleton className="aspect-square w-full" />
+    <div className="p-3 space-y-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-3 w-1/2" />
+    </div>
+  </div>
+);
+
+/**
+ * Skeleton pour les résultats de recherche
+ */
+export const SearchResultsSkeleton = () => (
+  <div className="space-y-8">
+    {/* Artists Skeleton */}
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <Skeleton className="w-5 h-5" />
+        <Skeleton className="h-6 w-24" />
+      </div>
+      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ArtistCircleSkeleton key={`artist-skeleton-${i}`} />
+        ))}
+      </div>
+    </section>
+
+    {/* Albums Skeleton */}
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <Skeleton className="w-5 h-5" />
+        <Skeleton className="h-6 w-24" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SearchAlbumCardSkeleton key={`album-skeleton-${i}`} />
+        ))}
+      </div>
+    </section>
+
+    {/* Tracks Skeleton */}
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <Skeleton className="w-5 h-5" />
+        <Skeleton className="h-6 w-32" />
+      </div>
+      <div className="space-y-1 bg-white/5 rounded-2xl p-2">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <SearchTrackItemSkeleton key={`track-skeleton-${i}`} />
+        ))}
+      </div>
+    </section>
+  </div>
+);
+

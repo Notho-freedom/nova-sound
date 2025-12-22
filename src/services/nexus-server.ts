@@ -203,12 +203,72 @@ class NexusServerService {
             reject(new Error("Invalid response from server"));
           }
         } else {
+          // Enhanced error handling with detailed messages
+          let errorMessage = `Upload failed: ${xhr.status}`;
+          let errorDetails: string | null = null;
+          
           try {
-            const error = JSON.parse(xhr.responseText);
-            reject(new Error(error.message || `Upload failed: ${xhr.status}`));
+            const errorResponse = JSON.parse(xhr.responseText);
+            
+            // Extract error message from various possible response formats
+            if (errorResponse.error?.message) {
+              errorMessage = errorResponse.error.message;
+              errorDetails = errorResponse.error.details || null;
+            } else if (errorResponse.message) {
+              errorMessage = errorResponse.message;
+              errorDetails = errorResponse.details || null;
+            } else if (errorResponse.error) {
+              errorMessage = typeof errorResponse.error === 'string' 
+                ? errorResponse.error 
+                : errorResponse.error.message || errorMessage;
+            }
+            
+            // Detect specific error types and provide user-friendly messages
+            const errorText = (errorMessage + ' ' + (errorDetails || '')).toLowerCase();
+            
+            if (errorText.includes('timeout') || errorText.includes('timed out') || errorText.includes('handshake')) {
+              errorMessage = "Timeout de connexion au serveur de stockage. Le serveur PlanetHoster/Bunny ne répond pas. Veuillez réessayer dans quelques instants.";
+            } else if (errorText.includes('connection') || errorText.includes('connection lost') || errorText.includes('network')) {
+              errorMessage = "Erreur de connexion au serveur de stockage. Vérifiez votre connexion internet et réessayez.";
+            } else if (errorText.includes('authentication') || errorText.includes('unauthorized') || xhr.status === 401) {
+              errorMessage = "Erreur d'authentification. Veuillez vous reconnecter.";
+            } else if (errorText.includes('storage') || errorText.includes('limit') || errorText.includes('quota')) {
+              errorMessage = "Limite de stockage atteinte. Passez au plan Pro pour un stockage illimité.";
+            } else if (errorText.includes('failed to upload') || errorText.includes('upload vers le cloud')) {
+              // Extract the underlying error from the message
+              const match = errorMessage.match(/Failed to upload to (PlanetHoster|Bunny):\s*(.+)/i);
+              if (match) {
+                const provider = match[1];
+                const underlyingError = match[2];
+                if (underlyingError.includes('timeout') || underlyingError.includes('handshake')) {
+                  errorMessage = `Timeout de connexion à ${provider}. Le serveur ne répond pas. Veuillez réessayer.`;
+                } else {
+                  errorMessage = `Erreur lors de l'upload vers ${provider}: ${underlyingError}`;
+                }
+              }
+            }
+            
+            // Add details if available and not already included
+            if (errorDetails && !errorMessage.includes(errorDetails)) {
+              errorMessage += ` (${errorDetails})`;
+            }
           } catch {
-            reject(new Error(`Upload failed: ${xhr.status}`));
+            // If response is not JSON, try to get status text
+            if (xhr.statusText) {
+              errorMessage = xhr.statusText;
+            }
+            
+            // Provide specific messages for common status codes
+            if (xhr.status === 500) {
+              errorMessage = "Erreur serveur (500). Le serveur de stockage rencontre un problème. Veuillez réessayer plus tard ou contacter le support.";
+            } else if (xhr.status === 503) {
+              errorMessage = "Service temporairement indisponible. Le serveur de stockage est en maintenance. Veuillez réessayer plus tard.";
+            } else if (xhr.status === 504) {
+              errorMessage = "Timeout du serveur. La requête a pris trop de temps. Veuillez réessayer.";
+            }
           }
+          
+          reject(new Error(errorMessage));
         }
       });
 

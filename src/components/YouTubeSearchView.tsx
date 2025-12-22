@@ -18,6 +18,8 @@ import { extractYouTubeVideoId } from "@/lib/youtube";
 import { searchYouTubePlaylists, fetchYouTubePlaylistVideos } from "@/lib/youtube-playlists";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { toast } from "sonner";
+import { VideoGridSkeleton } from "@/components/ui/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface YouTubeSearchViewProps {
   onPlayVideo: (video: Video, audioOnly?: boolean) => void;
@@ -999,9 +1001,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
 
               {/* Résultats de recherche */}
               {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
+                <VideoGridSkeleton count={12} />
               ) : results.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {results.map((result, index) => (
@@ -1104,8 +1104,16 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                 </div>
 
                 {loadingPlaylists ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={`playlist-skeleton-${i}`} className="bg-card rounded-lg overflow-hidden border border-border/50">
+                        <Skeleton className="aspect-video w-full" />
+                        <div className="p-3 space-y-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : playlists.length > 0 ? (
                   <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
