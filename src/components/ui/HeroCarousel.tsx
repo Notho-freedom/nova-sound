@@ -205,7 +205,7 @@ export const HeroCarousel = memo(({
             <img
               src={currentSlide.imageUrl}
               alt={currentSlide.title}
-              className="absolute inset-0 w-full h-full object-cover transform scale-105 transition-transform duration-[8s] group-hover:scale-90"
+              className="absolute inset-0 w-full h-full object-cover transform scale-105 transition-transform duration-[8s]"
               style={{
                 minWidth: '100%',
                 minHeight: '100%',
