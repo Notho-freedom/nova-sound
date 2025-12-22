@@ -24,7 +24,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 // UI Components
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { HeroSection } from "@/components/ui/HeroSection";
 import { StatCard } from "@/components/ui/StatCard";
 import { ArtistCard } from "@/components/ui/ArtistCard";
 import { PlaylistCard } from "@/components/ui/PlaylistCard";
@@ -242,21 +241,6 @@ export const HomeView = memo(({
 
   return (
     <div className="px-6 py-4 space-y-8 animate-in fade-in duration-200">
-      {/* Hero Section - Carousel
-      <HeroSection
-        tracks={displayRecent.slice(0, 10)}
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        userName={userName}
-        autoPlay={true}
-        autoPlayInterval={6000}
-        onTrackSelect={(track: Track) => {
-          const index = tracks.findIndex(t => t.id === track.id);
-          if (index !== -1) {
-            onTrackSelect(index);
-          }
-        }}
-      /> */}
 
       {/* Stats Section */}
       {stats && (
