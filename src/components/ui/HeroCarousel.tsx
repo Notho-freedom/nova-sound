@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ArtistImage } from "@/types/artist-image";
+import { getArtistImageProvider } from "@/services/artist-image-provider";
 
 interface CarouselSlide {
   id: string;
@@ -91,18 +92,40 @@ export const HeroCarousel = memo(({
       });
 
       const response = await fetch(`/api/artist-images?${params.toString()}`);
-      if (!response.ok) {
-        return null;
+      
+      // Check if API is available
+      if (response.ok) {
+        const data = await response.json();
+        if (data.image?.url) {
+          const imageUrl = data.image.url;
+          setImageCache(prev => new Map(prev).set(query, imageUrl));
+          return imageUrl;
+        }
       }
-
-      const data = await response.json();
-      if (data.image?.url) {
-        const imageUrl = data.image.url;
-        setImageCache(prev => new Map(prev).set(query, imageUrl));
-        return imageUrl;
+      
+      // If API returns 503 (server not available) or 404, use fallback
+      if (response.status === 503 || response.status === 404 || !response.ok) {
+        console.info('[HeroCarousel] API not available, using direct provider fallback');
+        const provider = getArtistImageProvider();
+        const image = await provider.getRandomImage(query);
+        if (image?.url) {
+          setImageCache(prev => new Map(prev).set(query, image.url));
+          return image.url;
+        }
       }
     } catch (error) {
-      console.warn(`[HeroCarousel] Erreur lors de la récupération d'image pour "${query}":`, error);
+      // Network error - API server not running, use fallback
+      console.info('[HeroCarousel] Network error, using direct provider fallback:', error);
+      try {
+        const provider = getArtistImageProvider();
+        const image = await provider.getRandomImage(query);
+        if (image?.url) {
+          setImageCache(prev => new Map(prev).set(query, image.url));
+          return image.url;
+        }
+      } catch (fallbackError) {
+        console.warn(`[HeroCarousel] Fallback also failed for "${query}":`, fallbackError);
+      }
     }
 
     return null;

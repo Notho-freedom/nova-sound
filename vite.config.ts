@@ -9,6 +9,29 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Proxy API calls to Next.js server (port 3000)
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Don't fail if the Next.js server is not running
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, res) => {
+            console.warn('[Vite Proxy] API proxy error, Next.js server may not be running:', err.message);
+            // Return a proper error response instead of crashing
+            if (res && !res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ 
+                error: 'API server not available', 
+                message: 'Next.js server is not running. Start it with: npm run dev:next',
+                fallback: true 
+              }));
+            }
+          });
+        },
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

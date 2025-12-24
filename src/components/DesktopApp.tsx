@@ -1698,7 +1698,7 @@ export const DesktopApp = () => {
 
             {/* Artist Info Panel */}
             {isArtistInfoOpen && currentTrack && (
-              <div className="absolute right-0 top-0 bottom-0 z-20 w-80 animate-in slide-in-from-right duration-300">
+              <div className="absolute right-0 top-0 bottom-0 z-20 w-96 animate-in slide-in-from-right duration-300">
                 <ArtistInfoPanel
                   isOpen={isArtistInfoOpen}
                   onClose={() => setIsArtistInfoOpen(false)}
@@ -1709,6 +1709,12 @@ export const DesktopApp = () => {
                     // Could set selected artist if needed
                   }}
                   onPlayTrack={handlePlayTrack}
+                  onPlayTracks={handlePlayTracks}
+                  onShuffleTracks={handleShuffleTracks}
+                  onAddToQueue={(tracks) => addToQueue(tracks)}
+                  onAddToPlaylist={(playlistId, track) => addTracksToPlaylist(playlistId, [track.id])}
+                  playlists={playlists.map(p => ({ id: p.id, name: p.name }))}
+                  onCreatePlaylist={(name, trackIds) => createPlaylist(name, trackIds)}
                 />
               </div>
             )}
