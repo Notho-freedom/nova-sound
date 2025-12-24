@@ -3,7 +3,7 @@
  * Gère le cache mémoire et localStorage avec TTL
  */
 
-import type { YouTubeVideo } from './types';
+import type { YouTubeVideo, YouTubePlaylist } from './types';
 
 interface CacheEntry<T> {
   data: T;
@@ -108,6 +108,47 @@ class YouTubeCache {
 
   setPopularSuggestions(suggestions: string[]): void {
     this.set('popular_suggestions', suggestions, { storageTTL: 7 * 24 * 60 * 60 * 1000 }); // 7 jours
+  }
+
+  // ==================== PLAYLISTS ====================
+
+  getArtistPlaylists(artistName: string): YouTubePlaylist[] | null {
+    const key = this.getArtistPlaylistsKey(artistName);
+    return this.get<YouTubePlaylist[]>(key);
+  }
+
+  setArtistPlaylists(artistName: string, playlists: YouTubePlaylist[]): void {
+    const key = this.getArtistPlaylistsKey(artistName);
+    this.set(key, playlists, { storageTTL: 24 * 60 * 60 * 1000 }); // 24 heures
+  }
+
+  private getArtistPlaylistsKey(artistName: string): string {
+    return `artist_playlists:${artistName.toLowerCase().trim()}`;
+  }
+
+  getPlaylist(playlistId: string): YouTubePlaylist | null {
+    const key = this.getPlaylistKey(playlistId);
+    return this.get<YouTubePlaylist>(key);
+  }
+
+  setPlaylist(playlist: YouTubePlaylist): void {
+    if (!playlist.id) return;
+    const key = this.getPlaylistKey(playlist.id);
+    this.set(key, playlist, { storageTTL: 24 * 60 * 60 * 1000 }); // 24 heures
+  }
+
+  private getPlaylistKey(playlistId: string): string {
+    return `playlist:${playlistId}`;
+  }
+
+  getPlaylistVideos(playlistId: string): YouTubeVideo[] | null {
+    const key = `playlist_videos:${playlistId}`;
+    return this.get<YouTubeVideo[]>(key);
+  }
+
+  setPlaylistVideos(playlistId: string, videos: YouTubeVideo[]): void {
+    const key = `playlist_videos:${playlistId}`;
+    this.set(key, videos, { storageTTL: 6 * 60 * 60 * 1000 }); // 6 heures
   }
 
   // ==================== MÉTHODES GÉNÉRIQUES ====================

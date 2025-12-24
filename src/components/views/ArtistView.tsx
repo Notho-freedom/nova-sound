@@ -24,6 +24,8 @@ import {
   Sparkles,
   TrendingUp,
   X,
+  ListMusic,
+  Loader2,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -38,6 +40,7 @@ import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useArtistMetadata } from "@/hooks/useArtistMetadata";
 import { useArtistImages } from "@/hooks/useArtistImage";
+import { useArtistPlaylists } from "@/hooks/useArtistPlaylists";
 import { ContentCarousel } from "@/components/ui/ContentCarousel";
 import { FeaturedCard } from "@/components/ui/FeaturedCard";
 
@@ -134,6 +137,22 @@ export const ArtistView = memo(({
     limit: 20,
     enabled: !!artistName,
   });
+
+  // Fetch artist playlists from YouTube
+  const { 
+    playlists: artistPlaylists, 
+    loading: playlistsLoading, 
+    loadPlaylistVideos,
+    loadingPlaylistId,
+  } = useArtistPlaylists({
+    artistName,
+    enabled: !!artistName,
+    maxPlaylists: 10,
+  });
+
+  // State for expanded playlist
+  const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>(null);
+  const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
 
   // Get artist tracks from the library
   const artistTracks = useMemo(() => {
@@ -401,6 +420,10 @@ export const ArtistView = memo(({
                       <Info className="w-4 h-4" />
                       À propos
                     </TabsTrigger>
+                    <TabsTrigger value="playlists" className="gap-2">
+                      <ListMusic className="w-4 h-4" />
+                      Playlists
+                    </TabsTrigger>
                     <TabsTrigger value="gallery" className="gap-2">
                       <ImageIcon className="w-4 h-4" />
                       Galerie
@@ -421,6 +444,7 @@ export const ArtistView = memo(({
             <TabsTrigger value="overview" />
             <TabsTrigger value="discography" />
             <TabsTrigger value="about" />
+            <TabsTrigger value="playlists" />
             <TabsTrigger value="gallery" />
           </TabsList>
 
@@ -784,6 +808,184 @@ export const ArtistView = memo(({
                 </div>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Playlists Tab */}
+          <TabsContent value="playlists" className="mt-0">
+            {playlistsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-xl" />
+                ))}
+              </div>
+            ) : artistPlaylists.length > 0 ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  {artistPlaylists.length} playlist{artistPlaylists.length > 1 ? 's' : ''} trouvée{artistPlaylists.length > 1 ? 's' : ''} sur YouTube
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {artistPlaylists.map((playlist) => (
+                    <motion.div
+                      key={playlist.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={cn(
+                        "bg-card/30 backdrop-blur-sm rounded-xl border transition-all overflow-hidden",
+                        expandedPlaylistId === playlist.id
+                          ? "border-primary/50 col-span-full"
+                          : "border-border/30 hover:border-primary/30 cursor-pointer"
+                      )}
+                    >
+                      {/* Playlist Header */}
+                      <div
+                        className="flex items-center gap-4 p-4"
+                        onClick={async () => {
+                          if (expandedPlaylistId === playlist.id) {
+                            setExpandedPlaylistId(null);
+                            setPlaylistTracks([]);
+                          } else {
+                            setExpandedPlaylistId(playlist.id);
+                            const tracks = await loadPlaylistVideos(playlist.id);
+                            setPlaylistTracks(tracks);
+                          }
+                        }}
+                      >
+                        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-muted relative group">
+                          {playlist.thumbnailUrl ? (
+                            <img
+                              src={playlist.thumbnailUrl}
+                              alt={playlist.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+                              <ListMusic className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          {loadingPlaylistId === playlist.id && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Loader2 className="w-5 h-5 animate-spin text-white" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium truncate">{playlist.title}</h4>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {playlist.channelTitle}
+                          </p>
+                          <p className="text-xs text-muted-foreground/70">
+                            {playlist.itemCount > 0 ? `${playlist.itemCount} vidéos` : 'Playlist YouTube'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 w-9 p-0"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const tracks = await loadPlaylistVideos(playlist.id);
+                              if (tracks.length > 0 && onAddToQueue) {
+                                // Jouer la première piste et ajouter le reste à la file
+                                onPlayNext?.(tracks[0]);
+                                tracks.slice(1).forEach(t => onAddToQueue(t));
+                              }
+                            }}
+                          >
+                            <Play className="w-4 h-4 fill-current" />
+                          </Button>
+                          <ChevronRight 
+                            className={cn(
+                              "w-4 h-4 text-muted-foreground transition-transform",
+                              expandedPlaylistId === playlist.id && "rotate-90"
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Expanded Playlist Content */}
+                      <AnimatePresence>
+                        {expandedPlaylistId === playlist.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="border-t border-border/30"
+                          >
+                            {loadingPlaylistId === playlist.id ? (
+                              <div className="p-6 flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                <span className="ml-2 text-sm text-muted-foreground">Chargement...</span>
+                              </div>
+                            ) : playlistTracks.length > 0 ? (
+                              <div className="max-h-[400px] overflow-y-auto">
+                                <table className="w-full">
+                                  <tbody>
+                                    {playlistTracks.map((track, idx) => (
+                                      <tr
+                                        key={`pl-track-${idx}-${track.id}`}
+                                        className="group cursor-pointer hover:bg-muted/40 transition-colors"
+                                        onClick={() => {
+                                          // Jouer cette piste et ajouter les suivantes à la file
+                                          onPlayNext?.(track);
+                                          playlistTracks.slice(idx + 1).forEach(t => onAddToQueue?.(t));
+                                        }}
+                                      >
+                                        <td className="w-12 px-4 py-2.5 text-center">
+                                          <span className="text-sm text-muted-foreground group-hover:hidden">
+                                            {idx + 1}
+                                          </span>
+                                          <Play className="w-4 h-4 hidden group-hover:block mx-auto fill-current" />
+                                        </td>
+                                        <td className="py-2.5">
+                                          <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                                              <img
+                                                src={getCoverUrl(track.coverUrl)}
+                                                alt=""
+                                                className="w-full h-full object-cover"
+                                              />
+                                            </div>
+                                            <div className="min-w-0">
+                                              <p className="font-medium truncate">{track.title}</p>
+                                              <p className="text-xs text-muted-foreground truncate">
+                                                {track.artist}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right text-sm text-muted-foreground font-mono">
+                                          {formatTime(track.duration)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="p-6 text-center text-muted-foreground text-sm">
+                                Aucune vidéo trouvée dans cette playlist
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <ListMusic className="w-16 h-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Aucune playlist</h3>
+                <p className="text-muted-foreground text-sm max-w-md">
+                  Aucune playlist YouTube n'a été trouvée pour "{artistName}".
+                </p>
+              </div>
+            )}
           </TabsContent>
 
           {/* Gallery Tab */}

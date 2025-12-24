@@ -46,6 +46,13 @@ export const YouTube = {
   getAutocomplete: (query: string) => 
     youtubeSearch.getAutocomplete(query),
 
+  // Playlists
+  searchArtistPlaylists: (artistName: string, options?: { forceRefresh?: boolean; maxResults?: number }) =>
+    youtubeSearch.searchArtistPlaylists(artistName, options),
+  
+  getPlaylistVideos: (playlistId: string, options?: { forceRefresh?: boolean; maxResults?: number }) =>
+    youtubeSearch.getPlaylistVideos(playlistId, options),
+
   // Player
   play: (videoOrId: YouTubeVideo | string) => 
     youtubePlayer.setCurrentVideo(videoOrId),

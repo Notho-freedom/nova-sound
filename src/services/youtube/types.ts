@@ -37,6 +37,22 @@ export interface YouTubeVideo {
 }
 
 /**
+ * Représente une playlist YouTube
+ */
+export interface YouTubePlaylist {
+  id: string;                    // ID de la playlist
+  title: string;                 // Titre de la playlist
+  description?: string;          // Description
+  thumbnailUrl: string;          // URL thumbnail
+  channelTitle: string;          // Nom de la chaîne
+  channelId?: string;            // ID de la chaîne
+  itemCount: number;             // Nombre de vidéos
+  publishedAt?: string;          // Date de publication
+  videos?: YouTubeVideo[];       // Vidéos de la playlist (si chargées)
+  cachedAt?: number;             // Timestamp de mise en cache
+}
+
+/**
  * Résultat d'une recherche YouTube
  */
 export interface YouTubeSearchResult {
@@ -45,6 +61,15 @@ export interface YouTubeSearchResult {
   fromCache: boolean;
   totalResults?: number;
   nextPageToken?: string;
+}
+
+/**
+ * Résultat d'une recherche de playlists
+ */
+export interface YouTubePlaylistSearchResult {
+  playlists: YouTubePlaylist[];
+  source: 'api' | 'cache' | 'invidious';
+  fromCache: boolean;
 }
 
 /**

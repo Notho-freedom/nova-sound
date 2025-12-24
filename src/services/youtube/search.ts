@@ -3,7 +3,7 @@
  * Point d'entrée unique pour toutes les recherches
  */
 
-import { YouTubeVideo, YouTubeSearchResult, YouTubeSearchOptions, createYouTubeVideo } from './types';
+import { YouTubeVideo, YouTubeSearchResult, YouTubeSearchOptions, YouTubePlaylist, YouTubePlaylistSearchResult, createYouTubeVideo } from './types';
 import { youtubeCache } from './cache';
 import { youtubeQuota } from './quota';
 import { 
@@ -283,6 +283,248 @@ class YouTubeSearchService {
       // Fallback: utiliser un proxy ou les suggestions générées
       return [];
     }
+  }
+
+  // ==================== PLAYLISTS ====================
+
+  /**
+   * Recherche les playlists d'un artiste
+   */
+  async searchArtistPlaylists(artistName: string, options: { forceRefresh?: boolean; maxResults?: number } = {}): Promise<YouTubePlaylistSearchResult> {
+    const { forceRefresh = false, maxResults = 10 } = options;
+
+    if (!artistName.trim()) {
+      return { playlists: [], source: 'cache', fromCache: true };
+    }
+
+    // 1. Vérifier le cache
+    if (!forceRefresh) {
+      const cached = youtubeCache.getArtistPlaylists(artistName);
+      if (cached && cached.length > 0) {
+        console.log('[YouTubeSearch] Playlists artiste depuis cache');
+        return { playlists: cached, source: 'cache', fromCache: true };
+      }
+    }
+
+    // 2. Essayer l'API YouTube
+    if (youtubeQuota.canMakeRequest('search') && this.apiKey) {
+      try {
+        const playlists = await this.searchPlaylistsViaAPI(`${artistName} playlist`, maxResults);
+        if (playlists.length > 0) {
+          youtubeQuota.recordSuccess();
+          youtubeCache.setArtistPlaylists(artistName, playlists);
+          return { playlists, source: 'api', fromCache: false };
+        }
+      } catch (error) {
+        console.warn('[YouTubeSearch] Playlist API error:', error);
+        youtubeQuota.recordFailure();
+      }
+    }
+
+    // 3. Fallback Invidious
+    try {
+      const playlists = await this.searchPlaylistsViaInvidious(artistName, maxResults);
+      if (playlists.length > 0) {
+        youtubeCache.setArtistPlaylists(artistName, playlists);
+        return { playlists, source: 'invidious', fromCache: false };
+      }
+    } catch (error) {
+      console.warn('[YouTubeSearch] Invidious playlist fallback failed:', error);
+    }
+
+    return { playlists: [], source: 'api', fromCache: false };
+  }
+
+  /**
+   * Recherche via API YouTube pour les playlists
+   */
+  private async searchPlaylistsViaAPI(query: string, maxResults: number): Promise<YouTubePlaylist[]> {
+    if (!this.apiKey) {
+      throw new Error('API key non configurée');
+    }
+
+    youtubeQuota.consumeQuota('search');
+
+    const searchUrl = new URL(`${YOUTUBE_API_BASE}/search`);
+    searchUrl.searchParams.set('part', 'snippet');
+    searchUrl.searchParams.set('type', 'playlist');
+    searchUrl.searchParams.set('q', query);
+    searchUrl.searchParams.set('maxResults', maxResults.toString());
+    searchUrl.searchParams.set('key', this.apiKey);
+
+    const response = await fetch(searchUrl.toString());
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.items?.map((item: any) => this.parsePlaylistItem(item)) || [];
+  }
+
+  /**
+   * Recherche via Invidious pour les playlists
+   */
+  private async searchPlaylistsViaInvidious(artistName: string, maxResults: number): Promise<YouTubePlaylist[]> {
+    const instances = [
+      'https://invidious.snopyta.org',
+      'https://yewtu.be',
+      'https://invidious.kavin.rocks',
+      'https://vid.puffyan.us',
+    ];
+
+    for (const instance of instances) {
+      try {
+        const url = `${instance}/api/v1/search?q=${encodeURIComponent(artistName + ' playlist')}&type=playlist`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        
+        if (!response.ok) continue;
+        
+        const data = await response.json();
+        const playlists = data
+          .filter((item: any) => item.type === 'playlist')
+          .slice(0, maxResults)
+          .map((item: any) => ({
+            id: item.playlistId,
+            title: item.title,
+            description: '',
+            thumbnailUrl: item.playlistThumbnail || `https://img.youtube.com/vi/${item.videos?.[0]?.videoId || ''}/hqdefault.jpg`,
+            channelTitle: item.author || 'YouTube',
+            itemCount: item.videoCount || 0,
+            cachedAt: Date.now(),
+          }));
+
+        if (playlists.length > 0) {
+          return playlists;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return [];
+  }
+
+  private parsePlaylistItem(item: any): YouTubePlaylist {
+    const snippet = item.snippet || {};
+    return {
+      id: item.id?.playlistId || item.id,
+      title: snippet.title || 'Playlist',
+      description: snippet.description || '',
+      thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || '',
+      channelTitle: snippet.channelTitle || 'YouTube',
+      channelId: snippet.channelId,
+      itemCount: 0, // Sera rempli lors du fetch des détails
+      publishedAt: snippet.publishedAt,
+      cachedAt: Date.now(),
+    };
+  }
+
+  /**
+   * Récupère les vidéos d'une playlist
+   */
+  async getPlaylistVideos(playlistId: string, options: { forceRefresh?: boolean; maxResults?: number } = {}): Promise<YouTubeVideo[]> {
+    const { forceRefresh = false, maxResults = 50 } = options;
+
+    // 1. Vérifier le cache
+    if (!forceRefresh) {
+      const cached = youtubeCache.getPlaylistVideos(playlistId);
+      if (cached && cached.length > 0) {
+        console.log('[YouTubeSearch] Vidéos playlist depuis cache');
+        return cached;
+      }
+    }
+
+    // 2. API YouTube
+    if (youtubeQuota.canMakeRequest('playlistItems') && this.apiKey) {
+      try {
+        const videos = await this.getPlaylistVideosViaAPI(playlistId, maxResults);
+        if (videos.length > 0) {
+          youtubeQuota.recordSuccess();
+          youtubeCache.setPlaylistVideos(playlistId, videos);
+          return videos;
+        }
+      } catch (error) {
+        console.warn('[YouTubeSearch] Playlist videos API error:', error);
+        youtubeQuota.recordFailure();
+      }
+    }
+
+    // 3. Fallback Invidious
+    try {
+      const videos = await this.getPlaylistVideosViaInvidious(playlistId);
+      if (videos.length > 0) {
+        youtubeCache.setPlaylistVideos(playlistId, videos);
+        return videos;
+      }
+    } catch (error) {
+      console.warn('[YouTubeSearch] Invidious playlist videos fallback failed:', error);
+    }
+
+    return [];
+  }
+
+  private async getPlaylistVideosViaAPI(playlistId: string, maxResults: number): Promise<YouTubeVideo[]> {
+    if (!this.apiKey) {
+      throw new Error('API key non configurée');
+    }
+
+    youtubeQuota.consumeQuota('playlistItems');
+
+    const url = new URL(`${YOUTUBE_API_BASE}/playlistItems`);
+    url.searchParams.set('part', 'snippet,contentDetails');
+    url.searchParams.set('playlistId', playlistId);
+    url.searchParams.set('maxResults', maxResults.toString());
+    url.searchParams.set('key', this.apiKey);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const videoIds = data.items
+      ?.map((item: any) => item.contentDetails?.videoId)
+      .filter(Boolean) || [];
+
+    if (videoIds.length === 0) return [];
+
+    // Récupérer les détails complets des vidéos
+    return this.getVideoDetails(videoIds);
+  }
+
+  private async getPlaylistVideosViaInvidious(playlistId: string): Promise<YouTubeVideo[]> {
+    const instances = [
+      'https://invidious.snopyta.org',
+      'https://yewtu.be',
+      'https://invidious.kavin.rocks',
+      'https://vid.puffyan.us',
+    ];
+
+    for (const instance of instances) {
+      try {
+        const url = `${instance}/api/v1/playlists/${playlistId}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        
+        if (!response.ok) continue;
+        
+        const data = await response.json();
+        const videos: YouTubeVideo[] = (data.videos || []).map((v: any) => createYouTubeVideo(v.videoId, {
+          title: v.title,
+          artist: v.author || data.author || 'YouTube',
+          channelTitle: v.author || data.author || 'YouTube',
+          thumbnailUrl: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`,
+          duration: v.lengthSeconds || 0,
+        }));
+
+        if (videos.length > 0) {
+          return videos;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return [];
   }
 
   // ==================== UTILITAIRES ====================
