@@ -371,7 +371,7 @@ useEffect(() => {
               backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              filter: 'blur(60px) saturate(1.4) brightness(0.9)',
+              filter: 'blur(15px) saturate(1.5) brightness(1)',
             }}
           />
           
