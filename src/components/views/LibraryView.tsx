@@ -166,64 +166,167 @@ const AlbumCard = memo(({
 ));
 AlbumCard.displayName = "AlbumCard";
 
-// Memoized Artist Card Component
+// Modern Artist Card Component with glassmorphism effect
 const ArtistCard = memo(({ 
   artist, 
   onSelect, 
   onPlay,
-  delay = 0
+  delay = 0,
+  variant = "default"
 }: { 
   artist: { name: string; tracks: Track[]; albums: Set<string> };
   onSelect: () => void;
   onPlay: () => void;
   delay?: number;
+  variant?: "default" | "featured" | "compact";
 }) => {
   const coverUrl = artist.tracks[0]?.coverUrl;
+  const totalDuration = artist.tracks.reduce((sum, t) => sum + t.duration, 0);
+  const hours = Math.floor(totalDuration / 3600);
+  const mins = Math.floor((totalDuration % 3600) / 60);
+  const durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins} min`;
   
+  // Featured variant - larger card for top artists
+  if (variant === "featured") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay, duration: 0.4 }}
+        whileHover={{ y: -8 }}
+        className="group relative cursor-pointer"
+        onClick={onSelect}
+      >
+        <div className="relative aspect-[3/4] rounded-2xl overflow-hidden">
+          {/* Background Image */}
+          {coverUrl ? (
+            <img
+              src={getCoverUrl(coverUrl)}
+              alt={artist.name}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/40 via-secondary/30 to-accent/40 flex items-center justify-center">
+              <User className="w-20 h-20 text-white/40" />
+            </div>
+          )}
+          
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-80" />
+          
+          {/* Content */}
+          <div className="absolute inset-x-0 bottom-0 p-5">
+            <h3 className="font-display text-2xl font-bold text-white mb-1 drop-shadow-lg">
+              {artist.name}
+            </h3>
+            <p className="text-white/70 text-sm mb-3">
+              {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titres
+            </p>
+            
+            {/* Play button */}
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileHover={{ scale: 1.1 }}
+              className="w-12 h-12 rounded-full bg-primary shadow-xl shadow-primary/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay();
+              }}
+            >
+              <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Compact variant for list view
+  if (variant === "compact") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay, duration: 0.3 }}
+        whileHover={{ x: 4 }}
+        className="group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-card/50 transition-all"
+        onClick={onSelect}
+      >
+        <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
+          {coverUrl ? (
+            <img src={getCoverUrl(coverUrl)} alt={artist.name} className="w-full h-full object-cover" loading="lazy" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center">
+              <User className="w-6 h-6 text-primary/50" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">{artist.name}</h3>
+          <p className="text-xs text-muted-foreground">{artist.tracks.length} titres</p>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onPlay(); }}
+          className="w-9 h-9 rounded-full bg-primary/10 hover:bg-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+        >
+          <Play className="w-4 h-4 text-primary group-hover:text-primary-foreground fill-current ml-0.5" />
+        </button>
+      </motion.div>
+    );
+  }
+
+  // Default variant - modern circular card
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay, duration: 0.3 }}
-      whileHover={{ scale: 1.03 }}
+      whileHover={{ y: -6 }}
       whileTap={{ scale: 0.98 }}
       className="group relative cursor-pointer"
       onClick={onSelect}
     >
-      <div className="aspect-square rounded-full overflow-hidden bg-gradient-to-br from-primary/30 to-accent/30 shadow-lg group-hover:shadow-xl transition-all duration-300 ring-4 ring-transparent group-hover:ring-primary/20">
-        {coverUrl ? (
-          <img
-            src={getCoverUrl(coverUrl)}
-            alt={artist.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <User className="w-12 h-12 text-primary/40" />
+      {/* Glow effect */}
+      <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-primary/20 via-secondary/20 to-accent/20 blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      
+      <div className="relative">
+        <div className="aspect-square rounded-full overflow-hidden bg-gradient-to-br from-primary/30 to-accent/30 shadow-lg group-hover:shadow-2xl transition-all duration-500 ring-2 ring-white/10 group-hover:ring-primary/40">
+          {coverUrl ? (
+            <img
+              src={getCoverUrl(coverUrl)}
+              alt={artist.name}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-500/30 via-fuchsia-500/20 to-pink-500/30">
+              <User className="w-12 h-12 text-white/50" />
+            </div>
+          )}
+          
+          {/* Hover Overlay */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+            <motion.button
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay();
+              }}
+              className="w-14 h-14 rounded-full bg-primary shadow-xl shadow-primary/40 flex items-center justify-center transform scale-75 group-hover:scale-100 transition-transform duration-300"
+            >
+              <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
+            </motion.button>
           </div>
-        )}
-        
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay();
-            }}
-            className="w-14 h-14 rounded-full bg-primary shadow-lg flex items-center justify-center"
-          >
-            <Play className="w-6 h-6 text-primary-foreground fill-current ml-0.5" />
-          </motion.button>
         </div>
       </div>
       
-      <div className="mt-3 text-center">
-        <h3 className="font-medium text-sm truncate text-foreground group-hover:text-primary transition-colors">
+      <div className="mt-4 text-center px-1">
+        <h3 className="font-semibold text-sm truncate text-foreground group-hover:text-primary transition-colors">
           {artist.name}
         </h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="text-xs text-muted-foreground mt-1">
           {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titres
         </p>
       </div>
@@ -1035,103 +1138,275 @@ export const LibraryView = memo(({
 
   // Artists View
   if (viewMode === "artists") {
-    return (
-      <PageContainer>
-        <PageHero
-          title={title}
-          subtitle={`${filteredAndSortedArtists.length} artiste${filteredAndSortedArtists.length > 1 ? "s" : ""}`}
-          icon={User}
-          gradient="from-blue-500/20 via-cyan-500/10 to-teal-500/20"
-          actions={
-            <div className="flex items-center gap-2">
-              <Button onClick={handlePlayAll} size="sm" className="gap-2">
-                <Play className="w-4 h-4 fill-current" />
-                Tout lire
-              </Button>
-              <Button onClick={handleShuffleAll} variant="outline" size="sm" className="gap-2">
-                <Shuffle className="w-4 h-4" />
-              </Button>
-            </div>
-          }
-        />
+    // Get top artists (most tracks)
+    const topArtists = [...filteredAndSortedArtists]
+      .sort((a, b) => b.tracks.length - a.tracks.length)
+      .slice(0, 4);
+    const remainingArtists = filteredAndSortedArtists.filter(
+      a => !topArtists.find(t => t.name === a.name)
+    );
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard icon={User} label="Artistes" value={artists.length} color="bg-blue-500/20 text-blue-400" />
-          <StatCard icon={Disc3} label="Albums" value={albums.length} color="bg-purple-500/20 text-purple-400" />
-          <StatCard icon={Music} label="Titres" value={tracks.length} color="bg-green-500/20 text-green-400" />
-          <StatCard icon={Clock} label="Durée totale" value={formatDuration(totalDuration)} color="bg-orange-500/20 text-orange-400" />
+    return (
+      <div className="min-h-full pb-8">
+        {/* Hero Section with gradient background */}
+        <div className="relative overflow-hidden">
+          {/* Animated gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-fuchsia-500/10 to-pink-500/20" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-cyan-400/10 via-transparent to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+          
+          <div className="relative px-6 pt-8 pb-16">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+              <div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 mb-3"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+                    Collection
+                  </span>
+                </motion.div>
+                <motion.h1
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="font-display text-5xl md:text-6xl font-bold bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text"
+                >
+                  {title}
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-muted-foreground mt-2 text-lg"
+                >
+                  {filteredAndSortedArtists.length} artiste{filteredAndSortedArtists.length > 1 ? "s" : ""} • {albums.length} albums • {tracks.length} titres
+                </motion.p>
+              </div>
+
+              {/* Actions */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-3"
+              >
+                <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
+                  <Play className="w-5 h-5 fill-current" />
+                  Tout lire
+                </Button>
+                <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
+                  <Shuffle className="w-5 h-5" />
+                  Aléatoire
+                </Button>
+              </motion.div>
+            </div>
+
+            {/* Featured Artists - Top 4 */}
+            {topArtists.length > 0 && !artistsSearchQuery && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                  Artistes vedettes
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {topArtists.map((artist, idx) => (
+                    <ArtistCard
+                      key={artist.name}
+                      artist={artist}
+                      variant="featured"
+                      delay={idx * 0.1}
+                      onSelect={() => {
+                        if (onNavigateToArtist) {
+                          onNavigateToArtist(artist.name);
+                        } else {
+                          setSelectedArtist(artist.name);
+                        }
+                      }}
+                      onPlay={() => {
+                        const firstTrack = artist.tracks[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </div>
         </div>
 
-        {/* Toolbar */}
-        <Toolbar className="mb-6">
-          <SearchBar
-            value={artistsSearchQuery}
-            onChange={setArtistsSearchQuery}
-            placeholder="Rechercher un artiste..."
-          />
-
-          <Select value={artistsSortBy} onValueChange={(v) => setArtistsSortBy(v as typeof artistsSortBy)}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Trier par" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Nom</SelectItem>
-              <SelectItem value="albums">Albums</SelectItem>
-              <SelectItem value="tracks">Titres</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setArtistsSortOrder(o => o === "asc" ? "desc" : "asc")}
+        {/* Main Content */}
+        <div className="px-6 -mt-8">
+          {/* Toolbar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="flex flex-wrap items-center gap-4 mb-8 p-4 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/30"
           >
-            {artistsSortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </Button>
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={artistsSearchQuery}
+                  onChange={(e) => setArtistsSearchQuery(e.target.value)}
+                  placeholder="Rechercher un artiste..."
+                  className="pl-10 bg-background/50 border-border/50"
+                />
+                {artistsSearchQuery && (
+                  <button
+                    onClick={() => setArtistsSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
 
-          <ViewToggle view={artistsViewMode} onViewChange={setArtistsViewMode} />
-        </Toolbar>
+            <Select value={artistsSortBy} onValueChange={(v) => setArtistsSortBy(v as typeof artistsSortBy)}>
+              <SelectTrigger className="w-[140px] bg-background/50">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Nom</SelectItem>
+                <SelectItem value="albums">Albums</SelectItem>
+                <SelectItem value="tracks">Titres</SelectItem>
+              </SelectContent>
+            </Select>
 
-        {/* Artists Grid */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6"
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredAndSortedArtists.map((artist, idx) => (
-              <ArtistCard
-                key={artist.name}
-                artist={artist}
-                delay={idx * 0.02}
-                onSelect={() => {
-                  // Use onNavigateToArtist if provided, otherwise fall back to internal state
-                  if (onNavigateToArtist) {
-                    onNavigateToArtist(artist.name);
-                  } else {
-                    setSelectedArtist(artist.name);
-                  }
-                }}
-                onPlay={() => {
-                  const firstTrack = artist.tracks[0];
-                  const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                  if (idx !== -1) onTrackSelect(idx);
-                }}
-              />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setArtistsSortOrder(o => o === "asc" ? "desc" : "asc")}
+              className="bg-background/50"
+            >
+              {artistsSortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
 
-        {filteredAndSortedArtists.length === 0 && (
-          <EmptyState
-            icon={<User className="w-10 h-10 text-primary" />}
-            title="Aucun artiste trouvé"
-            description="Essayez de modifier vos filtres de recherche"
-          />
-        )}
-      </PageContainer>
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+              <Button
+                variant={artistsViewMode === "grid" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setArtistsViewMode("grid")}
+                className="h-8 w-8"
+              >
+                <Grid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={artistsViewMode === "list" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setArtistsViewMode("list")}
+                className="h-8 w-8"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* All Artists Section */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+              Tous les artistes
+              <span className="text-sm font-normal text-muted-foreground">
+                ({artistsSearchQuery ? filteredAndSortedArtists.length : remainingArtists.length})
+              </span>
+            </h2>
+
+            {/* Grid View */}
+            {artistsViewMode === "grid" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
+              >
+                <AnimatePresence mode="popLayout">
+                  {(artistsSearchQuery ? filteredAndSortedArtists : remainingArtists).map((artist, idx) => (
+                    <ArtistCard
+                      key={artist.name}
+                      artist={artist}
+                      delay={Math.min(idx * 0.02, 0.3)}
+                      onSelect={() => {
+                        if (onNavigateToArtist) {
+                          onNavigateToArtist(artist.name);
+                        } else {
+                          setSelectedArtist(artist.name);
+                        }
+                      }}
+                      onPlay={() => {
+                        const firstTrack = artist.tracks[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }}
+                    />
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            )}
+
+            {/* List View */}
+            {artistsViewMode === "list" && (
+              <div className="space-y-1 bg-card/30 backdrop-blur-sm rounded-2xl border border-border/30 p-2">
+                <AnimatePresence mode="popLayout">
+                  {(artistsSearchQuery ? filteredAndSortedArtists : remainingArtists).map((artist, idx) => (
+                    <ArtistCard
+                      key={artist.name}
+                      artist={artist}
+                      variant="compact"
+                      delay={Math.min(idx * 0.015, 0.2)}
+                      onSelect={() => {
+                        if (onNavigateToArtist) {
+                          onNavigateToArtist(artist.name);
+                        } else {
+                          setSelectedArtist(artist.name);
+                        }
+                      }}
+                      onPlay={() => {
+                        const firstTrack = artist.tracks[0];
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </motion.div>
+
+          {(artistsSearchQuery ? filteredAndSortedArtists : remainingArtists).length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 text-center"
+            >
+              <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <User className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Aucun artiste trouvé</h3>
+              <p className="text-muted-foreground text-sm max-w-md">
+                {artistsSearchQuery 
+                  ? "Essayez de modifier vos termes de recherche" 
+                  : "Ajoutez de la musique à votre bibliothèque pour voir vos artistes"}
+              </p>
+            </motion.div>
+          )}
+        </div>
+      </div>
     );
   }
 
