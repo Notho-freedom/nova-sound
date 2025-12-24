@@ -75,6 +75,7 @@ export const DesktopApp = () => {
     currentTrack: queueCurrentTrack,
     addToQueue,
     addToQueueNext,
+    removeFromQueue,
     setCurrentIndex,
     setQueue,
     shuffle: shuffleQueue,
@@ -981,6 +982,15 @@ export const DesktopApp = () => {
     toast.success(message);
     notifySuccess(message);
   }, [playlists, libraryTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError]);
+
+  // Handler pour supprimer un track de la file par son ID
+  const handleRemoveFromQueue = useCallback((trackId: string) => {
+    const index = tracks.findIndex(t => t.id === trackId);
+    if (index !== -1 && index > currentTrackIndex) {
+      removeFromQueue(index);
+      toast.success('Retiré de la file d\'attente');
+    }
+  }, [tracks, currentTrackIndex, removeFromQueue]);
 
   // Handlers for PlaylistView - play/shuffle tracks by IDs
   const handlePlayTracks = useCallback((trackIds: string[]) => {
@@ -1909,6 +1919,7 @@ export const DesktopApp = () => {
                   historyTracks={historyTracks}
                   onPlayTrack={handlePlayTrack}
                   currentTrack={currentTrack}
+                  onRemoveFromQueue={handleRemoveFromQueue}
                 />
               </div>
             )}

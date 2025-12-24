@@ -1,5 +1,5 @@
-import { X, GripVertical, Play, Pause, Disc3, Radio, Clock, Loader2 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { X, GripVertical, Play, Pause, Disc3, Radio, Clock, Loader2, ListMusic, Youtube, Music2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Track } from "@/types/music";
@@ -19,6 +19,7 @@ interface QueuePanelProps {
   historyTracks?: Track[];
   onPlayTrack?: (track: Track) => void;
   currentTrack?: Track | null; // Track actuellement en lecture
+  onRemoveFromQueue?: (trackId: string) => void; // Supprimer un track de la file
 }
 
 const formatTime = (seconds: number) => {
@@ -89,8 +90,10 @@ export const QueuePanel = ({
   historyTracks = [],
   onPlayTrack,
   currentTrack: propCurrentTrack,
+  onRemoveFromQueue,
 }: QueuePanelProps) => {
   const currentTrack = propCurrentTrack || tracks[currentTrackIndex];
+  const [queueFilter, setQueueFilter] = useState<'all' | 'youtube' | 'local'>('all');
 
   // Hook pour charger les tracks YouTube similaires
   const { 
@@ -160,6 +163,27 @@ export const QueuePanel = ({
     ? youtubeSimilarTracks 
     : propSimilarTracks;
 
+  // File d'attente réelle (tous les tracks ajoutés à la queue)
+  // Exclure le track actuel de la file d'attente affichée
+  const queueTracks = useMemo(() => {
+    const upcomingTracks = tracks.filter((_, index) => index > currentTrackIndex);
+    return upcomingTracks;
+  }, [tracks, currentTrackIndex]);
+
+  // Stats et filtrage de la file d'attente
+  const queueStats = useMemo(() => {
+    const youtubeCount = queueTracks.filter(t => t.mediaSource === 'youtube').length;
+    const localCount = queueTracks.filter(t => t.mediaSource !== 'youtube').length;
+    return { youtubeCount, localCount, total: queueTracks.length };
+  }, [queueTracks]);
+
+  // Filtrer les tracks de la file selon le filtre actif
+  const filteredQueueTracks = useMemo(() => {
+    if (queueFilter === 'all') return queueTracks;
+    if (queueFilter === 'youtube') return queueTracks.filter(t => t.mediaSource === 'youtube');
+    return queueTracks.filter(t => t.mediaSource !== 'youtube');
+  }, [queueTracks, queueFilter]);
+
   return (
     <div className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl">
       {/* Header */}
@@ -212,15 +236,22 @@ export const QueuePanel = ({
       )}
 
       {/* Tabs */}
-      <Tabs defaultValue="file" className="flex-1 flex flex-col overflow-hidden">
+      <Tabs defaultValue="queue" className="flex-1 flex flex-col overflow-hidden">
         <div className="px-4 pt-2 border-b border-border">
-          <TabsList className="w-full grid grid-cols-3 h-auto bg-muted/30">
+          <TabsList className="w-full grid grid-cols-4 h-auto bg-muted/30">
+            <TabsTrigger 
+              value="queue" 
+              className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+            >
+              <ListMusic className="w-3 h-3 mr-1" />
+              Queue ({queueStats.total})
+            </TabsTrigger>
             <TabsTrigger 
               value="file" 
               className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
             >
               <Disc3 className="w-3 h-3 mr-1" />
-              File ({albumTracksForFile.length})
+              Album ({albumTracksForFile.length})
             </TabsTrigger>
             <TabsTrigger 
               value="similar" 
@@ -240,6 +271,111 @@ export const QueuePanel = ({
         </div>
 
         <ScrollArea className="flex-1">
+          {/* Queue: File d'attente réelle avec détection YouTube/Local */}
+          <TabsContent value="queue" className="p-4 mt-0">
+            {queueTracks.length > 0 ? (
+              <div>
+                {/* Filtres YouTube / Local */}
+                <div className="mb-4 flex items-center gap-2">
+                  <button
+                    onClick={() => setQueueFilter('all')}
+                    className={cn(
+                      "px-3 py-1.5 text-xs rounded-full transition-all duration-200",
+                      queueFilter === 'all' 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    Tous ({queueStats.total})
+                  </button>
+                  {queueStats.youtubeCount > 0 && (
+                    <button
+                      onClick={() => setQueueFilter('youtube')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-full transition-all duration-200 flex items-center gap-1.5",
+                        queueFilter === 'youtube' 
+                          ? "bg-red-500/90 text-white" 
+                          : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      )}
+                    >
+                      <Youtube className="w-3 h-3" />
+                      YouTube ({queueStats.youtubeCount})
+                    </button>
+                  )}
+                  {queueStats.localCount > 0 && (
+                    <button
+                      onClick={() => setQueueFilter('local')}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-full transition-all duration-200 flex items-center gap-1.5",
+                        queueFilter === 'local' 
+                          ? "bg-emerald-500/90 text-white" 
+                          : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                      )}
+                    >
+                      <Music2 className="w-3 h-3" />
+                      Local ({queueStats.localCount})
+                    </button>
+                  )}
+                </div>
+
+                {/* Info de la file */}
+                <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
+                  <p className="text-xs text-muted-foreground mb-1">File d'attente</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {filteredQueueTracks.length} {filteredQueueTracks.length === 1 ? 'piste à venir' : 'pistes à venir'}
+                  </p>
+                  {queueStats.youtubeCount > 0 && queueStats.localCount > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {queueStats.youtubeCount} YouTube • {queueStats.localCount} local
+                    </p>
+                  )}
+                </div>
+
+                {/* Liste des tracks */}
+                <div className="space-y-0.5">
+                  {filteredQueueTracks.map((track, index) => (
+                    <div key={track.id} className="group relative">
+                      <div className="flex items-center gap-2">
+                        {/* Indicateur YouTube/Local */}
+                        <div className={cn(
+                          "w-1 h-10 rounded-full flex-shrink-0",
+                          track.mediaSource === 'youtube' ? "bg-red-500/60" : "bg-emerald-500/60"
+                        )} />
+                        
+                        <div className="flex-1">
+                          <TrackItem
+                            track={track}
+                            onClick={() => onPlayTrack?.(track)}
+                          />
+                        </div>
+
+                        {/* Bouton supprimer */}
+                        {onRemoveFromQueue && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveFromQueue(track.id);
+                            }}
+                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/20 text-destructive transition-all duration-200"
+                            title="Retirer de la file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                <ListMusic className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                <p>La file d'attente est vide</p>
+                <p className="text-xs mt-1">Ajoutez des pistes depuis la bibliothèque ou YouTube</p>
+              </div>
+            )}
+          </TabsContent>
+
           {/* File: Flux de l'album complet */}
           <TabsContent value="file" className="p-4 mt-0">
             {albumTracksForFile.length > 0 ? (
