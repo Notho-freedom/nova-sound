@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, 
   Play, 
@@ -18,7 +19,10 @@ import {
   Clock,
   ListMusic,
   Share2,
-  MoreHorizontal
+  MoreHorizontal,
+  Waves,
+  Sparkles,
+  Radio
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { AlbumArt } from "./AlbumArt";
@@ -334,254 +338,582 @@ useEffect(() => {
     ? (currentTime / currentTrack.duration) * 100 
     : 0;
 
+  // Calculer les barres du visualizer basées sur FFT
+  const visualizerBars = useMemo(() => {
+    if (!vibesData?.frequency) return Array(48).fill(0.1);
+    const freq = vibesData.frequency;
+    const barCount = 48;
+    const result = [];
+    for (let i = 0; i < barCount; i++) {
+      const index = Math.floor((i / barCount) * freq.length);
+      result.push(freq[index] / 255);
+    }
+    return result;
+  }, [vibesData?.frequency]);
+
   // Inline mode - embedded in main content area
   if (isInline) {
     return (
-      <div className="h-full w-full flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
-        {/* Player YouTube en arrière-plan (masqué visuellement) pour les tracks YouTube en mode inline */}
-        {/* IMPORTANT: Ne jamais créer de nouveau player YouTube ici */}
-        {/* On utilise toujours le player persistant de DesktopApp via sharedYoutubePlayerRef */}
-        {/* Le player persistant est déjà monté dans DesktopApp et gère la lecture */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="h-full w-full flex items-center justify-center relative overflow-hidden"
+      >
+        {/* Animated Background Orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div
+            animate={{ 
+              x: [0, 50, 0],
+              y: [0, -30, 0],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-[100px] opacity-30"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-cyan)) 0%, transparent 70%)" }}
+          />
+          <motion.div
+            animate={{ 
+              x: [0, -40, 0],
+              y: [0, 40, 0],
+              scale: [1, 1.15, 1],
+            }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full blur-[120px] opacity-25"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-magenta)) 0%, transparent 70%)" }}
+          />
+        </div>
         
         <div className="flex flex-col items-center justify-center w-full relative z-10">
-          {/* Album Art with glow effect */}
-          <div className="relative mb-6 flex items-center justify-center">
-            <div 
-              className="absolute inset-0 blur-3xl opacity-30 scale-150"
+          {/* Album Art with premium glow effect */}
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="relative mb-8 flex items-center justify-center"
+          >
+            {/* Multi-layer glow */}
+            <motion.div 
+              animate={{ 
+                scale: isPlaying ? [1, 1.05, 1] : 1,
+                opacity: isPlaying ? [0.4, 0.6, 0.4] : 0.3,
+              }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 blur-3xl scale-150"
               style={{
                 backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }}
             />
+            <motion.div 
+              className="absolute -inset-4 rounded-full"
+              style={{
+                background: "conic-gradient(from 0deg, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)), hsl(var(--neon-purple)), hsl(var(--neon-cyan)))",
+                opacity: isPlaying ? 0.5 : 0.2,
+              }}
+              animate={{ rotate: isPlaying ? 360 : 0 }}
+              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+            />
             <AlbumArt
               src={getCoverUrl(currentTrack.coverUrl)}
               alt={currentTrack.album}
               isPlaying={isYouTube ? youtubeState.isPlaying : isPlaying}
-              className="w-64 h-64 relative z-10"
+              className="w-72 h-72 relative z-10"
             />
-          </div>
+          </motion.div>
 
-          {/* Track Info */}
-          <div className="text-center w-full px-4">
-            <h1 className="font-display text-2xl font-bold mb-1 text-foreground truncate max-w-md mx-auto">
+          {/* Track Info with animation */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-center w-full px-4"
+          >
+            <h1 className="font-display text-3xl font-bold mb-2 text-foreground truncate max-w-md mx-auto bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text">
               {currentTrack.title}
             </h1>
-            <p className="text-lg text-muted-foreground truncate max-w-md mx-auto">
+            <p className="text-lg text-muted-foreground truncate max-w-md mx-auto mb-1">
               {currentTrack.artist}
             </p>
-            <p className="text-sm text-muted-foreground/70 truncate max-w-md mx-auto">
-              {currentTrack.album}
-            </p>
-          </div>
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground/60">
+              <Disc3 className="w-3.5 h-3.5" />
+              <span className="truncate max-w-[200px]">{currentTrack.album}</span>
+            </div>
+          </motion.div>
+
+          {/* Mini Visualizer */}
+          {!isYouTube && isPlaying && (
+            <motion.div 
+              initial={{ opacity: 0, scaleY: 0 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              className="flex items-end justify-center gap-0.5 h-8 mt-6"
+            >
+              {visualizerBars.slice(0, 16).map((height, i) => (
+                <motion.div
+                  key={i}
+                  className="w-1 rounded-full bg-gradient-to-t from-primary/50 to-primary"
+                  animate={{ height: Math.max(4, height * 32) }}
+                  transition={{ duration: 0.1 }}
+                />
+              ))}
+            </motion.div>
+          )}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
-  // Fullscreen mode
+  // Fullscreen mode - Ultra Modern Cinematic Design
   return (
-    <div className={cn(
-      "fixed inset-0 z-[10000] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300",
-      isYouTube ? "bg-transparent" : "bg-background"
-    )}>
-      {!isYouTube && <BackgroundEffects />}
-      
-      {/* Main Panel - Background with album cover and FFT */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Player YouTube - visible pour les vidéos YouTube en mode fullscreen */}
-        {/* Le player YouTube persistant de DesktopApp est déjà rendu visible en fullscreen */}
-        {/* Il est positionné en z-9998 dans DesktopApp, donc en dessous du FullscreenPlayer (z-10000) */}
-        {/* Mais on peut voir la vidéo à travers le fond transparent du FullscreenPlayer */}
-        {/* Pour s'assurer que la vidéo est bien visible, on masque le fond quand c'est YouTube */}
-        
-        {/* Album cover background - blurred and faded (seulement pour non-YouTube) */}
-        {!isYouTube && (
-          <div 
-            className="absolute inset-0 opacity-20 blur-3xl scale-150 transition-opacity duration-500"
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={cn(
+        "fixed inset-0 z-[10000] flex overflow-hidden",
+        isYouTube ? "bg-transparent" : "bg-gradient-to-br from-background via-background to-background/95"
+      )}
+    >
+      {/* Animated Background Layer */}
+      {!isYouTube && (
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Album cover background - cinematic blur */}
+          <motion.div 
+            initial={{ scale: 1.2, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1.5 }}
+            className="absolute inset-0"
             style={{
               backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              zIndex: 2,
+              filter: 'blur(80px) saturate(1.2)',
+              opacity: 0.3,
+              transform: 'scale(1.2)',
             }}
           />
-        )}
+          
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
+          
+          {/* Animated orbs */}
+          <motion.div
+            animate={{ 
+              x: [0, 100, 0],
+              y: [0, -50, 0],
+              scale: [1, 1.3, 1],
+            }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full blur-[150px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-cyan) / 0.4) 0%, transparent 70%)" }}
+          />
+          <motion.div
+            animate={{ 
+              x: [0, -80, 0],
+              y: [0, 60, 0],
+              scale: [1, 1.2, 1],
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full blur-[180px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-magenta) / 0.35) 0%, transparent 70%)" }}
+          />
+          <motion.div
+            animate={{ 
+              x: [0, 50, 0],
+              y: [0, -80, 0],
+            }}
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 4 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full blur-[200px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-purple) / 0.25) 0%, transparent 70%)" }}
+          />
+
+          {/* Grid pattern overlay */}
+          <div 
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: `
+                linear-gradient(hsl(var(--primary) / 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, hsl(var(--primary) / 0.5) 1px, transparent 1px)
+              `,
+              backgroundSize: '60px 60px',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Main Content - Split Layout */}
+      <div className="relative z-10 flex w-full h-full">
         
-        {/* FFT Visualizer - Full width, reduced height and opacity (seulement pour non-YouTube) */}
-        {!isYouTube && (
-          <canvas
-            ref={canvasRef}
-            className="absolute bottom-0 left-0 right-0 w-full opacity-20"
-            style={{ 
-              height: '20%',
-              imageRendering: 'pixelated',
-              zIndex: 2,
-            }}
-          />
-        )}
-      </div>
-
-      {/* Overlay avec contrôles Nexus superposés sur YouTube */}
-      {/* L'iframe YouTube est en z-1, les contrôles Nexus sont en z-30+ */}
-      {/* Le YouTubePlayer gère déjà l'overlay pour permettre le clic droit */}
-
-      {/* Header */}
-      <div className={cn(
-        "relative z-30 flex items-center justify-between p-6",
-        isYouTube && "backdrop-blur-sm bg-black/20"
-      )}>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground backdrop-blur-sm bg-background/30"
-        >
-          <ChevronDown className="w-6 h-6" />
-        </button>
-        <div className="text-center">
-          <p className={cn(
-            "text-xs uppercase tracking-widest",
-            isYouTube ? "text-white/90" : "text-muted-foreground"
-          )}>
-            En Lecture
-          </p>
-        </div>
-        <button
-          onClick={onToggleFavorite}
-          className={cn(
-            "p-2 rounded-full transition-all duration-200 backdrop-blur-sm bg-background/30",
-            isFavorite 
-              ? "text-red-500" 
-              : "text-muted-foreground hover:text-red-500"
-          )}
-        >
-          <Heart className={cn("w-6 h-6", isFavorite && "fill-current")} />
-        </button>
-      </div>
-
-      {/* Panneau latéral avec tous les éléments */}
-      <div className={cn(
-        "absolute right-0 top-0 bottom-0 z-30 w-96 backdrop-blur-xl border-l p-6 flex flex-col",
-        isYouTube ? "bg-black/40 border-white/20" : "bg-background/20 border-border/30"
-      )}>
-        {/* Album Art */}
-        <div className="flex items-center justify-center mb-6">
-          <AlbumArt
-            src={getCoverUrl(currentTrack.coverUrl)}
-            alt={currentTrack.album}
-            isPlaying={isPlaying}
-            className="w-64 h-64"
-          />
-        </div>
-
-        {/* Track Info */}
-        <div className="text-center mb-6">
-          <h1 className="font-display text-2xl font-bold mb-2 text-foreground">
-            {currentTrack.title}
-          </h1>
-          <p className="text-lg text-muted-foreground mb-1">
-            {currentTrack.artist}
-          </p>
-          <p className="text-sm text-muted-foreground/70">
-            {currentTrack.album}
-          </p>
-        </div>
-
-
-        {/* Controls - Déplacés dans le panneau latéral */}
-        <div className="mt-auto flex flex-col gap-4">
-          {/* Progress Bar */}
-          <div className="w-full mb-2">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs text-muted-foreground w-10 text-right font-mono">
-                {formatTime(isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime)}
-              </span>
-              <Slider
-                value={[isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime]}
-                max={isYouTube && !sharedYoutubePlayerRef ? (youtubeState.duration || currentTrack.duration) : currentTrack.duration}
-                step={1}
-                onValueChange={handleSeekYouTube}
-                className="flex-1"
-              />
-              <span className="text-xs text-muted-foreground w-10 font-mono">
-                {formatTime(currentTrack.duration)}
+        {/* Left Side - Album Art & Visualizer (60%) */}
+        <div className="flex-1 flex flex-col items-center justify-center relative p-12">
+          
+          {/* Header - Close & Title */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-0 left-0 right-0 flex items-center justify-between p-6"
+          >
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onClose}
+              className="p-3 rounded-full backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
+            >
+              <ChevronDown className="w-6 h-6 text-white/70 group-hover:text-white transition-colors" />
+            </motion.button>
+            
+            <div className="flex items-center gap-3">
+              <motion.div 
+                animate={{ rotate: isPlaying ? 360 : 0 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                className="p-2 rounded-full bg-gradient-to-r from-primary/20 to-primary/10"
+              >
+                <Radio className="w-4 h-4 text-primary" />
+              </motion.div>
+              <span className="text-xs uppercase tracking-[0.2em] text-white/50 font-medium">
+                En Lecture
               </span>
             </div>
-          </div>
-
-          {/* Playback Controls */}
-          <div className="flex items-center justify-center gap-3 w-full">
-            <button
-              onClick={onShuffle}
+            
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onToggleFavorite}
               className={cn(
-                "p-2 rounded-full transition-all duration-200 backdrop-blur-sm bg-background/30",
-                isShuffle 
-                  ? "text-primary" 
-                  : "text-muted-foreground hover:text-foreground"
+                "p-3 rounded-full backdrop-blur-xl border transition-all",
+                isFavorite 
+                  ? "bg-red-500/20 border-red-500/30 text-red-500" 
+                  : "bg-white/5 border-white/10 text-white/70 hover:text-red-400 hover:bg-red-500/10"
               )}
             >
-              <Shuffle className="w-4 h-4" />
-            </button>
-            
-            <button
-              onClick={onPrevious}
-              className="p-2 text-foreground hover:text-primary transition-colors backdrop-blur-sm bg-background/30 rounded-full"
-            >
-              <SkipBack className="w-5 h-5 fill-current" />
-            </button>
-            
-            <button
-              onClick={onPlayPause}
-              className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:scale-105 shadow-lg transition-all duration-200 backdrop-blur-sm"
-            >
-              {(isYouTube && !sharedYoutubePlayerRef ? (youtubeState.isPlaying || false) : isPlaying) ? (
-                <Pause className="w-6 h-6 fill-current" />
-              ) : (
-                <Play className="w-6 h-6 fill-current ml-0.5" />
-              )}
-            </button>
-            
-            <button
-              onClick={onNext}
-              className="p-2 text-foreground hover:text-primary transition-colors backdrop-blur-sm bg-background/30 rounded-full"
-            >
-              <SkipForward className="w-5 h-5 fill-current" />
-            </button>
-            
-            <button
-              onClick={onRepeat}
-              className={cn(
-                "p-2 rounded-full transition-all duration-200 backdrop-blur-sm bg-background/30",
-                repeatMode !== "off" 
-                  ? "text-primary" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {repeatMode === "one" ? (
-                <Repeat1 className="w-4 h-4" />
-              ) : (
-                <Repeat className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+              <Heart className={cn("w-6 h-6", isFavorite && "fill-current")} />
+            </motion.button>
+          </motion.div>
 
-          {/* Volume */}
-          <div className="flex items-center justify-center gap-2 w-full">
-            <button
-              onClick={onMuteToggle}
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors backdrop-blur-sm bg-background/30 rounded-full"
-            >
-              <VolumeIcon className="w-4 h-4" />
-            </button>
-            <Slider
-              value={[isMuted ? 0 : volume]}
-              max={100}
-              step={1}
-              onValueChange={onVolumeChange}
-              className="flex-1"
+          {/* Central Album Art with Premium Effects */}
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.2 }}
+            className="relative"
+          >
+            {/* Outer pulsing ring */}
+            <motion.div
+              animate={{ 
+                scale: isPlaying ? [1, 1.05, 1] : 1,
+                opacity: isPlaying ? [0.3, 0.5, 0.3] : 0.2,
+              }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -inset-8 rounded-full"
+              style={{
+                background: `conic-gradient(from 0deg, hsl(var(--neon-cyan) / 0.5), hsl(var(--neon-magenta) / 0.5), hsl(var(--neon-purple) / 0.5), hsl(var(--neon-cyan) / 0.5))`,
+                filter: 'blur(40px)',
+              }}
             />
-          </div>
+            
+            {/* Rotating gradient border */}
+            <motion.div
+              animate={{ rotate: isPlaying ? 360 : 0 }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-1 rounded-full p-[3px]"
+              style={{
+                background: `conic-gradient(from 0deg, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)), hsl(var(--neon-purple)), hsl(var(--neon-cyan)))`,
+                opacity: isPlaying ? 0.8 : 0.4,
+              }}
+            >
+              <div className="w-full h-full rounded-full bg-background" />
+            </motion.div>
+
+            {/* Album Art */}
+            <motion.div
+              animate={{ rotate: isPlaying ? 360 : 0 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="relative w-80 h-80 rounded-full overflow-hidden shadow-2xl"
+              style={{
+                boxShadow: isPlaying 
+                  ? '0 0 80px hsl(var(--primary) / 0.3), 0 0 160px hsl(var(--primary) / 0.1)' 
+                  : '0 25px 50px rgba(0,0,0,0.4)',
+              }}
+            >
+              <img
+                src={getCoverUrl(currentTrack.coverUrl)}
+                alt={currentTrack.album}
+                className="w-full h-full object-cover"
+              />
+              {/* Vinyl center hole */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-[18%] h-[18%] rounded-full bg-background border-4 border-white/10 shadow-inner flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-white/20" />
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Visualizer - Circular Wave */}
+          {!isYouTube && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: isPlaying ? 1 : 0.3 }}
+              className="absolute bottom-32 left-1/2 -translate-x-1/2 flex items-end justify-center gap-1"
+              style={{ width: '60%' }}
+            >
+              {visualizerBars.map((height, i) => (
+                <motion.div
+                  key={i}
+                  className="flex-1 max-w-2 rounded-t-full"
+                  style={{
+                    background: `linear-gradient(to top, hsl(var(--neon-cyan) / ${0.3 + height * 0.5}), hsl(var(--neon-magenta) / ${0.2 + height * 0.4}))`,
+                  }}
+                  animate={{ 
+                    height: Math.max(4, height * 80),
+                  }}
+                  transition={{ duration: 0.08 }}
+                />
+              ))}
+            </motion.div>
+          )}
         </div>
+
+        {/* Right Side - Controls Panel (40%) */}
+        <motion.div 
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
+          className={cn(
+            "w-[420px] flex flex-col backdrop-blur-2xl border-l",
+            isYouTube 
+              ? "bg-black/60 border-white/10" 
+              : "bg-background/40 border-white/5"
+          )}
+        >
+          {/* Track Info Section */}
+          <div className="flex-1 flex flex-col justify-center p-8">
+            
+            {/* Artist Avatar & Info */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mb-8"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                  <Music2 className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-white/50 uppercase tracking-wider">Album</p>
+                  <p className="text-white/90 font-medium truncate max-w-[280px]">{currentTrack.album}</p>
+                </div>
+              </div>
+              
+              <h1 className="text-4xl font-bold text-white mb-3 leading-tight">
+                {currentTrack.title}
+              </h1>
+              <p className="text-xl text-white/60">
+                {currentTrack.artist}
+              </p>
+            </motion.div>
+
+            {/* Progress Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mb-8"
+            >
+              <div className="relative group">
+                {/* Progress bar background */}
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                  <motion.div 
+                    className="h-full rounded-full bg-gradient-to-r from-primary via-primary to-primary/80"
+                    style={{ width: `${progress}%` }}
+                    layoutId="progress"
+                  />
+                </div>
+                {/* Slider overlay */}
+                <Slider
+                  value={[isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime]}
+                  max={isYouTube && !sharedYoutubePlayerRef ? (youtubeState.duration || currentTrack.duration) : currentTrack.duration}
+                  step={1}
+                  onValueChange={handleSeekYouTube}
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between mt-3 text-sm">
+                <span className="text-white/50 font-mono tabular-nums">
+                  {formatTime(isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime)}
+                </span>
+                <div className="flex items-center gap-2 text-white/30">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span className="text-xs">{formatDuration(currentTrack.duration)}</span>
+                </div>
+                <span className="text-white/50 font-mono tabular-nums">
+                  {formatTime(currentTrack.duration)}
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Playback Controls */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="flex items-center justify-center gap-4 mb-8"
+            >
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onShuffle}
+                className={cn(
+                  "p-3 rounded-full transition-all",
+                  isShuffle 
+                    ? "bg-primary/20 text-primary" 
+                    : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                )}
+              >
+                <Shuffle className="w-5 h-5" />
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.1, x: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onPrevious}
+                className="p-4 rounded-full text-white/80 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <SkipBack className="w-7 h-7 fill-current" />
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onPlayPause}
+                className="w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8))',
+                  boxShadow: '0 8px 32px hsl(var(--primary) / 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                }}
+              >
+                {(isYouTube && !sharedYoutubePlayerRef ? (youtubeState.isPlaying || false) : isPlaying) ? (
+                  <Pause className="w-9 h-9 text-primary-foreground fill-current" />
+                ) : (
+                  <Play className="w-9 h-9 text-primary-foreground fill-current ml-1" />
+                )}
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.1, x: 2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onNext}
+                className="p-4 rounded-full text-white/80 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <SkipForward className="w-7 h-7 fill-current" />
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onRepeat}
+                className={cn(
+                  "p-3 rounded-full transition-all",
+                  repeatMode !== "off" 
+                    ? "bg-primary/20 text-primary" 
+                    : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                )}
+              >
+                {repeatMode === "one" ? (
+                  <Repeat1 className="w-5 h-5" />
+                ) : (
+                  <Repeat className="w-5 h-5" />
+                )}
+              </motion.button>
+            </motion.div>
+
+            {/* Volume Control */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="flex items-center gap-4 px-4 py-3 rounded-2xl bg-white/5 border border-white/5"
+            >
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onMuteToggle}
+                className="p-2 text-white/60 hover:text-white transition-colors"
+              >
+                <VolumeIcon className="w-5 h-5" />
+              </motion.button>
+              <Slider
+                value={[isMuted ? 0 : volume]}
+                max={100}
+                step={1}
+                onValueChange={onVolumeChange}
+                className="flex-1"
+              />
+              <span className="text-xs text-white/40 font-mono w-8 text-right">
+                {isMuted ? 0 : volume}%
+              </span>
+            </motion.div>
+          </div>
+
+          {/* Bottom Actions */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="p-6 border-t border-white/5"
+          >
+            <div className="flex items-center justify-center gap-6">
+              <button 
+                onClick={() => setShowLyrics(!showLyrics)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-all",
+                  showLyrics 
+                    ? "bg-primary/20 text-primary" 
+                    : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                )}
+              >
+                <ListMusic className="w-4 h-4" />
+                <span>Paroles</span>
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 rounded-full text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-all">
+                <Share2 className="w-4 h-4" />
+                <span>Partager</span>
+              </button>
+              <button 
+                title="Plus d'options"
+                className="p-2 rounded-full text-white/50 hover:text-white/80 hover:bg-white/5 transition-all"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
-    </div>
+
+      {/* Lyrics Overlay */}
+      <AnimatePresence>
+        {showLyrics && lyrics && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="absolute inset-x-0 bottom-0 z-50 max-h-[50vh] overflow-y-auto backdrop-blur-2xl bg-background/80 border-t border-white/10 p-8"
+          >
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center gap-3 mb-6">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold text-white">Paroles</h3>
+              </div>
+              <div className="text-white/70 whitespace-pre-wrap leading-relaxed text-lg">
+                {lyrics}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
