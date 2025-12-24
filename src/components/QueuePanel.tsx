@@ -334,7 +334,7 @@ export const QueuePanel = ({
                 {/* Liste des tracks */}
                 <div className="space-y-0.5">
                   {filteredQueueTracks.map((track, index) => (
-                    <div key={track.id} className="group relative">
+                    <div key={`${track.id}-${index}`} className="group relative">
                       <div className="flex items-center gap-2">
                         {/* Indicateur YouTube/Local */}
                         <div className={cn(
@@ -393,9 +393,9 @@ export const QueuePanel = ({
                   </p>
                 </div>
                 <div className="space-y-0.5">
-                  {albumTracksForFile.map((track) => (
+                  {albumTracksForFile.map((track, index) => (
                     <TrackItem
-                      key={track.id}
+                      key={`${track.id}-${index}`}
                       track={track}
                       onClick={() => onPlayTrack?.(track)}
                     />
@@ -440,9 +440,9 @@ export const QueuePanel = ({
                   </div>
                 )}
                 <div className="space-y-0.5">
-                  {similarTracksForDisplay.map((track) => (
+                  {similarTracksForDisplay.map((track, index) => (
                     <TrackItem
-                      key={track.id}
+                      key={`${track.id}-${index}`}
                       track={track}
                       onClick={() => onPlayTrack?.(track)}
                     />
@@ -462,9 +462,9 @@ export const QueuePanel = ({
           <TabsContent value="history" className="p-4 mt-0">
             {historyTracks.length > 0 ? (
               <div className="space-y-0.5">
-                {historyTracks.map((track) => (
+                {historyTracks.map((track, index) => (
                   <TrackItem
-                    key={track.id}
+                    key={`${track.id}-${index}`}
                     track={track}
                     onClick={() => onPlayTrack?.(track)}
                   />
