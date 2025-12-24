@@ -351,113 +351,220 @@ useEffect(() => {
     return result;
   }, [vibesData?.frequency]);
 
-  // Inline mode - embedded in main content area
+  // Inline mode - Ultra Modern Mini Player
   if (isInline) {
     return (
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         className="h-full w-full flex items-center justify-center relative overflow-hidden"
       >
-        {/* Animated Background Orbs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Dynamic Background based on album art */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Album art blur background */}
+          <motion.div
+            initial={{ scale: 1.3, opacity: 0 }}
+            animate={{ scale: 1.1, opacity: 0.5 }}
+            transition={{ duration: 1 }}
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(60px) saturate(1.4) brightness(0.9)',
+            }}
+          />
+          
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/30 to-background/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-transparent to-background/50" />
+          
+          {/* Animated orbs */}
           <motion.div
             animate={{ 
-              x: [0, 50, 0],
-              y: [0, -30, 0],
-              scale: [1, 1.2, 1],
+              x: [0, 30, 0],
+              y: [0, -20, 0],
+              scale: [1, 1.15, 1],
             }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-[100px] opacity-30"
-            style={{ background: "radial-gradient(circle, hsl(var(--neon-cyan)) 0%, transparent 70%)" }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full blur-[80px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-cyan) / 0.6) 0%, transparent 70%)" }}
           />
           <motion.div
             animate={{ 
-              x: [0, -40, 0],
-              y: [0, 40, 0],
-              scale: [1, 1.15, 1],
+              x: [0, -25, 0],
+              y: [0, 25, 0],
+              scale: [1, 1.1, 1],
             }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full blur-[120px] opacity-25"
-            style={{ background: "radial-gradient(circle, hsl(var(--neon-magenta)) 0%, transparent 70%)" }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute bottom-1/4 right-1/4 w-72 h-72 rounded-full blur-[100px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-magenta) / 0.5) 0%, transparent 70%)" }}
           />
         </div>
         
-        <div className="flex flex-col items-center justify-center w-full relative z-10">
-          {/* Album Art with premium glow effect */}
+        {/* Main Content */}
+        <div className="flex flex-col items-center justify-center w-full relative z-10 px-8">
+          
+          {/* Album Art Container with effects */}
           <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="relative mb-8 flex items-center justify-center"
+            initial={{ scale: 0.8, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 150, damping: 20 }}
+            className="relative mb-10"
           >
-            {/* Multi-layer glow */}
-            <motion.div 
+            {/* Outer glow ring */}
+            <motion.div
               animate={{ 
-                scale: isPlaying ? [1, 1.05, 1] : 1,
-                opacity: isPlaying ? [0.4, 0.6, 0.4] : 0.3,
+                scale: isPlaying ? [1, 1.03, 1] : 1,
+                opacity: isPlaying ? [0.4, 0.7, 0.4] : 0.25,
               }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute inset-0 blur-3xl scale-150"
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -inset-6 rounded-full"
+              style={{
+                background: `conic-gradient(from 0deg, hsl(var(--neon-cyan) / 0.6), hsl(var(--neon-magenta) / 0.6), hsl(var(--neon-purple) / 0.6), hsl(var(--neon-cyan) / 0.6))`,
+                filter: 'blur(30px)',
+              }}
+            />
+            
+            {/* Album art reflection */}
+            <div 
+              className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-56 h-32 opacity-20"
               style={{
                 backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
                 backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundPosition: 'bottom',
+                filter: 'blur(8px)',
+                transform: 'translateX(-50%) scaleY(-1)',
+                maskImage: 'linear-gradient(to top, black 0%, transparent 80%)',
+                WebkitMaskImage: 'linear-gradient(to top, black 0%, transparent 80%)',
               }}
             />
-            <motion.div 
-              className="absolute -inset-4 rounded-full"
-              style={{
-                background: "conic-gradient(from 0deg, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)), hsl(var(--neon-purple)), hsl(var(--neon-cyan)))",
-                opacity: isPlaying ? 0.5 : 0.2,
-              }}
+            
+            {/* Rotating gradient border */}
+            <motion.div
               animate={{ rotate: isPlaying ? 360 : 0 }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-            />
-            <AlbumArt
-              src={getCoverUrl(currentTrack.coverUrl)}
-              alt={currentTrack.album}
-              isPlaying={isYouTube ? youtubeState.isPlaying : isPlaying}
-              className="w-72 h-72 relative z-10"
-            />
+              transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-1.5 rounded-full p-[3px]"
+              style={{
+                background: `conic-gradient(from 0deg, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)), hsl(var(--neon-purple)), hsl(var(--neon-cyan)))`,
+                opacity: isPlaying ? 0.9 : 0.4,
+              }}
+            >
+              <div className="w-full h-full rounded-full bg-background" />
+            </motion.div>
+
+            {/* Album Art - Vinyl style */}
+            <motion.div
+              animate={{ rotate: isPlaying ? 360 : 0 }}
+              transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+              className="relative w-64 h-64 rounded-full overflow-hidden"
+              style={{
+                boxShadow: isPlaying 
+                  ? '0 0 60px hsl(var(--primary) / 0.35), 0 20px 60px rgba(0,0,0,0.4)' 
+                  : '0 20px 50px rgba(0,0,0,0.35)',
+              }}
+            >
+              <img
+                src={getCoverUrl(currentTrack.coverUrl)}
+                alt={currentTrack.album}
+                className="w-full h-full object-cover"
+              />
+              {/* Vinyl center hole */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-[16%] h-[16%] rounded-full bg-background/90 border-4 border-white/10 shadow-inner flex items-center justify-center backdrop-blur-sm">
+                  <motion.div 
+                    animate={{ scale: isPlaying ? [1, 1.2, 1] : 1 }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                    className="w-2 h-2 rounded-full bg-primary/80"
+                  />
+                </div>
+              </div>
+              
+              {/* Vinyl grooves overlay */}
+              <div 
+                className="absolute inset-0 rounded-full pointer-events-none opacity-10"
+                style={{
+                  background: `repeating-radial-gradient(circle at center, transparent 0px, transparent 2px, rgba(255,255,255,0.1) 3px, transparent 4px)`,
+                }}
+              />
+            </motion.div>
           </motion.div>
 
-          {/* Track Info with animation */}
+          {/* Track Info */}
           <motion.div 
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-center w-full px-4"
+            transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
+            className="text-center w-full max-w-lg mb-8"
           >
-            <h1 className="font-display text-3xl font-bold mb-2 text-foreground truncate max-w-md mx-auto bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text">
+            <h1 className="font-display text-3xl font-bold mb-3 text-foreground truncate">
               {currentTrack.title}
             </h1>
-            <p className="text-lg text-muted-foreground truncate max-w-md mx-auto mb-1">
+            <p className="text-xl text-muted-foreground truncate mb-2">
               {currentTrack.artist}
             </p>
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground/60">
-              <Disc3 className="w-3.5 h-3.5" />
-              <span className="truncate max-w-[200px]">{currentTrack.album}</span>
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground/50">
+              <Disc3 className="w-4 h-4" />
+              <span className="truncate max-w-[250px]">{currentTrack.album}</span>
             </div>
           </motion.div>
 
-          {/* Mini Visualizer */}
-          {!isYouTube && isPlaying && (
+          {/* Circular Visualizer around play button concept */}
+          {!isYouTube && (
             <motion.div 
-              initial={{ opacity: 0, scaleY: 0 }}
-              animate={{ opacity: 1, scaleY: 1 }}
-              className="flex items-end justify-center gap-0.5 h-8 mt-6"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.25 }}
+              className="flex items-center justify-center gap-1 h-12 mb-6"
             >
-              {visualizerBars.slice(0, 16).map((height, i) => (
+              {visualizerBars.slice(0, 24).map((height, i) => (
                 <motion.div
                   key={i}
-                  className="w-1 rounded-full bg-gradient-to-t from-primary/50 to-primary"
-                  animate={{ height: Math.max(4, height * 32) }}
-                  transition={{ duration: 0.1 }}
+                  className="w-1.5 rounded-full"
+                  style={{
+                    background: `linear-gradient(to top, hsl(var(--neon-cyan) / ${0.4 + height * 0.4}), hsl(var(--primary) / ${0.3 + height * 0.5}))`,
+                  }}
+                  animate={{ 
+                    height: isPlaying ? Math.max(6, height * 48) : 6,
+                    opacity: isPlaying ? 0.6 + height * 0.4 : 0.3,
+                  }}
+                  transition={{ duration: 0.08 }}
                 />
               ))}
             </motion.div>
           )}
+
+          {/* Mini Progress bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="w-full max-w-md"
+          >
+            <div className="relative h-1.5 rounded-full bg-white/10 overflow-hidden backdrop-blur-sm">
+              <motion.div 
+                className="h-full rounded-full"
+                style={{ 
+                  width: `${progress}%`,
+                  background: 'linear-gradient(90deg, hsl(var(--neon-cyan)), hsl(var(--primary)), hsl(var(--neon-magenta)))',
+                }}
+                layoutId="mini-progress"
+              />
+              {/* Glow effect on progress */}
+              <motion.div 
+                className="absolute top-0 h-full w-4 blur-sm"
+                style={{ 
+                  left: `calc(${progress}% - 8px)`,
+                  background: 'hsl(var(--primary))',
+                  opacity: isPlaying ? 0.8 : 0.4,
+                }}
+              />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-muted-foreground/60 font-mono">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(currentTrack.duration)}</span>
+            </div>
+          </motion.div>
         </div>
       </motion.div>
     );
