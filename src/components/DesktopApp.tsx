@@ -571,16 +571,18 @@ export const DesktopApp = () => {
         setCurrentIndex(0);
         setCurrentTime(0);
       } else {
-        // Repeat off: stay at last track, stop playback
+        // Repeat off: stop playback at the end
         setIsPlaying(false);
         if (audioRef.current) {
           audioRef.current.pause();
         }
       }
     } else {
-      // Move to next track
+      // Move to next track and continue playing
       setCurrentIndex(currentTrackIndex + 1);
       setCurrentTime(0);
+      // Keep playing when moving to next track
+      setIsPlaying(true);
     }
   }, [repeatMode, isShuffle, currentTrackIndex, tracks, setCurrentIndex]);
 
@@ -645,21 +647,9 @@ export const DesktopApp = () => {
         accumulatedPlaybackTimeRef.current = 0;
       }
       
-      // Handle repeat mode when track ends
-      if (repeatMode === "one") {
-        // Repeat current track
-        setCurrentTime(0);
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(console.error);
-        }
-      } else if (repeatMode === "all") {
-        // Move to next track (will loop if at end)
-        handleNextRef.current?.();
-      } else {
-        // Repeat off: move to next or stop if at end
-        handleNextRef.current?.();
-      }
+      // Always move to next track when current track ends
+      // The handleNext logic will handle repeat modes and stopping at the end
+      handleNextRef.current?.();
     };
 
     // Start animation frame loop for smooth updates when playing
