@@ -1010,129 +1010,285 @@ export const LibraryView = memo(({
 
   // Albums View
   if (viewMode === "albums") {
+    // Get featured albums (most tracks)
+    const featuredAlbums = [...filteredAndSortedAlbums]
+      .sort((a, b) => b.tracks.length - a.tracks.length)
+      .slice(0, 6);
+    const remainingAlbums = filteredAndSortedAlbums.filter(
+      a => !featuredAlbums.find(f => f.name === a.name && f.artist === a.artist)
+    );
+
     return (
-      <PageContainer>
+      <div className="min-h-full pb-8">
         {/* Hero Section */}
-        <PageHero
-          title={title}
-          subtitle={`${filteredAndSortedAlbums.length} album${filteredAndSortedAlbums.length > 1 ? "s" : ""} • ${tracks.length} titres`}
-          icon={Disc3}
-          gradient="from-indigo-500/20 via-purple-500/10 to-pink-500/20"
-          actions={
-            <div className="flex items-center gap-2">
-              <Button onClick={handlePlayAll} size="sm" className="gap-2">
-                <Play className="w-4 h-4 fill-current" />
-                Tout lire
-              </Button>
-              <Button onClick={handleShuffleAll} variant="outline" size="sm" className="gap-2">
-                <Shuffle className="w-4 h-4" />
-              </Button>
-            </div>
-          }
-        />
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard icon={Disc3} label="Albums" value={albums.length} color="bg-purple-500/20 text-purple-400" />
-          <StatCard icon={User} label="Artistes" value={artists.length} color="bg-blue-500/20 text-blue-400" />
-          <StatCard icon={Music} label="Titres" value={tracks.length} color="bg-green-500/20 text-green-400" />
-          <StatCard icon={Clock} label="Durée totale" value={formatDuration(totalDuration)} color="bg-orange-500/20 text-orange-400" />
-        </div>
-
-        {/* Toolbar */}
-        <Toolbar className="mb-6">
-          <SearchBar
-            value={albumsSearchQuery}
-            onChange={setAlbumsSearchQuery}
-            placeholder="Rechercher un album..."
-          />
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-purple-500/10 to-pink-500/20" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-blue-400/10 via-transparent to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
           
-          <Select value={albumsFilterArtist || "__all__"} onValueChange={(v) => setAlbumsFilterArtist(v === "__all__" ? null : v)}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Artiste" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Tous les artistes</SelectItem>
-              {uniqueAlbumArtists.map((artist) => (
-                <SelectItem key={artist} value={artist}>{artist}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative px-6 pt-8 pb-16">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+              <div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 mb-3"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <Disc3 className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+                    Discographie
+                  </span>
+                </motion.div>
+                <motion.h1
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="font-display text-5xl md:text-6xl font-bold"
+                >
+                  {title}
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-muted-foreground mt-2 text-lg"
+                >
+                  {filteredAndSortedAlbums.length} album{filteredAndSortedAlbums.length > 1 ? "s" : ""} • {artists.length} artistes • {tracks.length} titres
+                </motion.p>
+              </div>
 
-          <Select value={albumsSortBy} onValueChange={(v) => setAlbumsSortBy(v as typeof albumsSortBy)}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Trier par" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Nom</SelectItem>
-              <SelectItem value="artist">Artiste</SelectItem>
-              <SelectItem value="year">Année</SelectItem>
-              <SelectItem value="tracks">Titres</SelectItem>
-            </SelectContent>
-          </Select>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-3"
+              >
+                <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
+                  <Play className="w-5 h-5 fill-current" />
+                  Tout lire
+                </Button>
+                <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
+                  <Shuffle className="w-5 h-5" />
+                  Aléatoire
+                </Button>
+              </motion.div>
+            </div>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setAlbumsSortOrder(o => o === "asc" ? "desc" : "asc")}
-          >
-            {albumsSortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </Button>
-
-          <ViewToggle view={albumsViewMode} onViewChange={setAlbumsViewMode} />
-        </Toolbar>
-
-        {/* Active Filters */}
-        {(albumsSearchQuery || albumsFilterArtist) && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {albumsSearchQuery && (
-              <FilterChip 
-                label={`Recherche: ${albumsSearchQuery}`} 
-                onRemove={() => setAlbumsSearchQuery("")}
-              />
-            )}
-            {albumsFilterArtist && (
-              <FilterChip 
-                label={`Artiste: ${albumsFilterArtist}`} 
-                onRemove={() => setAlbumsFilterArtist(null)}
-              />
+            {/* Featured Albums */}
+            {featuredAlbums.length > 0 && !albumsSearchQuery && !albumsFilterArtist && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                  Albums populaires
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {featuredAlbums.map((album, idx) => (
+                    <motion.div
+                      key={`featured-${album.name}-${album.artist}`}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.5 + idx * 0.1 }}
+                      whileHover={{ scale: 1.03, y: -4 }}
+                      onClick={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                      className="group cursor-pointer"
+                    >
+                      <div className="relative aspect-square rounded-2xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all">
+                        {album.coverUrl ? (
+                          <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-indigo-500/30 to-purple-500/30 flex items-center justify-center">
+                            <Disc3 className="w-12 h-12 text-white/50" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                            <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-sm font-medium truncate">{album.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{album.artist}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Albums Grid */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredAndSortedAlbums.map((album, idx) => (
-              <AlbumCard
-                key={`${album.name}-${album.artist}`}
-                album={album}
-                delay={idx * 0.02}
-                onSelect={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
-                onPlay={() => {
-                  const firstTrack = album.tracks[0];
-                  const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                  if (idx !== -1) onTrackSelect(idx);
-                }}
-              />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        {/* Main Content */}
+        <div className="px-6 -mt-8">
+          {/* Toolbar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="flex flex-wrap items-center gap-4 mb-8 p-4 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/30"
+          >
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={albumsSearchQuery}
+                  onChange={(e) => setAlbumsSearchQuery(e.target.value)}
+                  placeholder="Rechercher un album..."
+                  className="pl-10 bg-background/50 border-border/50"
+                />
+                {albumsSearchQuery && (
+                  <button
+                    onClick={() => setAlbumsSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    title="Effacer la recherche"
+                    aria-label="Effacer la recherche"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
 
-        {filteredAndSortedAlbums.length === 0 && (
-          <EmptyState
-            icon={<Disc3 className="w-10 h-10 text-primary" />}
-            title="Aucun album trouvé"
-            description="Essayez de modifier vos filtres de recherche"
-          />
-        )}
-      </PageContainer>
+            <Select value={albumsFilterArtist || "__all__"} onValueChange={(v) => setAlbumsFilterArtist(v === "__all__" ? null : v)}>
+              <SelectTrigger className="w-[180px] bg-background/50">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Artiste" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tous les artistes</SelectItem>
+                {uniqueAlbumArtists.map((artist) => (
+                  <SelectItem key={artist} value={artist}>{artist}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={albumsSortBy} onValueChange={(v) => setAlbumsSortBy(v as typeof albumsSortBy)}>
+              <SelectTrigger className="w-[140px] bg-background/50">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Nom</SelectItem>
+                <SelectItem value="artist">Artiste</SelectItem>
+                <SelectItem value="year">Année</SelectItem>
+                <SelectItem value="tracks">Titres</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setAlbumsSortOrder(o => o === "asc" ? "desc" : "asc")}
+              className="bg-background/50"
+            >
+              {albumsSortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+              <Button
+                variant={albumsViewMode === "grid" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setAlbumsViewMode("grid")}
+                className="h-8 w-8"
+              >
+                <Grid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={albumsViewMode === "list" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setAlbumsViewMode("list")}
+                className="h-8 w-8"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Active Filters */}
+          {(albumsSearchQuery || albumsFilterArtist) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="flex flex-wrap gap-2 mb-6"
+            >
+              {albumsSearchQuery && (
+                <Badge variant="secondary" className="gap-1 px-3 py-1">
+                  Recherche: {albumsSearchQuery}
+                  <button onClick={() => setAlbumsSearchQuery("")} className="ml-1 hover:text-destructive" title="Supprimer le filtre" aria-label="Supprimer le filtre de recherche">
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+              {albumsFilterArtist && (
+                <Badge variant="secondary" className="gap-1 px-3 py-1">
+                  Artiste: {albumsFilterArtist}
+                  <button onClick={() => setAlbumsFilterArtist(null)} className="ml-1 hover:text-destructive" title="Supprimer le filtre" aria-label="Supprimer le filtre artiste">
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              )}
+            </motion.div>
+          )}
+
+          {/* All Albums Section */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+              Tous les albums
+              <span className="text-sm font-normal text-muted-foreground">
+                ({albumsSearchQuery || albumsFilterArtist ? filteredAndSortedAlbums.length : remainingAlbums.length})
+              </span>
+            </h2>
+
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
+            >
+              <AnimatePresence mode="popLayout">
+                {(albumsSearchQuery || albumsFilterArtist ? filteredAndSortedAlbums : remainingAlbums).map((album, idx) => (
+                  <AlbumCard
+                    key={`${album.name}-${album.artist}`}
+                    album={album}
+                    delay={Math.min(idx * 0.02, 0.3)}
+                    onSelect={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
+                    onPlay={() => {
+                      const firstTrack = album.tracks[0];
+                      const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                      if (idx !== -1) onTrackSelect(idx);
+                    }}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+
+          {(albumsSearchQuery || albumsFilterArtist ? filteredAndSortedAlbums : remainingAlbums).length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 text-center"
+            >
+              <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <Disc3 className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Aucun album trouvé</h3>
+              <p className="text-muted-foreground text-sm max-w-md">
+                {albumsSearchQuery || albumsFilterArtist
+                  ? "Essayez de modifier vos termes de recherche"
+                  : "Ajoutez de la musique à votre bibliothèque pour voir vos albums"}
+              </p>
+            </motion.div>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -1267,6 +1423,8 @@ export const LibraryView = memo(({
                   <button
                     onClick={() => setArtistsSearchQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    title="Effacer la recherche"
+                    aria-label="Effacer la recherche"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1412,196 +1570,427 @@ export const LibraryView = memo(({
 
   // Folders View
   if (viewMode === "folders") {
+    const totalFolderTracks = folders.reduce((acc, f) => acc + f.tracks.length, 0);
+
     return (
-      <PageContainer>
-        <PageHero
-          title={title}
-          subtitle={`${folders.length} dossier${folders.length > 1 ? "s" : ""} • ${tracks.length} titres`}
-          icon={FolderOpen}
-          gradient="from-amber-500/20 via-orange-500/10 to-red-500/20"
-        />
+      <div className="min-h-full pb-8">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-600/20 via-orange-500/10 to-red-500/20" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-yellow-400/10 via-transparent to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+          
+          <div className="relative px-6 pt-8 pb-16">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+              <div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 mb-3"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                    <FolderOpen className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+                    Sources
+                  </span>
+                </motion.div>
+                <motion.h1
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="font-display text-5xl md:text-6xl font-bold"
+                >
+                  {title}
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-muted-foreground mt-2 text-lg"
+                >
+                  {folders.length} dossier{folders.length > 1 ? "s" : ""} • {totalFolderTracks} titres
+                </motion.p>
+              </div>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-4"
-        >
-          {folders.map((folder, idx) => (
-            <motion.div
-              key={folder.path}
-              variants={itemVariants}
-              transition={{ delay: idx * 0.05 }}
-            >
-              <GlassCard
-                className={cn(
-                  "cursor-pointer transition-all hover:ring-2 hover:ring-primary/30",
-                  selectedFolder === folder.path && "ring-2 ring-primary"
-                )}
-                onClick={() => setSelectedFolder(selectedFolder === folder.path ? null : folder.path)}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-3"
               >
-                <div className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-amber-500/20">
-                      <FolderOpen className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{folder.path.split(/[/\\]/).pop()}</p>
-                      <p className="text-xs text-muted-foreground truncate max-w-md">{folder.path}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary">{folder.tracks.length} titres</Badge>
-                    <ChevronRight className={cn(
-                      "w-5 h-5 text-muted-foreground transition-transform",
-                      selectedFolder === folder.path && "rotate-90"
-                    )} />
-                  </div>
-                </div>
+                <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
+                  <Play className="w-5 h-5 fill-current" />
+                  Tout lire
+                </Button>
+                <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
+                  <Shuffle className="w-5 h-5" />
+                  Aléatoire
+                </Button>
+              </motion.div>
+            </div>
+          </div>
+        </div>
 
-                <AnimatePresence>
-                  {selectedFolder === folder.path && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="border-t border-border/30 overflow-hidden"
-                    >
-                      <div className="p-4">
-                        <TrackListView
-                          tracks={folder.tracks}
-                          currentTrackIndex={currentTrackIndex}
-                          isPlaying={isPlaying}
-                          onTrackSelect={(idx) => {
-                            const track = folder.tracks[idx];
-                            const realIdx = tracks.findIndex(t => t.id === track.id);
-                            if (realIdx !== -1) onTrackSelect(realIdx);
-                          }}
-                          onAddToPlaylist={onAddToPlaylist}
-                          createPlaylist={createPlaylist}
-                        />
-                      </div>
-                    </motion.div>
+        {/* Folders List */}
+        <div className="px-6 -mt-8">
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-3"
+          >
+            {folders.map((folder, idx) => (
+              <motion.div
+                key={folder.path}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+              >
+                <div
+                  className={cn(
+                    "rounded-2xl bg-card/50 backdrop-blur-xl border border-border/30 cursor-pointer transition-all hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5",
+                    selectedFolder === folder.path && "border-amber-500/50 shadow-lg shadow-amber-500/10"
                   )}
-                </AnimatePresence>
-              </GlassCard>
+                  onClick={() => setSelectedFolder(selectedFolder === folder.path ? null : folder.path)}
+                >
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
+                        <FolderOpen className={cn(
+                          "w-6 h-6 transition-colors",
+                          selectedFolder === folder.path ? "text-amber-400" : "text-amber-500/70"
+                        )} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{folder.path.split(/[/\\]/).pop()}</p>
+                        <p className="text-xs text-muted-foreground truncate max-w-lg">{folder.path}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-sm font-medium">{folder.tracks.length}</p>
+                        <p className="text-xs text-muted-foreground">titres</p>
+                      </div>
+                      <Badge variant="secondary" className="sm:hidden">{folder.tracks.length}</Badge>
+                      <motion.div
+                        animate={{ rotate: selectedFolder === folder.path ? 90 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </motion.div>
+                    </div>
+                  </div>
+
+                  <AnimatePresence>
+                    {selectedFolder === folder.path && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="border-t border-border/30 overflow-hidden"
+                      >
+                        <div className="p-4 bg-background/30">
+                          <TrackListView
+                            tracks={folder.tracks}
+                            currentTrackIndex={currentTrackIndex}
+                            isPlaying={isPlaying}
+                            onTrackSelect={(idx) => {
+                              const track = folder.tracks[idx];
+                              const realIdx = tracks.findIndex(t => t.id === track.id);
+                              if (realIdx !== -1) onTrackSelect(realIdx);
+                            }}
+                            onAddToPlaylist={onAddToPlaylist}
+                            createPlaylist={createPlaylist}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {folders.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 text-center"
+            >
+              <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <FolderOpen className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Aucun dossier</h3>
+              <p className="text-muted-foreground text-sm max-w-md">
+                Les dossiers scannés apparaîtront ici
+              </p>
             </motion.div>
-          ))}
-        </motion.div>
-      </PageContainer>
+          )}
+        </div>
+      </div>
     );
   }
 
   // Tracks View (default)
   return (
-    <PageContainer>
-      <PageHero
-        title={title}
-        subtitle={`${filteredAndSortedTracks.length} titre${filteredAndSortedTracks.length > 1 ? "s" : ""} • ${formatDuration(totalDuration)}`}
-        icon={Music}
-        gradient="from-emerald-500/20 via-green-500/10 to-teal-500/20"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button onClick={handlePlayAll} size="sm" className="gap-2">
-              <Play className="w-4 h-4 fill-current" />
-              Tout lire
-            </Button>
-            <Button onClick={handleShuffleAll} variant="outline" size="sm" className="gap-2">
-              <Shuffle className="w-4 h-4" />
-            </Button>
-          </div>
-        }
-      />
+    <div className="min-h-full pb-8">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 via-green-500/10 to-teal-500/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-400/10 via-transparent to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+        
+        <div className="relative px-6 pt-8 pb-16">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 mb-3"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                  <Music className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+                  Bibliothèque
+                </span>
+              </motion.div>
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="font-display text-5xl md:text-6xl font-bold"
+              >
+                {title}
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="text-muted-foreground mt-2 text-lg"
+              >
+                {filteredAndSortedTracks.length} titre{filteredAndSortedTracks.length > 1 ? "s" : ""} • {formatDuration(totalDuration)}
+              </motion.p>
+            </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={Music} label="Titres" value={tracks.length} color="bg-green-500/20 text-green-400" />
-        <StatCard icon={Disc3} label="Albums" value={albums.length} color="bg-purple-500/20 text-purple-400" />
-        <StatCard icon={User} label="Artistes" value={artists.length} color="bg-blue-500/20 text-blue-400" />
-        <StatCard icon={Clock} label="Durée totale" value={formatDuration(totalDuration)} color="bg-orange-500/20 text-orange-400" />
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex items-center gap-3"
+            >
+              <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
+                <Play className="w-5 h-5 fill-current" />
+                Tout lire
+              </Button>
+              <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
+                <Shuffle className="w-5 h-5" />
+                Aléatoire
+              </Button>
+            </motion.div>
+          </div>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+          >
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <Music className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{tracks.length}</p>
+                  <p className="text-xs text-muted-foreground">Titres</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Disc3 className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{albums.length}</p>
+                  <p className="text-xs text-muted-foreground">Albums</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{artists.length}</p>
+                  <p className="text-xs text-muted-foreground">Artistes</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{formatDuration(totalDuration)}</p>
+                  <p className="text-xs text-muted-foreground">Durée totale</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Toolbar */}
-      <Toolbar className="mb-6">
-        <SearchBar
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Rechercher un titre, artiste ou album..."
-        />
+      {/* Main Content */}
+      <div className="px-6 -mt-8">
+        {/* Toolbar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="flex flex-wrap items-center gap-4 mb-8 p-4 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/30"
+        >
+          <div className="flex-1 min-w-[200px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher un titre, artiste ou album..."
+                className="pl-10 bg-background/50 border-border/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title="Effacer la recherche"
+                  aria-label="Effacer la recherche"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
 
-        <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Trier par" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="title">Titre</SelectItem>
-            <SelectItem value="artist">Artiste</SelectItem>
-            <SelectItem value="album">Album</SelectItem>
-            <SelectItem value="duration">Durée</SelectItem>
-            <SelectItem value="date">Date d'ajout</SelectItem>
-          </SelectContent>
-        </Select>
+          <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+            <SelectTrigger className="w-[150px] bg-background/50">
+              <SelectValue placeholder="Trier par" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="title">Titre</SelectItem>
+              <SelectItem value="artist">Artiste</SelectItem>
+              <SelectItem value="album">Album</SelectItem>
+              <SelectItem value="duration">Durée</SelectItem>
+              <SelectItem value="date">Date d'ajout</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <ViewToggle view={displayMode} onViewChange={setDisplayMode} />
-      </Toolbar>
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+            <Button
+              variant={displayMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setDisplayMode("grid")}
+              className="h-8 w-8"
+            >
+              <Grid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={displayMode === "list" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setDisplayMode("list")}
+              className="h-8 w-8"
+            >
+              <List className="w-4 h-4" />
+            </Button>
+          </div>
+        </motion.div>
 
-      {/* Active Filters */}
-      {searchQuery && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <FilterChip 
-            label={`Recherche: ${searchQuery}`} 
-            onRemove={() => setSearchQuery("")}
-          />
-        </div>
-      )}
-
-      {/* Track List/Grid */}
-      <GlassCard className="overflow-hidden">
-        {displayMode === "grid" ? (
-          <TrackGridView
-            tracks={filteredAndSortedTracks}
-            currentTrackIndex={currentTrackIndex}
-            isPlaying={isPlaying}
-            onTrackSelect={(idx) => {
-              const track = filteredAndSortedTracks[idx];
-              const realIdx = tracks.findIndex(t => t.id === track.id);
-              if (realIdx !== -1) onTrackSelect(realIdx);
-            }}
-            onAddToPlaylist={onAddToPlaylist}
-            createPlaylist={createPlaylist}
-          />
-        ) : (
-          <TrackListView
-            tracks={filteredAndSortedTracks}
-            currentTrackIndex={currentTrackIndex}
-            isPlaying={isPlaying}
-            onTrackSelect={(idx) => {
-              const track = filteredAndSortedTracks[idx];
-              const realIdx = tracks.findIndex(t => t.id === track.id);
-              if (realIdx !== -1) onTrackSelect(realIdx);
-            }}
-            onAddToPlaylist={onAddToPlaylist}
-            createPlaylist={createPlaylist}
-            uploadTrack={uploadTrack}
-            getTrackProgress={(id) => getTrackProgress(id) ?? null}
-            canUploadToCloudinary={canUploadToCloudinary}
-            uploadTrackToNexus={uploadTrackToNexus}
-            getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
-            canUploadToNexus={canUploadToNexus}
-            isUploaded={isUploaded}
-            getUploadedProvider={getUploadedProvider}
-          />
+        {/* Active Filters */}
+        {searchQuery && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="flex flex-wrap gap-2 mb-6"
+          >
+            <Badge variant="secondary" className="gap-1 px-3 py-1">
+              Recherche: {searchQuery}
+              <button onClick={() => setSearchQuery("")} className="ml-1 hover:text-destructive" title="Supprimer le filtre" aria-label="Supprimer le filtre de recherche">
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          </motion.div>
         )}
-      </GlassCard>
 
-      {filteredAndSortedTracks.length === 0 && (
-        <EmptyState
-          icon={<Music className="w-10 h-10 text-primary" />}
-          title="Aucun titre trouvé"
-          description="Essayez de modifier vos filtres de recherche"
-        />
-      )}
-    </PageContainer>
+        {/* Track List/Grid */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden">
+            {displayMode === "grid" ? (
+              <TrackGridView
+                tracks={filteredAndSortedTracks}
+                currentTrackIndex={currentTrackIndex}
+                isPlaying={isPlaying}
+                onTrackSelect={(idx) => {
+                  const track = filteredAndSortedTracks[idx];
+                  const realIdx = tracks.findIndex(t => t.id === track.id);
+                  if (realIdx !== -1) onTrackSelect(realIdx);
+                }}
+                onAddToPlaylist={onAddToPlaylist}
+                createPlaylist={createPlaylist}
+              />
+            ) : (
+              <TrackListView
+                tracks={filteredAndSortedTracks}
+                currentTrackIndex={currentTrackIndex}
+                isPlaying={isPlaying}
+                onTrackSelect={(idx) => {
+                  const track = filteredAndSortedTracks[idx];
+                  const realIdx = tracks.findIndex(t => t.id === track.id);
+                  if (realIdx !== -1) onTrackSelect(realIdx);
+                }}
+                onAddToPlaylist={onAddToPlaylist}
+                createPlaylist={createPlaylist}
+                uploadTrack={uploadTrack}
+                getTrackProgress={(id) => getTrackProgress(id) ?? null}
+                canUploadToCloudinary={canUploadToCloudinary}
+                uploadTrackToNexus={uploadTrackToNexus}
+                getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
+                canUploadToNexus={canUploadToNexus}
+                isUploaded={isUploaded}
+                getUploadedProvider={getUploadedProvider}
+              />
+            )}
+          </div>
+        </motion.div>
+
+        {filteredAndSortedTracks.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-20 text-center"
+          >
+            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <Music className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">Aucun titre trouvé</h3>
+            <p className="text-muted-foreground text-sm max-w-md">
+              {searchQuery
+                ? "Essayez de modifier vos termes de recherche"
+                : "Ajoutez de la musique à votre bibliothèque"}
+            </p>
+          </motion.div>
+        )}
+      </div>
+    </div>
   );
 });
 

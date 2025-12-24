@@ -26,7 +26,9 @@ const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => (
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Clock, Music } from "lucide-react";
+import { Clock, Music, Play } from "lucide-react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
@@ -1375,21 +1377,88 @@ export const DesktopApp = () => {
         );
       case "recent":
         return (
-          <div className="h-full flex flex-col animate-in fade-in duration-300">
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6 space-y-8">
-                {/* Section: Récemment écoutées */}
-                {recentTracks.length > 0 && (
+          <div className="min-h-full pb-8">
+            {/* Hero Section */}
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-cyan-500/10 to-teal-500/20" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-400/10 via-transparent to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+              
+              <div className="relative px-6 pt-8 pb-16">
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
                   <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Clock className="w-5 h-5 text-primary" />
-                      <h2 className="font-display text-xl font-bold tracking-wider">
-                        ÉCOUTÉ RÉCEMMENT
-                      </h2>
-                      <span className="text-sm text-muted-foreground">
-                        ({recentTracks.length})
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-3 mb-3"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Clock className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
+                        Historique
                       </span>
+                    </motion.div>
+                    <motion.h1
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="font-display text-5xl md:text-6xl font-bold"
+                    >
+                      Récemment
+                    </motion.h1>
+                    <motion.p
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-muted-foreground mt-2 text-lg"
+                    >
+                      {recentTracks.length} écoute{recentTracks.length > 1 ? "s" : ""} récente{recentTracks.length > 1 ? "s" : ""} • {recentlyAddedTracks.length} ajout{recentlyAddedTracks.length > 1 ? "s" : ""} récent{recentlyAddedTracks.length > 1 ? "s" : ""}
+                    </motion.p>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="flex items-center gap-3"
+                  >
+                    <Button 
+                      onClick={() => {
+                        if (recentTracks.length > 0) {
+                          const track = recentTracks[0];
+                          const realIndex = tracks.findIndex(t => t.id === track.id);
+                          if (realIndex !== -1) handleTrackSelect(realIndex);
+                        }
+                      }} 
+                      size="lg" 
+                      className="gap-2 shadow-lg shadow-primary/30"
+                    >
+                      <Play className="w-5 h-5 fill-current" />
+                      Reprendre
+                    </Button>
+                  </motion.div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="px-6 -mt-8 space-y-8">
+              {/* Section: Récemment écoutées */}
+              {recentTracks.length > 0 && (
+                <motion.section
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-blue-400" />
                     </div>
+                    <h2 className="font-semibold text-lg">Écouté récemment</h2>
+                    <span className="text-sm text-muted-foreground">({recentTracks.length})</span>
+                  </div>
+                  <div className="rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden">
                     <LibraryView
                       tracks={recentTracks}
                       currentTrackIndex={currentTrackIndex}
@@ -1409,20 +1478,24 @@ export const DesktopApp = () => {
                       loading={libraryLoading}
                     />
                   </div>
-                )}
+                </motion.section>
+              )}
 
-                {/* Section: Récemment ajoutées */}
-                {recentlyAddedTracks.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Music className="w-5 h-5 text-primary" />
-                      <h2 className="font-display text-xl font-bold tracking-wider">
-                        RÉCEMMENT AJOUTÉES
-                      </h2>
-                      <span className="text-sm text-muted-foreground">
-                        ({recentlyAddedTracks.length})
-                      </span>
+              {/* Section: Récemment ajoutées */}
+              {recentlyAddedTracks.length > 0 && (
+                <motion.section
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                      <Music className="w-4 h-4 text-emerald-400" />
                     </div>
+                    <h2 className="font-semibold text-lg">Récemment ajoutées</h2>
+                    <span className="text-sm text-muted-foreground">({recentlyAddedTracks.length})</span>
+                  </div>
+                  <div className="rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden">
                     <LibraryView
                       tracks={recentlyAddedTracks}
                       currentTrackIndex={currentTrackIndex}
@@ -1441,19 +1514,25 @@ export const DesktopApp = () => {
                       loading={libraryLoading}
                     />
                   </div>
-                )}
+                </motion.section>
+              )}
 
-                {/* Empty state */}
-                {recentTracks.length === 0 && recentlyAddedTracks.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <Clock className="w-16 h-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Aucun historique</h3>
-                    <p className="text-muted-foreground text-sm max-w-md">
-                      Vos pistes récemment écoutées et récemment ajoutées apparaîtront ici.
-                    </p>
+              {/* Empty state */}
+              {recentTracks.length === 0 && recentlyAddedTracks.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center justify-center py-20 text-center"
+                >
+                  <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <Clock className="w-10 h-10 text-muted-foreground" />
                   </div>
-                )}
-              </div>
+                  <h3 className="text-lg font-medium mb-2">Aucun historique</h3>
+                  <p className="text-muted-foreground text-sm max-w-md">
+                    Vos pistes récemment écoutées et récemment ajoutées apparaîtront ici.
+                  </p>
+                </motion.div>
+              )}
             </div>
           </div>
         );

@@ -585,7 +585,7 @@ export const ArtistView = memo(({
           </TabsContent>
 
           {/* Discography Tab */}
-          <TabsContent value="discography" className="space-y-8 mt-0">
+          <TabsContent value="discography" className="space-y-8 mt-24">
             {albums.map((album) => (
               <section key={album.name} className="space-y-4">
                 <div className="flex items-center gap-4">
