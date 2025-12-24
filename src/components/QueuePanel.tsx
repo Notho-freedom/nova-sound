@@ -20,6 +20,7 @@ interface QueuePanelProps {
   onPlayTrack?: (track: Track) => void;
   currentTrack?: Track | null; // Track actuellement en lecture
   onRemoveFromQueue?: (trackId: string) => void; // Supprimer un track de la file
+  onClearQueue?: () => void; // Vider toute la file
 }
 
 const formatTime = (seconds: number) => {
@@ -91,6 +92,7 @@ export const QueuePanel = ({
   onPlayTrack,
   currentTrack: propCurrentTrack,
   onRemoveFromQueue,
+  onClearQueue,
 }: QueuePanelProps) => {
   const currentTrack = propCurrentTrack || tracks[currentTrackIndex];
   const [queueFilter, setQueueFilter] = useState<'all' | 'youtube' | 'local'>('all');
@@ -191,13 +193,24 @@ export const QueuePanel = ({
         <h2 className="font-display text-sm tracking-wider text-foreground">
           FILE D'ATTENTE
         </h2>
-        <button
-          onClick={onClose}
-          title="Fermer la file d'attente"
-          className="p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-        >
-          <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
-        </button>
+        <div className="flex items-center gap-2">
+          {onClearQueue && (
+            <button
+              onClick={onClearQueue}
+              title="Vider la file d'attente"
+              className="p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            title="Fermer la file d'attente"
+            className="p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-out active:scale-95 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
+          >
+            <X className="w-4 h-4 hover:scale-105 transition-transform duration-200 ease-out" />
+          </button>
+        </div>
       </div>
 
       {/* Now Playing - Always visible */}

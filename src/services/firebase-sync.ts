@@ -447,8 +447,14 @@ class FirebaseSyncService {
         });
       }
 
+      // Only save theme if it matches the current local theme (don't override user's choice)
       if (data.theme) {
-        saveOperations.push(() => this.saveToLocalStorage('nexus-theme', data.theme));
+        const currentTheme = this.loadFromLocalStorage<string>('nexus-theme');
+        if (!currentTheme || currentTheme === data.theme) {
+          saveOperations.push(() => this.saveToLocalStorage('nexus-theme', data.theme));
+        } else {
+          console.log('[FirebaseSync] Skipping theme update: local theme', currentTheme, 'differs from Firebase theme', data.theme);
+        }
       }
 
       if (data.notificationsEnabled !== undefined) {
@@ -532,7 +538,14 @@ class FirebaseSyncService {
 
       // Dispatch custom events for UI updates (non-bloquant)
       queueMicrotask(() => {
-        window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: data }));
+        // Exclude theme from sync event if it differs from local theme to prevent override
+        const currentTheme = this.loadFromLocalStorage<string>('nexus-theme');
+        const eventData = { ...data };
+        if (currentTheme && data.theme && currentTheme !== data.theme) {
+          delete eventData.theme;
+        }
+        
+        window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: eventData }));
         
         if (data.history && Array.isArray(data.history)) {
           window.dispatchEvent(new CustomEvent('firebase-history-update', { 

@@ -103,16 +103,15 @@ export function useTheme(): UseThemeReturn {
     
     loadTheme();
 
-    // Listen to Firebase sync updates
+    // Listen to Firebase sync updates - only update theme if it's explicitly different
     const handleSyncUpdate = (event: CustomEvent) => {
-      if (event.detail?.theme && themes.some(t => t.id === event.detail.theme)) {
+      // Only update if theme is present AND different from current theme
+      if (event.detail?.theme && 
+          themes.some(t => t.id === event.detail.theme) && 
+          event.detail.theme !== theme) {
+        console.log('[useTheme] Firebase sync: updating theme from', theme, 'to', event.detail.theme);
         setThemeState(event.detail.theme);
       }
-    };
-
-    window.addEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
-    return () => {
-      window.removeEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
     };
 
     // Watch system theme changes
@@ -123,9 +122,14 @@ export function useTheme(): UseThemeReturn {
       setSystemTheme(e.matches ? "dark" : "light");
     };
 
+    window.addEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
     mediaQuery.addEventListener("change", handler);
-    return () => mediaQuery.removeEventListener("change", handler);
-  }, []); // Only run once on mount
+    
+    return () => {
+      window.removeEventListener('firebase-sync-update', handleSyncUpdate as EventListener);
+      mediaQuery.removeEventListener("change", handler);
+    };
+  }, [theme]); // Add theme as dependency to get current value
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);

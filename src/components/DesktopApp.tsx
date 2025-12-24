@@ -76,20 +76,24 @@ export const DesktopApp = () => {
     addToQueue,
     addToQueueNext,
     removeFromQueue,
+    clearQueue,
     setCurrentIndex,
     setQueue,
     shuffle: shuffleQueue,
     unshuffle: unshuffleQueue,
     isShuffled: queueIsShuffled,
   } = useQueue(libraryTracks);
-  
-  // Initialize queue with library tracks when they change
-  useEffect(() => {
-    if (libraryTracks.length > 0 && queue.tracks.length === 0) {
-      setQueue(libraryTracks);
-    }
-  }, [libraryTracks, queue.tracks.length, setQueue]);
 
+  // Si la file restaurée correspond exactement à toute la bibliothèque (héritage de l'ancien autofill), on la vide
+  useEffect(() => {
+    if (!libraryTracks.length || !queue.tracks.length) return;
+    if (queue.tracks.length !== libraryTracks.length) return;
+    const sameOrder = queue.tracks.every((t, i) => t.id === libraryTracks[i]?.id);
+    if (sameOrder) {
+      clearQueue();
+    }
+  }, [libraryTracks, queue.tracks, clearQueue]);
+  
   // Préchargement YouTube au démarrage (en arrière-plan)
   useEffect(() => {
     // Attendre que les données soient chargées
@@ -1005,13 +1009,14 @@ export const DesktopApp = () => {
       return;
     }
 
+    clearQueue();
     setQueue(tracksToPlay);
     setCurrentIndex(0);
     setIsPlaying(true);
     const message = `Lecture de ${tracksToPlay.length} titre${tracksToPlay.length > 1 ? 's' : ''}`;
     toast.success(message);
     notifySuccess(message);
-  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
+  }, [libraryTracks, clearQueue, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
 
   // Lecture d'une liste de tracks (remplace entièrement la file)
   const handlePlayTrackList = useCallback((trackList: Track[], startIndex: number = 0) => {
@@ -1023,6 +1028,7 @@ export const DesktopApp = () => {
     }
 
     const clampedIndex = Math.max(0, Math.min(startIndex, validTracks.length - 1));
+    clearQueue();
     setQueue(validTracks);
     setCurrentIndex(clampedIndex);
     setIsPlaying(true);
@@ -1030,7 +1036,13 @@ export const DesktopApp = () => {
     const message = `Lecture de ${validTracks.length} titre${validTracks.length > 1 ? 's' : ''}`;
     toast.success(message);
     notifySuccess(message);
-  }, [setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess]);
+  }, [clearQueue, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess]);
+
+  // Action manuelle pour vider la file
+  const handleClearQueue = useCallback(() => {
+    clearQueue();
+    toast.success('File vidée');
+  }, [clearQueue]);
 
   const handleShuffleTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
@@ -1943,6 +1955,7 @@ export const DesktopApp = () => {
                   onPlayTrack={handlePlayTrack}
                   currentTrack={currentTrack}
                   onRemoveFromQueue={handleRemoveFromQueue}
+                  onClearQueue={handleClearQueue}
                 />
               </div>
             )}
