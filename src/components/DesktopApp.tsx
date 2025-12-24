@@ -1376,89 +1376,189 @@ export const DesktopApp = () => {
           />
         );
       case "recent":
+        // Get cover images for recent tracks
+        const recentCovers = recentTracks.filter(t => t.coverUrl).slice(0, 4);
+        const addedCovers = recentlyAddedTracks.filter(t => t.coverUrl).slice(0, 4);
+        
         return (
-          <div className="min-h-full pb-8">
-            {/* Hero Section */}
-            <div className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-cyan-500/10 to-teal-500/20" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-400/10 via-transparent to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-              
-              <div className="relative px-6 pt-8 pb-16">
-                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-                  <div>
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 mb-3"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <Clock className="w-6 h-6 text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-                        Historique
-                      </span>
-                    </motion.div>
-                    <motion.h1
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="font-display text-5xl md:text-6xl font-bold"
-                    >
-                      Récemment
-                    </motion.h1>
-                    <motion.p
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="text-muted-foreground mt-2 text-lg"
-                    >
-                      {recentTracks.length} écoute{recentTracks.length > 1 ? "s" : ""} récente{recentTracks.length > 1 ? "s" : ""} • {recentlyAddedTracks.length} ajout{recentlyAddedTracks.length > 1 ? "s" : ""} récent{recentlyAddedTracks.length > 1 ? "s" : ""}
-                    </motion.p>
-                  </div>
+          <div className="min-h-full pb-8 relative">
+            {/* Animated Background */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <motion.div
+                animate={{ 
+                  x: [0, 60, 0], 
+                  y: [0, -40, 0],
+                  scale: [1, 1.1, 1]
+                }}
+                transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute -top-20 -right-20 w-[500px] h-[500px] bg-blue-500/15 rounded-full blur-3xl"
+              />
+              <motion.div
+                animate={{ 
+                  x: [0, -50, 0], 
+                  y: [0, 30, 0],
+                  scale: [1, 0.9, 1]
+                }}
+                transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-60 -left-40 w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-3xl"
+              />
+              <motion.div
+                animate={{ 
+                  x: [0, 40, 0], 
+                  y: [0, -30, 0]
+                }}
+                transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute bottom-20 right-1/4 w-[300px] h-[300px] bg-violet-500/10 rounded-full blur-3xl"
+              />
+            </div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="flex items-center gap-3"
-                  >
-                    <Button 
-                      onClick={() => {
-                        if (recentTracks.length > 0) {
+            {/* Hero Section */}
+            <div className="relative px-6 pt-8 pb-6">
+              {/* Bento Grid Layout */}
+              <div className="grid grid-cols-12 gap-4 mb-8">
+                {/* Main Title Card */}
+                <motion.div
+                  initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 100 }}
+                  className="col-span-12 lg:col-span-8 relative rounded-3xl overflow-hidden border border-blue-500/20 bg-gradient-to-br from-blue-500/10 via-background to-cyan-500/5 backdrop-blur-xl group min-h-[240px]"
+                >
+                  {/* Floating Album Covers */}
+                  <div className="absolute inset-0 overflow-hidden">
+                    {recentCovers.slice(0, 3).map((track, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ 
+                          opacity: 0.15,
+                          scale: 1,
+                          x: [0, 10, 0],
+                          y: [0, -10, 0]
+                        }}
+                        transition={{ 
+                          delay: i * 0.2,
+                          x: { duration: 10 + i * 2, repeat: Infinity, ease: "easeInOut" },
+                          y: { duration: 8 + i * 2, repeat: Infinity, ease: "easeInOut" }
+                        }}
+                        className="absolute w-32 h-32 rounded-2xl overflow-hidden shadow-2xl"
+                        style={{
+                          top: `${20 + i * 25}%`,
+                          right: `${10 + i * 15}%`,
+                          transform: `rotate(${-10 + i * 8}deg)`
+                        }}
+                      >
+                        <img src={track.coverUrl} alt="" className="w-full h-full object-cover" />
+                      </motion.div>
+                    ))}
+                  </div>
+                  
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
+                  
+                  {/* Content */}
+                  <div className="relative p-8 h-full flex flex-col justify-center">
+                    <div className="flex items-center gap-3 mb-4">
+                      <motion.div
+                        animate={{ rotate: [0, 360] }}
+                        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                        className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center shadow-2xl shadow-blue-500/40"
+                      >
+                        <Clock className="w-8 h-8 text-white" />
+                      </motion.div>
+                      <div>
+                        <div className="px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 inline-block">
+                          <span className="text-xs font-medium text-blue-400 uppercase tracking-wider">Historique</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <h1 className="font-display text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-foreground via-foreground to-blue-300 bg-clip-text text-transparent">
+                      Récemment
+                    </h1>
+                    <p className="text-muted-foreground text-lg mb-6">
+                      Votre activité musicale récente
+                    </p>
+                    
+                    {/* Action Button */}
+                    {recentTracks.length > 0 && (
+                      <Button 
+                        onClick={() => {
                           const track = recentTracks[0];
                           const realIndex = tracks.findIndex(t => t.id === track.id);
                           if (realIndex !== -1) handleTrackSelect(realIndex);
-                        }
-                      }} 
-                      size="lg" 
-                      className="gap-2 shadow-lg shadow-primary/30"
-                    >
-                      <Play className="w-5 h-5 fill-current" />
-                      Reprendre
-                    </Button>
+                        }} 
+                        size="lg" 
+                        className="gap-3 px-8 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/40 w-fit"
+                      >
+                        <Play className="w-6 h-6 fill-current" />
+                        <span className="font-semibold">Reprendre l'écoute</span>
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Stats Cards */}
+                <div className="col-span-12 lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4">
+                  <motion.div
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                    whileHover={{ scale: 1.03, x: -4 }}
+                    className="p-6 rounded-3xl bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent border border-blue-500/20 backdrop-blur-xl relative overflow-hidden group"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Clock className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-3xl font-bold">{recentTracks.length}</p>
+                        <p className="text-sm text-muted-foreground">Écoutes récentes</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ scale: 1.03, x: -4 }}
+                    className="p-6 rounded-3xl bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/20 backdrop-blur-xl relative overflow-hidden group"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                        <Music className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-3xl font-bold">{recentlyAddedTracks.length}</p>
+                        <p className="text-sm text-muted-foreground">Ajouts récents</p>
+                      </div>
+                    </div>
                   </motion.div>
                 </div>
               </div>
             </div>
 
-            {/* Main Content */}
-            <div className="px-6 -mt-8 space-y-8">
-              {/* Section: Récemment écoutées */}
+            {/* Content Sections */}
+            <div className="px-6 space-y-8">
+              {/* Recently Played Section */}
               {recentTracks.length > 0 && (
                 <motion.section
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                      <Clock className="w-4 h-4 text-blue-400" />
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-blue-400" />
                     </div>
-                    <h2 className="font-semibold text-lg">Écouté récemment</h2>
-                    <span className="text-sm text-muted-foreground">({recentTracks.length})</span>
+                    <div>
+                      <h2 className="font-semibold text-xl">Écouté récemment</h2>
+                      <p className="text-sm text-muted-foreground">{recentTracks.length} pistes</p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden">
+                  <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
                     <LibraryView
                       tracks={recentTracks}
                       currentTrackIndex={currentTrackIndex}
@@ -1481,21 +1581,23 @@ export const DesktopApp = () => {
                 </motion.section>
               )}
 
-              {/* Section: Récemment ajoutées */}
+              {/* Recently Added Section */}
               {recentlyAddedTracks.length > 0 && (
                 <motion.section
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
                 >
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                      <Music className="w-4 h-4 text-emerald-400" />
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
+                      <Music className="w-5 h-5 text-emerald-400" />
                     </div>
-                    <h2 className="font-semibold text-lg">Récemment ajoutées</h2>
-                    <span className="text-sm text-muted-foreground">({recentlyAddedTracks.length})</span>
+                    <div>
+                      <h2 className="font-semibold text-xl">Récemment ajoutées</h2>
+                      <p className="text-sm text-muted-foreground">{recentlyAddedTracks.length} nouvelles pistes</p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden">
+                  <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
                     <LibraryView
                       tracks={recentlyAddedTracks}
                       currentTrackIndex={currentTrackIndex}
@@ -1520,16 +1622,23 @@ export const DesktopApp = () => {
               {/* Empty state */}
               {recentTracks.length === 0 && recentlyAddedTracks.length === 0 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col items-center justify-center py-20 text-center"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center justify-center py-24 text-center"
                 >
-                  <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <Clock className="w-10 h-10 text-muted-foreground" />
+                  <div className="relative mb-6">
+                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 flex items-center justify-center">
+                      <Clock className="w-12 h-12 text-blue-400/50" />
+                    </div>
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="absolute inset-0 rounded-3xl bg-blue-500/20 blur-xl"
+                    />
                   </div>
-                  <h3 className="text-lg font-medium mb-2">Aucun historique</h3>
-                  <p className="text-muted-foreground text-sm max-w-md">
-                    Vos pistes récemment écoutées et récemment ajoutées apparaîtront ici.
+                  <h3 className="text-xl font-semibold mb-2">Aucun historique</h3>
+                  <p className="text-muted-foreground max-w-sm">
+                    Vos pistes récemment écoutées et ajoutées apparaîtront ici
                   </p>
                 </motion.div>
               )}

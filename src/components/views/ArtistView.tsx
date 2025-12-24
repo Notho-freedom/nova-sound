@@ -425,7 +425,7 @@ export const ArtistView = memo(({
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-8 mt-0">
+          <TabsContent value="overview" className="space-y-8 mt-24">
             {/* Popular Tracks */}
             <section>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">

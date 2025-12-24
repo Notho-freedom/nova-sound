@@ -1571,114 +1571,189 @@ export const LibraryView = memo(({
   // Folders View
   if (viewMode === "folders") {
     const totalFolderTracks = folders.reduce((acc, f) => acc + f.tracks.length, 0);
+    const totalDur = folders.reduce((acc, f) => acc + f.tracks.reduce((a, t) => a + t.duration, 0), 0);
 
     return (
-      <div className="min-h-full pb-8">
+      <div className="min-h-full pb-8 relative">
+        {/* Animated Background Orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div
+            animate={{ 
+              x: [0, 100, 0], 
+              y: [0, -50, 0],
+              scale: [1, 1.2, 1]
+            }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-20 -left-32 w-96 h-96 bg-amber-500/20 rounded-full blur-3xl"
+          />
+          <motion.div
+            animate={{ 
+              x: [0, -80, 0], 
+              y: [0, 60, 0],
+              scale: [1, 0.9, 1]
+            }}
+            transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-40 -right-32 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl"
+          />
+        </div>
+
         {/* Hero Section */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-600/20 via-orange-500/10 to-red-500/20" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-yellow-400/10 via-transparent to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-          
-          <div className="relative px-6 pt-8 pb-16">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-              <div>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 mb-3"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                    <FolderOpen className="w-6 h-6 text-white" />
+        <div className="relative">
+          <div className="px-6 pt-8 pb-12">
+            {/* Bento Grid Header */}
+            <div className="grid grid-cols-12 gap-4 mb-8">
+              {/* Main Title Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="col-span-12 md:col-span-8 p-8 rounded-3xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border border-amber-500/20 backdrop-blur-xl relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-4">
+                    <motion.div
+                      whileHover={{ rotate: 15, scale: 1.1 }}
+                      className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-xl shadow-amber-500/30"
+                    >
+                      <FolderOpen className="w-7 h-7 text-white" />
+                    </motion.div>
+                    <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30">
+                      <span className="text-xs font-medium text-amber-400 uppercase tracking-wider">Sources Locales</span>
+                    </div>
                   </div>
-                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-                    Sources
-                  </span>
-                </motion.div>
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="font-display text-5xl md:text-6xl font-bold"
-                >
-                  {title}
-                </motion.h1>
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-muted-foreground mt-2 text-lg"
-                >
-                  {folders.length} dossier{folders.length > 1 ? "s" : ""} • {totalFolderTracks} titres
-                </motion.p>
-              </div>
+                  
+                  <h1 className="font-display text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-foreground via-foreground to-amber-300 bg-clip-text text-transparent">
+                    {title}
+                  </h1>
+                  <p className="text-muted-foreground text-lg">
+                    Explorez votre collection musicale locale
+                  </p>
+                </div>
+              </motion.div>
+
+              {/* Stats Cards */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="col-span-6 md:col-span-2 p-6 rounded-3xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/20 backdrop-blur-xl flex flex-col justify-center items-center text-center group hover:scale-105 transition-transform duration-300"
+              >
+                <FolderOpen className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
+                <p className="text-3xl font-bold">{folders.length}</p>
+                <p className="text-xs text-muted-foreground">Dossiers</p>
+              </motion.div>
 
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="flex items-center gap-3"
+                transition={{ delay: 0.2 }}
+                className="col-span-6 md:col-span-2 p-6 rounded-3xl bg-gradient-to-br from-orange-500/20 to-red-500/10 border border-orange-500/20 backdrop-blur-xl flex flex-col justify-center items-center text-center group hover:scale-105 transition-transform duration-300"
               >
-                <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
-                  <Play className="w-5 h-5 fill-current" />
-                  Tout lire
-                </Button>
-                <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
-                  <Shuffle className="w-5 h-5" />
-                  Aléatoire
-                </Button>
+                <Music className="w-8 h-8 text-orange-400 mb-2 group-hover:scale-110 transition-transform" />
+                <p className="text-3xl font-bold">{totalFolderTracks}</p>
+                <p className="text-xs text-muted-foreground">Titres</p>
               </motion.div>
             </div>
+
+            {/* Action Bar */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex items-center gap-4 mb-8"
+            >
+              <Button 
+                onClick={handlePlayAll} 
+                size="lg" 
+                className="gap-3 px-8 h-14 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-xl shadow-amber-500/30 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-amber-500/40"
+              >
+                <Play className="w-6 h-6 fill-current" />
+                <span className="font-semibold">Tout lire</span>
+              </Button>
+              <Button 
+                onClick={handleShuffleAll} 
+                variant="outline" 
+                size="lg" 
+                className="gap-3 px-8 h-14 rounded-2xl border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all hover:scale-105"
+              >
+                <Shuffle className="w-5 h-5" />
+                <span className="font-semibold">Aléatoire</span>
+              </Button>
+              <div className="ml-auto text-sm text-muted-foreground">
+                <Clock className="w-4 h-4 inline mr-1" />
+                {formatDuration(totalDur)}
+              </div>
+            </motion.div>
           </div>
         </div>
 
-        {/* Folders List */}
-        <div className="px-6 -mt-8">
+        {/* Folders Grid */}
+        <div className="px-6">
           <motion.div
-            variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="space-y-3"
+            variants={containerVariants}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
             {folders.map((folder, idx) => (
               <motion.div
                 key={folder.path}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: idx * 0.05, type: "spring", stiffness: 100 }}
+                whileHover={{ y: -4 }}
+                className="group"
               >
                 <div
                   className={cn(
-                    "rounded-2xl bg-card/50 backdrop-blur-xl border border-border/30 cursor-pointer transition-all hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5",
-                    selectedFolder === folder.path && "border-amber-500/50 shadow-lg shadow-amber-500/10"
+                    "relative rounded-3xl border transition-all duration-300 cursor-pointer overflow-hidden",
+                    selectedFolder === folder.path 
+                      ? "bg-gradient-to-br from-amber-500/15 to-orange-500/10 border-amber-500/40 shadow-xl shadow-amber-500/10" 
+                      : "bg-card/40 backdrop-blur-xl border-border/30 hover:bg-card/60 hover:border-amber-500/30 hover:shadow-lg"
                   )}
                   onClick={() => setSelectedFolder(selectedFolder === folder.path ? null : folder.path)}
                 >
-                  <div className="flex items-center justify-between p-4">
+                  {/* Glow effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-orange-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  
+                  <div className="relative p-5">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center">
-                        <FolderOpen className={cn(
-                          "w-6 h-6 transition-colors",
-                          selectedFolder === folder.path ? "text-amber-400" : "text-amber-500/70"
-                        )} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{folder.path.split(/[/\\]/).pop()}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-lg">{folder.path}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-sm font-medium">{folder.tracks.length}</p>
-                        <p className="text-xs text-muted-foreground">titres</p>
-                      </div>
-                      <Badge variant="secondary" className="sm:hidden">{folder.tracks.length}</Badge>
-                      <motion.div
-                        animate={{ rotate: selectedFolder === folder.path ? 90 : 0 }}
-                        transition={{ duration: 0.2 }}
+                      <motion.div 
+                        animate={{ rotate: selectedFolder === folder.path ? 15 : 0 }}
+                        className={cn(
+                          "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300",
+                          selectedFolder === folder.path 
+                            ? "bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-500/30" 
+                            : "bg-gradient-to-br from-amber-500/20 to-orange-500/10 group-hover:from-amber-500/30 group-hover:to-orange-500/20"
+                        )}
                       >
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        <FolderOpen className={cn(
+                          "w-7 h-7 transition-colors",
+                          selectedFolder === folder.path ? "text-white" : "text-amber-400"
+                        )} />
                       </motion.div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-lg truncate group-hover:text-amber-300 transition-colors">
+                          {folder.path.split(/[/\\]/).pop()}
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate">{folder.path}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-amber-400">{folder.tracks.length}</p>
+                          <p className="text-xs text-muted-foreground">titres</p>
+                        </div>
+                        <motion.div
+                          animate={{ rotate: selectedFolder === folder.path ? 90 : 0 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                        >
+                          <ChevronRight className="w-6 h-6 text-muted-foreground" />
+                        </motion.div>
+                      </div>
                     </div>
                   </div>
 
@@ -1688,10 +1763,10 @@ export const LibraryView = memo(({
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="border-t border-border/30 overflow-hidden"
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="border-t border-amber-500/20 overflow-hidden"
                       >
-                        <div className="p-4 bg-background/30">
+                        <div className="p-4 bg-background/50 backdrop-blur-sm">
                           <TrackListView
                             tracks={folder.tracks}
                             currentTrackIndex={currentTrackIndex}
@@ -1715,16 +1790,23 @@ export const LibraryView = memo(({
 
           {folders.length === 0 && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center py-20 text-center"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
             >
-              <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                <FolderOpen className="w-10 h-10 text-muted-foreground" />
+              <div className="relative mb-6">
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center">
+                  <FolderOpen className="w-12 h-12 text-amber-400/50" />
+                </div>
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0 rounded-3xl bg-amber-500/20 blur-xl"
+                />
               </div>
-              <h3 className="text-lg font-medium mb-2">Aucun dossier</h3>
-              <p className="text-muted-foreground text-sm max-w-md">
-                Les dossiers scannés apparaîtront ici
+              <h3 className="text-xl font-semibold mb-2">Aucun dossier</h3>
+              <p className="text-muted-foreground max-w-sm">
+                Ajoutez des dossiers contenant votre musique pour les voir apparaître ici
               </p>
             </motion.div>
           )}
@@ -1734,141 +1816,246 @@ export const LibraryView = memo(({
   }
 
   // Tracks View (default)
+  // Get random cover images for visual display
+  const randomCovers = useMemo(() => {
+    const coversWithImages = tracks.filter(t => t.coverUrl).slice(0, 12);
+    return coversWithImages.sort(() => Math.random() - 0.5).slice(0, 6);
+  }, [tracks]);
+
+  // If no title, render simplified list only (for embedded use in other views)
+  if (!title) {
+    return (
+      <div className="p-4">
+        {displayMode === "grid" ? (
+          <TrackGridView
+            tracks={filteredAndSortedTracks}
+            currentTrackIndex={currentTrackIndex}
+            isPlaying={isPlaying}
+            onTrackSelect={(idx) => {
+              const track = filteredAndSortedTracks[idx];
+              const realIdx = tracks.findIndex(t => t.id === track.id);
+              if (realIdx !== -1) onTrackSelect(realIdx);
+            }}
+            onAddToPlaylist={onAddToPlaylist}
+            createPlaylist={createPlaylist}
+          />
+        ) : (
+          <TrackListView
+            tracks={filteredAndSortedTracks}
+            currentTrackIndex={currentTrackIndex}
+            isPlaying={isPlaying}
+            onTrackSelect={(idx) => {
+              const track = filteredAndSortedTracks[idx];
+              const realIdx = tracks.findIndex(t => t.id === track.id);
+              if (realIdx !== -1) onTrackSelect(realIdx);
+            }}
+            onAddToPlaylist={onAddToPlaylist}
+            createPlaylist={createPlaylist}
+            uploadTrack={uploadTrack}
+            getTrackProgress={(id) => getTrackProgress(id) ?? null}
+            canUploadToCloudinary={canUploadToCloudinary}
+            uploadTrackToNexus={uploadTrackToNexus}
+            getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
+            canUploadToNexus={canUploadToNexus}
+            isUploaded={isUploaded}
+            getUploadedProvider={getUploadedProvider}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-full pb-8">
+    <div className="min-h-full pb-8 relative">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{ 
+            x: [0, 50, 0], 
+            y: [0, -30, 0],
+            rotate: [0, 5, 0]
+          }}
+          transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-20 -left-20 w-[500px] h-[500px] bg-emerald-500/15 rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{ 
+            x: [0, -40, 0], 
+            y: [0, 40, 0],
+            rotate: [0, -5, 0]
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-60 -right-40 w-[400px] h-[400px] bg-teal-500/10 rounded-full blur-3xl"
+        />
+        <motion.div
+          animate={{ 
+            x: [0, 30, 0], 
+            y: [0, -20, 0]
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-20 left-1/3 w-[300px] h-[300px] bg-cyan-500/10 rounded-full blur-3xl"
+        />
+      </div>
+
       {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/20 via-green-500/10 to-teal-500/20" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-400/10 via-transparent to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-        
-        <div className="relative px-6 pt-8 pb-16">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 mb-3"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                  <Music className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-                  Bibliothèque
-                </span>
-              </motion.div>
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="font-display text-5xl md:text-6xl font-bold"
-              >
-                {title}
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-muted-foreground mt-2 text-lg"
-              >
-                {filteredAndSortedTracks.length} titre{filteredAndSortedTracks.length > 1 ? "s" : ""} • {formatDuration(totalDuration)}
-              </motion.p>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center gap-3"
-            >
-              <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
-                <Play className="w-5 h-5 fill-current" />
-                Tout lire
-              </Button>
-              <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
-                <Shuffle className="w-5 h-5" />
-                Aléatoire
-              </Button>
-            </motion.div>
-          </div>
-
-          {/* Stats */}
+      <div className="relative px-6 pt-8 pb-6">
+        {/* Bento Grid Layout */}
+        <div className="grid grid-cols-12 gap-4 mb-8">
+          {/* Main Hero Card with Album Art Collage */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 100 }}
+            className="col-span-12 lg:col-span-7 relative rounded-3xl overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 backdrop-blur-xl group min-h-[280px]"
           >
-            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                  <Music className="w-5 h-5 text-emerald-400" />
-                </div>
+            {/* Album Art Collage Background */}
+            <div className="absolute inset-0 grid grid-cols-3 gap-1 opacity-20 group-hover:opacity-30 transition-opacity duration-500">
+              {randomCovers.map((track, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 1.1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="relative overflow-hidden"
+                >
+                  <img 
+                    src={getCoverUrl(track.coverUrl)} 
+                    alt="" 
+                    className="w-full h-full object-cover"
+                  />
+                </motion.div>
+              ))}
+            </div>
+            
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-background/60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            
+            {/* Content */}
+            <div className="relative p-8 h-full flex flex-col justify-end">
+              <div className="flex items-center gap-3 mb-4">
+                <motion.div
+                  whileHover={{ rotate: 360, scale: 1.1 }}
+                  transition={{ duration: 0.5 }}
+                  className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/40"
+                >
+                  <Music className="w-8 h-8 text-white" />
+                </motion.div>
                 <div>
-                  <p className="text-2xl font-bold">{tracks.length}</p>
-                  <p className="text-xs text-muted-foreground">Titres</p>
+                  <div className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 inline-block mb-1">
+                    <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Bibliothèque</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <Disc3 className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{albums.length}</p>
-                  <p className="text-xs text-muted-foreground">Albums</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <User className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{artists.length}</p>
-                  <p className="text-xs text-muted-foreground">Artistes</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{formatDuration(totalDuration)}</p>
-                  <p className="text-xs text-muted-foreground">Durée totale</p>
-                </div>
+              
+              <h1 className="font-display text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-foreground via-foreground to-emerald-300 bg-clip-text text-transparent">
+                {title}
+              </h1>
+              <p className="text-muted-foreground text-lg mb-6">
+                Votre collection musicale complète
+              </p>
+              
+              {/* Action Buttons */}
+              <div className="flex items-center gap-4">
+                <Button 
+                  onClick={handlePlayAll} 
+                  size="lg" 
+                  className="gap-3 px-8 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-xl shadow-emerald-500/30 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/40"
+                >
+                  <Play className="w-6 h-6 fill-current" />
+                  <span className="font-semibold">Tout lire</span>
+                </Button>
+                <Button 
+                  onClick={handleShuffleAll} 
+                  variant="outline" 
+                  size="lg" 
+                  className="gap-3 px-8 h-14 rounded-2xl border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all hover:scale-105"
+                >
+                  <Shuffle className="w-5 h-5" />
+                  <span className="font-semibold">Aléatoire</span>
+                </Button>
               </div>
             </div>
           </motion.div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="px-6 -mt-8">
-        {/* Toolbar */}
+          {/* Stats Cards */}
+          <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              whileHover={{ scale: 1.03, y: -4 }}
+              className="p-6 rounded-3xl bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/20 backdrop-blur-xl relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Music className="w-10 h-10 text-emerald-400 mb-3" />
+              <p className="text-4xl font-bold">{tracks.length.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Titres</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              whileHover={{ scale: 1.03, y: -4 }}
+              className="p-6 rounded-3xl bg-gradient-to-br from-purple-500/20 via-purple-500/10 to-transparent border border-purple-500/20 backdrop-blur-xl relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Disc3 className="w-10 h-10 text-purple-400 mb-3" />
+              <p className="text-4xl font-bold">{albums.length.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Albums</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ scale: 1.03, y: -4 }}
+              className="p-6 rounded-3xl bg-gradient-to-br from-blue-500/20 via-blue-500/10 to-transparent border border-blue-500/20 backdrop-blur-xl relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <User className="w-10 h-10 text-blue-400 mb-3" />
+              <p className="text-4xl font-bold">{artists.length.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Artistes</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              whileHover={{ scale: 1.03, y: -4 }}
+              className="p-6 rounded-3xl bg-gradient-to-br from-orange-500/20 via-orange-500/10 to-transparent border border-orange-500/20 backdrop-blur-xl relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Clock className="w-10 h-10 text-orange-400 mb-3" />
+              <p className="text-4xl font-bold">{formatDuration(totalDuration)}</p>
+              <p className="text-sm text-muted-foreground">Durée totale</p>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Modern Toolbar */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="flex flex-wrap items-center gap-4 mb-8 p-4 rounded-2xl bg-card/50 backdrop-blur-xl border border-border/30"
+          transition={{ delay: 0.3 }}
+          className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-card/40 backdrop-blur-2xl border border-border/30 shadow-xl"
         >
-          <div className="flex-1 min-w-[200px]">
+          {/* Search Input */}
+          <div className="flex-1 min-w-[250px] relative group">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 opacity-0 group-focus-within:opacity-100 blur transition-opacity" />
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-emerald-400 transition-colors" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher un titre, artiste ou album..."
-                className="pl-10 bg-background/50 border-border/50"
+                placeholder="Rechercher dans votre bibliothèque..."
+                className="pl-12 h-12 bg-background/50 border-border/50 rounded-xl focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
                   title="Effacer la recherche"
                   aria-label="Effacer la recherche"
                 >
@@ -1878,8 +2065,9 @@ export const LibraryView = memo(({
             </div>
           </div>
 
+          {/* Sort Select */}
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-            <SelectTrigger className="w-[150px] bg-background/50">
+            <SelectTrigger className="w-[160px] h-12 bg-background/50 border-border/50 rounded-xl">
               <SelectValue placeholder="Trier par" />
             </SelectTrigger>
             <SelectContent>
@@ -1891,20 +2079,27 @@ export const LibraryView = memo(({
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 p-1.5 rounded-xl bg-muted/50 border border-border/30">
             <Button
-              variant={displayMode === "grid" ? "secondary" : "ghost"}
+              variant={displayMode === "grid" ? "default" : "ghost"}
               size="icon"
               onClick={() => setDisplayMode("grid")}
-              className="h-8 w-8"
+              className={cn(
+                "h-9 w-9 rounded-lg transition-all",
+                displayMode === "grid" && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30"
+              )}
             >
               <Grid className="w-4 h-4" />
             </Button>
             <Button
-              variant={displayMode === "list" ? "secondary" : "ghost"}
+              variant={displayMode === "list" ? "default" : "ghost"}
               size="icon"
               onClick={() => setDisplayMode("list")}
-              className="h-8 w-8"
+              className={cn(
+                "h-9 w-9 rounded-lg transition-all",
+                displayMode === "list" && "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30"
+              )}
             >
               <List className="w-4 h-4" />
             </Button>
@@ -1916,24 +2111,32 @@ export const LibraryView = memo(({
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="flex flex-wrap gap-2 mb-6"
+            className="flex flex-wrap gap-2 mt-4"
           >
-            <Badge variant="secondary" className="gap-1 px-3 py-1">
-              Recherche: {searchQuery}
-              <button onClick={() => setSearchQuery("")} className="ml-1 hover:text-destructive" title="Supprimer le filtre" aria-label="Supprimer le filtre de recherche">
+            <Badge className="gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30 transition-colors">
+              <Search className="w-3 h-3" />
+              {searchQuery}
+              <button 
+                onClick={() => setSearchQuery("")} 
+                className="ml-1 hover:text-white transition-colors"
+                title="Supprimer le filtre" 
+                aria-label="Supprimer le filtre de recherche"
+              >
                 <X className="w-3 h-3" />
               </button>
             </Badge>
           </motion.div>
         )}
+      </div>
 
-        {/* Track List/Grid */}
+      {/* Track List/Grid */}
+      <div className="px-6">
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
         >
-          <div className="rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30 overflow-hidden">
+          <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
             {displayMode === "grid" ? (
               <TrackGridView
                 tracks={filteredAndSortedTracks}
@@ -1974,15 +2177,22 @@ export const LibraryView = memo(({
 
         {filteredAndSortedTracks.length === 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-20 text-center"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center py-24 text-center"
           >
-            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-              <Music className="w-10 h-10 text-muted-foreground" />
+            <div className="relative mb-6">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center">
+                <Music className="w-12 h-12 text-emerald-400/50" />
+              </div>
+              <motion.div
+                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="absolute inset-0 rounded-3xl bg-emerald-500/20 blur-xl"
+              />
             </div>
-            <h3 className="text-lg font-medium mb-2">Aucun titre trouvé</h3>
-            <p className="text-muted-foreground text-sm max-w-md">
+            <h3 className="text-xl font-semibold mb-2">Aucun titre trouvé</h3>
+            <p className="text-muted-foreground max-w-sm">
               {searchQuery
                 ? "Essayez de modifier vos termes de recherche"
                 : "Ajoutez de la musique à votre bibliothèque"}
