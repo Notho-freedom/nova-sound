@@ -115,7 +115,7 @@ interface UseYouTubePlayerReturn {
 /**
  * Hook pour gérer le player YouTube via l'API officielle IFrame
  */
-export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
+export function useYouTubePlayer(videoId?: string, options?: UseYouTubePlayerOptions): UseYouTubePlayerReturn {
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -331,6 +331,10 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
             } else if (state === window.YT.PlayerState.ENDED) {
               setIsPlaying(false);
               setCurrentTime(0);
+              // Call onEnded callback to advance to next track
+              if (options?.onEnded) {
+                options.onEnded();
+              }
             }
           },
           onError: (event: YT.OnErrorEvent) => {

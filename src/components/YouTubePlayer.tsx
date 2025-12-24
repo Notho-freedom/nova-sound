@@ -15,6 +15,7 @@ interface YouTubePlayerProps {
   onStateChange?: (isPlaying: boolean) => void;
   onTimeUpdate?: (currentTime: number) => void;
   onError?: (error: string) => void;
+  onEnded?: () => void; // Called when video ends
   audioOnly?: boolean; // Mode audio-only (masque la vidéo)
 }
 
@@ -47,8 +48,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
   onReady,
   onStateChange,
   onTimeUpdate,
-  onError,
-  audioOnly = false,
+  onError,  onEnded,  audioOnly = false,
 }, ref) => {
   const extractedVideoId = extractYouTubeVideoId(videoId) || videoId;
   
@@ -72,7 +72,13 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     setQuality,
     loadVideo,
     playerRef,
-  } = useYouTubePlayer(extractedVideoId);
+  } = useYouTubePlayer(extractedVideoId, {
+    onEnded: () => {
+      if (onEndedRef.current) {
+        onEndedRef.current();
+      }
+    },
+  });
 
   // Exposer les méthodes via ref
   useImperativeHandle(ref, () => ({
@@ -115,6 +121,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
   const onStateChangeRef = useRef(onStateChange);
   const onTimeUpdateRef = useRef(onTimeUpdate);
   const onErrorRef = useRef(onError);
+  const onEndedRef = useRef(onEnded);
 
   // Mettre à jour les refs quand les callbacks changent
   useEffect(() => {
@@ -122,7 +129,8 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     onStateChangeRef.current = onStateChange;
     onTimeUpdateRef.current = onTimeUpdate;
     onErrorRef.current = onError;
-  }, [onReady, onStateChange, onTimeUpdate, onError]);
+    onEndedRef.current = onEnded;
+  }, [onReady, onStateChange, onTimeUpdate, onError, onEnded]);
 
   // Réagir aux changements de audioOnly pour forcer la visibilité de la vidéo
   useEffect(() => {

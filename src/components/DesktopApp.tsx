@@ -2090,6 +2090,22 @@ export const DesktopApp = () => {
               videoId={currentTrack?.youtubeVideoId || ''}
               autoPlay={isPlaying}
               audioOnly={!isFullscreen} // Audio-only en background, vidéo visible en fullscreen
+              onEnded={() => {
+                console.log('[DesktopApp] YouTube video ended, moving to next track');
+                // Record playback before moving to next
+                if (currentTrack && playbackStartTrackIdRef.current === currentTrack.id) {
+                  const elapsedTime = accumulatedPlaybackTimeRef.current;
+                  const completedPercentage = currentTrack.duration > 0
+                    ? Math.min(100, (elapsedTime / currentTrack.duration) * 100)
+                    : 100;
+                  recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage);
+                  playbackStartTimeRef.current = null;
+                  playbackStartTrackIdRef.current = null;
+                  accumulatedPlaybackTimeRef.current = 0;
+                }
+                // Move to next track
+                handleNext();
+              }}
               onStateChange={(playing) => {
                 console.log('[DesktopApp] YouTube onStateChange:', { playing, currentIsPlaying: isPlaying });
                 if (playing !== isPlaying) {
