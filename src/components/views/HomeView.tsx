@@ -52,6 +52,7 @@ interface HomeViewProps {
   onAddToQueue?: (track: Track | Track[]) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
   onPlayTracks?: (trackIds: string[]) => void;
+  onPlayTrackList?: (tracks: Track[]) => void;
   onFilterByGenre?: (genre: string) => void;
   onFilterByArtist?: (artist: string) => void;
   recentTracks?: Track[];
@@ -127,7 +128,6 @@ export const HomeView = memo(({
   onNext,
   onPrevious,
   onShuffle,
-  onPlayTracks,
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
@@ -136,6 +136,7 @@ export const HomeView = memo(({
   recentTracks = [],
   favoriteTracks = [],
   history = [],
+  onPlayTrackList,
   loading = false,
 }: HomeViewProps) => {
   // Hooks
@@ -518,6 +519,17 @@ export const HomeView = memo(({
             title="Vos favoris"
             icon={<Heart className="w-5 h-5 text-red-500" />}
             count={favoriteTracks.length}
+            action={onPlayTrackList ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onPlayTrackList(displayFavorites)}
+                className="gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Lecture
+              </Button>
+            ) : null}
           />
           <div className="bg-card/30 backdrop-blur-sm rounded-2xl overflow-hidden border border-border/30">
             <table className="w-full">

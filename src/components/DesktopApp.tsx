@@ -1013,6 +1013,25 @@ export const DesktopApp = () => {
     notifySuccess(message);
   }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
 
+  // Lecture d'une liste de tracks (remplace entièrement la file)
+  const handlePlayTrackList = useCallback((trackList: Track[], startIndex: number = 0) => {
+    const validTracks = trackList.filter(Boolean);
+    if (validTracks.length === 0) {
+      toast.error('Aucun titre trouvé');
+      notifyError('Aucun titre trouvé');
+      return;
+    }
+
+    const clampedIndex = Math.max(0, Math.min(startIndex, validTracks.length - 1));
+    setQueue(validTracks);
+    setCurrentIndex(clampedIndex);
+    setIsPlaying(true);
+    setIsShuffle(false);
+    const message = `Lecture de ${validTracks.length} titre${validTracks.length > 1 ? 's' : ''}`;
+    toast.success(message);
+    notifySuccess(message);
+  }, [setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess]);
+
   const handleShuffleTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
       .map(id => libraryTracks.find(t => t.id === id))
@@ -1313,6 +1332,7 @@ export const DesktopApp = () => {
           onPlayNext={handlePlayNext}
           onAddToQueue={handleAddToQueue}
           onAddToPlaylist={handleAddToPlaylist}
+          onPlayTrackList={handlePlayTrackList}
           recentTracks={recentTracks}
           favoriteTracks={favoriteTracks}
           history={history}
@@ -1701,6 +1721,7 @@ export const DesktopApp = () => {
             onTrackSelect={handleTrackSelect}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
+            onPlayTrackList={handlePlayTrackList}
             onAddToPlaylist={handleAddToPlaylist}
             onBack={() => {
               setSelectedArtist(null);

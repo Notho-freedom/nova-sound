@@ -52,6 +52,7 @@ interface ArtistViewProps {
   onTrackSelect: (index: number) => void;
   onPlayNext?: (track: Track) => void;
   onAddToQueue?: (track: Track) => void;
+  onPlayTrackList?: (tracks: Track[], startIndex?: number) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
   onBack?: () => void;
   onAlbumClick?: (albumName: string, artistName: string) => void;
@@ -109,6 +110,7 @@ export const ArtistView = memo(({
   onTrackSelect,
   onPlayNext,
   onAddToQueue,
+  onPlayTrackList,
   onAddToPlaylist,
   onBack,
   onAlbumClick,
@@ -888,10 +890,8 @@ export const ArtistView = memo(({
                             onClick={async (e) => {
                               e.stopPropagation();
                               const tracks = await loadPlaylistVideos(playlist.id);
-                              if (tracks.length > 0 && onAddToQueue) {
-                                // Jouer la première piste et ajouter le reste à la file
-                                onPlayNext?.(tracks[0]);
-                                tracks.slice(1).forEach(t => onAddToQueue(t));
+                              if (tracks.length > 0) {
+                                onPlayTrackList?.(tracks, 0);
                               }
                             }}
                           >
@@ -929,9 +929,7 @@ export const ArtistView = memo(({
                                         key={`pl-track-${idx}-${track.id}`}
                                         className="group cursor-pointer hover:bg-muted/40 transition-colors"
                                         onClick={() => {
-                                          // Jouer cette piste et ajouter les suivantes à la file
-                                          onPlayNext?.(track);
-                                          playlistTracks.slice(idx + 1).forEach(t => onAddToQueue?.(t));
+                                          onPlayTrackList?.(playlistTracks, idx);
                                         }}
                                       >
                                         <td className="w-12 px-4 py-2.5 text-center">
