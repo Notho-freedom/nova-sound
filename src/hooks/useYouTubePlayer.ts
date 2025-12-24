@@ -89,6 +89,13 @@ declare global {
 // Qualités vidéo disponibles (de la plus basse à la plus haute)
 export type YouTubeQuality = 'auto' | 'tiny' | 'small' | 'medium' | 'large' | 'hd720' | 'hd1080' | 'hd1440' | 'hd2160' | 'highres';
 
+interface UseYouTubePlayerOptions {
+  autoplay?: boolean;
+  onReady?: () => void;
+  onError?: (error: string) => void;
+  onEnded?: () => void;
+}
+
 interface UseYouTubePlayerReturn {
   isReady: boolean;
   isPlaying: boolean;
