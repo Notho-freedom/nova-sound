@@ -62,6 +62,9 @@ declare namespace YT {
     getPlaybackRate(): number;
     getAvailablePlaybackRates(): number[];
     getPlayerState(): number;
+    getPlaybackQuality(): string;
+    setPlaybackQuality(quality: string): void;
+    getAvailableQualityLevels(): string[];
     destroy(): void;
   }
 }
@@ -83,6 +86,9 @@ declare global {
   }
 }
 
+// Qualités vidéo disponibles (de la plus basse à la plus haute)
+export type YouTubeQuality = 'auto' | 'tiny' | 'small' | 'medium' | 'large' | 'hd720' | 'hd1080' | 'hd1440' | 'hd2160' | 'highres';
+
 interface UseYouTubePlayerReturn {
   isReady: boolean;
   isPlaying: boolean;
@@ -92,6 +98,8 @@ interface UseYouTubePlayerReturn {
   isMuted: boolean;
   isLoading: boolean;
   error: string | null;
+  quality: string;
+  availableQualities: string[];
   play: () => void;
   pause: () => void;
   togglePlayPause: () => void;
@@ -99,6 +107,7 @@ interface UseYouTubePlayerReturn {
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   setPlaybackRate: (rate: number) => void;
+  setQuality: (quality: YouTubeQuality) => void;
   loadVideo: (videoId: string, startSeconds?: number) => void;
   playerRef: React.RefObject<HTMLDivElement>;
 }
@@ -115,6 +124,8 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quality, setQualityState] = useState<string>('auto');
+  const [availableQualities, setAvailableQualities] = useState<string[]>([]);
   
   const playerRef = useRef<HTMLDivElement>(null);
   const playerInstanceRef = useRef<YT.Player | null>(null);
@@ -299,6 +310,20 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
             if (state === window.YT.PlayerState.PLAYING) {
               setIsPlaying(true);
               setIsLoading(false);
+              // Récupérer les qualités disponibles quand la vidéo commence
+              try {
+                const player = event.target;
+                const qualities = player.getAvailableQualityLevels();
+                if (qualities && qualities.length > 0) {
+                  setAvailableQualities(['auto', ...qualities]);
+                }
+                const currentQuality = player.getPlaybackQuality();
+                if (currentQuality) {
+                  setQualityState(currentQuality);
+                }
+              } catch (err) {
+                // Ignorer silencieusement
+              }
             } else if (state === window.YT.PlayerState.PAUSED) {
               setIsPlaying(false);
             } else if (state === window.YT.PlayerState.BUFFERING) {
@@ -482,6 +507,29 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
     }
   }, []);
 
+  // Définir la qualité vidéo
+  // 'auto' = YouTube gère automatiquement (recommandé pour les perfs)
+  // 'tiny' = 144p, 'small' = 240p, 'medium' = 360p, 'large' = 480p
+  // 'hd720' = 720p, 'hd1080' = 1080p, 'hd1440' = 1440p, 'hd2160' = 4K
+  const setQuality = useCallback((newQuality: YouTubeQuality) => {
+    if (!playerInstanceRef.current) {
+      setQualityState(newQuality);
+      return;
+    }
+    try {
+      if (newQuality === 'auto') {
+        // Pour 'auto', on laisse YouTube décider en mettant 'default'
+        // ou en ne changeant pas la qualité
+        setQualityState('auto');
+      } else {
+        playerInstanceRef.current.setPlaybackQuality(newQuality);
+        setQualityState(newQuality);
+      }
+    } catch (err) {
+      console.error('Erreur lors du changement de qualité:', err);
+    }
+  }, []);
+
   // Nettoyer lors du démontage
   useEffect(() => {
     return () => {
@@ -507,6 +555,8 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
     isMuted,
     isLoading,
     error,
+    quality,
+    availableQualities,
     play,
     pause,
     togglePlayPause,
@@ -514,6 +564,7 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
     setVolume,
     toggleMute,
     setPlaybackRate,
+    setQuality,
     loadVideo,
     playerRef,
   };

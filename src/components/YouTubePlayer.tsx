@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
-import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
+import { useYouTubePlayer, type YouTubeQuality } from "@/hooks/useYouTubePlayer";
 import { extractYouTubeVideoId } from "@/lib/youtube";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
@@ -25,11 +25,14 @@ export interface YouTubePlayerRef {
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
+  setQuality: (quality: YouTubeQuality) => void;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
   volume: number;
   isMuted: boolean;
+  quality: string;
+  availableQualities: string[];
 }
 
 /**
@@ -58,12 +61,15 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     isMuted,
     isLoading,
     error,
+    quality,
+    availableQualities,
     play,
     pause,
     togglePlayPause,
     seek,
     setVolume,
     toggleMute,
+    setQuality,
     loadVideo,
     playerRef,
   } = useYouTubePlayer(extractedVideoId);
@@ -76,12 +82,15 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     seek,
     setVolume,
     toggleMute,
+    setQuality,
     isPlaying,
     currentTime,
     duration,
     volume,
     isMuted,
-  }), [play, pause, togglePlayPause, seek, setVolume, toggleMute, isPlaying, currentTime, duration, volume, isMuted]);
+    quality,
+    availableQualities,
+  }), [play, pause, togglePlayPause, seek, setVolume, toggleMute, setQuality, isPlaying, currentTime, duration, volume, isMuted, quality, availableQualities]);
 
   // Charger la vidéo avec startTime si fourni
   useEffect(() => {
