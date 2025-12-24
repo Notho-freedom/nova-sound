@@ -55,12 +55,18 @@ export class WikimediaAdapter {
     try {
       const { query, limit = 10 } = options;
       
+      // Améliorer la requête avec le contexte musical pour des résultats plus pertinents
+      // Wikimedia a beaucoup de photos d'artistes et musiciens
+      const enhancedQuery = query.toLowerCase().includes('artist') || query.toLowerCase().includes('musician')
+        ? query
+        : `${query} musician singer artist`;
+      
       // Étape 1: Rechercher des pages d'images
       const searchParams = new URLSearchParams({
         action: 'query',
         format: 'json',
         list: 'search',
-        srsearch: `filetype:bitmap ${query}`,
+        srsearch: `filetype:bitmap ${enhancedQuery}`,
         srnamespace: '6', // Namespace pour les fichiers
         srlimit: Math.min(limit, 50).toString(),
         origin: '*',

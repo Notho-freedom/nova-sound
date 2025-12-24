@@ -73,18 +73,30 @@ export const HeroCarousel = memo(({
   }, []);
 
   // Fonction pour récupérer une image améliorée depuis le service d'image
+  // Utilise requestIdleCallback pour ne pas bloquer l'UI
   const fetchEnhancedImage = useCallback(async (query: string): Promise<string | null> => {
     // Vérifier le cache d'abord
     if (imageCache.has(query)) {
       return imageCache.get(query) || null;
     }
 
+    // Attendre un moment d'inactivité pour ne pas bloquer l'UI
+    await new Promise<void>((resolve) => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => resolve(), { timeout: 2000 });
+      } else {
+        setTimeout(resolve, 100);
+      }
+    });
+
     try {
       const { width, height } = getOptimalImageDimensions();
+      // Améliorer la requête avec le contexte "artiste/musicien" pour des résultats plus pertinents
+      const enhancedQuery = `${query} musician artist singer performer portrait`;
       // Recherche avec dimensions spécifiques et orientation landscape
       const params = new URLSearchParams({
-        query: query,
-        limit: '1',
+        query: enhancedQuery,
+        limit: '5', // Récupérer plus de résultats pour trouver une meilleure image
         random: 'true',
         width: width.toString(),
         height: height.toString(),
@@ -165,7 +177,7 @@ export const HeroCarousel = memo(({
       setEnhancedSlides(updatedSlides);
     };
 
-    enhanceSlides();
+    //enhanceSlides();
   }, [slides, fetchEnhancedImage]);
 
   useEffect(() => {

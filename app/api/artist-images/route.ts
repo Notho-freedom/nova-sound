@@ -32,7 +32,7 @@ const provider = new ArtistImageProvider({
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('query');
+    const query = 'artiste '+searchParams.get('query');
     const limit = parseInt(searchParams.get('limit') || '10', 10);
     const random = searchParams.get('random') === 'true';
     const width = searchParams.get('width') ? parseInt(searchParams.get('width')!, 10) : undefined;

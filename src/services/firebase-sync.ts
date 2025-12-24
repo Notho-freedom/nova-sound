@@ -143,7 +143,7 @@ class FirebaseSyncService {
   private isInitialized: boolean = false;
   
   async initializeSync(userId: string): Promise<void> {
-    // Ensure Firebase is initialized first
+    // Ensure Firebase is initialized first (non-bloquant)
     const { firebaseService } = await import('./firebase');
     await firebaseService.ensureInitialized();
     
@@ -189,32 +189,50 @@ class FirebaseSyncService {
 
       this.currentUserId = userId;
       
-      // Migrate old localStorage keys to user-isolated keys
-      try {
-        const { migrateToUserIsolatedStorage } = await import('../lib/storage-utils');
-        await migrateToUserIsolatedStorage();
-      } catch (error) {
-        console.error('Failed to migrate to user-isolated storage:', error);
-      }
+      // Différer la migration pour ne pas bloquer l'initialisation
+      // (opération non-critique qui peut être faite en arrière-plan)
+      setTimeout(async () => {
+        try {
+          const { migrateToUserIsolatedStorage } = await import('../lib/storage-utils');
+          await migrateToUserIsolatedStorage();
+        } catch (error) {
+          console.error('Failed to migrate to user-isolated storage:', error);
+        }
+      }, 1000);
       
-      // Load initial data from Firestore (or create if doesn't exist)
-      const loadedData = await this.loadFromFirestore(userId);
-      
-      // If no data exists, save local data to Firestore to create the document
-      if (!loadedData) {
-        console.log('📝 No Firestore data found, creating initial sync document');
-        await this.saveToFirestore(userId);
-      }
-      
-      // Set up real-time listeners
+      // Set up real-time listeners first (critical path)
       this.setupRealtimeListeners(userId);
       
-      // Start periodic sync (every hour)
-      this.startPeriodicSync(userId);
+      // Différer le chargement initial et la synchronisation
+      // Ces opérations sont moins critiques et peuvent être faites en arrière-plan
+      const deferredInit = async () => {
+        try {
+          // Load initial data from Firestore (or create if doesn't exist)
+          const loadedData = await this.loadFromFirestore(userId);
+          
+          // If no data exists, save local data to Firestore to create the document
+          if (!loadedData) {
+            console.log('📝 No Firestore data found, creating initial sync document');
+            await this.saveToFirestore(userId);
+          }
+          
+          // Calculate initial hash for change detection
+          const initialData = await this.getCurrentLocalData();
+          this.lastSyncedDataHash = this.calculateDataHash(initialData);
+        } catch (error) {
+          console.error('Error during deferred sync initialization:', error);
+        }
+      };
+
+      // Utiliser requestIdleCallback pour différer les opérations non-critiques
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => deferredInit(), { timeout: 3000 });
+      } else {
+        setTimeout(deferredInit, 500);
+      }
       
-      // Calculate initial hash for change detection
-      const initialData = await this.getCurrentLocalData();
-      this.lastSyncedDataHash = this.calculateDataHash(initialData);
+      // Start periodic sync (every hour) - différé
+      setTimeout(() => this.startPeriodicSync(userId), 2000);
       
       // Only log on first initialization, not on every call
       if (!this.syncListeners.has('appData')) {
@@ -395,101 +413,133 @@ class FirebaseSyncService {
   }
 
   // Handle remote updates from Firestore
+  // Optimisé: opérations non-bloquantes via queueMicrotask
   private async handleRemoteUpdate(data: UserAppData): Promise<void> {
     this.isSyncing = true;
     
     try {
-      // Update local storage with Firestore data
+      // Batch all localStorage operations to minimize main thread blocking
+      // Use queueMicrotask to yield to the browser between operations
+      const saveOperations: Array<() => void> = [];
+      
       if (data.settings) {
-        this.saveToLocalStorage('nexus-settings', data.settings);
-        // Trigger Electron storage update if available
-        if (window.electronAPI) {
-          await window.electronAPI.updateSettings(data.settings);
-        }
+        saveOperations.push(() => this.saveToLocalStorage('nexus-settings', data.settings));
       }
 
       if (data.favorites) {
-        this.saveToLocalStorage('nexus-favorites', data.favorites);
-        // Trigger Electron storage update if available
-        if (window.electronAPI) {
-          for (const trackId of data.favorites) {
-            await window.electronAPI.addFavorite(trackId);
-          }
-        }
+        saveOperations.push(() => this.saveToLocalStorage('nexus-favorites', data.favorites));
       }
 
       if (data.history && Array.isArray(data.history) && data.history.length > 0) {
         console.log('[FirebaseSync] Mise à jour historique depuis Firebase:', data.history.length, 'entrées');
-        this.saveToLocalStorage('nexus-play-history', data.history);
-        // Émettre un événement spécifique pour l'historique pour forcer la mise à jour
-        window.dispatchEvent(new CustomEvent('firebase-history-update', { 
-          detail: { history: data.history } 
-        }));
+        saveOperations.push(() => {
+          this.saveToLocalStorage('nexus-play-history', data.history);
+          window.dispatchEvent(new CustomEvent('firebase-history-update', { 
+            detail: { history: data.history } 
+          }));
+        });
       } else if (data.history && Array.isArray(data.history) && data.history.length === 0) {
-        // Même si l'historique est vide, on le sauvegarde pour éviter les conflits
-        this.saveToLocalStorage('nexus-play-history', data.history);
-        window.dispatchEvent(new CustomEvent('firebase-history-update', { 
-          detail: { history: data.history } 
-        }));
+        saveOperations.push(() => {
+          this.saveToLocalStorage('nexus-play-history', data.history);
+          window.dispatchEvent(new CustomEvent('firebase-history-update', { 
+            detail: { history: data.history } 
+          }));
+        });
       }
 
       if (data.theme) {
-        this.saveToLocalStorage('nexus-theme', data.theme);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-theme', data.theme));
       }
 
       if (data.notificationsEnabled !== undefined) {
-        this.saveToLocalStorage('nexus-notifications-enabled', data.notificationsEnabled);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-notifications-enabled', data.notificationsEnabled));
       }
 
       if (data.volume !== undefined) {
-        this.saveToLocalStorage('nexus-volume', data.volume);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-volume', data.volume));
       }
 
       if (data.searchHistory) {
-        this.saveToLocalStorage('nexus-search-history', data.searchHistory);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-search-history', data.searchHistory));
       }
 
       if (data.uploadedMedia && this.currentUserId) {
-        // Use user-isolated storage key
         const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
-        this.saveToLocalStorage(storageKey, data.uploadedMedia);
+        saveOperations.push(() => this.saveToLocalStorage(storageKey, data.uploadedMedia));
       } else if (data.uploadedMedia) {
-        // Fallback to old key for backward compatibility
-        this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-uploaded-media', data.uploadedMedia));
       }
 
       if (data.cloudinaryConfig) {
-        this.saveToLocalStorage('nexus-cloudinary-config', data.cloudinaryConfig);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-cloudinary-config', data.cloudinaryConfig));
       }
 
       if (data.equalizerPresets) {
-        this.saveToLocalStorage('nexus-equalizer-presets', data.equalizerPresets);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-equalizer-presets', data.equalizerPresets));
       }
 
       if (data.scrobblerSettings) {
-        this.saveToLocalStorage('nexus-scrobbler-settings', data.scrobblerSettings);
+        saveOperations.push(() => this.saveToLocalStorage('nexus-scrobbler-settings', data.scrobblerSettings));
       }
       
       if (data.youtubeApiKey !== undefined) {
-        this.saveToLocalStorage('nexus-youtube-api-key', data.youtubeApiKey);
-        // Émettre un événement pour notifier les composants
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('youtube-api-key-updated', { detail: data.youtubeApiKey }));
-        }
+        saveOperations.push(() => {
+          this.saveToLocalStorage('nexus-youtube-api-key', data.youtubeApiKey);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('youtube-api-key-updated', { detail: data.youtubeApiKey }));
+          }
+        });
+      }
+
+      // Exécuter les opérations de manière non-bloquante
+      // Utiliser queueMicrotask pour céder au navigateur entre les opérations
+      for (let i = 0; i < saveOperations.length; i++) {
+        await new Promise<void>(resolve => {
+          queueMicrotask(() => {
+            saveOperations[i]();
+            resolve();
+          });
+        });
+      }
+
+      // Trigger Electron storage update if available (en arrière-plan)
+      if (window.electronAPI && data.settings) {
+        // Différer les opérations Electron pour ne pas bloquer
+        setTimeout(async () => {
+          try {
+            await window.electronAPI!.updateSettings(data.settings!);
+          } catch (error) {
+            console.warn('Error updating Electron settings:', error);
+          }
+        }, 0);
+      }
+
+      if (window.electronAPI && data.favorites) {
+        // Différer les opérations Electron pour ne pas bloquer
+        setTimeout(async () => {
+          try {
+            for (const trackId of data.favorites!) {
+              await window.electronAPI!.addFavorite(trackId);
+            }
+          } catch (error) {
+            console.warn('Error updating Electron favorites:', error);
+          }
+        }, 0);
       }
 
       // Update hash after remote update
       this.lastSyncedDataHash = this.calculateDataHash(data);
 
-      // Dispatch custom events for UI updates
-      window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: data }));
-      
-      // Émettre aussi un événement spécifique pour l'historique si présent
-      if (data.history && Array.isArray(data.history)) {
-        window.dispatchEvent(new CustomEvent('firebase-history-update', { 
-          detail: { history: data.history } 
-        }));
-      }
+      // Dispatch custom events for UI updates (non-bloquant)
+      queueMicrotask(() => {
+        window.dispatchEvent(new CustomEvent('firebase-sync-update', { detail: data }));
+        
+        if (data.history && Array.isArray(data.history)) {
+          window.dispatchEvent(new CustomEvent('firebase-history-update', { 
+            detail: { history: data.history } 
+          }));
+        }
+      });
       
       // Silent sync - no console logs for normal operations
     } catch (error) {
@@ -868,42 +918,64 @@ class FirebaseSyncService {
   }
 
   // Queue a sync operation (with debounce and change detection)
+  // Non-blocking: toutes les opérations sont différées pour ne pas ralentir la navigation
   queueSync(type: string, data: any): void {
-    // Save locally immediately
-    const dataMap: Record<string, any> = { [type]: data };
-    this.saveDataLocally(dataMap as Partial<UserAppData>);
-    
-    // Mark as pending change
-    this.pendingChanges.add(type);
+    // Utiliser requestIdleCallback ou setTimeout pour ne jamais bloquer l'UI
+    const deferredOperation = () => {
+      // Save locally immediately (synchrone mais très rapide)
+      const dataMap: Record<string, any> = { [type]: data };
+      this.saveDataLocally(dataMap as Partial<UserAppData>);
+      
+      // Mark as pending change
+      this.pendingChanges.add(type);
 
-    // Clear existing debounce timer
-    if (this.changeDetectionDebounce) {
-      clearTimeout(this.changeDetectionDebounce);
-    }
-
-    // Debounce sync to Firestore (only sync if changes persist after delay)
-    this.changeDetectionDebounce = setTimeout(async () => {
-      if (!this.currentUserId) {
-        return;
+      // Clear existing debounce timer
+      if (this.changeDetectionDebounce) {
+        clearTimeout(this.changeDetectionDebounce);
       }
 
-      try {
-        // Check if data actually changed before syncing
-        const currentData = await this.getCurrentLocalData();
-        const newHash = this.calculateDataHash(currentData);
-
-        if (newHash !== this.lastSyncedDataHash) {
-          // Silent sync - no console log
-          await this.saveToFirestore(this.currentUserId, { [type]: data } as Partial<UserAppData>);
-        } else {
-          // Silent - no changes
-          this.pendingChanges.delete(type);
+      // Debounce sync to Firestore (only sync if changes persist after delay)
+      // Utiliser un délai plus long pour éviter de bloquer la navigation
+      this.changeDetectionDebounce = setTimeout(async () => {
+        if (!this.currentUserId) {
+          return;
         }
-      } catch (error) {
-        console.error(`Error syncing ${type}:`, error);
-        // Will be retried in periodic sync
-      }
-    }, this.changeDetectionDelay);
+
+        // Différer l'opération Firestore via requestIdleCallback pour ne jamais bloquer
+        const performSync = async () => {
+          try {
+            // Check if data actually changed before syncing
+            const currentData = await this.getCurrentLocalData();
+            const newHash = this.calculateDataHash(currentData);
+
+            if (newHash !== this.lastSyncedDataHash) {
+              // Silent sync - no console log
+              await this.saveToFirestore(this.currentUserId!, { [type]: data } as Partial<UserAppData>);
+            } else {
+              // Silent - no changes
+              this.pendingChanges.delete(type);
+            }
+          } catch (error) {
+            console.error(`Error syncing ${type}:`, error);
+            // Will be retried in periodic sync
+          }
+        };
+
+        // Exécuter via requestIdleCallback si disponible, sinon setTimeout
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(() => performSync(), { timeout: 5000 });
+        } else {
+          setTimeout(performSync, 100);
+        }
+      }, this.changeDetectionDelay);
+    };
+
+    // Différer l'opération initiale pour ne pas bloquer la navigation
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(deferredOperation, { timeout: 1000 });
+    } else {
+      setTimeout(deferredOperation, 0);
+    }
   }
 
   // Process sync queue

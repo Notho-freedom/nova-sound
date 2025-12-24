@@ -48,9 +48,14 @@ export class PixabayAdapter {
     try {
       const { query, limit = 10, orientation } = options;
       
+      // Améliorer la requête avec le contexte musical pour des résultats plus pertinents
+      const enhancedQuery = query.toLowerCase().includes('artist') || query.toLowerCase().includes('musician')
+        ? query
+        : `${query} musician artist portrait`;
+      
       const params = new URLSearchParams({
         key: this.apiKey,
-        q: query,
+        q: enhancedQuery,
         image_type: 'photo',
         per_page: Math.min(limit, 200).toString(),
         safesearch: 'true',

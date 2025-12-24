@@ -67,6 +67,7 @@ interface LibraryViewProps {
   showHistory?: boolean;
   initialSelectedAlbum?: string | null;
   loading?: boolean;
+  onNavigateToArtist?: (artistName: string) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -329,6 +330,7 @@ export const LibraryView = memo(({
   showHistory = false,
   initialSelectedAlbum,
   loading = false,
+  onNavigateToArtist,
 }: LibraryViewProps) => {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("list");
   const [sortMode, setSortMode] = useState<SortMode>("title");
@@ -1104,7 +1106,14 @@ export const LibraryView = memo(({
                 key={artist.name}
                 artist={artist}
                 delay={idx * 0.02}
-                onSelect={() => setSelectedArtist(artist.name)}
+                onSelect={() => {
+                  // Use onNavigateToArtist if provided, otherwise fall back to internal state
+                  if (onNavigateToArtist) {
+                    onNavigateToArtist(artist.name);
+                  } else {
+                    setSelectedArtist(artist.name);
+                  }
+                }}
                 onPlay={() => {
                   const firstTrack = artist.tracks[0];
                   const idx = tracks.findIndex(t => t.id === firstTrack.id);

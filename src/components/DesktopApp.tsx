@@ -16,6 +16,7 @@ import { LibraryView } from "./views/LibraryView";
 import { PlaylistView } from "./views/PlaylistView";
 import { SettingsView } from "./views/SettingsView";
 import { NotificationsView } from "./views/NotificationsView";
+import { ArtistView } from "./views/ArtistView";
 
 // Lazy load heavy components
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
@@ -152,6 +153,7 @@ export const DesktopApp = () => {
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
+  const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Audio element ref for real playback
@@ -1127,11 +1129,9 @@ export const DesktopApp = () => {
   const handleNavigateToArtist = useCallback(() => {
     if (!currentTrack) return;
     setShowInlinePlayer(false);
-    setCurrentView("artists");
-    // Note: LibraryView will handle artist filtering internally when in artists view mode
-    const message = `Affichage de l'artiste "${currentTrack.artist}"`;
-    toast.success(message);
-    notifySuccess(message);
+    setSelectedArtist(currentTrack.artist);
+    setCurrentView("artist-detail");
+    toast.success(`Ouverture de la page artiste "${currentTrack.artist}"`);
   }, [currentTrack]);
 
   // Utility function to remove duplicates from track lists
@@ -1303,6 +1303,10 @@ export const DesktopApp = () => {
           recentTracks={recentTracks}
           favoriteTracks={favoriteTracks}
           history={history}
+          onFilterByArtist={(artistName) => {
+            setSelectedArtist(artistName);
+            setCurrentView("artist-detail");
+          }}
         />
         );
       case "search":
@@ -1482,6 +1486,53 @@ export const DesktopApp = () => {
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
             loading={libraryLoading}
+            onNavigateToArtist={(artistName) => {
+              setSelectedArtist(artistName);
+              setCurrentView("artist-detail");
+            }}
+          />
+        );
+      case "artist-detail":
+        return selectedArtist ? (
+          <ArtistView
+            artistName={selectedArtist}
+            tracks={tracks}
+            currentTrackIndex={currentTrackIndex}
+            isPlaying={isPlaying}
+            onTrackSelect={handleTrackSelect}
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
+            onBack={() => {
+              setSelectedArtist(null);
+              setCurrentView("artists");
+            }}
+            onAlbumClick={(albumName, artistName) => {
+              const albumKey = `${albumName}-${artistName}`;
+              setAlbumToOpen(albumKey);
+              setCurrentView("albums");
+              setTimeout(() => setAlbumToOpen(null), 100);
+            }}
+            onArtistClick={(artistName) => {
+              setSelectedArtist(artistName);
+            }}
+          />
+        ) : (
+          <LibraryView
+            tracks={tracks}
+            currentTrackIndex={currentTrackIndex}
+            isPlaying={isPlaying}
+            onTrackSelect={handleTrackSelect}
+            title="Artistes"
+            viewMode="artists"
+            onPlayNext={handlePlayNext}
+            onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
+            loading={libraryLoading}
+            onNavigateToArtist={(artistName) => {
+              setSelectedArtist(artistName);
+              setCurrentView("artist-detail");
+            }}
           />
         );
       case "videos":

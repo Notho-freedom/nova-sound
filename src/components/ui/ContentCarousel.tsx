@@ -49,7 +49,7 @@ export const ContentCarousel = memo(({
   }, []);
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative w-full min-w-0 overflow-hidden", className)} style={{ contain: 'inline-size' }}>
       {/* Header */}
       {(title || subtitle || action) && (
         <div className="flex items-center justify-between mb-4 px-1">
@@ -103,7 +103,7 @@ export const ContentCarousel = memo(({
       )}
 
       {/* Carousel container */}
-      <div className="relative group/carousel">
+      <div className="relative group/carousel min-w-0 max-w-full">
         {/* Left fade */}
         <div
           className={cn(
@@ -128,13 +128,12 @@ export const ContentCarousel = memo(({
         <div
           ref={scrollRef}
           onScroll={checkScrollability}
-          className={cn(
-            "flex overflow-x-auto scrollbar-hide pb-4 -mb-4",
-            "scroll-smooth snap-x snap-mandatory"
-          )}
+          className="flex overflow-x-auto overflow-y-hidden scrollbar-hide pb-4 -mb-4 scroll-smooth snap-x snap-mandatory w-full"
           style={{ gap: `${gap}px` }}
         >
           {children}
+          {/* Spacer to ensure right padding in scroll */}
+          <div className="flex-shrink-0 w-px" aria-hidden="true" />
         </div>
 
         {/* Mobile navigation arrows */}

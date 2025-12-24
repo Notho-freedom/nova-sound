@@ -46,8 +46,14 @@ export class UnsplashAdapter {
     try {
       const { query, limit = 10, orientation = 'squarish' } = options;
       
+      // Améliorer la requête avec le contexte musical pour des résultats plus pertinents
+      // Éviter les résultats génériques (ex: "Royal" → rue royale)
+      const enhancedQuery = query.toLowerCase().includes('artist') || query.toLowerCase().includes('musician')
+        ? query
+        : `${query} musician artist portrait`;
+      
       const params = new URLSearchParams({
-        query: query,
+        query: enhancedQuery,
         per_page: Math.min(limit, 30).toString(),
         orientation: orientation,
       });

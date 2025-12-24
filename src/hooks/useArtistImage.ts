@@ -25,13 +25,44 @@ interface UseArtistImageResult {
 }
 
 /**
+ * Améliore la requête avec le contexte musical pour des résultats plus pertinents
+ * Évite les résultats génériques (ex: "Royal" → rue royale au lieu de l'artiste)
+ */
+function enhanceQueryForArtist(query: string): string {
+  // Si la requête contient déjà des mots-clés pertinents, ne pas modifier
+  const lowerQuery = query.toLowerCase();
+  if (lowerQuery.includes('artist') || 
+      lowerQuery.includes('musician') || 
+      lowerQuery.includes('singer') ||
+      lowerQuery.includes('band') ||
+      lowerQuery.includes('performer')) {
+    return query;
+  }
+  // Ajouter le contexte musical pour de meilleurs résultats
+  return `${query} musician artist singer portrait`;
+}
+
+/**
  * Fetches artist image from API with fallback to direct provider
+ * Utilise requestIdleCallback pour ne pas bloquer l'UI
  */
 async function fetchArtistImageWithFallback(query: string, random: boolean = true): Promise<{ image: ArtistImage | null }> {
+  // Attendre un moment d'inactivité pour ne pas bloquer l'UI
+  await new Promise<void>((resolve) => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => resolve(), { timeout: 1000 });
+    } else {
+      // Fallback pour les environnements sans requestIdleCallback
+      queueMicrotask(resolve);
+    }
+  });
+
+  const enhancedQuery = enhanceQueryForArtist(query);
+  
   try {
     // Try API first
     const params = new URLSearchParams({
-      query,
+      query: enhancedQuery,
       random: random ? 'true' : 'false',
     });
 
@@ -46,7 +77,7 @@ async function fetchArtistImageWithFallback(query: string, random: boolean = tru
     if (response.status === 503 || response.status === 404) {
       console.info('[useArtistImage] API not available, using direct provider fallback');
       const provider = getArtistImageProvider();
-      const image = await provider.getRandomImage(query);
+      const image = await provider.getRandomImage(enhancedQuery);
       return { image };
     }
     
@@ -56,7 +87,7 @@ async function fetchArtistImageWithFallback(query: string, random: boolean = tru
     console.info('[useArtistImage] Network error, using direct provider fallback:', error);
     try {
       const provider = getArtistImageProvider();
-      const image = await provider.getRandomImage(query);
+      const image = await provider.getRandomImage(enhancedQuery);
       return { image };
     } catch (fallbackError) {
       console.warn('[useArtistImage] Fallback also failed:', fallbackError);
@@ -67,12 +98,24 @@ async function fetchArtistImageWithFallback(query: string, random: boolean = tru
 
 /**
  * Fetches multiple artist images from API with fallback to direct provider
+ * Utilise requestIdleCallback pour ne pas bloquer l'UI
  */
 async function fetchArtistImagesWithFallback(query: string, limit: number = 10): Promise<ImageSearchResult> {
+  // Attendre un moment d'inactivité pour ne pas bloquer l'UI
+  await new Promise<void>((resolve) => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => resolve(), { timeout: 1000 });
+    } else {
+      queueMicrotask(resolve);
+    }
+  });
+
+  const enhancedQuery = enhanceQueryForArtist(query);
+  
   try {
     // Try API first
     const params = new URLSearchParams({
-      query,
+      query: enhancedQuery,
       limit: limit.toString(),
     });
 
@@ -87,7 +130,7 @@ async function fetchArtistImagesWithFallback(query: string, limit: number = 10):
     if (response.status === 503 || response.status === 404) {
       console.info('[useArtistImages] API not available, using direct provider fallback');
       const provider = getArtistImageProvider();
-      const result = await provider.search({ query, limit });
+      const result = await provider.search({ query: enhancedQuery, limit });
       return result;
     }
     
@@ -97,7 +140,7 @@ async function fetchArtistImagesWithFallback(query: string, limit: number = 10):
     console.info('[useArtistImages] Network error, using direct provider fallback:', error);
     try {
       const provider = getArtistImageProvider();
-      const result = await provider.search({ query, limit });
+      const result = await provider.search({ query: enhancedQuery, limit });
       return result;
     } catch (fallbackError) {
       console.warn('[useArtistImages] Fallback also failed:', fallbackError);

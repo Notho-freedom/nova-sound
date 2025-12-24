@@ -284,7 +284,7 @@ export const HomeView = memo(({
   }
 
   return (
-    <div className="pb-8 space-y-10 animate-fade-in">
+    <div className="pb-8 space-y-10 animate-fade-in overflow-hidden w-full" style={{ contain: 'inline-size' }}>
       {/* Hero Section with Carousel */}
       {heroSlides.length > 0 && (
         <section className="px-6">
@@ -377,7 +377,7 @@ export const HomeView = memo(({
 
       {/* Recently Played Artists - Carousel */}
       {recentArtists.length > 0 && (
-        <section className="pl-6">
+        <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <ContentCarousel
             title="Artistes récents"
             subtitle="Vos artistes écoutés récemment"
@@ -400,7 +400,7 @@ export const HomeView = memo(({
 
       {/* Explore by Genre - Carousel */}
       {topGenres.length > 0 && (
-        <section className="pl-6">
+        <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <ContentCarousel
             title="Explorer par genre"
             subtitle={`${genres.length} genres disponibles`}
@@ -429,13 +429,13 @@ export const HomeView = memo(({
 
       {/* Recently Played Tracks - Carousel */}
       {displayRecent.length > 0 && (
-        <section className="pl-6">
+        <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <ContentCarousel
             title={recentTracks.length > 0 ? "Écouté récemment" : "À découvrir"}
             subtitle={`${displayRecent.length} titres`}
             icon={<Clock className="w-5 h-5 text-accent" />}
           >
-            {displayRecent.slice(0, 5).map((track, idx) => {
+            {displayRecent.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;
               
@@ -480,13 +480,13 @@ export const HomeView = memo(({
 
       {/* New in Library - Carousel */}
       {newTracks.length > 0 && (
-        <section className="pl-6">
+        <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <ContentCarousel
             title="Nouveautés"
             subtitle="Récemment ajouté à votre bibliothèque"
             icon={<Star className="w-5 h-5 text-yellow-500" />}
           >
-            {newTracks.slice(0,5).map((track, idx) => {
+            {newTracks.map((track, idx) => {
               const actualIndex = tracks.findIndex(t => t.id === track.id);
               const isCurrent = currentTrackIndex === actualIndex;
               
