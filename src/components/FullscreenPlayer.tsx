@@ -471,72 +471,83 @@ useEffect(() => {
       exit={{ opacity: 0 }}
       className={cn(
         "fixed inset-0 z-[10000] flex overflow-hidden",
-        isYouTube ? "bg-transparent" : "bg-gradient-to-br from-background via-background to-background/95"
+        isYouTube ? "bg-transparent" : "bg-background"
       )}
     >
       {/* Animated Background Layer */}
       {!isYouTube && (
         <div className="absolute inset-0 overflow-hidden">
-          {/* Album cover background - cinematic blur */}
+          {/* Album cover background - vivid blur */}
           <motion.div 
-            initial={{ scale: 1.2, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+            initial={{ scale: 1.3, opacity: 0 }}
+            animate={{ scale: 1.1, opacity: 0.6 }}
             transition={{ duration: 1.5 }}
             className="absolute inset-0"
             style={{
               backgroundImage: `url(${getCoverUrl(currentTrack.coverUrl)})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              filter: 'blur(80px) saturate(1.2)',
-              opacity: 0.3,
-              transform: 'scale(1.2)',
+              filter: 'blur(80px) saturate(1.5) brightness(1.1)',
             }}
           />
           
-          {/* Gradient overlays */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
+          {/* Color extraction overlay - makes colors pop */}
+          <div className="absolute inset-0 mix-blend-soft-light bg-gradient-to-br from-primary/40 via-transparent to-primary/30" />
           
-          {/* Animated orbs */}
+          {/* Subtle gradient for readability - uses background color */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-background/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-transparent to-background/50" />
+          
+          {/* Animated light rays */}
           <motion.div
             animate={{ 
-              x: [0, 100, 0],
-              y: [0, -50, 0],
-              scale: [1, 1.3, 1],
+              rotate: [0, 360],
             }}
-            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full blur-[150px]"
-            style={{ background: "radial-gradient(circle, hsl(var(--neon-cyan) / 0.4) 0%, transparent 70%)" }}
+            transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] opacity-[0.07]"
+            style={{
+              background: `conic-gradient(from 0deg, transparent 0deg, white 2deg, transparent 4deg, transparent 90deg, white 92deg, transparent 94deg, transparent 180deg, white 182deg, transparent 184deg, transparent 270deg, white 272deg, transparent 274deg)`,
+            }}
           />
+          
+          {/* Animated glowing orbs */}
           <motion.div
             animate={{ 
-              x: [0, -80, 0],
-              y: [0, 60, 0],
+              x: [0, 80, 0],
+              y: [0, -40, 0],
               scale: [1, 1.2, 1],
+              opacity: [0.5, 0.7, 0.5],
             }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-            className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full blur-[180px]"
-            style={{ background: "radial-gradient(circle, hsl(var(--neon-magenta) / 0.35) 0%, transparent 70%)" }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/4 left-1/4 w-[400px] h-[400px] rounded-full blur-[120px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-cyan)) 0%, transparent 70%)" }}
           />
           <motion.div
             animate={{ 
-              x: [0, 50, 0],
-              y: [0, -80, 0],
+              x: [0, -60, 0],
+              y: [0, 50, 0],
+              scale: [1, 1.15, 1],
+              opacity: [0.4, 0.6, 0.4],
             }}
-            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full blur-[200px]"
-            style={{ background: "radial-gradient(circle, hsl(var(--neon-purple) / 0.25) 0%, transparent 70%)" }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute bottom-1/4 right-1/4 w-[450px] h-[450px] rounded-full blur-[140px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-magenta)) 0%, transparent 70%)" }}
+          />
+          <motion.div
+            animate={{ 
+              scale: [1, 1.1, 1],
+              opacity: [0.3, 0.5, 0.3],
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[160px]"
+            style={{ background: "radial-gradient(circle, hsl(var(--neon-purple)) 0%, transparent 70%)" }}
           />
 
-          {/* Grid pattern overlay */}
+          {/* Noise texture overlay */}
           <div 
-            className="absolute inset-0 opacity-[0.03]"
+            className="absolute inset-0 opacity-[0.03] mix-blend-overlay"
             style={{
-              backgroundImage: `
-                linear-gradient(hsl(var(--primary) / 0.5) 1px, transparent 1px),
-                linear-gradient(90deg, hsl(var(--primary) / 0.5) 1px, transparent 1px)
-              `,
-              backgroundSize: '60px 60px',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
             }}
           />
         </div>
