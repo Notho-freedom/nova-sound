@@ -1284,6 +1284,7 @@ export const DesktopApp = () => {
           repeatMode={repeatMode}
           volume={volume}
           isMuted={isMuted}
+          youtubeDuration={youtubeDuration}
           onPlayPause={handlePlayPause}
           onPrevious={handlePrevious}
           onNext={handleNext}
@@ -1828,6 +1829,7 @@ export const DesktopApp = () => {
             volume={volume}
             isMuted={isMuted}
             audioElement={audioRef.current}
+            youtubeDuration={youtubeDuration}
             onPlayPause={handlePlayPause}
             onPrevious={handlePrevious}
             onNext={handleNext}

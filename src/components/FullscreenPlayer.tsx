@@ -46,6 +46,7 @@ interface FullscreenPlayerProps {
   isFavorite?: boolean;
   isInline?: boolean;
   audioElement?: HTMLAudioElement | null;
+  youtubeDuration?: number;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -87,6 +88,7 @@ export const FullscreenPlayer = ({
   isFavorite = false,
   isInline = false,
   audioElement,
+  youtubeDuration,
   onPlayPause,
   onPrevious,
   onNext,
@@ -334,8 +336,11 @@ useEffect(() => {
     loadLyrics();
   }, [currentTrack.id, currentTrack.artist, currentTrack.title]);
 
-  const progress = currentTrack.duration > 0 
-    ? (currentTime / currentTrack.duration) * 100 
+  // Utiliser youtubeDuration pour les tracks YouTube, sinon la durée du track
+  const isYouTubeTrack = currentTrack.mediaSource === 'youtube';
+  const effectiveDuration = isYouTubeTrack && youtubeDuration ? youtubeDuration : currentTrack.duration;
+  const progress = effectiveDuration > 0 
+    ? (currentTime / effectiveDuration) * 100 
     : 0;
 
   // Calculer les barres du visualizer basées sur FFT
@@ -562,7 +567,7 @@ useEffect(() => {
             </div>
             <div className="flex justify-between mt-2 text-xs text-muted-foreground/60 font-mono">
               <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(currentTrack.duration)}</span>
+              <span>{formatTime(effectiveDuration)}</span>
             </div>
           </motion.div>
         </div>
@@ -851,9 +856,9 @@ useEffect(() => {
                 </div>
                 {/* Slider overlay */}
                 <Slider
-                  value={[isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime]}
-                  max={isYouTube && !sharedYoutubePlayerRef ? (youtubeState.duration || currentTrack.duration) : currentTrack.duration}
-                  step={1}
+                  value={[currentTime]}
+                  max={effectiveDuration}
+                  step={0.1}
                   onValueChange={handleSeekYouTube}
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 />
@@ -861,14 +866,14 @@ useEffect(() => {
               
               <div className="flex items-center justify-between mt-3 text-sm">
                 <span className="text-white/50 font-mono tabular-nums">
-                  {formatTime(isYouTube && !sharedYoutubePlayerRef ? youtubeState.currentTime : currentTime)}
+                  {formatTime(currentTime)}
                 </span>
                 <div className="flex items-center gap-2 text-white/30">
                   <Clock className="w-3.5 h-3.5" />
-                  <span className="text-xs">{formatDuration(currentTrack.duration)}</span>
+                  <span className="text-xs">{formatDuration(effectiveDuration)}</span>
                 </div>
                 <span className="text-white/50 font-mono tabular-nums">
-                  {formatTime(currentTrack.duration)}
+                  {formatTime(effectiveDuration)}
                 </span>
               </div>
             </motion.div>

@@ -355,12 +355,16 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
 
   // Mettre à jour le temps, la durée, le volume et le mute
   useEffect(() => {
-    if (!playerInstanceRef.current || !isReady) return;
+    // Attendre que le player soit vraiment initialisé
+    if (!isReady) return;
 
     const updateProgress = () => {
       try {
         const player = playerInstanceRef.current;
         if (!player) return;
+
+        // Vérifier que le player a les méthodes nécessaires
+        if (typeof player.getCurrentTime !== 'function') return;
 
         // Mettre à jour le temps actuel
         const current = player.getCurrentTime();
@@ -396,16 +400,16 @@ export function useYouTubePlayer(videoId?: string): UseYouTubePlayerReturn {
       }
     };
 
-    // Mettre à jour toutes les 250ms pour une progression fluide
+    // Mettre à jour toutes les 100ms pour une progression très fluide
     updateProgress(); // Appel immédiat
-    updateIntervalRef.current = setInterval(updateProgress, 250);
+    updateIntervalRef.current = setInterval(updateProgress, 100);
     
     return () => {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
       }
     };
-  }, [isReady]); // Ne pas dépendre de isPlaying pour continuer à mettre à jour même en pause
+  }, [isReady, isPlaying]); // Ajouter isPlaying pour redémarrer l'intervalle quand la lecture change
 
   // Charger une nouvelle vidéo
   const loadVideo = useCallback((newVideoId: string, startSeconds?: number) => {

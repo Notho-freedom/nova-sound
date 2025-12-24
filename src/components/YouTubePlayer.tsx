@@ -157,11 +157,30 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     }
   }, [isPlaying]);
 
+  // Ref pour stocker currentTime et éviter les closures stales
+  const currentTimeRef = useRef(currentTime);
   useEffect(() => {
-    if (onTimeUpdateRef.current) {
-      onTimeUpdateRef.current(currentTime);
-    }
+    currentTimeRef.current = currentTime;
   }, [currentTime]);
+
+  // Appeler onTimeUpdate via un intervalle pour garantir une mise à jour continue
+  useEffect(() => {
+    if (!isReady) return;
+    
+    // Appel immédiat avec la valeur actuelle
+    if (onTimeUpdateRef.current && currentTimeRef.current >= 0) {
+      onTimeUpdateRef.current(currentTimeRef.current);
+    }
+    
+    // Intervalle pour mise à jour continue
+    const interval = setInterval(() => {
+      if (onTimeUpdateRef.current && currentTimeRef.current >= 0) {
+        onTimeUpdateRef.current(currentTimeRef.current);
+      }
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [isReady, isPlaying]); // Redémarrer quand isReady ou isPlaying change
 
   useEffect(() => {
     if (error && onErrorRef.current) {
