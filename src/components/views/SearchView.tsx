@@ -59,6 +59,7 @@ const formatTime = (seconds: number) => {
 }
 
 const MAX_HISTORY = 8
+const HISTORY_AUTOSAVE_DELAY = 5000 // 5s d'inactivité avant auto-validation
 
 // Browse category card - Enhanced
 const CategoryCard = memo(({
@@ -252,6 +253,8 @@ export const SearchView = ({
   const [youtubeTracks, setYoutubeTracks] = useState<Track[]>([])
   const [isFocused, setIsFocused] = useState(false)
   const youtubeSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const historySaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const latestTypedQueryRef = useRef("")
   const inputRef = useRef<HTMLInputElement>(null)
   
   // Hooks for context menu
@@ -297,16 +300,75 @@ export const SearchView = ({
     }
   }, [])
 
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (historySaveTimerRef.current) {
+        clearTimeout(historySaveTimerRef.current)
+      }
+    }
+  }, [])
+
   // Save search history
+  // Similarity ratio (0..1) using Levenshtein distance
+  const similarityRatio = (a: string, b: string): number => {
+    const s = a.trim().toLowerCase()
+    const t = b.trim().toLowerCase()
+    if (!s && !t) return 1
+    if (!s || !t) return 0
+    const m = s.length
+    const n = t.length
+    const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1))
+    for (let i = 0; i <= m; i++) dp[i][0] = i
+    for (let j = 0; j <= n; j++) dp[0][j] = j
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        const cost = s[i - 1] === t[j - 1] ? 0 : 1
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,      // deletion
+          dp[i][j - 1] + 1,      // insertion
+          dp[i - 1][j - 1] + cost // substitution
+        )
+      }
+    }
+    const dist = dp[m][n]
+    const maxLen = Math.max(m, n)
+    return maxLen === 0 ? 1 : 1 - dist / maxLen
+  }
+
   const saveToHistory = (term: string) => {
-    const normalized = term.trim().toLowerCase()
+    const cleaned = term.trim()
+    const normalized = cleaned.toLowerCase()
     if (!normalized) return
 
-    // Remove any existing entry with same normalized text
-    const filtered = searchHistory.filter((h) => h.trim().toLowerCase() !== normalized)
-    const newHistory = [term.trim(), ...filtered].slice(0, MAX_HISTORY)
+    // Find existing entry similar >=95%
+    const existingIndex = searchHistory.findIndex((h) => similarityRatio(h, cleaned) >= 0.95)
+
+    let filtered = searchHistory
+    if (existingIndex !== -1) {
+      filtered = searchHistory.filter((_, idx) => idx !== existingIndex)
+    } else {
+      // Otherwise remove exact normalized duplicates
+      filtered = searchHistory.filter((h) => h.trim().toLowerCase() !== normalized)
+    }
+
+    const newHistory = [cleaned, ...filtered].slice(0, MAX_HISTORY)
     setSearchHistory(newHistory)
     localStorage.setItem("nexus-search-history", JSON.stringify(newHistory))
+  }
+
+  const scheduleAutoSaveHistory = (value: string) => {
+    latestTypedQueryRef.current = value
+    if (historySaveTimerRef.current) {
+      clearTimeout(historySaveTimerRef.current)
+    }
+    if (!value.trim()) return
+    historySaveTimerRef.current = setTimeout(() => {
+      const cleaned = latestTypedQueryRef.current.trim()
+      if (cleaned) {
+        saveToHistory(cleaned)
+      }
+    }, HISTORY_AUTOSAVE_DELAY)
   }
 
   const clearHistory = () => {
@@ -487,6 +549,7 @@ export const SearchView = ({
                   onChange={(e) => {
                     const value = e.target.value
                     setQuery(value)
+                    scheduleAutoSaveHistory(value)
                   }}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
@@ -495,6 +558,10 @@ export const SearchView = ({
                       const cleaned = query.trim()
                       if (cleaned) {
                         saveToHistory(cleaned)
+                        if (historySaveTimerRef.current) {
+                          clearTimeout(historySaveTimerRef.current)
+                          historySaveTimerRef.current = null
+                        }
                       }
                     }
                   }}
