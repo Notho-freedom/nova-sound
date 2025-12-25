@@ -591,6 +591,12 @@ export const LibraryView = memo(({
 
   const totalDuration = tracks.reduce((acc, track) => acc + track.duration, 0);
 
+  // Get random cover images for visual display
+  const randomCovers = useMemo(() => {
+    const coversWithImages = tracks.filter(t => t.coverUrl).slice(0, 12);
+    return coversWithImages.sort(() => Math.random() - 0.5).slice(0, 6);
+  }, [tracks]);
+
   // Handle initial album selection
   useEffect(() => {
     if (initialSelectedAlbum && viewMode === "albums") {
@@ -1816,12 +1822,6 @@ export const LibraryView = memo(({
   }
 
   // Tracks View (default)
-  // Get random cover images for visual display
-  const randomCovers = useMemo(() => {
-    const coversWithImages = tracks.filter(t => t.coverUrl).slice(0, 12);
-    return coversWithImages.sort(() => Math.random() - 0.5).slice(0, 6);
-  }, [tracks]);
-
   // If no title, render simplified list only (for embedded use in other views)
   if (!title) {
     return (
