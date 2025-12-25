@@ -787,9 +787,21 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   const nexusLogout = useCallback(async () => {
     try {
+      console.log('📝 Starting complete logout process...');
+      
       // Déconnexion complète : à la fois authService (OAuth manuel) et firebaseService
       await authService.signOut();
       await firebaseService.signOut();
+      
+      // Nettoyer toutes les données de l'application
+      const { completeLogoutCleanup } = await import('@/lib/storage-utils');
+      await completeLogoutCleanup();
+      
+      // Dispatcher l'événement de nettoyage pour tous les hooks et composants
+      const { dispatchLogoutCleanupEvent } = await import('@/lib/logout-cleanup');
+      dispatchLogoutCleanupEvent();
+      
+      // Nettoyer les états React
       setNexusUser(null);
       setNexusAuthenticated(false);
       setNexusIsPro(false);
@@ -798,6 +810,30 @@ export function useCloudSync(): UseCloudSyncReturn {
         tracksUploaded: 0,
         tracksDownloaded: 0,
       });
+      setCloudinaryConfig(null);
+      setCloudinaryConfigured(false);
+      
+      // Réinitialiser les flags internes
+      syncInitializedRef.current = false;
+      lastUserIdRef.current = null;
+      anonymousUserInitRef.current = false;
+      googleMergeInProgressRef.current = false;
+      
+      // Nettoyer les timers
+      if (syncStatusDebounceTimerRef.current) {
+        clearTimeout(syncStatusDebounceTimerRef.current);
+        syncStatusDebounceTimerRef.current = null;
+      }
+      
+      // Forcer un garbage collection des services
+      try {
+        const { firebaseSyncService } = await import('@/services/firebase-sync');
+        firebaseSyncService.cleanup();
+      } catch (error) {
+        // Silently fail
+      }
+      
+      console.log('✅ Complete logout finished - all user data cleaned');
       notificationService.logoutSuccess();
     } catch (error: any) {
       console.error("Logout error:", error);

@@ -212,8 +212,12 @@ export const CloudView = () => {
       const currentUser = firebaseService.getCurrentUser();
       if (currentUser && !currentUser.isAnonymous) {
         try {
+          // Wait for Firebase to be ready
+          await firebaseService.ensureInitialized();
+          
           const token = await firebaseService.getIdToken();
           if (token) {
+            console.log("[CloudView] Fetching files from Nexus API...");
             const response = await fetch("/api/storage/files", {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -251,11 +255,23 @@ export const CloudView = () => {
                   }
                 }
               });
+              
+              // Save updated list to localStorage for faster loading next time
+              if (userId) {
+                localStorage.setItem(storageKey, JSON.stringify(uploadedMedia));
+                console.log("[CloudView] Saved updated file list to localStorage");
+              }
+            } else {
+              console.warn("[CloudView] Nexus API returned status:", response.status);
             }
+          } else {
+            console.warn("[CloudView] No Firebase token available");
           }
         } catch (error) {
           console.error("[CloudView] Failed to fetch Nexus files:", error);
         }
+      } else {
+        console.log("[CloudView] User not authenticated or anonymous, skipping Nexus API fetch");
       }
 
       uploadedMedia.sort((a, b) => 
@@ -273,6 +289,16 @@ export const CloudView = () => {
 
   useEffect(() => {
     loadUploadedFiles();
+    
+    // Retry loading files when authentication changes
+    const retryTimer = setTimeout(() => {
+      if (nexusAuthenticated) {
+        console.log("[CloudView] Retrying file load after authentication");
+        loadUploadedFiles();
+      }
+    }, 2000);
+    
+    return () => clearTimeout(retryTimer);
   }, [loadUploadedFiles, nexusAuthenticated]);
 
   useEffect(() => {

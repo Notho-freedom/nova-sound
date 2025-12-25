@@ -1315,8 +1315,8 @@ export const DesktopApp = () => {
     return shuffled.slice(0, 20);
   }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
-  // Calculer la vue actuelle directement (pas de fonction pour éviter les problèmes de hooks)
-  const currentViewContent = (() => {
+  // Calculer la vue actuelle avec useMemo pour éviter les problèmes de hooks
+  const currentViewContent = useMemo(() => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
@@ -1835,7 +1835,55 @@ export const DesktopApp = () => {
           </div>
         );
     }
-  })();
+  }, [
+    showInlinePlayer,
+    currentTrack,
+    isPlaying,
+    currentTime,
+    isShuffle,
+    repeatMode,
+    volume,
+    isMuted,
+    youtubeDuration,
+    currentView,
+    tracks,
+    currentTrackIndex,
+    libraryLoading,
+    recentTracks,
+    favoriteTracks,
+    history,
+    playlists,
+    recentlyAddedTracks,
+    albumToOpen,
+    selectedArtist,
+    audioRef.current,
+    isFavorite,
+    handleToggleFavorite,
+    handlePlayPause,
+    handlePrevious,
+    handleNext,
+    handleShuffle,
+    handleRepeat,
+    handleSeek,
+    handleVolumeChange,
+    handleShowPlayer,
+    handleTrackSelect,
+    handlePlayNext,
+    handleAddToQueue,
+    handleAddToPlaylist,
+    handlePlayTrackList,
+    handlePlayTracks,
+    handleShuffleTracks,
+    createPlaylist,
+    updatePlaylist,
+    deletePlaylist,
+    addTracksToPlaylist,
+    removeTracksFromPlaylist,
+    handlePlayTrack,
+    setSelectedArtist,
+    setCurrentView,
+    setAlbumToOpen,
+  ]);
 
   // Show loading screen
   if (isLoading) {

@@ -3,6 +3,62 @@ import { nexusServerService } from '@/services/nexus-server';
 import { notificationService } from '@/services/notification-service';
 import { toast } from 'sonner';
 import type { Track } from '@/types/music';
+import { getUserStorageKey, getCurrentUserId } from '@/lib/storage-utils';
+
+const UPLOADED_MEDIA_KEY = 'nexus-uploaded-media';
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  uploadedAt: string;
+  cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster';
+  url?: string;
+  size?: number;
+  type?: 'audio' | 'video' | 'image' | 'other';
+  cloudId?: string;
+}
+
+// Helper function to save uploaded file to localStorage
+async function saveUploadedFile(file: UploadedFile): Promise<void> {
+  try {
+    const userId = await getCurrentUserId();
+    const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+    
+    const saved = localStorage.getItem(storageKey);
+    let uploadedMedia: UploadedFile[] = [];
+    
+    if (saved) {
+      try {
+        uploadedMedia = JSON.parse(saved);
+      } catch (e) {
+        console.error('[useNexusUpload] Error parsing localStorage:', e);
+      }
+    }
+    
+    // Check if file already exists
+    const existingIndex = uploadedMedia.findIndex(f => f.id === file.id);
+    if (existingIndex >= 0) {
+      // Update existing file
+      uploadedMedia[existingIndex] = file;
+    } else {
+      // Add new file
+      uploadedMedia.push(file);
+    }
+    
+    // Sort by upload date
+    uploadedMedia.sort((a, b) => 
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
+    
+    localStorage.setItem(storageKey, JSON.stringify(uploadedMedia));
+    console.log('[useNexusUpload] Saved file to localStorage:', file.name);
+    
+    // Dispatch event to notify CloudView
+    window.dispatchEvent(new CustomEvent('uploadedMediaChanged', { detail: file }));
+  } catch (error) {
+    console.error('[useNexusUpload] Failed to save uploaded file:', error);
+  }
+}
 
 export interface NexusUploadProgress {
   trackId: string;
@@ -164,6 +220,17 @@ export function useNexusUpload(): UseNexusUploadReturn {
           return updated;
         });
 
+        // Save to localStorage
+        await saveUploadedFile({
+          id: result.id || track.id,
+          name: fileName,
+          uploadedAt: new Date().toISOString(),
+          cloudProvider: 'nexus',
+          url: result.url || `/api/storage/download/${result.id || track.id}`,
+          size: fileInfo?.size,
+          type: 'audio',
+        });
+
         notificationService.uploadCompleted(track.title, 'PlanetHoster/Nexus (Serveur 2)');
 
         // Remove progress after 3 seconds
@@ -263,7 +330,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
       const blob = new Blob([byteArray], { type: mimeType });
 
       // Upload to Nexus/Bunny
-      await nexusServerService.uploadFile(blob, fileName, (progressValue) => {
+      const uploadResult = await nexusServerService.uploadFile(blob, fileName, (progressValue) => {
         setUploadProgress(prev => {
           const updated = new Map(prev);
           const current = updated.get(track.id);
@@ -289,6 +356,17 @@ export function useNexusUpload(): UseNexusUploadReturn {
           });
         }
         return updated;
+      });
+
+      // Save to localStorage
+      await saveUploadedFile({
+        id: uploadResult?.id || track.id,
+        name: fileName,
+        uploadedAt: new Date().toISOString(),
+        cloudProvider: 'nexus',
+        url: uploadResult?.url || `/api/storage/download/${uploadResult?.id || track.id}`,
+        size: blob.size,
+        type: 'audio',
       });
 
       notificationService.uploadCompleted(track.title, 'PlanetHoster/Nexus (Serveur 2)');

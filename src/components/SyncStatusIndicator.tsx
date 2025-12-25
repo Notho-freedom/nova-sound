@@ -18,10 +18,10 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [firebaseReady, setFirebaseReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    let authUnsubscribe: (() => void) | null = null;
     
     // Wait for Firebase to be initialized before checking auth
     const initializeAuth = async () => {
@@ -30,23 +30,26 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
         await firebaseService.ensureInitialized();
         
         if (!mounted) return;
-        setFirebaseReady(true);
         
-        // Now check the current user
-        const user = firebaseService.getCurrentUser();
-        if (user) {
-          setIsAuthenticated(!user.isAnonymous);
-          setUserEmail(user.email || null);
+        // Listen for auth state changes - this is the primary and ONLY source of truth
+        // This listener will be called immediately with the current auth state
+        authUnsubscribe = firebaseService.onAuthStateChange((user) => {
+          if (!mounted) return;
+          
+          console.log('🔄 SyncStatusIndicator: Auth state changed', { 
+            user: user ? { uid: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null 
+          });
+          
+          const authenticated = !!user && !user.isAnonymous;
+          setIsAuthenticated(authenticated);
+          setUserEmail(user?.email || null);
           setSyncStatus("idle");
-        } else {
-          setIsAuthenticated(false);
-          setUserEmail(null);
-          setSyncStatus("idle");
-        }
+          
+          console.log('📊 SyncStatusIndicator: Updated auth state', { authenticated, email: user?.email });
+        });
       } catch (error) {
         console.error("SyncStatusIndicator: Firebase init error:", error);
         if (mounted) {
-          setFirebaseReady(true);
           setSyncStatus("idle");
         }
       }
@@ -100,22 +103,6 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
       });
     }
 
-    // Listen for auth state changes - this is the primary source of truth
-    const unsubscribe = firebaseService.onAuthStateChange((user) => {
-      if (!mounted) return;
-      
-      const authenticated = !!user && !user.isAnonymous;
-      setIsAuthenticated(authenticated);
-      setUserEmail(user?.email || null);
-      
-      // Update sync status based on auth change
-      if (authenticated && syncStatus === "loading") {
-        setSyncStatus("idle");
-      } else if (!authenticated && syncStatus === "loading") {
-        setSyncStatus("idle");
-      }
-    });
-
     // Custom event listeners for sync status
     window.addEventListener("nexus-sync-start", handleSyncStart);
     window.addEventListener("nexus-sync-complete", handleSyncComplete);
@@ -127,7 +114,9 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
       window.removeEventListener("nexus-sync-start", handleSyncStart);
       window.removeEventListener("nexus-sync-complete", handleSyncComplete);
       window.removeEventListener("nexus-sync-error", handleSyncError);
-      unsubscribe();
+      if (authUnsubscribe) {
+        authUnsubscribe();
+      }
     };
   }, []);
 
