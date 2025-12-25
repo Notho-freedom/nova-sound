@@ -113,6 +113,161 @@
     --sidebar-border: 230 20% 10%;
     --sidebar-ring: 177 100% 50%;
   }
+
+  /* Spotify theme */
+  .spotify {
+    --background: 150 18% 7%;
+    --foreground: 0 0% 96%;
+    --card: 150 18% 9%;
+    --card-foreground: 0 0% 96%;
+    --popover: 150 18% 10%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 141 73% 42%; /* Spotify green */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 150 15% 18%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 150 15% 14%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 141 73% 42%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 15% 16%;
+    --input: 150 15% 14%;
+    --ring: 141 73% 42%;
+    --sidebar-background: 150 18% 6%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 141 73% 42%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 150 15% 12%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 150 15% 14%;
+    --sidebar-ring: 141 73% 42%;
+  }
+
+  /* Apple Music theme */
+  .apple-music {
+    --background: 350 25% 8%;
+    --foreground: 0 0% 98%;
+    --card: 350 25% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 350 25% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 354 91% 63%; /* Apple Music red/pink */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 350 20% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 350 18% 15%;
+    --muted-foreground: 0 0% 72%;
+    --accent: 354 91% 63%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 350 18% 16%;
+    --input: 350 18% 14%;
+    --ring: 354 91% 63%;
+    --sidebar-background: 350 25% 7%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 354 91% 63%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 350 18% 13%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 350 18% 15%;
+    --sidebar-ring: 354 91% 63%;
+  }
+
+  /* YouTube Music theme */
+  .youtube-music {
+    --background: 0 0% 5%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 0 100% 50%; /* YouTube red */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 0 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
+    --ring: 0 100% 50%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 0 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 12%;
+    --sidebar-ring: 0 100% 50%;
+  }
+
+  /* Tidal theme */
+  .tidal {
+    --background: 200 30% 6%;
+    --foreground: 0 0% 96%;
+    --card: 200 30% 9%;
+    --card-foreground: 0 0% 96%;
+    --popover: 200 30% 11%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 184 100% 50%; /* Cyan accent */
+    --primary-foreground: 200 30% 6%;
+    --secondary: 200 22% 16%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 200 20% 14%;
+    --muted-foreground: 0 0% 72%;
+    --accent: 184 100% 50%;
+    --accent-foreground: 200 30% 6%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 20% 14%;
+    --input: 200 20% 12%;
+    --ring: 184 100% 50%;
+    --sidebar-background: 200 30% 6%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 184 100% 50%;
+    --sidebar-primary-foreground: 200 30% 6%;
+    --sidebar-accent: 200 22% 13%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 200 22% 14%;
+    --sidebar-ring: 184 100% 50%;
+  }
+
+  /* Deezer theme */
+  .deezer {
+    --background: 210 25% 6%;
+    --foreground: 0 0% 96%;
+    --card: 210 25% 9%;
+    --card-foreground: 0 0% 96%;
+    --popover: 210 25% 11%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 193 89% 54%; /* Deezer blue */
+    --primary-foreground: 210 25% 6%;
+    --secondary: 321 100% 60%; /* Deezer magenta */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 20% 14%;
+    --muted-foreground: 0 0% 72%;
+    --accent: 43 100% 60%; /* Yellow accent */
+    --accent-foreground: 210 25% 6%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 22% 14%;
+    --input: 210 22% 12%;
+    --ring: 193 89% 54%;
+    --sidebar-background: 210 25% 6%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 193 89% 54%;
+    --sidebar-primary-foreground: 210 25% 6%;
+    --sidebar-accent: 321 100% 60%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 210 22% 14%;
+    --sidebar-ring: 193 89% 54%;
+  }
 }
 
 /* Enhanced animations with more variety and sophistication */
