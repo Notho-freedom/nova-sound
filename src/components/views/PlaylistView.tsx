@@ -79,6 +79,23 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, scale: 1 }
 };
 
+const gradientPalette = [
+  "from-fuchsia-500/25 via-purple-500/20 to-indigo-500/30",
+  "from-amber-500/25 via-orange-500/15 to-rose-500/25",
+  "from-emerald-500/20 via-teal-500/15 to-cyan-500/25",
+  "from-blue-500/25 via-indigo-500/20 to-slate-500/25",
+  "from-pink-500/25 via-rose-500/15 to-red-500/25",
+  "from-lime-500/25 via-emerald-500/15 to-teal-500/25",
+];
+
+const hashString = (value: string) =>
+  value.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+const pickGradient = (seed: string) => {
+  const index = Math.abs(hashString(seed)) % gradientPalette.length;
+  return gradientPalette[index];
+};
+
 // Memoized Playlist Card
 const PlaylistCard = memo(({ 
   playlist, 
@@ -110,6 +127,7 @@ const PlaylistCard = memo(({
   
   const coverUrl = playlistTracks[0]?.coverUrl ? getCoverUrl(playlistTracks[0].coverUrl) : null;
   const totalDuration = playlistTracks.reduce((acc, t) => acc + t.duration, 0);
+  const gradient = pickGradient(`${playlist.id}-${playlist.name}`);
   
   return (
     <PlaylistContextMenu
@@ -124,51 +142,59 @@ const PlaylistCard = memo(({
     >
       <motion.div
         variants={itemVariants}
-        whileHover={{ scale: 1.02, y: -4 }}
+        whileHover={{ scale: 1.025, y: -6 }}
         whileTap={{ scale: 0.98 }}
         onClick={onSelect}
         className="group relative cursor-pointer"
       >
-        {/* Cover */}
-        <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-primary/30 to-accent/30 shadow-lg group-hover:shadow-xl transition-all duration-300 mb-3">
-          {coverUrl ? (
-            <div className="relative w-full h-full">
-              <img
-                src={coverUrl}
-                alt={playlist.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            </div>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/30">
-              <ListMusic className="w-12 h-12 text-primary/50" />
-            </div>
+        <div className="relative aspect-square rounded-2xl overflow-hidden border border-white/5 bg-gradient-to-br shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:border-white/10"
+          style={{ boxShadow: "0 25px 60px -35px rgba(0,0,0,0.6)" }}
+        >
+          <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(255,255,255,0.08),transparent_25%)]" aria-hidden="true" />
+
+          {coverUrl && (
+            <img
+              src={coverUrl}
+              alt={playlist.name}
+              className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:opacity-60 transition-opacity duration-500"
+              loading="lazy"
+            />
           )}
-          
-          {/* Play Button Overlay */}
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+
           <motion.button
-            initial={{ scale: 0 }}
-            whileHover={{ scale: 1.1 }}
+            initial={{ scale: 0.85, opacity: 0 }}
+            whileHover={{ scale: 1.05, opacity: 1 }}
             onClick={(e) => {
               e.stopPropagation();
               onPlay();
             }}
-            className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300"
+            className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-white/90 text-black shadow-2xl flex items-center justify-center backdrop-blur-md"
           >
-            <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+            <Play className="w-5 h-5 fill-current ml-0.5" />
           </motion.button>
-        </div>
-        
-        {/* Info */}
-        <div>
-          <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-            {playlist.name}
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""} • {formatDuration(totalDuration)}
-          </p>
+
+          <div className="absolute bottom-4 left-4 right-4">
+            <div className="flex items-center gap-2 text-white/80 text-xs font-semibold uppercase tracking-[0.12em]">
+              <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">Playlist</span>
+              <span className="px-2 py-1 rounded-full bg-black/30 backdrop-blur">{playlistTracks.length} titres</span>
+            </div>
+            <h3 className="mt-3 text-lg font-display font-bold text-white drop-shadow-sm line-clamp-2">
+              {playlist.name}
+            </h3>
+            <p className="text-xs text-white/70 mt-1 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-black/40 backdrop-blur border border-white/10">
+                <Clock className="w-3 h-3" />
+                {formatDuration(totalDuration)}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/20">
+                <Shuffle className="w-3 h-3" />
+                Mix prêt
+              </span>
+            </p>
+          </div>
         </div>
       </motion.div>
     </PlaylistContextMenu>
@@ -434,23 +460,28 @@ export const PlaylistView = memo(({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setPageMode("list");
-                setNewPlaylistName("");
-                setSelectedTracksForPlaylist([]);
-                resetFilters();
-              }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold font-display">Nouvelle playlist</h1>
-              <p className="text-sm text-muted-foreground">Créez une playlist personnalisée</p>
+          <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-slate-900 via-background to-black/60 shadow-lg p-5">
+            <div className="absolute -left-10 -top-10 h-40 w-40 bg-fuchsia-500/15 blur-3xl" aria-hidden="true" />
+            <div className="absolute right-0 top-0 h-32 w-32 bg-cyan-400/15 blur-3xl" aria-hidden="true" />
+            <div className="relative flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setPageMode("list");
+                  setNewPlaylistName("");
+                  setSelectedTracksForPlaylist([]);
+                  resetFilters();
+                }}
+                className="bg-white/5 text-white border border-white/10"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold font-display text-white">Nouvelle playlist</h1>
+                <p className="text-sm text-white/70">Assemblez un set ultra-moderne en quelques clics</p>
+              </div>
+              <Badge variant="secondary" className="ml-auto bg-white/10 text-white border-white/20">Mode création</Badge>
             </div>
           </div>
 
@@ -678,24 +709,31 @@ export const PlaylistView = memo(({
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
-          {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setPageMode("detail");
-                setSelectedTracksForPlaylist([]);
-                resetFilters();
-              }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold font-display">
-                {isRemoving ? "Retirer des titres" : "Ajouter des titres"}
-              </h1>
-              <p className="text-sm text-muted-foreground">{selectedPlaylist.name}</p>
+          <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-slate-900 via-background to-black/60 shadow-lg p-5">
+            <div className="absolute -left-10 -top-10 h-40 w-40 bg-emerald-500/15 blur-3xl" aria-hidden="true" />
+            <div className="absolute right-0 top-0 h-32 w-32 bg-indigo-400/15 blur-3xl" aria-hidden="true" />
+            <div className="relative flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setPageMode("detail");
+                  setSelectedTracksForPlaylist([]);
+                  resetFilters();
+                }}
+                className="bg-white/5 text-white border border-white/10"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold font-display text-white">
+                  {isRemoving ? "Retirer des titres" : "Ajouter des titres"}
+                </h1>
+                <p className="text-sm text-white/70">{selectedPlaylist.name}</p>
+              </div>
+              <Badge variant="secondary" className="ml-auto bg-white/10 text-white border-white/20">
+                {isRemoving ? "Nettoyage" : "Enrichissement"}
+              </Badge>
             </div>
           </div>
 
@@ -798,6 +836,7 @@ export const PlaylistView = memo(({
 
   // Playlist Detail View
   if (selectedPlaylist) {
+    const heroCover = playlistTracks[0]?.coverUrl ? getCoverUrl(playlistTracks[0].coverUrl) : null;
     return (
       <PageContainer>
         <motion.div
@@ -805,93 +844,123 @@ export const PlaylistView = memo(({
           animate={{ opacity: 1, x: 0 }}
           className="space-y-6"
         >
-          {/* Header */}
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSelectedPlaylistId(null)}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex-1">
-              {editingPlaylistId === selectedPlaylist.id ? (
-                <div className="flex items-center gap-3">
-                  <Input
-                    value={editingPlaylistName}
-                    onChange={(e) => setEditingPlaylistName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveEdit();
-                      if (e.key === "Escape") {
-                        setEditingPlaylistId(null);
-                        setEditingPlaylistName("");
-                      }
-                    }}
-                    className="text-xl font-bold max-w-md"
-                    autoFocus
-                  />
-                  <Button size="sm" onClick={handleSaveEdit}>Enregistrer</Button>
-                  <Button size="sm" variant="outline" onClick={() => {
-                    setEditingPlaylistId(null);
-                    setEditingPlaylistName("");
-                  }}>
-                    Annuler
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold font-display">{selectedPlaylist.name}</h1>
+          <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-br from-slate-900 via-background to-black/70 shadow-2xl">
+            <div className="absolute inset-0 opacity-60" aria-hidden="true">
+              <div className="absolute -left-12 -top-16 h-48 w-48 bg-fuchsia-500/15 blur-3xl" />
+              <div className="absolute right-0 top-10 h-56 w-56 bg-cyan-400/15 blur-3xl" />
+              <div className="absolute -right-8 bottom-0 h-48 w-48 bg-amber-400/15 blur-3xl" />
+            </div>
+            <div className="relative p-6 md:p-8 space-y-6">
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex items-start gap-4">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleEditPlaylist(selectedPlaylist)}
+                    onClick={() => setSelectedPlaylistId(null)}
+                    className="bg-white/5 text-white border border-white/10"
                   >
-                    <Edit className="w-4 h-4" />
+                    <ArrowLeft className="w-5 h-5" />
                   </Button>
+                  <div className="relative w-28 h-28 rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+                    {heroCover ? (
+                      <img src={heroCover} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/70">
+                        <ListMusic className="w-10 h-10" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-transparent to-black/40" />
+                  </div>
                 </div>
-              )}
-              {selectedPlaylist.description && (
-                <p className="text-muted-foreground mt-1">{selectedPlaylist.description}</p>
-              )}
-              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                <Music className="w-4 h-4" />
-                {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
-                <span className="mx-1">•</span>
-                <Clock className="w-4 h-4" />
-                {formatDuration(playlistTracks.reduce((a, t) => a + t.duration, 0))}
-              </p>
-            </div>
-          </div>
+                <div className="flex-1 space-y-3">
+                  {editingPlaylistId === selectedPlaylist.id ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <Input
+                        value={editingPlaylistName}
+                        onChange={(e) => setEditingPlaylistName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveEdit();
+                          if (e.key === "Escape") {
+                            setEditingPlaylistId(null);
+                            setEditingPlaylistName("");
+                          }
+                        }}
+                        className="text-xl font-bold max-w-md bg-white/5 border-white/20 text-white"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleSaveEdit}>Enregistrer</Button>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setEditingPlaylistId(null);
+                          setEditingPlaylistName("");
+                        }}>
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      <h1 className="text-3xl font-display font-bold text-white drop-shadow-sm">{selectedPlaylist.name}</h1>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditPlaylist(selectedPlaylist)}
+                        className="text-white hover:bg-white/10"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {selectedPlaylist.description && (
+                    <p className="text-sm text-white/70">{selectedPlaylist.description}</p>
+                  )}
+                  <div className="flex flex-wrap gap-2 text-sm text-white/80">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20">
+                      <Music className="w-4 h-4" />
+                      {playlistTracks.length} titre{playlistTracks.length > 1 ? "s" : ""}
+                    </span>
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20">
+                      <Clock className="w-4 h-4" />
+                      {formatDuration(playlistTracks.reduce((a, t) => a + t.duration, 0))}
+                    </span>
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20">
+                      <Sparkles className="w-4 h-4" />
+                      Mode immersif
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-          {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => handlePlayPlaylist(selectedPlaylist.id)} disabled={playlistTracks.length === 0} className="gap-2">
-              <Play className="w-4 h-4 fill-current" />
-              Lecture
-            </Button>
-            <Button variant="outline" onClick={() => handleShufflePlaylist(selectedPlaylist.id)} disabled={playlistTracks.length === 0} className="gap-2">
-              <Shuffle className="w-4 h-4" />
-              Mélanger
-            </Button>
-            <Button variant="outline" onClick={() => {
-              setSelectedTracksForPlaylist([]);
-              setPageMode("edit");
-            }} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Ajouter
-            </Button>
-            {playlistTracks.length > 0 && (
-              <Button variant="outline" onClick={() => {
-                setSelectedTracksForPlaylist(playlistTracks.map(t => t.id));
-                setPageMode("edit");
-              }} className="gap-2">
-                <X className="w-4 h-4" />
-                Retirer
-              </Button>
-            )}
-            <Button variant="destructive" onClick={() => handleDeletePlaylist(selectedPlaylist.id)} className="gap-2">
-              <Trash2 className="w-4 h-4" />
-            </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={() => handlePlayPlaylist(selectedPlaylist.id)} disabled={playlistTracks.length === 0} className="gap-2 shadow-lg">
+                  <Play className="w-4 h-4 fill-current" />
+                  Lecture
+                </Button>
+                <Button variant="outline" onClick={() => handleShufflePlaylist(selectedPlaylist.id)} disabled={playlistTracks.length === 0} className="gap-2 bg-white/5 border-white/20 text-white hover:bg-white/10">
+                  <Shuffle className="w-4 h-4" />
+                  Mélanger
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  setSelectedTracksForPlaylist([]);
+                  setPageMode("edit");
+                }} className="gap-2 bg-white/5 border-white/20 text-white hover:bg-white/10">
+                  <Plus className="w-4 h-4" />
+                  Ajouter
+                </Button>
+                {playlistTracks.length > 0 && (
+                  <Button variant="outline" onClick={() => {
+                    setSelectedTracksForPlaylist(playlistTracks.map(t => t.id));
+                    setPageMode("edit");
+                  }} className="gap-2 bg-white/5 border-white/20 text-white hover:bg-white/10">
+                    <X className="w-4 h-4" />
+                    Retirer
+                  </Button>
+                )}
+                <Button variant="destructive" onClick={() => handleDeletePlaylist(selectedPlaylist.id)} className="gap-2">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Tracks */}
@@ -963,25 +1032,51 @@ export const PlaylistView = memo(({
   // Playlists List (Main View)
   return (
     <PageContainer>
-      {/* Hero */}
-      <PageHero
-        title="Playlists"
-        subtitle={`${playlists.length} playlist${playlists.length > 1 ? "s" : ""} • ${totalTracks} titres au total`}
-        icon={ListMusic}
-        gradient="from-pink-500/20 via-rose-500/10 to-red-500/20"
-        actions={
-          <Button onClick={() => setPageMode("create")} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nouvelle playlist
-          </Button>
-        }
-      />
+      <div className="relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-slate-900 via-background to-slate-900/60 shadow-2xl mb-8">
+        <div className="absolute inset-0 opacity-50" aria-hidden="true">
+          <div className="absolute -left-10 -top-20 h-64 w-64 bg-fuchsia-500/20 blur-3xl" />
+          <div className="absolute right-10 top-10 h-52 w-52 bg-cyan-400/15 blur-3xl" />
+          <div className="absolute -right-10 bottom-0 h-72 w-72 bg-amber-400/10 blur-3xl" />
+        </div>
+        <div className="relative p-6 md:p-8 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs uppercase tracking-[0.15em] text-white/80">
+                <Sparkles className="w-4 h-4" />
+                Mixs sur-mesure
+              </div>
+              <h1 className="text-3xl md:text-4xl font-display font-bold text-white drop-shadow-sm">Playlists</h1>
+              <p className="text-sm text-white/70">
+                {`${playlists.length} playlist${playlists.length > 1 ? "s" : ""} • ${totalTracks} titres en rotation`}
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Badge variant="secondary" className="bg-white/10 text-white border-white/20">Smart order</Badge>
+                <Badge variant="secondary" className="bg-white/10 text-white border-white/20">Sync cloud</Badge>
+                <Badge variant="secondary" className="bg-white/10 text-white border-white/20">Hi-fi ready</Badge>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                className="bg-white/5 text-white border-white/20 hover:bg-white/10"
+                onClick={() => setSearchQuery("")}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Nettoyer les filtres
+              </Button>
+              <Button onClick={() => setPageMode("create")} className="gap-2 shadow-lg">
+                <Plus className="w-4 h-4" />
+                Nouvelle playlist
+              </Button>
+            </div>
+          </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <StatCard icon={ListMusic} label="Playlists" value={playlists.length} color="bg-pink-500/20 text-pink-400" />
-        <StatCard icon={Music} label="Titres" value={totalTracks} color="bg-purple-500/20 text-purple-400" />
-        <StatCard icon={Heart} label="Favoris" value={playlists.filter(p => p.trackIds.length > 5).length} color="bg-red-500/20 text-red-400" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard icon={ListMusic} label="Playlists" value={playlists.length} color="bg-white/5 text-white" />
+            <StatCard icon={Music} label="Titres" value={totalTracks} color="bg-white/5 text-white" />
+            <StatCard icon={Heart} label="Favoris" value={playlists.filter(p => p.trackIds.length > 5).length} color="bg-white/5 text-white" />
+          </div>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -991,7 +1086,10 @@ export const PlaylistView = memo(({
           onChange={setSearchQuery}
           placeholder="Rechercher une playlist..."
         />
-        <ViewToggle view={viewMode} onViewChange={setViewMode} />
+        <div className="flex items-center gap-2">
+          <ViewToggle view={viewMode} onViewChange={setViewMode} />
+          <Badge variant="outline" className="border-dashed border-primary/40 text-primary bg-primary/5">Vue dynamique</Badge>
+        </div>
       </Toolbar>
 
       {/* Loading */}
