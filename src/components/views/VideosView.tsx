@@ -1240,7 +1240,10 @@ export const VideosView = memo(() => {
         {/* YouTube Search View */}
         {viewMode === "youtube" && (
           <YouTubeSearchView
-            onPlayVideo={handlePlayVideo}
+            onPlayVideo={() => {
+              // Ne pas naviguer automatiquement vers le player vidéo
+              // YouTubeSearchView gère sa propre lecture interne
+            }}
             onAddToQueue={(video) => {
               // Ajouter à la file d'attente si nécessaire
               toast.success("Vidéo ajoutée à la file");

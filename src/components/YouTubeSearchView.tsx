@@ -734,10 +734,8 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       
       setPlayingVideo(video);
       setIsPlayerFullscreen(true);
-      // Ajouter à l'historique
-      if (onPlayVideo) {
-        onPlayVideo(video, playbackMode === "audio");
-      }
+      // Ne pas appeler onPlayVideo pour éviter la navigation automatique
+      // Le player reste dans YouTubeSearchView
     }
   }, [convertToVideo, onPlayVideo, playbackMode, onPlayAsAudio]);
   
@@ -760,10 +758,8 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       // Mode vidéo : jouer dans le lecteur intégré
       setPlayingVideo(video);
       setIsPlayerFullscreen(true);
-      // Ajouter à l'historique
-      if (onPlayVideo) {
-        onPlayVideo(video, playbackMode === "audio");
-      }
+      // Ne pas appeler onPlayVideo pour éviter la navigation automatique
+      // Le player reste dans YouTubeSearchView
     }
   }, [playbackMode, onPlayAsAudio, onPlayVideo]);
 
@@ -878,30 +874,29 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     }
   }, [isPlayerFullscreen, playingVideo, playingVideoId]);
 
+  // Si une vidéo est en lecture, afficher le player intégré comme VideosView
+  if (isPlayerFullscreen && playingVideo) {
+    return (
+      <div className="flex flex-col animate-in fade-in duration-300 bg-black absolute inset-0">
+        <VideoPlayer
+          video={playingVideo}
+          videos={[]}
+          onClose={() => {
+            setPlayingVideo(null);
+            setIsPlayerFullscreen(false);
+          }}
+          className="w-full h-full"
+          showControls={true}
+          autoPlay={true}
+          audioOnly={playbackMode === "audio"}
+          onProgressUpdate={updateWatchProgress}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full relative">
-      {/* Lecteur vidéo intégré en overlay */}
-      {isPlayerFullscreen && playingVideo && (
-        <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
-          <VideoPlayer
-            video={playingVideo}
-            videos={[]}
-            onClose={() => {
-                setPlayingVideo(null);
-                setIsPlayerFullscreen(false);
-              }}
-            className="w-full h-full"
-            showControls={true}
-                autoPlay={true}
-            isFullApp={true}
-                audioOnly={playbackMode === "audio"}
-            onProgressUpdate={updateWatchProgress}
-          />
-        </div>
-      )}
-      
-      {/* Contenu principal */}
-      <div className={cn("flex flex-col h-full", isPlayerFullscreen && "opacity-0 pointer-events-none")}>
+    <div className="flex flex-col h-full">
       {/* Header avec recherche */}
       <div className="flex-shrink-0 p-6 border-b border-border/30 bg-background/80 backdrop-blur-sm">
         <div className="space-y-4">
@@ -1445,7 +1440,6 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
             )}
           </div>
         )}
-      </div>
       </div>
     </div>
   );
