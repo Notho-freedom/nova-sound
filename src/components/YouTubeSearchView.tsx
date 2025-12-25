@@ -874,24 +874,22 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     }
   }, [isPlayerFullscreen, playingVideo, playingVideoId]);
 
-  // Si une vidéo est en lecture, afficher le player intégré comme VideosView
+  // Si une vidéo est en lecture, utiliser le VideoPlayer unifié
   if (isPlayerFullscreen && playingVideo) {
     return (
-      <div className="flex flex-col animate-in fade-in duration-300 bg-black absolute inset-0">
-        <VideoPlayer
-          video={playingVideo}
-          videos={[]}
-          onClose={() => {
-            setPlayingVideo(null);
-            setIsPlayerFullscreen(false);
-          }}
-          className="w-full h-full"
-          showControls={true}
-          autoPlay={true}
-          audioOnly={playbackMode === "audio"}
-          onProgressUpdate={updateWatchProgress}
-        />
-      </div>
+      <VideoPlayer
+        video={playingVideo}
+        videos={[]} // Pas de liste pour navigation dans le contexte YouTube search
+        onClose={() => {
+          setPlayingVideo(null);
+          setIsPlayerFullscreen(false);
+        }}
+        className="absolute inset-0"
+        showControls={true}
+        autoPlay={true}
+        audioOnly={playbackMode === "audio"}
+        onProgressUpdate={updateWatchProgress}
+      />
     );
   }
 
