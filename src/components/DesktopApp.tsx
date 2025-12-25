@@ -999,7 +999,7 @@ export const DesktopApp = () => {
       return;
     }
 
-    clearQueue();
+    // Remplacer la file sans passer par un clear intermédiaire
     setQueue(tracksToPlay);
     setCurrentIndex(0);
     setIsPlaying(true);
@@ -1018,7 +1018,7 @@ export const DesktopApp = () => {
     }
 
     const clampedIndex = Math.max(0, Math.min(startIndex, validTracks.length - 1));
-    clearQueue();
+    // Remplacer la file sans effacer d'autres caches
     setQueue(validTracks);
     setCurrentIndex(clampedIndex);
     setIsPlaying(true);
@@ -1026,7 +1026,7 @@ export const DesktopApp = () => {
     const message = `Lecture de ${validTracks.length} titre${validTracks.length > 1 ? 's' : ''}`;
     toast.success(message);
     notifySuccess(message);
-  }, [clearQueue, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess]);
+  }, [setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess]);
 
   // Action manuelle pour vider la file
   const handleClearQueue = useCallback(() => {

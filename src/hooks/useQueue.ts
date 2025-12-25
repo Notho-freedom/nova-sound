@@ -64,15 +64,14 @@ export function useQueue(initialTracks: Track[] = []): UseQueueReturn {
     };
   });
 
-  // Save to localStorage whenever queue changes
+  // Save to localStorage whenever queue changes (persist even when empty to avoid wiping other caches)
   useEffect(() => {
-    if (typeof window !== 'undefined' && queue.tracks.length > 0) {
-      try {
-        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue.tracks));
-        localStorage.setItem(QUEUE_INDEX_STORAGE_KEY, queue.currentIndex.toString());
-      } catch (error) {
-        console.error('Failed to save queue to localStorage:', error);
-      }
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue.tracks));
+      localStorage.setItem(QUEUE_INDEX_STORAGE_KEY, queue.currentIndex.toString());
+    } catch (error) {
+      console.error('Failed to save queue to localStorage:', error);
     }
   }, [queue.tracks, queue.currentIndex]);
 
@@ -136,15 +135,21 @@ export function useQueue(initialTracks: Track[] = []): UseQueueReturn {
 
   // Clear entire queue
   const clearQueue = useCallback(() => {
-    setQueueState({
+    setQueueState((prev) => ({
       tracks: [],
       currentIndex: 0,
-      originalOrder: [],
+      // Conserver l'ordre original pour pouvoir rétablir facilement après ajout
+      originalOrder: prev.originalOrder,
       shuffleOrder: null,
-    });
+    }));
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(QUEUE_STORAGE_KEY);
-      localStorage.removeItem(QUEUE_INDEX_STORAGE_KEY);
+      try {
+        // Persister un état vide plutôt que supprimer les clés pour éviter tout reset global
+        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify([]));
+        localStorage.setItem(QUEUE_INDEX_STORAGE_KEY, '0');
+      } catch (error) {
+        console.error('Failed to persist cleared queue:', error);
+      }
     }
   }, []);
 
