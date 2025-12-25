@@ -554,8 +554,12 @@ export function useCloudSync(): UseCloudSyncReturn {
             try {
               const token = await authService.getAccessToken();
               console.log("useCloudSync: Token available:", token ? "✓" : "✗");
+              if (!token) {
+                console.warn("useCloudSync: Failed to obtain access token, but continuing without it");
+              }
             } catch (tokenError) {
               console.error("useCloudSync: Error getting token:", tokenError);
+              // Don't throw, just log the error - continue with UI update
             }
           }
 

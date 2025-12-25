@@ -48,9 +48,10 @@ const PRODUCTION_URL = process.env.NEXT_PUBLIC_VERCEL_URL || 'https://nova-sound
 const OAUTH_PROXY_ENDPOINT = 
   (typeof window !== 'undefined' ? process.env.OAUTH_PROXY_URL : null) || null;
 
-// Next.js API route for OAuth token exchange (uses server-side credentials)
+// Next.js API routes for OAuth (uses server-side credentials)
 // This is the default and secure method for web applications
 const OAUTH_API_ENDPOINT = '/api/oauth/token';
+const OAUTH_REFRESH_ENDPOINT = '/api/oauth/refresh';
 
 class AuthService {
   private currentUser: UserProfile | null = null;
@@ -58,6 +59,8 @@ class AuthService {
   private authStateListeners: Set<(user: UserProfile | null) => void> = new Set();
   private googleClientId: string | null = null;
   private tokenRefreshInterval: NodeJS.Timeout | null = null;
+  private lastTokenRefreshError: Error | null = null;
+  private tokenRefreshErrorTime: number = 0;
 
   constructor() {
     // Load persisted data (only for manual OAuth users, not Firebase anonymous)
@@ -464,50 +467,53 @@ class AuthService {
     }
   }
 
-  // Refresh access token
+  // Refresh access token using server-side endpoint (secure method)
   private async refreshAccessToken(): Promise<AuthTokens> {
     if (!this.authTokens?.refreshToken) {
       throw new Error("No refresh token available");
     }
 
-    const clientId = await this.getGoogleClientId();
-    if (!clientId) {
-      throw new Error("Google OAuth Client ID not configured");
+    try {
+      // Use Next.js API endpoint to safely refresh token (server handles client_secret)
+      const response = await fetch(OAUTH_REFRESH_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refresh_token: this.authTokens.refreshToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Token refresh failed' }));
+        throw new Error(
+          errorData.message || 
+          "Token refresh failed. OAuth may not be configured properly."
+        );
+      }
+
+      const data = await response.json();
+      const expiresIn = data.expires_in || 3600;
+      const expiresAt = Date.now() + expiresIn * 1000;
+
+      this.authTokens = {
+        ...this.authTokens,
+        accessToken: data.access_token,
+        idToken: data.id_token,
+        expiresAt: expiresAt,
+      };
+
+      this.saveToStorage();
+      
+      // Restart token refresh interval with new expiration time
+      this.setupTokenRefresh();
+      
+      return this.authTokens;
+    } catch (error) {
+      console.error("Token refresh error:", error);
+      throw error;
     }
-
-    const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        client_id: clientId,
-        refresh_token: this.authTokens.refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Token refresh failed");
-    }
-
-    const data = await response.json();
-    const expiresIn = data.expires_in || 3600;
-    const expiresAt = Date.now() + expiresIn * 1000;
-
-    this.authTokens = {
-      ...this.authTokens,
-      accessToken: data.access_token,
-      idToken: data.id_token,
-      expiresAt: expiresAt,
-    };
-
-    this.saveToStorage();
-    
-    // Restart token refresh interval with new expiration time
-    this.setupTokenRefresh();
-    
-    return this.authTokens;
   }
 
   // Get user info from Google
@@ -866,11 +872,26 @@ class AuthService {
     // Check if token is expired or will expire soon (within 5 minutes)
     if (this.authTokens.expiresAt < Date.now() + 5 * 60 * 1000) {
       if (this.authTokens.refreshToken) {
+        // Avoid refresh attempts within 30 seconds if there was a recent error
+        const timeSinceLastError = Date.now() - this.tokenRefreshErrorTime;
+        if (this.lastTokenRefreshError && timeSinceLastError < 30000) {
+          console.warn("Token refresh failed recently, waiting before retry:", this.lastTokenRefreshError.message);
+          // Return null but don't sign out, let user try again later
+          return null;
+        }
+
         try {
           await this.refreshAccessToken();
+          // Clear error state on successful refresh
+          this.lastTokenRefreshError = null;
+          this.tokenRefreshErrorTime = 0;
         } catch (error) {
+          // Track the error to avoid spamming refresh attempts
+          this.lastTokenRefreshError = error instanceof Error ? error : new Error(String(error));
+          this.tokenRefreshErrorTime = Date.now();
           console.error("Failed to refresh token:", error);
-          this.signOut();
+          // Don't sign out on refresh failure, just return null
+          // User can try again in 30 seconds or manually sign in again
           return null;
         }
       } else {
