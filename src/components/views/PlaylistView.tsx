@@ -147,7 +147,8 @@ const PlaylistCard = memo(({
         onClick={onSelect}
         className="group relative cursor-pointer"
       >
-        <div className="relative aspect-square rounded-2xl overflow-hidden border border-white/5 bg-gradient-to-br shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:border-white/10"
+        <div
+          className="relative aspect-square rounded-2xl overflow-hidden border border-white/5 bg-gradient-to-br shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:border-white/10 min-h-[240px]"
           style={{ boxShadow: "0 25px 60px -35px rgba(0,0,0,0.6)" }}
         >
           <div className={cn("absolute inset-0 bg-gradient-to-br", gradient)} />
@@ -164,9 +165,30 @@ const PlaylistCard = memo(({
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
+          <div className="absolute inset-x-4 top-4 flex items-center justify-between text-white/85 text-[11px] font-semibold tracking-[0.14em] uppercase">
+            <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20">Playlist</span>
+            <span className="px-2 py-1 rounded-full bg-black/35 backdrop-blur border border-white/20">{playlistTracks.length} titres</span>
+          </div>
+
+          <h3 className="absolute left-4 right-4 bottom-16 text-lg font-display font-bold text-white drop-shadow-sm line-clamp-2">
+            {playlist.name}
+          </h3>
+
+          <div className="absolute left-4 bottom-4 flex items-center gap-2 text-xs text-white/80">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-black/40 backdrop-blur border border-white/10">
+              <Clock className="w-3 h-3" />
+              {formatDuration(totalDuration)}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/12 border border-white/20">
+              <Shuffle className="w-3 h-3" />
+              Mix prêt
+            </span>
+          </div>
+
           <motion.button
-            initial={{ scale: 0.85, opacity: 0 }}
-            whileHover={{ scale: 1.05, opacity: 1 }}
+            initial={{ scale: 0.98, opacity: 1 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileHover={{ scale: 1.06 }}
             onClick={(e) => {
               e.stopPropagation();
               onPlay();
@@ -175,26 +197,6 @@ const PlaylistCard = memo(({
           >
             <Play className="w-5 h-5 fill-current ml-0.5" />
           </motion.button>
-
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="flex items-center gap-2 text-white/80 text-xs font-semibold uppercase tracking-[0.12em]">
-              <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">Playlist</span>
-              <span className="px-2 py-1 rounded-full bg-black/30 backdrop-blur">{playlistTracks.length} titres</span>
-            </div>
-            <h3 className="mt-3 text-lg font-display font-bold text-white drop-shadow-sm line-clamp-2">
-              {playlist.name}
-            </h3>
-            <p className="text-xs text-white/70 mt-1 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-black/40 backdrop-blur border border-white/10">
-                <Clock className="w-3 h-3" />
-                {formatDuration(totalDuration)}
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 border border-white/20">
-                <Shuffle className="w-3 h-3" />
-                Mix prêt
-              </span>
-            </p>
-          </div>
         </div>
       </motion.div>
     </PlaylistContextMenu>
@@ -1112,9 +1114,9 @@ export const PlaylistView = memo(({
       ) : viewMode === "grid" ? (
         <motion.div
           variants={containerVariants}
-          initial="hidden"
+          initial="visible"
           animate="visible"
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-5"
         >
           <AnimatePresence mode="popLayout">
             {filteredPlaylists.map((playlist) => (
@@ -1141,7 +1143,7 @@ export const PlaylistView = memo(({
       ) : (
         <motion.div
           variants={containerVariants}
-          initial="hidden"
+          initial="visible"
           animate="visible"
           className="space-y-2"
         >
