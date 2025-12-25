@@ -1,4 +1,4 @@
-import { X, GripVertical, Play, Pause, Disc3, Radio, Clock, Loader2, ListMusic, Youtube, Music2, Trash2 } from "lucide-react";
+import { X, GripVertical, Play, Pause, Radio, Clock, Loader2, ListMusic, Youtube, Music2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +14,6 @@ interface QueuePanelProps {
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
   onClose: () => void;
-  albumTracks?: Track[];
   similarTracks?: Track[];
   historyTracks?: Track[];
   onPlayTrack?: (track: Track) => void;
@@ -86,7 +85,6 @@ export const QueuePanel = ({
   isPlaying,
   onTrackSelect,
   onClose,
-  albumTracks = [],
   similarTracks: propSimilarTracks = [],
   historyTracks = [],
   onPlayTrack,
@@ -110,55 +108,6 @@ export const QueuePanel = ({
       loadYouTubeSimilar(currentTrack);
     }
   }, [currentTrack?.id, currentTrack?.mediaSource, currentTrack?.artist, currentTrack?.youtubeVideoId, loadYouTubeSimilar]);
-
-  // File: Tous les tracks de l'album (flux de l'album complet)
-  // Se met à jour automatiquement quand currentTrack ou albumTracks changent
-  const albumTracksForFile = useMemo(() => {
-    // Si pas de track actuel, retourner un tableau vide
-    if (!currentTrack) {
-      console.log('[QueuePanel] Pas de currentTrack');
-      return [];
-    }
-    
-    // Pour les tracks YouTube, pas d'album réel
-    if (currentTrack.mediaSource === 'youtube') {
-      return [];
-    }
-    
-    // Si pas de tracks d'album fournis, retourner un tableau vide
-    if (!albumTracks || albumTracks.length === 0) {
-      console.log('[QueuePanel] Pas de albumTracks fournis', {
-        albumTracksLength: albumTracks?.length,
-        currentTrackAlbum: currentTrack.album,
-        currentTrackArtist: currentTrack.artist,
-      });
-      return [];
-    }
-    
-    // Les albumTracks sont déjà filtrés par album et artiste dans DesktopApp
-    // On doit juste exclure le track actuel
-    // Utiliser une comparaison stricte pour éviter les problèmes de type
-    const filtered = albumTracks.filter(t => {
-      // Comparer par ID d'abord
-      if (t.id === currentTrack.id) return false;
-      // Si les IDs ne correspondent pas mais que c'est le même fichier, exclure aussi
-      if (t.filePath && currentTrack.filePath && t.filePath === currentTrack.filePath) return false;
-      return true;
-    });
-    
-    console.log('[QueuePanel] albumTracksForFile calculé', {
-      albumTracksCount: albumTracks.length,
-      currentTrackId: currentTrack.id,
-      currentTrackTitle: currentTrack.title,
-      currentTrackAlbum: currentTrack.album,
-      currentTrackArtist: currentTrack.artist,
-      currentTrackFilePath: currentTrack.filePath,
-      filteredCount: filtered.length,
-      albumTracksIds: albumTracks.map(t => t.id),
-    });
-    
-    return filtered;
-  }, [currentTrack, albumTracks]);
 
   // Similaire: Utiliser les tracks YouTube si c'est un track YouTube, sinon les tracks locaux
   const similarTracksForDisplay = currentTrack?.mediaSource === 'youtube' 
@@ -251,20 +200,13 @@ export const QueuePanel = ({
       {/* Tabs */}
       <Tabs defaultValue="queue" className="flex-1 flex flex-col overflow-hidden">
         <div className="px-4 pt-2 border-b border-border">
-          <TabsList className="w-full grid grid-cols-4 h-auto bg-muted/30">
+          <TabsList className="w-full grid grid-cols-3 h-auto bg-muted/30">
             <TabsTrigger 
               value="queue" 
               className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
             >
               <ListMusic className="w-3 h-3 mr-1" />
               Queue ({queueStats.total})
-            </TabsTrigger>
-            <TabsTrigger 
-              value="file" 
-              className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
-            >
-              <Disc3 className="w-3 h-3 mr-1" />
-              Album ({albumTracksForFile.length})
             </TabsTrigger>
             <TabsTrigger 
               value="similar" 
@@ -385,45 +327,6 @@ export const QueuePanel = ({
                 <ListMusic className="w-8 h-8 mx-auto mb-3 opacity-50" />
                 <p>La file d'attente est vide</p>
                 <p className="text-xs mt-1">Ajoutez des pistes depuis la bibliothèque ou YouTube</p>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* File: Flux de l'album complet */}
-          <TabsContent value="file" className="p-4 mt-0">
-            {albumTracksForFile.length > 0 ? (
-              <div>
-                <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/30">
-                  <p className="text-xs text-muted-foreground mb-1">Album en lecture</p>
-                  <p className="text-sm font-medium text-foreground">
-                    {currentTrack?.album || 'Album inconnu'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {currentTrack?.artist || 'Artiste inconnu'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {albumTracksForFile.length} {albumTracksForFile.length === 1 ? 'piste' : 'pistes'} disponible{albumTracksForFile.length > 1 ? 's' : ''}
-                  </p>
-                </div>
-                <div className="space-y-0.5">
-                  {albumTracksForFile.map((track, index) => (
-                    <TrackItem
-                      key={`${track.id}-${index}`}
-                      track={track}
-                      onClick={() => onPlayTrack?.(track)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                {currentTrack 
-                  ? currentTrack.mediaSource === 'youtube'
-                    ? "Les vidéos YouTube n'ont pas d'album associé"
-                    : currentTrack.album
-                      ? `Aucune autre piste dans l'album "${currentTrack.album}" de ${currentTrack.artist}`
-                      : `Aucun album associé à "${currentTrack.title}"`
-                  : "Aucun album en lecture"}
               </div>
             )}
           </TabsContent>

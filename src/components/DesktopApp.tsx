@@ -1244,53 +1244,6 @@ export const DesktopApp = () => {
       .slice(0, 50);
   }, [libraryTracks, getUniqueTracks]);
 
-  // Get album tracks for current track - without duplicates
-  // Se met à jour automatiquement quand currentTrack change
-  // Cherche dans libraryTracks ET dans la queue actuelle pour trouver tous les tracks de l'album
-  const albumTracks = useMemo(() => {
-    if (!currentTrack) {
-      console.log('[DesktopApp] Pas de currentTrack pour albumTracks');
-      return [];
-    }
-    // Pour les tracks YouTube, pas d'album réel
-    if ((currentTrack.mediaSource as string) === 'youtube') return [];
-    
-    // Combiner libraryTracks et tracks de la queue pour chercher dans les deux sources
-    const allTracks = [...libraryTracks];
-    // Ajouter les tracks de la queue qui ne sont pas déjà dans libraryTracks
-    tracks.forEach(track => {
-      if (!allTracks.find(t => t.id === track.id)) {
-        allTracks.push(track);
-      }
-    });
-    
-    // Filtrer les tracks du même album et artiste
-    const filtered = allTracks.filter(t => 
-      t.album === currentTrack.album && 
-      t.artist === currentTrack.artist &&
-      t.album && // S'assurer que l'album n'est pas vide
-      t.artist   // S'assurer que l'artiste n'est pas vide
-    );
-    
-    const unique = getUniqueTracks(filtered);
-    const sorted = unique.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
-    
-    console.log('[DesktopApp] albumTracks calculé', {
-      currentTrackId: currentTrack.id,
-      currentTrackTitle: currentTrack.title,
-      currentTrackAlbum: currentTrack.album,
-      currentTrackArtist: currentTrack.artist,
-      libraryTracksCount: libraryTracks.length,
-      queueTracksCount: tracks.length,
-      allTracksCount: allTracks.length,
-      filteredCount: filtered.length,
-      uniqueCount: unique.length,
-      sortedCount: sorted.length,
-    });
-    
-    return sorted;
-  }, [currentTrack?.id, currentTrack?.album, currentTrack?.artist, currentTrack?.mediaSource, libraryTracks, tracks, getUniqueTracks]);
-
   // Get similar tracks (same artist or genre, random selection) - without duplicates
   // Se met à jour automatiquement quand currentTrack change
   // Note: Pour les tracks YouTube, les tracks similaires sont chargés directement dans QueuePanel
@@ -2010,7 +1963,6 @@ export const DesktopApp = () => {
                   isPlaying={isPlaying}
                   onTrackSelect={handleTrackSelect}
                   onClose={() => setIsQueueOpen(false)}
-                  albumTracks={albumTracks}
                   similarTracks={similarTracks}
                   historyTracks={historyTracks}
                   onPlayTrack={handlePlayTrack}
