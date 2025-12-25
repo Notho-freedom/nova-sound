@@ -1142,6 +1142,29 @@ export const DesktopApp = () => {
     };
   }, [tracks, addToHistory]);
 
+  // Écouter les mises à jour Firebase pour volume et autres paramètres
+  useEffect(() => {
+    const handleFirebaseUpdate = (event: CustomEvent) => {
+      const data = event.detail;
+      console.log('[DesktopApp] Firebase sync: received data', data);
+      
+      // Synchroniser le volume depuis Firebase
+      if (data?.volume !== undefined && data.volume !== volume) {
+        console.log('[DesktopApp] Firebase sync: updating volume from', volume, 'to', data.volume);
+        setVolume(data.volume);
+      }
+      
+      // Synchroniser d'autres paramètres si nécessaire
+      // Note: Les favoris, historique, theme sont gérés par leurs hooks respectifs
+    };
+
+    window.addEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+    };
+  }, [volume]);
+
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
     setShowInlinePlayer(false);

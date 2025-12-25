@@ -45,6 +45,24 @@ export function useFavorites(): UseFavoritesReturn {
     };
 
     loadFavorites();
+
+    // Écouter les mises à jour Firebase
+    const handleFirebaseUpdate = (event: CustomEvent) => {
+      const data = event.detail;
+      if (data?.favorites && Array.isArray(data.favorites)) {
+        console.log('[useFavorites] Firebase sync: updating favorites');
+        setFavorites(data.favorites);
+        if (!isElectron) {
+          localStorage.setItem("nexus-favorites", JSON.stringify(data.favorites));
+        }
+      }
+    };
+
+    window.addEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+    };
   }, [isElectron]);
 
   // Save to localStorage in web mode

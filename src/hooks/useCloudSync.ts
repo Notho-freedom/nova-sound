@@ -7,6 +7,8 @@ import { stripeService } from "@/services/stripe";
 import { notificationService } from "@/services/notification-service";
 import { isElectron } from "@/lib/electron-detector";
 import { toast } from "sonner";
+import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import { auth } from "@/services/firebase";
 
 interface UseCloudSyncReturn {
   // Auth status
@@ -74,6 +76,7 @@ export function useCloudSync(): UseCloudSyncReturn {
   const syncInitializedRef = useRef<boolean>(false);
   const lastUserIdRef = useRef<string | null>(null);
   const anonymousUserInitRef = useRef<boolean>(false); // Prevent multiple anonymous user creations
+  const googleMergeInProgressRef = useRef<boolean>(false); // Prevent multiple Google merge attempts
   const syncStatusDebounceTimerRef = useRef<NodeJS.Timeout | null>(null); // Debounce sync status calls
 
   // Initialize on mount
@@ -261,71 +264,108 @@ export function useCloudSync(): UseCloudSyncReturn {
           const profile = firebaseService.getUserProfile();
           
           // If there's a local Google user, merge it (Google data takes priority)
-          if (localGoogleUser && localGoogleUser.email && profile) {
+          if (localGoogleUser && localGoogleUser.email && profile && !googleMergeInProgressRef.current) {
+            googleMergeInProgressRef.current = true; // Set flag to prevent concurrent merges
             console.log("🔄 Merging local Google user with existing Firebase anonymous user (Google data takes priority)");
             try {
               // Wait for Firebase to be fully initialized
               await firebaseService.ensureInitialized();
               
-              // Verify that we still have an anonymous user
+              // Get fresh Firebase user state to avoid stale data
               const currentFirebaseUser = firebaseService.getCurrentUser();
-              if (!currentFirebaseUser || !currentFirebaseUser.isAnonymous) {
-                console.warn("⚠️ No anonymous user found, skipping merge");
+              
+              // Check if Google account already exists in Firestore first
+              const existingGoogleUser = await firebaseService.findUserByEmail(localGoogleUser.email);
+              
+              if (existingGoogleUser && currentFirebaseUser && existingGoogleUser.uid !== currentFirebaseUser.uid) {
+                // Google account exists with different UID - sign in to existing account instead of linking
+                console.log("🔍 Google account exists with different UID, signing in directly");
+                
+                const accessToken = await authService.getAccessToken();
+                const idToken = await authService.getIdToken();
+                
+                if (accessToken && idToken) {
+                  // Clean up anonymous user session first
+                  await firebaseService.signOut();
+                  
+                  // Sign in to existing Google account
+                  const credential = GoogleAuthProvider.credential(idToken, accessToken);
+                  const authInstance = auth;
+                  if (authInstance) {
+                    await signInWithCredential(authInstance, credential);
+                  
+                    // Get updated profile
+                    const mergedProfile = firebaseService.getUserProfile();
+                    if (mergedProfile) {
+                      setNexusUser(mergedProfile);
+                      setNexusAuthenticated(true);
+                      setNexusIsPro(firebaseService.isPro());
+                      console.log("✅ Signed in to existing Google account directly");
+                      
+                      // Clear local Google user data (now using Firebase)
+                      await authService.signOut();
+                      anonymousUserInitRef.current = true;
+                      googleMergeInProgressRef.current = false; // Reset flag on success
+                      return;
+                    }
+                  }
+                }
+                googleMergeInProgressRef.current = false; // Reset flag if sign-in failed
+              } else if (currentFirebaseUser && currentFirebaseUser.isAnonymous) {
+                // Safe to link - we have an anonymous user
+                const accessToken = await authService.getAccessToken();
+                const idToken = await authService.getIdToken();
+                
+                if (accessToken && idToken) {
+                  console.log("🔗 Linking Google account to anonymous user");
+                  
+                  // Pass Google user data to prioritize it during merge
+                  const googleUserData = {
+                    email: localGoogleUser.email,
+                    displayName: localGoogleUser.displayName,
+                    photoURL: localGoogleUser.photoURL || undefined,
+                  };
+                  
+                  // Link Google account to anonymous Firebase user (Google data takes priority)
+                  const mergedProfile = await firebaseService.linkWithGoogleCredential(
+                    idToken, 
+                    accessToken,
+                    googleUserData
+                  );
+                  
+                  // Wait a bit for Firestore to update and Firebase listeners to trigger
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  // Get the latest profile from Firestore (to ensure we have the merged data)
+                  const latestProfile = firebaseService.getUserProfile();
+                  const profileToUse = latestProfile || mergedProfile;
+                  
+                  // Update UI with merged profile from Firestore (Google data is prioritized)
+                  setNexusUser(profileToUse);
+                  // Now authenticated because Google account is linked (not anonymous anymore)
+                  setNexusAuthenticated(true);
+                  setNexusIsPro(firebaseService.isPro());
+                  console.log("✅ Google user merged with Firebase anonymous user. Profile (Google data):", profileToUse);
+                  
+                  // Clear local Google user data (now merged in Firebase)
+                  await authService.signOut();
+                  anonymousUserInitRef.current = true;
+                  googleMergeInProgressRef.current = false; // Reset flag on success
+                  return;
+                }
+              } else {
+                // Not an anonymous user or other conditions not met
+                console.warn("⚠️ Cannot merge - user is not anonymous or merge conditions not met");
                 setNexusUser(profile);
                 setNexusAuthenticated(false);
                 setNexusIsPro(false);
-                anonymousUserInitRef.current = true;
-                return;
-              }
-              
-              const accessToken = await authService.getAccessToken();
-              const idToken = await authService.getIdToken();
-              
-              if (accessToken && idToken) {
-                // Check if a Google account with this email already exists in Firestore
-                const existingGoogleUser = await firebaseService.findUserByEmail(localGoogleUser.email);
-                
-                if (existingGoogleUser && existingGoogleUser.uid !== firebaseUser.uid) {
-                  // Account Google existe déjà avec un autre UID
-                  // Firebase va automatiquement remplacer l'utilisateur anonyme lors de la liaison
-                  console.log("🔍 Google account exists with different UID, will replace anonymous user during link");
-                }
-                
-                // Pass Google user data to prioritize it during merge
-                const googleUserData = {
-                  email: localGoogleUser.email,
-                  displayName: localGoogleUser.displayName,
-                  photoURL: localGoogleUser.photoURL || undefined,
-                };
-                
-                // Link Google account to anonymous Firebase user (Google data takes priority)
-                const mergedProfile = await firebaseService.linkWithGoogleCredential(
-                  idToken, 
-                  accessToken,
-                  googleUserData
-                );
-                
-                // Wait a bit for Firestore to update and Firebase listeners to trigger
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Get the latest profile from Firestore (to ensure we have the merged data)
-                const latestProfile = firebaseService.getUserProfile();
-                const profileToUse = latestProfile || mergedProfile;
-                
-                // Update UI with merged profile from Firestore (Google data is prioritized)
-                setNexusUser(profileToUse);
-                // Now authenticated because Google account is linked (not anonymous anymore)
-                setNexusAuthenticated(true);
-                setNexusIsPro(firebaseService.isPro());
-                console.log("✅ Google user merged with Firebase anonymous user. Profile (Google data):", profileToUse);
-                
-                // Clear local Google user data (now merged in Firebase)
-                await authService.signOut();
+                googleMergeInProgressRef.current = false; // Reset flag
                 anonymousUserInitRef.current = true;
                 return;
               }
             } catch (mergeError: any) {
               console.error("Error merging Google user:", mergeError);
+              googleMergeInProgressRef.current = false; // Reset flag on error
               // If merge fails, use the existing anonymous profile
               anonymousUserInitRef.current = false; // Allow retry
             }
@@ -747,7 +787,9 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   const nexusLogout = useCallback(async () => {
     try {
+      // Déconnexion complète : à la fois authService (OAuth manuel) et firebaseService
       await authService.signOut();
+      await firebaseService.signOut();
       setNexusUser(null);
       setNexusAuthenticated(false);
       setNexusIsPro(false);

@@ -42,8 +42,23 @@ export function useNotifications(): UseNotificationsReturn {
     
     // Request permission on mount
     notificationService.requestPermission();
+
+    // Écouter les mises à jour Firebase
+    const handleFirebaseUpdate = (event: CustomEvent) => {
+      const data = event.detail;
+      if (data?.notificationsEnabled !== undefined) {
+        console.log('[useNotifications] Firebase sync: updating notifications enabled to', data.notificationsEnabled);
+        setEnabledState(data.notificationsEnabled);
+        notificationService.setEnabled(data.notificationsEnabled);
+      }
+    };
+
+    window.addEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
     
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      window.removeEventListener('firebase-sync-update', handleFirebaseUpdate as EventListener);
+    };
   }, []);
 
   const setEnabled = useCallback((value: boolean) => {
