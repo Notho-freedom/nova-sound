@@ -14,6 +14,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const syncInProgressRef = useRef(false);
   const lastSyncUserIdRef = useRef<string | null>(null);
+  const lastSyncTimestampRef = useRef<number>(0);
   const initializedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       
       // Éviter de synchroniser plusieurs fois pour le même utilisateur dans un court délai
       if (lastSyncUserIdRef.current === userId) {
-        const timeSinceLastSync = Date.now() - (lastSyncUserIdRef.current as any).timestamp;
+        const timeSinceLastSync = Date.now() - lastSyncTimestampRef.current;
         if (timeSinceLastSync < 10000) { // 10 secondes
           console.log('⏳ FirebaseProvider: Synchronisation Stripe récente, ignorée');
           return;
@@ -52,7 +53,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       
       syncInProgressRef.current = true;
       lastSyncUserIdRef.current = userId;
-      (lastSyncUserIdRef.current as any).timestamp = Date.now();
+      lastSyncTimestampRef.current = Date.now();
       
       try {
         const { firebaseService: fbService } = await import('@/services/firebase');
@@ -128,6 +129,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           console.log('🔄 FirebaseProvider: User signed out, cleaning up sync');
           firebaseSyncService.cleanup();
           lastSyncUserIdRef.current = null;
+          lastSyncTimestampRef.current = 0;
           initializedUserIdRef.current = null;
           isFirstAuth = true;
         }
