@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -38,6 +38,25 @@ export const TitleBar = ({
   const electronEnv = isElectron()
   const electronAPI = getElectronAPI()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
+  
+  // Debug: Log auth state changes in TitleBar
+  if (typeof window !== 'undefined') {
+    console.log('🎯 TitleBar auth state:', {
+      authenticated: nexusAuthenticated,
+      user: nexusUser?.email || nexusUser?.displayName || 'N/A',
+      isPro: nexusIsPro,
+    });
+  }
+
+  // React to auth state changes
+  useEffect(() => {
+    console.log('🔄 TitleBar: Auth state updated', {
+      authenticated: nexusAuthenticated,
+      hasUser: !!nexusUser,
+      userEmail: nexusUser?.email,
+      isPro: nexusIsPro,
+    });
+  }, [nexusAuthenticated, nexusUser, nexusIsPro]);
 
   const handleLogout = async () => {
     await nexusLogout()
