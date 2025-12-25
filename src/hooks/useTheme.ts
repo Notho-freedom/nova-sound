@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export type Theme = "dark" | "light" | "cyberpunk" | "minimal" | "spotify" | "apple-music" | "youtube-music" | "tidal" | "deezer" | "system";
 
@@ -37,6 +37,8 @@ export function useTheme(): UseThemeReturn {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme);
   const [systemTheme, setSystemTheme] = useState<"dark" | "light">("dark");
   const [isLoaded, setIsLoaded] = useState(false);
+  // Track if user changed theme in current session to avoid remote override
+  const userChangedThemeRef = useRef(false);
 
   // Apply theme to document immediately when theme or systemTheme changes
   useEffect(() => {
@@ -86,11 +88,12 @@ export function useTheme(): UseThemeReturn {
         setThemeState(saved);
       }
       
-      // Load from Firebase if authenticated (Firebase takes priority)
+      // Load from Firebase if authenticated
       try {
         const { firebaseSyncService } = await import('@/services/firebase-sync');
         const firestoreData = await firebaseSyncService.loadFromFirestore();
-        if (firestoreData?.theme && themes.some(t => t.id === firestoreData.theme)) {
+        // Do not override if user changed theme in this session
+        if (!userChangedThemeRef.current && firestoreData?.theme && themes.some(t => t.id === firestoreData.theme)) {
           setThemeState(firestoreData.theme);
           localStorage.setItem("nexus-theme", firestoreData.theme);
         }
@@ -105,6 +108,9 @@ export function useTheme(): UseThemeReturn {
 
     // Listen to Firebase sync updates - only update theme if it's explicitly different
     const handleSyncUpdate = (event: CustomEvent) => {
+      // Skip if user already chose a theme in this session
+      if (userChangedThemeRef.current) return;
+
       // Only update if theme is present AND different from current theme
       if (event.detail?.theme && 
           themes.some(t => t.id === event.detail.theme) && 
@@ -132,6 +138,7 @@ export function useTheme(): UseThemeReturn {
   }, [theme]); // Add theme as dependency to get current value
 
   const setTheme = useCallback((newTheme: Theme) => {
+    userChangedThemeRef.current = true;
     setThemeState(newTheme);
   }, []);
 

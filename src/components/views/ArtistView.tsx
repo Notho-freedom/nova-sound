@@ -285,7 +285,7 @@ export const ArtistView = memo(({
             <img
               src={coverImage}
               alt=""
-              className="w-full h-full object-cover opacity-30 blur-2xl scale-110"
+              className="w-full h-full object-cover opacity-100 blur-[8px] scale-100"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background" />

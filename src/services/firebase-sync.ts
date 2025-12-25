@@ -144,6 +144,12 @@ class FirebaseSyncService {
   private realtimeListenersEnabled: boolean = false; // Désactivé par défaut
   private initialLoadComplete: boolean = false;
   
+  // Backup system
+  private lastBackupTime: number = 0;
+  private backupInterval: NodeJS.Timeout | null = null;
+  private backupIntervalMs: number = 60 * 60 * 1000; // 1 heure
+  private lastBackupDataHash: string | null = null;
+  
   async initializeSync(userId: string): Promise<void> {
     // Ensure Firebase is initialized first (non-bloquant)
     const { firebaseService } = await import('./firebase');
@@ -331,6 +337,9 @@ class FirebaseSyncService {
       this.initialLoadComplete = true;
       console.log('✅ Initial load complete. Local is now source of truth.');
       
+      // Démarrer le système de backup automatique
+      this.startAutomaticBackup(userId);
+      
     } catch (error) {
       console.error('Error loading initial data from Firebase:', error);
     } finally {
@@ -338,53 +347,279 @@ class FirebaseSyncService {
     }
   }
 
-  // Merger intelligemment les données Firebase avec le local
-  // RÈGLE: Local a priorité, Firebase sert uniquement de backup/restore
-  private async mergeFirebaseWithLocal(firebaseData: UserAppData): Promise<void> {
-    console.log('🔄 Merging Firebase backup with local data...');
-    
-    const localData = await this.getCurrentLocalData();
-    
-    // Settings: restaurer depuis Firebase si local est vide
-    if (!localData.settings && firebaseData.settings) {
-      console.log('📥 Restoring settings from Firebase backup');
-      this.saveToLocalStorage('nexus-settings', firebaseData.settings);
+  // Système de backup automatique
+  private startAutomaticBackup(userId: string): void {
+    // Arrêter le backup précédent si existant
+    if (this.backupInterval) {
+      clearInterval(this.backupInterval);
     }
     
-    // Favorites: merger (union des deux listes)
-    if (firebaseData.favorites) {
+    console.log('🕐 Starting automatic backup system (every 1 hour if data changed)');
+    
+    // Créer un backup initial
+    setTimeout(() => {
+      this.createBackupIfNeeded(userId);
+    }, 5000); // Premier backup après 5 secondes
+    
+    // Backup périodique
+    this.backupInterval = setInterval(async () => {
+      await this.createBackupIfNeeded(userId);
+    }, this.backupIntervalMs);
+  }
+
+  // Créer un backup uniquement si les données ont changé
+  private async createBackupIfNeeded(userId: string): Promise<void> {
+    const db = getFirestoreInstance();
+    if (!db) return;
+    
+    try {
+      // Récupérer les données actuelles
+      const currentData = await this.getCurrentLocalData();
+      const currentHash = this.calculateDataHash(currentData);
+      
+      // Vérifier si les données ont changé depuis le dernier backup
+      if (currentHash === this.lastBackupDataHash) {
+        console.log('ℹ️ Backup skipped: No changes detected');
+        return;
+      }
+      
+      // Créer le backup avec timestamp
+      const timestamp = Date.now();
+      const backupId = `backup_appdata_${timestamp}`;
+      
+      const backupRef = doc(db, 'users', userId, 'backups', backupId);
+      await setDoc(backupRef, {
+        ...currentData,
+        backupCreatedAt: new Date().toISOString(),
+        backupTimestamp: timestamp,
+        version: currentData.version || 1
+      });
+      
+      this.lastBackupDataHash = currentHash;
+      this.lastBackupTime = timestamp;
+      
+      console.log(`💾 Backup created: ${backupId}`);
+      
+      // Nettoyer les vieux backups (garder seulement les 10 derniers)
+      await this.cleanupOldBackups(userId);
+      
+    } catch (error) {
+      console.error('Error creating backup:', error);
+    }
+  }
+
+  // Nettoyer les anciens backups (garder les 10 plus récents)
+  private async cleanupOldBackups(userId: string): Promise<void> {
+    const db = getFirestoreInstance();
+    if (!db) return;
+    
+    try {
+      const backupsRef = collection(db, 'users', userId, 'backups');
+      const backupsSnap = await getDocs(backupsRef);
+      
+      if (backupsSnap.size <= 10) return; // Garder au moins 10 backups
+      
+      // Trier par timestamp (du plus ancien au plus récent)
+      const backups = backupsSnap.docs
+        .map(doc => ({ id: doc.id, timestamp: doc.data().backupTimestamp || 0 }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+      
+      // Supprimer les plus anciens (garder les 10 derniers)
+      const toDelete = backups.slice(0, backups.length - 10);
+      
+      for (const backup of toDelete) {
+        const backupDoc = doc(db, 'users', userId, 'backups', backup.id);
+        await deleteDoc(backupDoc);
+      }
+      
+      if (toDelete.length > 0) {
+        console.log(`🗑️ Cleaned up ${toDelete.length} old backup(s)`);
+      }
+    } catch (error) {
+      console.error('Error cleaning up old backups:', error);
+    }
+  }
+
+  // Restaurer depuis un backup spécifique
+  async restoreFromBackup(userId: string, backupId: string): Promise<boolean> {
+    const db = getFirestoreInstance();
+    if (!db) return false;
+    
+    try {
+      const backupRef = doc(db, 'users', userId, 'backups', backupId);
+      const backupSnap = await getDoc(backupRef);
+      
+      if (!backupSnap.exists()) {
+        console.error('Backup not found:', backupId);
+        return false;
+      }
+      
+      const backupData = backupSnap.data() as UserAppData;
+      await this.mergeFirebaseWithLocal(backupData);
+      
+      console.log(`✅ Restored from backup: ${backupId}`);
+      return true;
+    } catch (error) {
+      console.error('Error restoring from backup:', error);
+      return false;
+    }
+  }
+
+  // Lister les backups disponibles
+  async listBackups(userId: string): Promise<Array<{ id: string; timestamp: number; date: string }>> {
+    const db = getFirestoreInstance();
+    if (!db) return [];
+    
+    try {
+      const backupsRef = collection(db, 'users', userId, 'backups');
+      const backupsSnap = await getDocs(backupsRef);
+      
+      return backupsSnap.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            timestamp: data.backupTimestamp || 0,
+            date: data.backupCreatedAt || 'Unknown'
+          };
+        })
+        .sort((a, b) => b.timestamp - a.timestamp); // Plus récent en premier
+    } catch (error) {
+      console.error('Error listing backups:', error);
+      return [];
+    }
+  }
+
+  // Comparaison intelligente de valeurs
+  // Retourne: 'keep-local' | 'use-firebase' | 'merge' | 'no-change'
+  private intelligentCompare(local: any, firebase: any, type: 'object' | 'array' | 'primitive'): string {
+    // Cas 1: Firebase a une valeur, local est null/undefined/vide
+    const localIsEmpty = local === null || local === undefined || 
+      (Array.isArray(local) && local.length === 0) ||
+      (typeof local === 'object' && !Array.isArray(local) && Object.keys(local).length === 0);
+    
+    const firebaseIsEmpty = firebase === null || firebase === undefined ||
+      (Array.isArray(firebase) && firebase.length === 0) ||
+      (typeof firebase === 'object' && !Array.isArray(firebase) && Object.keys(firebase).length === 0);
+    
+    if (localIsEmpty && !firebaseIsEmpty) {
+      return 'use-firebase'; // Firebase a des données, local est vide → restaurer
+    }
+    
+    if (!localIsEmpty && firebaseIsEmpty) {
+      return 'keep-local'; // Local a des données, Firebase est vide → garder local
+    }
+    
+    if (localIsEmpty && firebaseIsEmpty) {
+      return 'no-change'; // Les deux sont vides → rien à faire
+    }
+    
+    // Cas 2: Les deux ont des valeurs → comparer
+    if (type === 'array') {
+      // Pour les arrays (favoris, history), on merge (union)
+      return 'merge';
+    }
+    
+    if (type === 'object') {
+      // Pour les objets, comparer JSON
+      const localStr = JSON.stringify(local);
+      const firebaseStr = JSON.stringify(firebase);
+      return localStr === firebaseStr ? 'no-change' : 'keep-local';
+    }
+    
+    // Cas 3: Valeurs primitives
+    return local === firebase ? 'no-change' : 'keep-local';
+  }
+
+  // Merger intelligemment les données Firebase avec le local
+  // RÈGLE: Comparaison intelligente pour chaque champ
+  private async mergeFirebaseWithLocal(firebaseData: UserAppData): Promise<void> {
+    console.log('🔄 Intelligent merge: Comparing Firebase backup with local data...');
+    
+    const localData = await this.getCurrentLocalData();
+    let changesApplied = 0;
+    
+    // Settings
+    const settingsAction = this.intelligentCompare(localData.settings, firebaseData.settings, 'object');
+    if (settingsAction === 'use-firebase') {
+      console.log('📥 Settings: Local empty → Restoring from Firebase');
+      this.saveToLocalStorage('nexus-settings', firebaseData.settings);
+      changesApplied++;
+    } else if (settingsAction === 'no-change') {
+      console.log('✓ Settings: Identical, no change needed');
+    } else {
+      console.log('✓ Settings: Keeping local (has value)');
+    }
+    
+    // Favorites (merge = union)
+    const favoritesAction = this.intelligentCompare(localData.favorites, firebaseData.favorites, 'array');
+    if (favoritesAction === 'use-firebase') {
+      console.log('📥 Favorites: Local empty → Restoring from Firebase');
+      this.saveToLocalStorage('nexus-favorites', firebaseData.favorites);
+      window.dispatchEvent(new CustomEvent('favorites-updated'));
+      changesApplied++;
+    } else if (favoritesAction === 'merge') {
       const localFavorites = localData.favorites || [];
-      const merged = [...new Set([...localFavorites, ...firebaseData.favorites])];
+      const firebaseFavorites = firebaseData.favorites || [];
+      const merged = [...new Set([...localFavorites, ...firebaseFavorites])];
       if (merged.length > localFavorites.length) {
-        console.log(`📥 Merged favorites: ${localFavorites.length} local + ${firebaseData.favorites.length} Firebase = ${merged.length} total`);
+        console.log(`📥 Favorites: Merging ${localFavorites.length} local + ${firebaseFavorites.length} Firebase = ${merged.length} total`);
         this.saveToLocalStorage('nexus-favorites', merged);
-        // Dispatch event pour mettre à jour l'UI
         window.dispatchEvent(new CustomEvent('favorites-updated'));
+        changesApplied++;
+      } else {
+        console.log('✓ Favorites: No new items to merge');
       }
     }
     
-    // History: restaurer depuis Firebase si local est vide
-    if ((!localData.history || localData.history.length === 0) && firebaseData.history?.length) {
-      console.log(`📥 Restoring ${firebaseData.history.length} history entries from Firebase backup`);
+    // History
+    const historyAction = this.intelligentCompare(localData.history, firebaseData.history, 'array');
+    if (historyAction === 'use-firebase') {
+      console.log(`📥 History: Local empty → Restoring ${firebaseData.history?.length || 0} entries from Firebase`);
       this.saveToLocalStorage('nexus-play-history', firebaseData.history);
       window.dispatchEvent(new CustomEvent('firebase-history-update', { detail: { history: firebaseData.history } }));
+      changesApplied++;
+    } else {
+      console.log('✓ History: Keeping local');
     }
     
-    // Theme, Volume: TOUJOURS garder le local (préférences utilisateur actuelles)
+    // Theme & Volume: TOUJOURS garder local (préférences actuelles)
+    console.log('✓ Theme & Volume: Keeping local (user preferences)');
     
-    // Cloudinary config: restaurer uniquement si local est vide
-    if (!localData.cloudinaryConfig && firebaseData.cloudinaryConfig) {
-      console.log('📥 Restoring Cloudinary config from Firebase backup');
+    // Cloudinary Config
+    const cloudinaryAction = this.intelligentCompare(localData.cloudinaryConfig, firebaseData.cloudinaryConfig, 'object');
+    if (cloudinaryAction === 'use-firebase') {
+      console.log('📥 Cloudinary: Local empty → Restoring from Firebase');
       this.saveToLocalStorage('nexus-cloudinary-config', firebaseData.cloudinaryConfig);
+      changesApplied++;
+    } else if (cloudinaryAction === 'no-change') {
+      console.log('✓ Cloudinary: Identical configuration');
+    } else {
+      console.log('✓ Cloudinary: Keeping local configuration');
     }
     
-    // Equalizer presets: restaurer uniquement si local est vide
-    if ((!localData.equalizerPresets || localData.equalizerPresets.length === 0) && firebaseData.equalizerPresets?.length) {
-      console.log('📥 Restoring equalizer presets from Firebase backup');
+    // Equalizer Presets
+    const equalizerAction = this.intelligentCompare(localData.equalizerPresets, firebaseData.equalizerPresets, 'array');
+    if (equalizerAction === 'use-firebase') {
+      console.log('📥 Equalizer: Local empty → Restoring from Firebase');
       this.saveToLocalStorage('nexus-equalizer-presets', firebaseData.equalizerPresets);
+      changesApplied++;
+    } else {
+      console.log('✓ Equalizer: Keeping local presets');
     }
     
-    console.log('✅ Merge complete. Local data preserved, Firebase used only as backup.');
+    // Uploaded Media
+    const mediaAction = this.intelligentCompare(localData.uploadedMedia, firebaseData.uploadedMedia, 'array');
+    if (mediaAction === 'use-firebase') {
+      console.log('📥 Uploaded Media: Local empty → Restoring from Firebase');
+      if (this.currentUserId) {
+        const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
+        this.saveToLocalStorage(storageKey, firebaseData.uploadedMedia);
+      }
+      changesApplied++;
+    }
+    
+    console.log(`✅ Intelligent merge complete: ${changesApplied} changes applied from Firebase backup.`);
   }
 
   // Merger les playlists Firebase avec le local
@@ -990,13 +1225,13 @@ class FirebaseSyncService {
     return data;
   }
 
-  // Calculate hash for change detection
+  // Calculate hash for change detection and backup comparison
   private calculateDataHash(data: Partial<UserAppData>): string {
     // Create a simplified version for hashing (exclude metadata fields)
     const hashableData = {
       settings: data.settings,
-      favorites: data.favorites,
-      history: data.history,
+      favorites: data.favorites?.sort(), // Trier pour détecter les changements d'ordre
+      history: data.history?.slice(0, 50), // Comparer seulement les 50 dernières entrées
       theme: data.theme,
       notificationsEnabled: data.notificationsEnabled,
       volume: data.volume,
@@ -1008,7 +1243,14 @@ class FirebaseSyncService {
     };
     
     // Simple hash using JSON stringify (for change detection)
-    return JSON.stringify(hashableData);
+    const str = JSON.stringify(hashableData);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(36);
   }
 
   // Start periodic sync (every hour)
@@ -1240,8 +1482,15 @@ class FirebaseSyncService {
       this.changeDetectionDebounce = null;
     }
     
+    // Arrêter le backup automatique
+    if (this.backupInterval) {
+      clearInterval(this.backupInterval);
+      this.backupInterval = null;
+    }
+    
     this.currentUserId = null;
     this.lastSyncedDataHash = null;
+    this.lastBackupDataHash = null;
     this.pendingChanges.clear();
   }
 
