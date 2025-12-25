@@ -327,7 +327,7 @@ export const SearchView = ({
     if (query.trim() && query.length >= 2) {
       youtubeSearchTimerRef.current = setTimeout(() => {
         searchYouTube(query)
-      }, 500)
+      }, 3000)
     } else {
       setYoutubeTracks([])
     }
