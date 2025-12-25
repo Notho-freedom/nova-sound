@@ -17,6 +17,7 @@ import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
 import { extractYouTubeVideoId } from "@/lib/youtube";
 import { searchYouTubePlaylists, fetchYouTubePlaylistVideos } from "@/lib/youtube-playlists";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { CinemaMode } from "@/components/CinemaMode";
 import { toast } from "sonner";
 import { VideoGridSkeleton } from "@/components/ui/skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -88,6 +89,9 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     return () => clearInterval(interval);
   }, []);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
+  // États pour les fonctionnalités avancées du player (comme en mode local)
+  const [isFullApp, setIsFullApp] = useState(false);
+  const [isCinemaMode, setIsCinemaMode] = useState(false);
   
   // Filtrer TOUTES les vidéos YouTube de l'historique (pas de limite)
   // Utiliser à la fois recentlyWatched, enhancedVideos ET l'historique brut depuis localStorage
@@ -874,21 +878,65 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     }
   }, [isPlayerFullscreen, playingVideo, playingVideoId]);
 
-  // Si une vidéo est en lecture, utiliser le VideoPlayer unifié
+  // Mode cinéma comme en mode local
+  if (isPlayerFullscreen && playingVideo && isCinemaMode) {
+    return (
+      <CinemaMode
+        video={playingVideo}
+        videos={[]} // Pas de navigation en mode recherche YouTube
+        onClose={() => {
+          setIsCinemaMode(false);
+          setIsPlayerFullscreen(false);
+          setPlayingVideo(null);
+        }}
+        onNext={undefined} // Pas de navigation suivant/précédent
+        onPrevious={undefined}
+        autoPlay={true}
+      />
+    );
+  }
+
+  // Mode cinéma comme en mode local
+  if (isPlayerFullscreen && playingVideo && isCinemaMode) {
+    return (
+      <CinemaMode
+        video={playingVideo}
+        videos={[]} // Pas de navigation en mode recherche YouTube
+        onClose={() => {
+          setIsCinemaMode(false);
+          setIsPlayerFullscreen(false);
+          setPlayingVideo(null);
+        }}
+        onNext={undefined} // Pas de navigation suivant/précédent
+        onPrevious={undefined}
+        autoPlay={true}
+      />
+    );
+  }
+
+  // Si une vidéo est en lecture, utiliser le VideoPlayer unifié avec toutes les options
   if (isPlayerFullscreen && playingVideo) {
     return (
       <VideoPlayer
         video={playingVideo}
         videos={[]} // Pas de liste pour navigation dans le contexte YouTube search
         onClose={() => {
+          setIsFullApp(false);
+          setIsCinemaMode(false);
           setPlayingVideo(null);
           setIsPlayerFullscreen(false);
         }}
+        onNext={undefined} // Pas de navigation suivant/précédent en mode recherche
+        onPrevious={undefined}
         className="absolute inset-0"
         showControls={true}
         autoPlay={true}
+        onFullApp={() => setIsFullApp(!isFullApp)}
+        onCinemaMode={() => setIsCinemaMode(true)}
+        isFullApp={isFullApp}
         audioOnly={playbackMode === "audio"}
         onProgressUpdate={updateWatchProgress}
+        onPlayAsAudio={onPlayAsAudio}
       />
     );
   }

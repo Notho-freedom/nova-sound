@@ -468,6 +468,12 @@ export const VideosView = memo(() => {
           isFullApp={isFullApp}
           audioOnly={youtubeAudioOnly}
           onProgressUpdate={updateWatchProgress}
+          onPlayAsAudio={(track) => {
+            // Même logique que YouTubeSearchView : émettre un événement
+            if (window.dispatchEvent) {
+              window.dispatchEvent(new CustomEvent('youtube-audio-play', { detail: track }));
+            }
+          }}
         />
       </div>
     );

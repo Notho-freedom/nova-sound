@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   Monitor,
   Film,
+  Music,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -24,6 +25,8 @@ import { useVideoPlayer } from "@/hooks/useVideoPlayer";
 import { YouTubePlayer, type YouTubePlayerRef } from "./YouTubePlayer";
 import { detectMediaSource, extractYouTubeVideoId } from "@/lib/youtube";
 import { fetchYouTubeVideoMetadata } from "@/lib/youtube-metadata";
+import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
+import type { Track } from "@/types/music";
 // Analyseur audio désactivé temporairement
 // import { useAudioAI } from "@/hooks/useAudioAI";
 // import { AIAnalysisPanel } from "./AIAnalysisPanel";
@@ -43,6 +46,8 @@ interface VideoPlayerProps {
   isFullApp?: boolean;
   audioOnly?: boolean; // Mode audio-only pour YouTube
   onProgressUpdate?: (videoId: string, currentTime: number, duration: number) => void; // Callback pour sauvegarder la progression
+  onAudioOnlyChange?: (audioOnly: boolean) => void; // Callback pour changer le mode audio
+  onPlayAsAudio?: (track: Track) => void; // Callback pour transférer vers le système audio de l'app
 }
 
 const formatTime = (seconds: number) => {
@@ -69,6 +74,8 @@ export const VideoPlayer = ({
   isFullApp = false,
   audioOnly = false,
   onProgressUpdate,
+  onAudioOnlyChange,
+  onPlayAsAudio,
 }: VideoPlayerProps) => {
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
@@ -565,6 +572,35 @@ export const VideoPlayer = ({
                   <Film className="w-5 h-5" />
                 </Button>
               )}
+              
+              {/* Switch Audio Mode pour YouTube */}
+              {isYouTube && onPlayAsAudio && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    // Convertir la vidéo en track et transférer vers le système audio
+                    const track = youtubeVideoToTrack({
+                      videoId: youtubeVideoId || '',
+                      title: video.title,
+                      description: video.description || '',
+                      thumbnailUrl: video.thumbnailUrl || '',
+                      channelTitle: video.channelTitle || '',
+                      duration: video.duration ? `PT${Math.floor(video.duration)}S` : 'PT0S', // Convertir en format ISO 8601
+                      publishedAt: new Date().toISOString(),
+                      viewCount: '0', // Pas disponible dans le type Video
+                    });
+                    onPlayAsAudio(track);
+                    // Fermer le player vidéo car on bascule vers l'audio
+                    onClose?.();
+                  }}
+                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                  title="Transférer vers le player audio"
+                >
+                  <Music className="w-5 h-5" />
+                </Button>
+              )}
+              
               {onFullApp && (
                 <Button
                   variant="ghost"
