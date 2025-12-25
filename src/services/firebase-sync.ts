@@ -141,6 +141,8 @@ class FirebaseSyncService {
   // Initialize sync for a user
   private isInitializing: boolean = false;
   private isInitialized: boolean = false;
+  private realtimeListenersEnabled: boolean = false; // Désactivé par défaut
+  private initialLoadComplete: boolean = false;
   
   async initializeSync(userId: string): Promise<void> {
     // Ensure Firebase is initialized first (non-bloquant)
@@ -200,21 +202,18 @@ class FirebaseSyncService {
         }
       }, 1000);
       
-      // Set up real-time listeners first (critical path)
-      this.setupRealtimeListeners(userId);
+      // NOUVEAU SYSTÈME: Charger les données depuis Firebase une seule fois au login
+      // Les listeners temps réel sont désactivés pour éviter d'écraser les changements locaux
+      console.log('🔄 Initial load: Fetching backup from Firebase...');
+      await this.loadInitialDataFromFirebase(userId);
       
-      // Différer le chargement initial et la synchronisation
-      // Ces opérations sont moins critiques et peuvent être faites en arrière-plan
+      // Différer la synchronisation périodique
+      // Cette opération synchronise Local → Firebase
       const deferredInit = async () => {
         try {
-          // Load initial data from Firestore (or create if doesn't exist)
-          const loadedData = await this.loadFromFirestore(userId);
-          
-          // If no data exists, save local data to Firestore to create the document
-          if (!loadedData) {
-            console.log('📝 No Firestore data found, creating initial sync document');
-            await this.saveToFirestore(userId);
-          }
+          // Sauvegarder les données locales vers Firebase comme backup
+          console.log('💾 Syncing local data to Firebase as backup...');
+          await this.saveToFirestore(userId);
           
           // Calculate initial hash for change detection
           const initialData = await this.getCurrentLocalData();
@@ -289,8 +288,142 @@ class FirebaseSyncService {
     }
   }
 
-  // Set up real-time listeners for continuous sync
+  // Chargement initial des données depuis Firebase (backup/restore au login uniquement)
+  private async loadInitialDataFromFirebase(userId: string): Promise<void> {
+    const db = getFirestoreInstance();
+    if (!db) {
+      console.error('Firestore instance not available');
+      return;
+    }
+
+    try {
+      this.isSyncing = true; // Empêche les interférences pendant le chargement
+      
+      // Charger les données principales
+      const appDataRef = doc(db, 'users', userId, 'appData', 'data');
+      const appDataSnap = await getDoc(appDataRef);
+      
+      if (appDataSnap.exists()) {
+        const firebaseData = appDataSnap.data() as UserAppData;
+        console.log('📥 Initial load: Found backup data in Firebase');
+        
+        // Merger intelligemment avec les données locales
+        await this.mergeFirebaseWithLocal(firebaseData);
+      } else {
+        console.log('📥 Initial load: No backup in Firebase yet');
+      }
+
+      // Charger les playlists
+      const playlistsRef = collection(db, 'users', userId, 'playlists');
+      const playlistsSnap = await getDocs(playlistsRef);
+      
+      if (!playlistsSnap.empty) {
+        const playlists: Playlist[] = [];
+        playlistsSnap.forEach((doc) => {
+          playlists.push({ id: doc.id, ...doc.data() } as Playlist);
+        });
+        console.log(`📥 Initial load: Found ${playlists.length} playlists in Firebase`);
+        
+        // Merger avec les playlists locales
+        await this.mergePlaylistsWithLocal(playlists);
+      }
+
+      this.initialLoadComplete = true;
+      console.log('✅ Initial load complete. Local is now source of truth.');
+      
+    } catch (error) {
+      console.error('Error loading initial data from Firebase:', error);
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  // Merger intelligemment les données Firebase avec le local
+  // RÈGLE: Local a priorité, Firebase sert uniquement de backup/restore
+  private async mergeFirebaseWithLocal(firebaseData: UserAppData): Promise<void> {
+    console.log('🔄 Merging Firebase backup with local data...');
+    
+    const localData = await this.getCurrentLocalData();
+    
+    // Settings: restaurer depuis Firebase si local est vide
+    if (!localData.settings && firebaseData.settings) {
+      console.log('📥 Restoring settings from Firebase backup');
+      this.saveToLocalStorage('nexus-settings', firebaseData.settings);
+    }
+    
+    // Favorites: merger (union des deux listes)
+    if (firebaseData.favorites) {
+      const localFavorites = localData.favorites || [];
+      const merged = [...new Set([...localFavorites, ...firebaseData.favorites])];
+      if (merged.length > localFavorites.length) {
+        console.log(`📥 Merged favorites: ${localFavorites.length} local + ${firebaseData.favorites.length} Firebase = ${merged.length} total`);
+        this.saveToLocalStorage('nexus-favorites', merged);
+        // Dispatch event pour mettre à jour l'UI
+        window.dispatchEvent(new CustomEvent('favorites-updated'));
+      }
+    }
+    
+    // History: restaurer depuis Firebase si local est vide
+    if ((!localData.history || localData.history.length === 0) && firebaseData.history?.length) {
+      console.log(`📥 Restoring ${firebaseData.history.length} history entries from Firebase backup`);
+      this.saveToLocalStorage('nexus-play-history', firebaseData.history);
+      window.dispatchEvent(new CustomEvent('firebase-history-update', { detail: { history: firebaseData.history } }));
+    }
+    
+    // Theme, Volume: TOUJOURS garder le local (préférences utilisateur actuelles)
+    
+    // Cloudinary config: restaurer uniquement si local est vide
+    if (!localData.cloudinaryConfig && firebaseData.cloudinaryConfig) {
+      console.log('📥 Restoring Cloudinary config from Firebase backup');
+      this.saveToLocalStorage('nexus-cloudinary-config', firebaseData.cloudinaryConfig);
+    }
+    
+    // Equalizer presets: restaurer uniquement si local est vide
+    if ((!localData.equalizerPresets || localData.equalizerPresets.length === 0) && firebaseData.equalizerPresets?.length) {
+      console.log('📥 Restoring equalizer presets from Firebase backup');
+      this.saveToLocalStorage('nexus-equalizer-presets', firebaseData.equalizerPresets);
+    }
+    
+    console.log('✅ Merge complete. Local data preserved, Firebase used only as backup.');
+  }
+
+  // Merger les playlists Firebase avec le local
+  private async mergePlaylistsWithLocal(firebasePlaylists: Playlist[]): Promise<void> {
+    const localPlaylists = this.loadFromLocalStorage<Playlist[]>('nexus-playlists') || [];
+    
+    // Merger par ID (garder les versions locales en priorité)
+    const merged = new Map<string, Playlist>();
+    
+    // D'abord ajouter les playlists Firebase
+    firebasePlaylists.forEach(p => merged.set(p.id, p));
+    
+    // Puis écraser avec les versions locales (priorité au local)
+    localPlaylists.forEach(p => merged.set(p.id, p));
+    
+    const result = Array.from(merged.values());
+    
+    if (result.length > localPlaylists.length) {
+      console.log(`📥 Merged playlists: ${localPlaylists.length} local + ${firebasePlaylists.length} Firebase = ${result.length} total`);
+      this.saveToLocalStorage('nexus-playlists', result);
+      window.dispatchEvent(new CustomEvent('playlists-updated'));
+    }
+  }
+
+  // Set up real-time listeners for continuous sync (DÉSACTIVÉ PAR DÉFAUT)
+  // Les listeners temps réel sont désactivés pour éviter d'écraser les changements locaux
+  // La synchronisation se fait maintenant: Local → Firebase uniquement
   private setupRealtimeListeners(userId: string): void {
+    // DÉSACTIVÉ: Les listeners temps réel écrasent les changements locaux
+    // On utilise maintenant un système de chargement initial + sync unidirectionnel (Local → Firebase)
+    if (!this.realtimeListenersEnabled) {
+      console.log('ℹ️ Real-time listeners DISABLED. Local is source of truth.');
+      console.log('💾 Sync direction: Local → Firebase (backup mode)');
+      return;
+    }
+    
+    // Le code ci-dessous n'est exécuté que si explicitement activé (pour debug/tests)
+    console.warn('⚠️ Real-time listeners ENABLED. This may overwrite local changes!');
+    
     const db = getFirestoreInstance();
     if (!db) {
       console.warn('⚠️ Cannot setup real-time listeners: Firestore not initialized');
