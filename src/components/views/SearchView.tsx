@@ -281,7 +281,16 @@ export const SearchView = ({
     const saved = localStorage.getItem("nexus-search-history")
     if (saved) {
       try {
-        setSearchHistory(JSON.parse(saved))
+        const parsed: string[] = JSON.parse(saved)
+        // Deduplicate on load with normalization
+        const seen = new Set<string>()
+        const cleaned = parsed.filter((term) => {
+          const key = term.trim().toLowerCase()
+          if (!key || seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        setSearchHistory(cleaned)
       } catch {
         setSearchHistory([])
       }
@@ -290,8 +299,12 @@ export const SearchView = ({
 
   // Save search history
   const saveToHistory = (term: string) => {
-    if (!term.trim()) return
-    const newHistory = [term, ...searchHistory.filter((h) => h !== term)].slice(0, MAX_HISTORY)
+    const normalized = term.trim().toLowerCase()
+    if (!normalized) return
+
+    // Remove any existing entry with same normalized text
+    const filtered = searchHistory.filter((h) => h.trim().toLowerCase() !== normalized)
+    const newHistory = [term.trim(), ...filtered].slice(0, MAX_HISTORY)
     setSearchHistory(newHistory)
     localStorage.setItem("nexus-search-history", JSON.stringify(newHistory))
   }
@@ -415,8 +428,9 @@ export const SearchView = ({
   ]
 
   const handleSearch = (term: string) => {
-    setQuery(term)
-    saveToHistory(term)
+    const cleaned = term.trim()
+    setQuery(cleaned)
+    if (cleaned) saveToHistory(cleaned)
   }
 
   const hasResults =
@@ -473,13 +487,15 @@ export const SearchView = ({
                   onChange={(e) => {
                     const value = e.target.value
                     setQuery(value)
-                    if (value.trim()) saveToHistory(value)
                   }}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && query.trim()) {
-                      saveToHistory(query.trim())
+                    if (e.key === "Enter") {
+                      const cleaned = query.trim()
+                      if (cleaned) {
+                        saveToHistory(cleaned)
+                      }
                     }
                   }}
                   className={cn(
