@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, startTransition } from "react";
 import { 
   Home, 
   Library, 
@@ -227,36 +227,25 @@ export const Sidebar = ({
   // Enrich playlists with metadata (covers, duration, artists)
   const playlistMetadata = usePlaylistMetadata(playlists, tracks);
 
-  // Wrapper pour mesurer les temps de réponse au clic sur les nav items
-  const handleViewChangeWithMetrics = (newView: ViewType, source: string) => {
+  // Optimized view change with startTransition for non-blocking updates
+  const handleViewChangeWithMetrics = useCallback((newView: ViewType, source: string) => {
     const startTime = performance.now();
-    const timestamp = new Date().toISOString();
     
-    console.log(`🖱️ [Sidebar] Clic sur nav item:`, {
-      view: newView,
-      source,
-      timestamp,
-      previousView: currentView,
-      startTime: startTime.toFixed(2),
+    // Use startTransition to mark this as a non-urgent update
+    startTransition(() => {
+      onViewChange(newView);
     });
 
-    // Appeler la fonction de changement de vue
-    onViewChange(newView);
-
-    // Mesurer le temps après le changement (asynchrone pour capturer le re-render)
-    requestAnimationFrame(() => {
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
-      console.log(`⏱️ [Sidebar] Temps de réponse:`, {
-        view: newView,
-        source,
-        duration: `${duration.toFixed(2)}ms`,
-        timestamp: new Date().toISOString(),
-        performance: duration < 16 ? '✅ Excellent (< 16ms)' : duration < 50 ? '✅ Bon (< 50ms)' : duration < 100 ? '⚠️ Acceptable (< 100ms)' : '❌ Lent (> 100ms)',
+    // Measure time after transition completes (production: remove for better perf)
+    if (process.env.NODE_ENV === 'development') {
+      requestAnimationFrame(() => {
+        const duration = performance.now() - startTime;
+        if (duration > 100) {
+          console.log(`⚠️ [Sidebar] Slow navigation to ${newView}: ${duration.toFixed(0)}ms`);
+        }
       });
-    });
-  };
+    }
+  }, [onViewChange]);
 
   const handleCollapsedChange = (value: boolean) => {
     if (onCollapsedChange) {

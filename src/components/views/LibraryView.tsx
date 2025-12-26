@@ -88,39 +88,32 @@ const formatDuration = (seconds: number) => {
 type DisplayMode = "grid" | "list";
 type SortMode = "title" | "artist" | "album" | "duration" | "date";
 
-// Animation variants
+// Animation variants - simplified for better performance
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05 }
+    transition: { duration: 0.15 } // Removed staggerChildren for perf
   }
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.1 } }
 };
 
-// Memoized Album Card Component
+// Memoized Album Card Component - simplified animations
 const AlbumCard = memo(({ 
   album, 
   onSelect, 
   onPlay,
-  delay = 0
 }: { 
   album: { name: string; artist: string; coverUrl: string; tracks: Track[]; year?: number };
   onSelect: () => void;
   onPlay: () => void;
-  delay?: number;
 }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
-    transition={{ delay, duration: 0.3 }}
-    whileHover={{ scale: 1.03 }}
-    whileTap={{ scale: 0.98 }}
-    className="group relative cursor-pointer"
+  <div
+    className="group relative cursor-pointer transition-transform duration-200 hover:scale-[1.02]"
     onClick={onSelect}
   >
     <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 shadow-lg group-hover:shadow-xl transition-all duration-300">
@@ -140,18 +133,16 @@ const AlbumCard = memo(({
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
       
-      {/* Play button */}
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        whileHover={{ scale: 1.1 }}
+      {/* Play button - simplified without heavy animations */}
+      <button
         onClick={(e) => {
           e.stopPropagation();
           onPlay();
         }}
-        className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300"
+        className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 hover:scale-110"
       >
         <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
-      </motion.button>
+      </button>
     </div>
     
     <div className="mt-3 px-1">
@@ -162,22 +153,21 @@ const AlbumCard = memo(({
         {album.artist} • {album.tracks.length} titres
       </p>
     </div>
-  </motion.div>
+  </div>
 ));
 AlbumCard.displayName = "AlbumCard";
 
-// Modern Artist Card Component with glassmorphism effect
+// Modern Artist Card Component - optimized with minimal animations
 const ArtistCard = memo(({ 
   artist, 
   onSelect, 
   onPlay,
-  delay = 0,
   variant = "default"
 }: { 
   artist: { name: string; tracks: Track[]; albums: Set<string> };
   onSelect: () => void;
   onPlay: () => void;
-  delay?: number;
+  delay?: number; // Kept for backwards compatibility but ignored
   variant?: "default" | "featured" | "compact";
 }) => {
   const coverUrl = artist.tracks[0]?.coverUrl;
@@ -186,24 +176,19 @@ const ArtistCard = memo(({
   const mins = Math.floor((totalDuration % 3600) / 60);
   const durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins} min`;
   
-  // Featured variant - larger card for top artists
+  // Featured variant - larger card for top artists (simplified)
   if (variant === "featured") {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay, duration: 0.4 }}
-        whileHover={{ y: -8 }}
-        className="group relative cursor-pointer"
+      <div
+        className="group relative cursor-pointer transition-transform duration-200 hover:-translate-y-2"
         onClick={onSelect}
       >
         <div className="relative aspect-[3/4] rounded-2xl overflow-hidden">
-          {/* Background Image */}
           {coverUrl ? (
             <img
               src={getCoverUrl(coverUrl)}
               alt={artist.name}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
             />
           ) : (
@@ -211,11 +196,7 @@ const ArtistCard = memo(({
               <User className="w-20 h-20 text-white/40" />
             </div>
           )}
-          
-          {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-80" />
-          
-          {/* Content */}
           <div className="absolute inset-x-0 bottom-0 p-5">
             <h3 className="font-display text-2xl font-bold text-white mb-1 drop-shadow-lg">
               {artist.name}
@@ -223,34 +204,23 @@ const ArtistCard = memo(({
             <p className="text-white/70 text-sm mb-3">
               {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titres
             </p>
-            
-            {/* Play button */}
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileHover={{ scale: 1.1 }}
-              className="w-12 h-12 rounded-full bg-primary shadow-xl shadow-primary/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlay();
-              }}
+            <button
+              className="w-12 h-12 rounded-full bg-primary shadow-xl shadow-primary/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110"
+              onClick={(e) => { e.stopPropagation(); onPlay(); }}
             >
               <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
-            </motion.button>
+            </button>
           </div>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
-  // Compact variant for list view
+  // Compact variant for list view (simplified)
   if (variant === "compact") {
     return (
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay, duration: 0.3 }}
-        whileHover={{ x: 4 }}
-        className="group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-card/50 transition-all"
+      <div
+        className="group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-card/50 transition-all duration-150 hover:translate-x-1"
         onClick={onSelect}
       >
         <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
@@ -268,23 +238,18 @@ const ArtistCard = memo(({
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="w-9 h-9 rounded-full bg-primary/10 hover:bg-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+          className="w-9 h-9 rounded-full bg-primary/10 hover:bg-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
         >
           <Play className="w-4 h-4 text-primary group-hover:text-primary-foreground fill-current ml-0.5" />
         </button>
-      </motion.div>
+      </div>
     );
   }
 
-  // Default variant - modern circular card
+  // Default variant - modern circular card (simplified)
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay, duration: 0.3 }}
-      whileHover={{ y: -6 }}
-      whileTap={{ scale: 0.98 }}
-      className="group relative cursor-pointer"
+    <div
+      className="group relative cursor-pointer transition-transform duration-200 hover:-translate-y-1.5"
       onClick={onSelect}
     >
       {/* Glow effect */}
@@ -1263,7 +1228,6 @@ export const LibraryView = memo(({
                   <AlbumCard
                     key={`${album.name}-${album.artist}`}
                     album={album}
-                    delay={Math.min(idx * 0.02, 0.3)}
                     onSelect={() => setSelectedAlbum(`${album.name}-${album.artist}`)}
                     onPlay={() => {
                       const firstTrack = album.tracks[0];
