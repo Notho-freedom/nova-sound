@@ -988,9 +988,9 @@ export const DesktopApp = () => {
       return;
     }
 
-    // Get tracks from playlist trackIds
+    // Get tracks from playlist trackIds - utiliser allTracks pour inclure les tracks YouTube
     const playlistTracks = playlist.trackIds
-      .map(id => libraryTracks.find(t => t.id === id))
+      .map(id => allTracks.find(t => t.id === id))
       .filter((t): t is Track => t !== undefined);
 
     if (playlistTracks.length === 0) {
@@ -1007,7 +1007,7 @@ export const DesktopApp = () => {
     const message = `Lecture de "${playlist.name}"`;
     toast.success(message);
     notifySuccess(message);
-  }, [playlists, libraryTracks, setQueue, setCurrentIndex, notifySuccess, notifyError]);
+  }, [playlists, allTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
 
   // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
   // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
@@ -1020,9 +1020,9 @@ export const DesktopApp = () => {
       return;
     }
 
-    // Get tracks from playlist trackIds
+    // Get tracks from playlist trackIds - utiliser allTracks pour inclure les tracks YouTube
     const playlistTracks = playlist.trackIds
-      .map(id => libraryTracks.find(t => t.id === id))
+      .map(id => allTracks.find(t => t.id === id))
       .filter((t): t is Track => t !== undefined);
 
     if (playlistTracks.length === 0) {
@@ -1043,7 +1043,7 @@ export const DesktopApp = () => {
     const message = `Lecture aléatoire de "${playlist.name}"`;
     toast.success(message);
     notifySuccess(message);
-  }, [playlists, libraryTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError]);
+  }, [playlists, allTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError]);
 
   // Handler pour supprimer un track de la file par son ID
   const handleRemoveFromQueue = useCallback((trackId: string) => {
@@ -1059,7 +1059,7 @@ export const DesktopApp = () => {
   // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handlePlayTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
-      .map(id => libraryTracks.find(t => t.id === id))
+      .map(id => allTracks.find(t => t.id === id))
       .filter((t): t is Track => t !== undefined);
 
     if (tracksToPlay.length === 0) {
@@ -1076,7 +1076,7 @@ export const DesktopApp = () => {
     const message = `Lecture de ${tracksToPlay.length} titre${tracksToPlay.length > 1 ? 's' : ''}`;
     toast.success(message);
     notifySuccess(message);
-  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
+  }, [allTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
 
   // Lecture d'une liste de tracks (remplace entièrement la file)
   // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
@@ -1110,7 +1110,7 @@ export const DesktopApp = () => {
   // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handleShuffleTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
-      .map(id => libraryTracks.find(t => t.id === id))
+      .map(id => allTracks.find(t => t.id === id))
       .filter((t): t is Track => t !== undefined);
 
     if (tracksToPlay.length === 0) {
@@ -1131,7 +1131,7 @@ export const DesktopApp = () => {
     const message = `Lecture aléatoire de ${shuffled.length} titre${shuffled.length > 1 ? 's' : ''}`;
     toast.success(message);
     notifySuccess(message);
-  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError]);
+  }, [allTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError]);
 
   // Handler pour ouvrir une playlist dans PlaylistView
   const handleOpenPlaylist = useCallback((playlistId: string) => {
