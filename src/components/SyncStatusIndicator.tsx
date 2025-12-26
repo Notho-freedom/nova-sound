@@ -23,6 +23,33 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     let mounted = true;
     let authUnsubscribe: (() => void) | null = null;
     
+    // Helper function to update auth state based on current user and profile
+    const updateAuthState = () => {
+      if (!mounted) return;
+      
+      const user = firebaseService.getCurrentUser();
+      const profile = firebaseService.getUserProfile();
+      const profileEmail = profile?.email;
+      
+      // Consider authenticated if:
+      // 1. User is NOT anonymous, OR
+      // 2. Profile has a valid email (Google data was merged)
+      const hasValidEmail = !!profileEmail && profileEmail.includes('@');
+      const authenticated = !!user && (!user.isAnonymous || hasValidEmail);
+      const isPro = profile?.plan === 'pro' && profile?.subscriptionStatus === 'active';
+      
+      console.log('📊 SyncStatusIndicator: Updating auth state', { 
+        authenticated, 
+        email: user?.email || profileEmail,
+        isPro,
+        hasProfile: !!profile
+      });
+      
+      setIsAuthenticated(authenticated);
+      setUserEmail(user?.email || profileEmail || null);
+      setSyncStatus("idle");
+    };
+    
     // Wait for Firebase to be initialized before checking auth
     const initializeAuth = async () => {
       try {
@@ -31,22 +58,50 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
         
         if (!mounted) return;
         
-        // Listen for auth state changes - this is the primary and ONLY source of truth
-        // This listener will be called immediately with the current auth state
+        // Listen for auth state changes
         authUnsubscribe = firebaseService.onAuthStateChange((user) => {
           if (!mounted) return;
           
           console.log('🔄 SyncStatusIndicator: Auth state changed', { 
-            user: user ? { uid: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null 
+            user: user ? { uid: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null
           });
           
-          const authenticated = !!user && !user.isAnonymous;
-          setIsAuthenticated(authenticated);
-          setUserEmail(user?.email || null);
-          setSyncStatus("idle");
+          // Update auth state immediately
+          updateAuthState();
           
-          console.log('📊 SyncStatusIndicator: Updated auth state', { authenticated, email: user?.email });
+          // Also set a short delay to catch profile that loads after auth state
+          setTimeout(() => {
+            if (mounted) updateAuthState();
+          }, 500);
         });
+        
+        // Also poll for profile changes (in case profile loads after auth state change)
+        // This handles the case where signInAnonymously returns a Google user
+        let profileCheckInterval: NodeJS.Timeout | null = null;
+        profileCheckInterval = setInterval(() => {
+          if (!mounted) {
+            if (profileCheckInterval) clearInterval(profileCheckInterval);
+            return;
+          }
+          const profile = firebaseService.getUserProfile();
+          const currentUser = firebaseService.getCurrentUser();
+          const hasValidEmail = !!profile?.email && profile.email.includes('@');
+          const shouldBeAuthenticated = !!currentUser && (!currentUser.isAnonymous || hasValidEmail);
+          
+          // Only update if we detect authentication but state shows not authenticated
+          if (shouldBeAuthenticated && !isAuthenticated) {
+            console.log('🔄 SyncStatusIndicator: Profile detected, updating auth state');
+            updateAuthState();
+            // Stop polling once authenticated
+            if (profileCheckInterval) clearInterval(profileCheckInterval);
+          }
+        }, 1000);
+        
+        // Clear interval after 10 seconds (profile should be loaded by then)
+        setTimeout(() => {
+          if (profileCheckInterval) clearInterval(profileCheckInterval);
+        }, 10000);
+        
       } catch (error) {
         console.error("SyncStatusIndicator: Firebase init error:", error);
         if (mounted) {

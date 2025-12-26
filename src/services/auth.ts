@@ -943,6 +943,26 @@ class AuthService {
     );
   }
 
+  // Update user plan (used when syncing with Stripe)
+  updateUserPlan(plan: "free" | "pro", subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing" | null): void {
+    if (!this.currentUser) {
+      console.warn("updateUserPlan: No current user");
+      return;
+    }
+
+    this.currentUser = {
+      ...this.currentUser,
+      plan,
+      subscriptionStatus: subscriptionStatus || null,
+    };
+
+    this.saveToStorage();
+    console.log(`✅ AuthService: User plan updated to ${plan} (${subscriptionStatus})`);
+    
+    // Notify listeners of the update
+    this.authStateListeners.forEach((listener) => listener(this.currentUser));
+  }
+
   // Update user profile
   async updateProfile(data: Partial<UserProfile>): Promise<void> {
     if (!this.currentUser) {

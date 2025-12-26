@@ -838,6 +838,12 @@ class FirebaseService {
     }
   }
 
+  // Public method to load user profile and return it
+  async loadUserProfileById(uid: string): Promise<UserProfile | null> {
+    await this.loadUserProfile(uid);
+    return this.userProfile;
+  }
+
   // Create profile in memory only (for offline scenarios)
   private createOrUpdateProfileOffline(user: User, googleUserData?: { email?: string; displayName?: string; photoURL?: string }): UserProfile {
     const email = googleUserData?.email || user.email || "";

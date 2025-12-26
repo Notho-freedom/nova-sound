@@ -78,6 +78,8 @@ export function useCloudSync(): UseCloudSyncReturn {
   const anonymousUserInitRef = useRef<boolean>(false); // Prevent multiple anonymous user creations
   const googleMergeInProgressRef = useRef<boolean>(false); // Prevent multiple Google merge attempts
   const syncStatusDebounceTimerRef = useRef<NodeJS.Timeout | null>(null); // Debounce sync status calls
+  const stripeSyncInProgressRef = useRef<boolean>(false); // Prevent multiple Stripe sync calls
+  const lastStripeSyncEmailRef = useRef<string | null>(null); // Track last synced email
 
   // Initialize on mount
   useEffect(() => {
@@ -117,13 +119,20 @@ export function useCloudSync(): UseCloudSyncReturn {
         
         // PRIORITY 1: If there's already a non-anonymous Firebase user, use it
         if (firebaseUser && !firebaseUser.isAnonymous) {
-          const profile = firebaseService.getUserProfile();
+          // Try to get profile, if not loaded yet, load it
+          let profile = firebaseService.getUserProfile();
+          if (!profile) {
+            console.log("📥 Profile not loaded yet, loading from Firestore...");
+            profile = await firebaseService.loadUserProfileById(firebaseUser.uid);
+          }
+          
           if (profile) {
             setNexusUser(profile);
             setNexusAuthenticated(true);
-            setNexusIsPro(firebaseService.isPro());
+            // Use profile directly instead of isPro() to ensure we have the latest data
+            setNexusIsPro(profile.plan === 'pro' && profile.subscriptionStatus === 'active');
             anonymousUserInitRef.current = true;
-            console.log("✅ Using existing Firebase Google user:", firebaseUser.email);
+            console.log("✅ Using existing Firebase Google user:", firebaseUser.email, "isPro:", profile.plan === 'pro');
             
             // Synchroniser automatiquement le profil Firestore avec Stripe au démarrage
             // Cela garantit que Firestore est toujours à jour avec les données Stripe réelles
@@ -232,10 +241,24 @@ export function useCloudSync(): UseCloudSyncReturn {
             const anonymousProfile = await firebaseService.signInAnonymously();
             
             setNexusUser(anonymousProfile);
-            // Anonymous user is NOT considered authenticated (only Google users are)
-            setNexusAuthenticated(false);
-            setNexusIsPro(false);
-            console.log("✅ Firebase anonymous user initialized (not authenticated - waiting for Google)");
+            
+            // Check if the returned profile is actually from a Google user (not anonymous)
+            // This can happen if Firebase already had a Google user persisted
+            const hasValidEmail = !!anonymousProfile.email && anonymousProfile.email.includes('@');
+            const currentUser = firebaseService.getCurrentUser();
+            const isActuallyAuthenticated = hasValidEmail || (currentUser && !currentUser.isAnonymous);
+            
+            if (isActuallyAuthenticated) {
+              // This is actually a Google user, not anonymous
+              setNexusAuthenticated(true);
+              setNexusIsPro(anonymousProfile.plan === 'pro' && anonymousProfile.subscriptionStatus === 'active');
+              console.log("✅ Firebase returned existing Google user:", anonymousProfile.email, "isPro:", anonymousProfile.plan === 'pro');
+            } else {
+              // Anonymous user is NOT considered authenticated (only Google users are)
+              setNexusAuthenticated(false);
+              setNexusIsPro(false);
+              console.log("✅ Firebase anonymous user initialized (not authenticated - waiting for Google)");
+            }
             return;
           } catch (anonError: any) {
             // Check if anonymous auth is disabled
@@ -468,17 +491,29 @@ export function useCloudSync(): UseCloudSyncReturn {
       unsubscribeFirebase = firebaseService.onAuthStateChange(async (firebaseUser) => {
         if (firebaseUser) {
           // Always get the latest profile from Firestore (contains merged Google data with priority)
-          const profile = firebaseService.getUserProfile();
+          let profile = firebaseService.getUserProfile();
+          // If profile is not loaded yet, load it from Firestore
+          if (!profile && !firebaseUser.isAnonymous) {
+            console.log("📥 onAuthStateChange: Profile not loaded yet, loading from Firestore...");
+            profile = await firebaseService.loadUserProfileById(firebaseUser.uid);
+          }
           if (profile) {
             // Update UI with profile from Firestore (Google data is prioritized during merge)
             setNexusUser(profile);
-            // Only consider authenticated if user is NOT anonymous (has Google account)
-            setNexusAuthenticated(!firebaseUser.isAnonymous);
-            setNexusIsPro(firebaseService.isPro());
+            // Consider authenticated if:
+            // 1. User is NOT anonymous (has Google account linked in Firebase), OR
+            // 2. Profile has a valid email (Google data was merged even if Firebase user is still anonymous)
+            const hasValidEmail = !!profile.email && profile.email.includes('@');
+            const isAuthenticated = !firebaseUser.isAnonymous || hasValidEmail;
+            setNexusAuthenticated(isAuthenticated);
+            // Check isPro from profile directly (more reliable than firebaseService.isPro())
+            const isPro = profile.plan === 'pro' && profile.subscriptionStatus === 'active';
+            setNexusIsPro(isPro);
             
             // Initialize Firebase sync ONLY ONCE per user session
             // Check if this is a new user or if sync hasn't been initialized yet
-            if (!firebaseUser.isAnonymous) {
+            // Also initialize sync for users with valid email (even if Firebase user is anonymous)
+            if (isAuthenticated) {
               const currentUserId = firebaseUser.uid;
               
               // Only initialize if it's a different user or sync hasn't been initialized
@@ -567,6 +602,46 @@ export function useCloudSync(): UseCloudSyncReturn {
           setNexusUser(user);
           setNexusAuthenticated(!user.isAnonymous);
           setNexusIsPro(authService.isPro());
+
+          // Try to sync with Stripe to get the real subscription status
+          // This is important when Firestore lookup fails or profile has stale data
+          // Use refs to prevent multiple concurrent calls for the same user
+          if (!user.isAnonymous && user.email && 
+              !stripeSyncInProgressRef.current && 
+              lastStripeSyncEmailRef.current !== user.email) {
+            stripeSyncInProgressRef.current = true;
+            try {
+              const token = await authService.getAccessToken();
+              if (token) {
+                console.log('🔄 useCloudSync: Syncing with Stripe to get real subscription status...');
+                const response = await fetch('/api/stripe/subscription-status', {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                  },
+                });
+                
+                if (response.ok) {
+                  const stripeData = await response.json();
+                  console.log('✅ useCloudSync: Stripe subscription status:', stripeData);
+                  lastStripeSyncEmailRef.current = user.email; // Mark as synced
+                  
+                  if (stripeData.isActive && stripeData.plan === 'pro') {
+                    setNexusIsPro(true);
+                    console.log('✅ useCloudSync: User is Pro (verified from Stripe)');
+                    
+                    // Update local auth service cache
+                    authService.updateUserPlan('pro', 'active');
+                  }
+                } else {
+                  console.warn('⚠️ useCloudSync: Failed to get Stripe subscription status');
+                }
+              }
+            } catch (stripeError) {
+              console.warn('⚠️ useCloudSync: Error syncing with Stripe (non-blocking):', stripeError);
+            } finally {
+              stripeSyncInProgressRef.current = false;
+            }
+          }
 
           // Try to sync with Firestore if Firebase is initialized
           if (firebaseService.isInitialized() && user.email && !user.isAnonymous) {
