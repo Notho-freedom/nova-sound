@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, 
@@ -42,6 +42,7 @@ import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { usePlaylistFavorites } from "@/hooks/usePlaylistFavorites";
 import { AlbumGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
 import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/PageLayout";
 import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
@@ -60,6 +61,7 @@ interface PlaylistViewProps {
   onAddTracksToPlaylist: (playlistId: string, trackIds: string[]) => Promise<void>;
   onRemoveTracksFromPlaylist: (playlistId: string, trackIds: string[]) => Promise<void>;
   loading?: boolean;
+  initialPlaylistId?: string | null; // ID de la playlist à ouvrir au chargement
 }
 
 type ViewMode = "grid" | "list";
@@ -241,11 +243,20 @@ export const PlaylistView = memo(({
   onAddTracksToPlaylist,
   onRemoveTracksFromPlaylist,
   loading = false,
+  initialPlaylistId = null,
 }: PlaylistViewProps) => {
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(initialPlaylistId);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [pageMode, setPageMode] = useState<PageMode>("list");
+  const [pageMode, setPageMode] = useState<PageMode>(initialPlaylistId ? "detail" : "list");
   const [newPlaylistName, setNewPlaylistName] = useState("");
+
+  // Mettre à jour selectedPlaylistId quand initialPlaylistId change
+  useEffect(() => {
+    if (initialPlaylistId) {
+      setSelectedPlaylistId(initialPlaylistId);
+      setPageMode("detail");
+    }
+  }, [initialPlaylistId]);
   const [selectedTracksForPlaylist, setSelectedTracksForPlaylist] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
@@ -257,6 +268,7 @@ export const PlaylistView = memo(({
   const { uploadPlaylist: uploadPlaylistToNexus, uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
+  const { isFavorite: isPlaylistFavorite, toggleFavorite: togglePlaylistFavorite } = usePlaylistFavorites();
   
   const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
@@ -275,8 +287,11 @@ export const PlaylistView = memo(({
   );
 
   // Get tracks for selected playlist
+  // Les tracks YouTube sont maintenant inclus dans la prop `tracks` via le cache dans DesktopApp
   const playlistTracks = useMemo(() => {
     if (!selectedPlaylist) return [];
+    
+    // Chercher les tracks dans la liste fournie (qui inclut maintenant les tracks YouTube en cache)
     return selectedPlaylist.trackIds
       .map((id) => tracks.find((t) => t.id === id))
       .filter((t): t is Track => !!t);
@@ -942,6 +957,17 @@ export const PlaylistView = memo(({
                   <Shuffle className="w-4 h-4" />
                   Mélanger
                 </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => togglePlaylistFavorite(selectedPlaylist.id)} 
+                  className={cn(
+                    "gap-2 bg-white/5 border-white/20 text-white hover:bg-white/10",
+                    isPlaylistFavorite(selectedPlaylist.id) && "bg-rose-500/20 border-rose-500/50 text-rose-400 hover:bg-rose-500/30"
+                  )}
+                >
+                  <Heart className={cn("w-4 h-4", isPlaylistFavorite(selectedPlaylist.id) && "fill-current")} />
+                  {isPlaylistFavorite(selectedPlaylist.id) ? "Retirer des favoris" : "Ajouter aux favoris"}
+                </Button>
                 <Button variant="outline" onClick={() => {
                   setSelectedTracksForPlaylist([]);
                   setPageMode("edit");
@@ -1166,6 +1192,8 @@ export const PlaylistView = memo(({
                   onEdit={() => handleEditPlaylist(playlist)}
                   onDelete={() => handleDeletePlaylist(playlist.id)}
                   onView={() => setSelectedPlaylistId(playlist.id)}
+                  onToggleFavorite={() => togglePlaylistFavorite(playlist.id)}
+                  isFavorite={isPlaylistFavorite(playlist.id)}
                 >
                   <GlassCard
                     className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/30 transition-colors"

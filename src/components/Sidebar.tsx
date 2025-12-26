@@ -27,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { usePlaylistMetadata } from "@/hooks/usePlaylistMetadata";
+import { usePlaylistFavorites } from "@/hooks/usePlaylistFavorites";
 import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
@@ -218,11 +219,23 @@ export const Sidebar = ({
   const collapsed = controlledCollapsed ?? internalCollapsed;
   const hookPlaylists = usePlaylists();
   // Use prop playlists if provided (from DesktopApp), otherwise use hook playlists
-  const playlists = propPlaylists ?? hookPlaylists.playlists;
+  const allPlaylists = propPlaylists ?? hookPlaylists.playlists;
   const { createPlaylist, updatePlaylist, deletePlaylist } = hookPlaylists;
   const { notifySuccess } = useNotifications();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
+  
+  // Gestion centralisée des playlists favorites
+  const { isFavorite: isPlaylistFavorite, favoritePlaylistIds } = usePlaylistFavorites();
+  
+  // Filtrer pour ne montrer que les playlists favorites dans la sidebar
+  // Utiliser directement favoritePlaylistIds pour que le filtre se mette à jour immédiatement
+  const playlists = useMemo(() => {
+    const favoriteIdsSet = new Set(favoritePlaylistIds);
+    const filtered = allPlaylists.filter(playlist => favoriteIdsSet.has(playlist.id));
+    console.log('[Sidebar] Playlists favorites filtrées:', filtered.length, 'sur', allPlaylists.length, 'IDs favoris:', favoritePlaylistIds);
+    return filtered;
+  }, [allPlaylists, favoritePlaylistIds]);
   
   // Enrich playlists with metadata (covers, duration, artists)
   const playlistMetadata = usePlaylistMetadata(playlists, tracks);
@@ -463,6 +476,8 @@ export const Sidebar = ({
                         }
                       }}
                       onView={() => handleViewChangeWithMetrics("playlists", `playlist-view-${playlist.id}`)}
+                      onToggleFavorite={() => togglePlaylistFavorite(playlist.id)}
+                      isFavorite={isPlaylistFavorite(playlist.id)}
                     >
                       <div
                         onClick={() => handleViewChangeWithMetrics("playlists", `playlist-item-${playlist.id}`)}

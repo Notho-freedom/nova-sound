@@ -6,6 +6,7 @@ interface UsePlaylistsReturn {
   playlists: Playlist[];
   loading: boolean;
   createPlaylist: (name: string, trackIds?: string[]) => Promise<Playlist | null>;
+  createPlaylistFromYouTube: (youtubePlaylistId: string, name: string, trackIds: string[], coverUrl?: string) => Promise<Playlist | null>;
   updatePlaylist: (id: string, data: Partial<Playlist>) => Promise<Playlist | null>;
   deletePlaylist: (id: string) => Promise<void>;
   addTracksToPlaylist: (playlistId: string, trackIds: string[]) => Promise<void>;
@@ -125,6 +126,75 @@ export function usePlaylists(): UsePlaylistsReturn {
       } catch (err) {
         console.error("Failed to create playlist:", err);
         notificationService.error("Erreur", "Impossible de créer la playlist");
+        return null;
+      }
+    },
+    [isElectron, playlists]
+  );
+
+  // Créer une playlist locale à partir d'une playlist YouTube
+  const createPlaylistFromYouTube = useCallback(
+    async (youtubePlaylistId: string, name: string, trackIds: string[] = [], coverUrl?: string): Promise<Playlist | null> => {
+      try {
+        let playlist: Playlist | null = null;
+        
+        if (isElectron && window.electronAPI) {
+          // En Electron, créer la playlist via l'API
+          playlist = await window.electronAPI.createPlaylist(name, trackIds);
+          if (playlist) {
+            // Mettre à jour la playlist avec les métadonnées YouTube
+            const updated = await window.electronAPI.updatePlaylist(playlist.id, {
+              mediaSource: 'youtube',
+              externalId: youtubePlaylistId,
+              coverUrl: coverUrl,
+            });
+            if (updated) {
+              playlist = updated;
+            } else {
+              playlist = {
+                ...playlist,
+                mediaSource: 'youtube',
+                externalId: youtubePlaylistId,
+                coverUrl: coverUrl,
+              };
+            }
+            setPlaylists((prev) => [...prev, playlist!]);
+          }
+        } else {
+          // Web mode
+          playlist = {
+            id: crypto.randomUUID(),
+            name,
+            trackIds,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            mediaSource: 'youtube',
+            externalId: youtubePlaylistId,
+            coverUrl: coverUrl,
+          };
+          setPlaylists((prev) => [...prev, playlist!]);
+        }
+        
+        // Sync to Firebase
+        if (playlist) {
+          try {
+            const { firebaseSyncService } = await import('@/services/firebase-sync');
+            const updatedPlaylists = [...playlists, playlist];
+            firebaseSyncService.queueSync('playlists', updatedPlaylists);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: updatedPlaylists }));
+            }
+          } catch (error) {
+            console.error('Error syncing YouTube playlist to Firebase:', error);
+          }
+          // Notify user
+          notificationService.playlistCreated(playlist.name);
+        }
+        
+        return playlist;
+      } catch (err) {
+        console.error("Failed to create playlist from YouTube:", err);
+        notificationService.error("Erreur", "Impossible de créer la playlist YouTube");
         return null;
       }
     },
@@ -307,6 +377,7 @@ export function usePlaylists(): UsePlaylistsReturn {
     playlists,
     loading,
     createPlaylist,
+    createPlaylistFromYouTube,
     updatePlaylist,
     deletePlaylist,
     addTracksToPlaylist,

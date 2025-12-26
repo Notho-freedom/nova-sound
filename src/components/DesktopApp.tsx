@@ -54,6 +54,45 @@ export const DesktopApp = () => {
   // Initialize theme hook to ensure theme is loaded and applied on mount
   useTheme();
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
+  
+  // État pour stocker les tracks YouTube chargés dynamiquement
+  const [youtubeTracksCache, setYoutubeTracksCache] = useState<Map<string, Track[]>>(new Map());
+  
+  // Écouter les événements de chargement de tracks YouTube
+  useEffect(() => {
+    const handleYouTubeTracksLoaded = (event: CustomEvent<{ playlistId: string; tracks: Track[] }>) => {
+      const { playlistId, tracks } = event.detail;
+      setYoutubeTracksCache(prev => {
+        const newMap = new Map(prev);
+        newMap.set(playlistId, tracks);
+        return newMap;
+      });
+    };
+    
+    window.addEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
+    return () => {
+      window.removeEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
+    };
+  }, []);
+  
+  // Combiner libraryTracks avec les tracks YouTube en cache
+  const allTracks = useMemo(() => {
+    const tracksMap = new Map<string, Track>();
+    
+    // Ajouter les tracks de la bibliothèque
+    libraryTracks.forEach(track => tracksMap.set(track.id, track));
+    
+    // Ajouter les tracks YouTube en cache
+    youtubeTracksCache.forEach(tracks => {
+      tracks.forEach(track => {
+        if (!tracksMap.has(track.id)) {
+          tracksMap.set(track.id, track);
+        }
+      });
+    });
+    
+    return Array.from(tracksMap.values());
+  }, [libraryTracks, youtubeTracksCache]);
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory, recordPlayback } = usePlayHistory();
   const { 
@@ -165,6 +204,7 @@ export const DesktopApp = () => {
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [playlistToOpen, setPlaylistToOpen] = useState<string | null>(null);
   // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
 
   // Audio element ref for real playback
@@ -1093,6 +1133,14 @@ export const DesktopApp = () => {
     notifySuccess(message);
   }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError]);
 
+  // Handler pour ouvrir une playlist dans PlaylistView
+  const handleOpenPlaylist = useCallback((playlistId: string) => {
+    setPlaylistToOpen(playlistId);
+    setCurrentView("playlists");
+    // Réinitialiser après un court délai pour permettre la réouverture
+    setTimeout(() => setPlaylistToOpen(null), 100);
+  }, []);
+
   const handleToggleFavorite = useCallback(() => {
     if (!currentTrack) return;
     if (isFavorite(currentTrack.id)) {
@@ -1408,7 +1456,7 @@ export const DesktopApp = () => {
       case "playlists":
         return (
           <PlaylistView
-            tracks={libraryTracks}
+            tracks={allTracks}
             playlists={playlists}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
@@ -1421,6 +1469,7 @@ export const DesktopApp = () => {
             onAddTracksToPlaylist={addTracksToPlaylist}
             onRemoveTracksFromPlaylist={removeTracksFromPlaylist}
             loading={libraryLoading}
+            initialPlaylistId={playlistToOpen}
           />
         );
       case "recent": {
@@ -1754,6 +1803,7 @@ export const DesktopApp = () => {
             onArtistClick={(artistName) => {
               setSelectedArtist(artistName);
             }}
+            onOpenPlaylist={handleOpenPlaylist}
           />
         ) : (
           <LibraryView
@@ -1952,7 +2002,7 @@ export const DesktopApp = () => {
 
           {/* Sidebar */}
           <Sidebar 
-            tracks={libraryTracks}
+            tracks={allTracks}
             playlists={playlists}
             currentView={currentView} 
             onViewChange={(view) => {

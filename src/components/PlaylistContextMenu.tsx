@@ -15,6 +15,7 @@ import {
   ListMusic,
   Cloud,
   Zap,
+  Heart,
 } from "lucide-react";
 import { Playlist } from "@/types/music";
 
@@ -27,6 +28,8 @@ interface PlaylistContextMenuProps {
   onDelete?: () => void;
   onShare?: () => void;
   onView?: () => void;
+  onToggleFavorite?: () => void;
+  isFavorite?: boolean;
   onUploadToCloudinary?: () => void;
   canUploadToCloudinary?: boolean;
   onUploadToNexus?: () => void;
@@ -42,6 +45,8 @@ export const PlaylistContextMenu = ({
   onDelete,
   onShare,
   onView,
+  onToggleFavorite,
+  isFavorite = false,
   onUploadToCloudinary,
   canUploadToCloudinary = false,
   onUploadToNexus,
@@ -78,6 +83,14 @@ export const PlaylistContextMenu = ({
           <ContextMenuItem onClick={onShare}>
             <Share2 className="w-4 h-4 mr-2" />
             Partager
+          </ContextMenuItem>
+        )}
+        {onToggleFavorite && (
+          <ContextMenuItem onClick={onToggleFavorite}>
+            <Heart
+              className={`w-4 h-4 mr-2 ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
+            />
+            {isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
           </ContextMenuItem>
         )}
 

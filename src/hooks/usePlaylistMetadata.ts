@@ -56,9 +56,13 @@ export function usePlaylistMetadata(
         .filter((t): t is Track => !!t);
 
       // Première couverture pour la preview
-      const coverUrl = playlistTracks.length > 0
-        ? getCoverUrl(playlistTracks[0].coverUrl)
-        : null;
+      // Utiliser la coverUrl de la playlist si disponible (pour les playlists YouTube)
+      // Sinon, utiliser la première track
+      const coverUrl = playlist.coverUrl 
+        ? getCoverUrl(playlist.coverUrl)
+        : (playlistTracks.length > 0
+          ? getCoverUrl(playlistTracks[0].coverUrl)
+          : null);
 
       // Toutes les couvertures (pour grille)
       const coverUrls = playlistTracks
