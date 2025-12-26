@@ -295,7 +295,7 @@ const ArtistCard = memo(({
           {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titres
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 });
 ArtistCard.displayName = "ArtistCard";
