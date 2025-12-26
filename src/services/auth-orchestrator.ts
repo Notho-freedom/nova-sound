@@ -103,7 +103,7 @@ async function checkStripeOnce(uid: string, email: string): Promise<boolean> {
   if (stripeCheckedForUid.has(uid)) {
     return currentState.isPro;
   }
-  
+  //
   // Marquer comme en cours de vérification
   stripeCheckedForUid.add(uid);
   
