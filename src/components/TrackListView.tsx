@@ -188,7 +188,7 @@ export const TrackListView = memo(({
                 </td>
                 {showAlbum && (
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <p className="text-sm text-muted-foreground truncate">{track.album}</p>
+                    <p className="text-sm text-muted-foreground truncate max-w-xs">{track.album}</p>
                   </td>
                 )}
                 {showHistory && (

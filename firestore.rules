@@ -6,41 +6,51 @@ service cloud.firestore {
     match /users/{userId} {
       // Allow read/write if the user is authenticated and accessing their own document
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Also allow anonymous users to read/write their own document
-      allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous' && request.auth.uid == userId;
-      
-      // Allow collection queries by email for account linking
-      // This allows findUserByEmail to work for authenticated users
-      // Only matches if: user is authenticated AND (it's their own doc OR the doc's email matches their email)
-      allow read: if request.auth != null 
-        && (request.auth.uid == userId 
-            || (resource != null && resource.data.email == request.auth.token.email));
-      
+
+      // Allow collection queries by email for account linking (findUserByEmail)
+      allow read: if request.auth != null && resource != null && resource.data.email == request.auth.token.email;
+
       // Allow write for manual OAuth users (when creating profile with their UID)
-      // This allows ensureUserProfileExists to work for manual OAuth users
-      // Note: This is less secure but necessary for manual OAuth flow
-      // In production, consider using Firebase Auth for better security
-      allow write: if request.resource.data.uid == userId;
+      allow write: if request.auth != null && request.resource.data.uid == userId;
     }
     
     // AppData subcollection under users - for Firebase sync and backups
     match /users/{userId}/appData/{dataId} {
-      // Allow read/write for the user's own data
+      // Allow read/write for the user's own data (Firebase Auth)
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Also allow for Google users who may have different UIDs
+
+      // Allow read/write for authenticated users if the email matches (for Google OAuth backup restore)
+      // This allows manual OAuth users to access their data via email matching
       allow read, write: if request.auth != null 
         && request.auth.token.email != null 
-        && resource != null 
-        && resource.data.email == request.auth.token.email;
-      // Allow create for authenticated users writing their own data
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.email == request.auth.token.email;
+
+      // Allow create for authenticated users writing their own data (backup creation)
+      allow create: if request.auth != null && request.resource.data.uid == userId;
+      
+      // Allow create for authenticated users if email matches (for manual OAuth users)
       allow create: if request.auth != null 
-        && request.resource.data.uid == userId;
+        && request.auth.token.email != null 
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.email == request.auth.token.email;
     }
     
     // Playlists subcollection under users
     match /users/{userId}/playlists/{playlistId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Backups subcollection under users - for app data backups
+    match /users/{userId}/backups/{backupId} {
+      // Allow read/write for the user's own backups (Firebase Auth)
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow read/write for authenticated users if the email matches (for manual OAuth users)
+      allow read, write: if request.auth != null 
+        && request.auth.token.email != null 
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.email == request.auth.token.email;
     }
     
     // Sync data - users can only access their own sync data

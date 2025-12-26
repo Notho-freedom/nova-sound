@@ -151,6 +151,13 @@ class FirebaseSyncService {
   private lastBackupDataHash: string | null = null;
   
   async initializeSync(userId: string): Promise<void> {
+    // Validate that userId is a Firebase Auth UID (28 characters, no @, no user_ prefix)
+    // This prevents using old Google UIDs that don't work with Firestore rules
+    const isFirebaseUid = userId && userId.length === 28 && !userId.includes('@') && !userId.includes('user_');
+    if (!isFirebaseUid) {
+      console.error(`❌ Cannot initialize Firebase sync: Invalid UID format. Expected Firebase Auth UID (28 chars), got: ${userId}`);
+      throw new Error(`Invalid Firebase Auth UID format: ${userId}`);
+    }
     // Ensure Firebase is initialized first (non-bloquant)
     const { firebaseService } = await import('./firebase');
     await firebaseService.ensureInitialized();

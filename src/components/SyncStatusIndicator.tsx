@@ -24,29 +24,41 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     let authUnsubscribe: (() => void) | null = null;
     
     // Helper function to update auth state based on current user and profile
-    const updateAuthState = () => {
+    const updateAuthState = async () => {
       if (!mounted) return;
       
       const user = firebaseService.getCurrentUser();
       const profile = firebaseService.getUserProfile();
       const profileEmail = profile?.email;
       
+      // Also check manual OAuth auth service for authenticated users
+      let manualAuthUser = null;
+      try {
+        const { authService } = await import('@/services/auth');
+        manualAuthUser = authService.getCurrentUser();
+      } catch (error) {
+        // Auth service not available, continue with Firebase only
+      }
+      
       // Consider authenticated if:
-      // 1. User is NOT anonymous, OR
-      // 2. Profile has a valid email (Google data was merged)
+      // 1. Firebase user is NOT anonymous, OR
+      // 2. Profile has a valid email (Google data was merged), OR
+      // 3. Manual OAuth user exists (for manual OAuth users)
       const hasValidEmail = !!profileEmail && profileEmail.includes('@');
-      const authenticated = !!user && (!user.isAnonymous || hasValidEmail);
+      const hasManualAuth = !!manualAuthUser && !!manualAuthUser.email;
+      const authenticated = !!user && (!user.isAnonymous || hasValidEmail) || hasManualAuth;
       const isPro = profile?.plan === 'pro' && profile?.subscriptionStatus === 'active';
       
       console.log('📊 SyncStatusIndicator: Updating auth state', { 
         authenticated, 
-        email: user?.email || profileEmail,
+        email: user?.email || profileEmail || manualAuthUser?.email,
         isPro,
-        hasProfile: !!profile
+        hasProfile: !!profile,
+        hasManualAuth
       });
       
       setIsAuthenticated(authenticated);
-      setUserEmail(user?.email || profileEmail || null);
+      setUserEmail(user?.email || profileEmail || manualAuthUser?.email || null);
       setSyncStatus("idle");
     };
     
@@ -66,7 +78,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
             user: user ? { uid: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null
           });
           
-          // Update auth state immediately
+          // Update auth state immediately (async)
           updateAuthState();
           
           // Also set a short delay to catch profile that loads after auth state
@@ -76,9 +88,9 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
         });
         
         // Also poll for profile changes (in case profile loads after auth state change)
-        // This handles the case where signInAnonymously returns a Google user
+        // This handles the case where signInAnonymously returns a Google user or manual OAuth user
         let profileCheckInterval: NodeJS.Timeout | null = null;
-        profileCheckInterval = setInterval(() => {
+        profileCheckInterval = setInterval(async () => {
           if (!mounted) {
             if (profileCheckInterval) clearInterval(profileCheckInterval);
             return;
@@ -86,12 +98,23 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
           const profile = firebaseService.getUserProfile();
           const currentUser = firebaseService.getCurrentUser();
           const hasValidEmail = !!profile?.email && profile.email.includes('@');
-          const shouldBeAuthenticated = !!currentUser && (!currentUser.isAnonymous || hasValidEmail);
+          
+          // Also check manual OAuth auth service
+          let manualAuthUser = null;
+          try {
+            const { authService } = await import('@/services/auth');
+            manualAuthUser = authService.getCurrentUser();
+          } catch (error) {
+            // Auth service not available, continue with Firebase only
+          }
+          
+          const hasManualAuth = !!manualAuthUser && !!manualAuthUser.email;
+          const shouldBeAuthenticated = !!currentUser && (!currentUser.isAnonymous || hasValidEmail) || hasManualAuth;
           
           // Only update if we detect authentication but state shows not authenticated
           if (shouldBeAuthenticated && !isAuthenticated) {
             console.log('🔄 SyncStatusIndicator: Profile detected, updating auth state');
-            updateAuthState();
+            await updateAuthState();
             // Stop polling once authenticated
             if (profileCheckInterval) clearInterval(profileCheckInterval);
           }

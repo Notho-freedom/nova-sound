@@ -798,8 +798,35 @@ class AuthService {
 
   // Create new Google profile (manual OAuth, not Firebase)
   private async createGoogleProfile(userInfo: any, tokens: AuthTokens): Promise<UserProfile> {
+    // Try to authenticate with Firebase Auth using Google credential
+    // This ensures the user has request.auth for Firestore rules
+    let firebaseUser: any = null;
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized() && tokens.idToken) {
+        // Try to sign in with Firebase Auth using Google credential
+        const { getAuth, signInWithCredential, GoogleAuthProvider } = await import('firebase/auth');
+        const { getFirebaseApp } = await import('@/services/firebase');
+        const app = getFirebaseApp();
+        if (app) {
+          const auth = getAuth(app);
+          const credential = GoogleAuthProvider.credential(tokens.idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          firebaseUser = userCredential.user;
+          console.log('✅ Authenticated with Firebase Auth using Google credential:', firebaseUser.uid);
+        }
+      }
+    } catch (firebaseAuthError: any) {
+      // If Firebase Auth fails, continue with manual OAuth (non-blocking)
+      console.warn('⚠️ Could not authenticate with Firebase Auth (non-blocking):', firebaseAuthError.message);
+    }
+
+    // Use Firebase Auth UID if available, otherwise use Google UID
+    // IMPORTANT: Always use Firebase Auth UID if available for Firestore rules to work
+    const uid = firebaseUser?.uid || userInfo.id || userInfo.sub || `user_${Date.now()}`;
+    
     const profile: UserProfile = {
-      uid: userInfo.id || userInfo.sub || `user_${Date.now()}`,
+      uid, // This will be Firebase Auth UID if firebaseUser exists
       email: userInfo.email || "",
       displayName: userInfo.name || userInfo.email?.split("@")[0] || "Utilisateur",
       photoURL: userInfo.picture || null,
@@ -809,6 +836,7 @@ class AuthService {
       lastLoginAt: new Date().toISOString(),
     };
 
+    // Update current user with profile (has Firebase Auth UID if available)
     this.currentUser = profile;
     this.authTokens = tokens;
     this.saveToStorage();
@@ -817,16 +845,31 @@ class AuthService {
     this.setupTokenRefresh();
 
     // Try to create/update user in Firestore (non-blocking)
+    // IMPORTANT: Use Firebase Auth UID in Firestore profile to ensure rules work
     try {
       const { firebaseService } = await import('@/services/firebase');
-      if (firebaseService.isInitialized()) {
+      if (firebaseService.isInitialized() && firebaseUser) {
+        // Update profile with Firebase Auth UID before saving to Firestore
+        const firestoreProfile = {
+          ...profile,
+          uid: firebaseUser.uid, // Always use Firebase Auth UID
+        };
+        await firebaseService.ensureUserProfileExists(firestoreProfile);
+        console.log('✅ Firestore profile created/updated with Firebase Auth UID:', firebaseUser.uid);
+        
+        // Update local profile with Firebase Auth UID (for consistency)
+        profile.uid = firebaseUser.uid;
+        this.currentUser = profile;
+      } else if (firebaseService.isInitialized()) {
+        // Fallback: try without Firebase Auth UID (may fail due to rules)
         await firebaseService.ensureUserProfileExists(profile);
       }
     } catch (error) {
       console.warn('⚠️ Could not create Firestore user profile (non-blocking):', error);
     }
 
-    // Notify listeners
+    // Notify listeners with profile that has Firebase Auth UID
+    // This ensures useCloudSync receives the correct UID
     this.authStateListeners.forEach((listener) => listener(profile));
 
     return profile;
@@ -843,7 +886,14 @@ class AuthService {
     this.currentUser = null;
     this.authTokens = null;
     this.clearStorage();
-    
+
+    // App reset: remove all local app/user data (localStorage, caches, etc.)
+    import('@/lib/storage-utils').then(utils => {
+      if (utils && typeof utils.completeLogoutCleanup === 'function') {
+        utils.completeLogoutCleanup();
+      }
+    });
+
     // Notify listeners
     this.authStateListeners.forEach((listener) => listener(null));
   }

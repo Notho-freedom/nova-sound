@@ -77,7 +77,9 @@ export function useCloudSync(): UseCloudSyncReturn {
   const lastUserIdRef = useRef<string | null>(null);
   const anonymousUserInitRef = useRef<boolean>(false); // Prevent multiple anonymous user creations
   const googleMergeInProgressRef = useRef<boolean>(false); // Prevent multiple Google merge attempts
-  const syncStatusDebounceTimerRef = useRef<NodeJS.Timeout | null>(null); // Debounce sync status calls
+  const syncStatusDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastFindUserByEmailRef = useRef<string | null>(null); // Prevent multiple findUserByEmail calls for same email
+  const findUserByEmailInProgressRef = useRef<boolean>(false); // Prevent multiple findUserByEmail calls
   const stripeSyncInProgressRef = useRef<boolean>(false); // Prevent multiple Stripe sync calls
   const lastStripeSyncEmailRef = useRef<string | null>(null); // Track last synced email
 
@@ -183,34 +185,91 @@ export function useCloudSync(): UseCloudSyncReturn {
           setNexusIsPro(authService.isPro());
           anonymousUserInitRef.current = true;
           
-          // Try to find existing user in Firestore and sync (non-blocking)
-          if (firebaseService.isInitialized()) {
-            firebaseService.findUserByEmail(localGoogleUser.email)
-              .then(async (existingUser) => {
-                if (existingUser) {
-                  console.log("✅ Found existing Google user in Firestore, syncing...");
-                  // Update with Firestore data (more complete)
-                  setNexusUser(existingUser);
-                  setNexusIsPro(existingUser.plan === 'pro');
-                  
-                  // Initialize Firebase sync for this user
-                  try {
-                    const { firebaseSyncService } = await import('@/services/firebase-sync');
-                    if (existingUser.uid) {
-                      await firebaseSyncService.initializeSync(existingUser.uid);
-                      console.log('✅ Firebase sync initialized for local Google user');
-                      syncInitializedRef.current = true;
-                      lastUserIdRef.current = existingUser.uid;
-                    }
-                  } catch (syncError) {
-                    console.error('Error initializing Firebase sync for local Google user:', syncError);
-                  }
+          // Try to sync with Firebase if possible
+          // Only if Firebase is initialized AND we haven't already processed this email
+          if (firebaseService.isInitialized() && lastFindUserByEmailRef.current !== localGoogleUser.email) {
+            lastFindUserByEmailRef.current = localGoogleUser.email;
+            
+            // Use the UID from the local profile if it's a Firebase Auth UID
+            const localUid = localGoogleUser.uid;
+            const isLocalFirebaseUid = localUid && localUid.length === 28 && !localUid.includes('@') && !localUid.includes('user_');
+            
+            if (isLocalFirebaseUid) {
+              // Local profile already has Firebase Auth UID, use it directly
+              console.log("✅ Using Firebase Auth UID from local profile:", localUid);
+              
+              // Initialize Firebase sync using the Firebase Auth UID from local profile
+              if (!syncInitializedRef.current || lastUserIdRef.current !== localUid) {
+                try {
+                  const { firebaseSyncService } = await import('@/services/firebase-sync');
+                  await firebaseSyncService.initializeSync(localUid);
+                  console.log('✅ Firebase sync initialized using Firebase Auth UID from local profile:', localUid);
+                  syncInitializedRef.current = true;
+                  lastUserIdRef.current = localUid;
+                } catch (syncError) {
+                  console.error('Error initializing Firebase sync for local Google user:', syncError);
                 }
-              })
-              .catch((error) => {
-                // Silent fail - local user data is already set
-                console.warn("⚠️ Could not sync with Firestore, using local user data");
-              });
+              }
+              
+              // Try to get latest profile from Firestore (optional, for plan/subscription data)
+              // Only if not already initialized to avoid infinite loop
+              if (!syncInitializedRef.current) {
+                firebaseService.findUserByEmail(localGoogleUser.email)
+                  .then(async (existingUser) => {
+                    if (existingUser) {
+                      console.log("✅ Found existing Google user in Firestore, syncing...");
+                      // Update with Firestore data (more complete)
+                      setNexusUser(existingUser);
+                      setNexusIsPro(existingUser.plan === 'pro');
+                    }
+                  })
+                  .catch((error) => {
+                    // Silent fail - local user data is already set
+                    console.warn('Could not find Firestore user (using local profile):', error);
+                  });
+              }
+            } else {
+              // Local profile doesn't have Firebase Auth UID, try to get it from Firestore
+              // But only if Firebase Auth is ready (has a current user)
+              const firebaseCurrentUser = firebaseService.getCurrentUser();
+              if (firebaseCurrentUser && !firebaseCurrentUser.isAnonymous) {
+                firebaseService.findUserByEmail(localGoogleUser.email)
+                  .then(async (existingUser) => {
+                    if (existingUser) {
+                      console.log("✅ Found existing Google user in Firestore, syncing...");
+                      // Update with Firestore data (more complete)
+                      setNexusUser(existingUser);
+                      setNexusIsPro(existingUser.plan === 'pro');
+                      
+                      // Check if Firestore user has Firebase Auth UID
+                      const firestoreUid = existingUser.uid;
+                      const isFirestoreFirebaseUid = firestoreUid && firestoreUid.length === 28 && !firestoreUid.includes('@') && !firestoreUid.includes('user_');
+                      
+                      if (isFirestoreFirebaseUid && (!syncInitializedRef.current || lastUserIdRef.current !== firestoreUid)) {
+                        // Initialize Firebase sync using Firebase Auth UID from Firestore
+                        try {
+                          const { firebaseSyncService } = await import('@/services/firebase-sync');
+                          await firebaseSyncService.initializeSync(firestoreUid);
+                          console.log('✅ Firebase sync initialized using Firebase Auth UID from Firestore:', firestoreUid);
+                          syncInitializedRef.current = true;
+                          lastUserIdRef.current = firestoreUid;
+                        } catch (syncError) {
+                          console.error('Error initializing Firebase sync for local Google user:', syncError);
+                        }
+                      } else if (!isFirestoreFirebaseUid) {
+                        console.warn('⚠️ Firestore UID is not a Firebase Auth UID, cannot initialize sync:', firestoreUid);
+                      }
+                    }
+                  })
+                  .catch((error) => {
+                    // Silent fail - local user data is already set
+                    console.warn("⚠️ Could not sync with Firestore, using local user data");
+                  });
+              } else {
+                // Firebase Auth not ready yet, will be handled by auth state change listener
+                console.log("⏳ Firebase Auth not ready yet, will sync when auth state changes");
+              }
+            }
           }
           
           // Load sync status
@@ -645,39 +704,103 @@ export function useCloudSync(): UseCloudSyncReturn {
 
           // Try to sync with Firestore if Firebase is initialized
           if (firebaseService.isInitialized() && user.email && !user.isAnonymous) {
-            firebaseService.findUserByEmail(user.email)
-              .then(async (existingUser) => {
-                if (existingUser) {
-                  console.log("✅ Syncing with Firestore user data");
-                  setNexusUser(existingUser);
-                  setNexusIsPro(existingUser.plan === 'pro');
-                  
-                  // Initialize Firebase sync for this user
-                  try {
-                    const { firebaseSyncService } = await import('@/services/firebase-sync');
-                    const firebaseUser = firebaseService.getCurrentUser();
-                    if (firebaseUser && !firebaseUser.isAnonymous) {
-                      // Use Firebase user UID for sync
-                      await firebaseSyncService.initializeSync(firebaseUser.uid);
-                      console.log('✅ Firebase sync initialized for manual OAuth user via Firestore');
-                      syncInitializedRef.current = true;
-                      lastUserIdRef.current = firebaseUser.uid;
-                    } else if (existingUser.uid) {
-                      // Fallback: use Firestore user ID directly
-                      await firebaseSyncService.initializeSync(existingUser.uid);
-                      console.log('✅ Firebase sync initialized using Firestore user ID');
-                      syncInitializedRef.current = true;
-                      lastUserIdRef.current = existingUser.uid;
+            // Prevent multiple calls for the same email (avoid infinite loop)
+            if (lastFindUserByEmailRef.current === user.email && syncInitializedRef.current) {
+              // Already processed this email, skip
+              return;
+            }
+            
+            // Use the UID from the profile directly (should be Firebase Auth UID after createGoogleProfile)
+            // This is more reliable than findUserByEmail which might return old data
+            const profileUid = user.uid;
+            const isFirebaseUid = profileUid && profileUid.length === 28 && !profileUid.includes('@') && !profileUid.includes('user_');
+            
+            if (isFirebaseUid) {
+              // Profile already has Firebase Auth UID, use it directly
+              console.log("✅ Using Firebase Auth UID from profile:", profileUid);
+              
+              // Mark as processed to prevent infinite loop
+              lastFindUserByEmailRef.current = user.email;
+              
+              // Try to get latest profile from Firestore (optional, for plan/subscription data)
+              // Only if not already initialized and not already in progress to avoid infinite loop
+              if (!syncInitializedRef.current && !findUserByEmailInProgressRef.current && lastFindUserByEmailRef.current !== user.email) {
+                findUserByEmailInProgressRef.current = true;
+                firebaseService.findUserByEmail(user.email)
+                  .then(async (existingUser) => {
+                    findUserByEmailInProgressRef.current = false;
+                    if (existingUser) {
+                      console.log("✅ Syncing with Firestore user data");
+                      setNexusUser(existingUser);
+                      setNexusIsPro(existingUser.plan === 'pro');
                     }
-                  } catch (syncError) {
-                    console.error('Error initializing Firebase sync for manual OAuth user:', syncError);
-                  }
+                  })
+                  .catch((error) => {
+                    findUserByEmailInProgressRef.current = false;
+                    // Silent fail - use local profile
+                    console.warn('Could not find Firestore user (using local profile):', error);
+                  });
+              }
+              
+              // Initialize Firebase sync using the Firebase Auth UID from profile
+              // Only if not already initialized for this UID
+              if (lastUserIdRef.current !== profileUid) {
+                try {
+                  const { firebaseSyncService } = await import('@/services/firebase-sync');
+                  await firebaseSyncService.initializeSync(profileUid);
+                  console.log('✅ Firebase sync initialized using Firebase Auth UID from profile:', profileUid);
+                  syncInitializedRef.current = true;
+                  lastUserIdRef.current = profileUid;
+                } catch (syncError) {
+                  console.error('Error initializing Firebase sync for manual OAuth user:', syncError);
                 }
-              })
-              .catch((error) => {
-                // Silent fail - local user data is already set
-                console.warn('Could not find Firestore user:', error);
-              });
+              } else if (syncInitializedRef.current && lastUserIdRef.current === profileUid) {
+                // Already initialized for this UID, skip silently
+                return;
+              }
+            } else {
+              // Profile doesn't have Firebase Auth UID yet, try to get it from Firestore
+              // Only if not already processed and not already in progress
+              if (lastFindUserByEmailRef.current !== user.email && !findUserByEmailInProgressRef.current) {
+                console.log("⚠️ Profile UID is not a Firebase Auth UID, trying to find in Firestore...");
+                lastFindUserByEmailRef.current = user.email;
+                findUserByEmailInProgressRef.current = true;
+                
+                firebaseService.findUserByEmail(user.email)
+                  .then(async (existingUser) => {
+                    findUserByEmailInProgressRef.current = false;
+                    if (existingUser) {
+                      console.log("✅ Syncing with Firestore user data");
+                      setNexusUser(existingUser);
+                      setNexusIsPro(existingUser.plan === 'pro');
+                      
+                      // Check if Firestore user has Firebase Auth UID
+                      const firestoreUid = existingUser.uid;
+                      const isFirestoreFirebaseUid = firestoreUid && firestoreUid.length === 28 && !firestoreUid.includes('@') && !firestoreUid.includes('user_');
+                      
+                      if (isFirestoreFirebaseUid && lastUserIdRef.current !== firestoreUid) {
+                        // Initialize Firebase sync using Firebase Auth UID from Firestore
+                        try {
+                          const { firebaseSyncService } = await import('@/services/firebase-sync');
+                          await firebaseSyncService.initializeSync(firestoreUid);
+                          console.log('✅ Firebase sync initialized using Firebase Auth UID from Firestore:', firestoreUid);
+                          syncInitializedRef.current = true;
+                          lastUserIdRef.current = firestoreUid;
+                        } catch (syncError) {
+                          console.error('Error initializing Firebase sync for manual OAuth user:', syncError);
+                        }
+                      } else if (!isFirestoreFirebaseUid) {
+                        console.warn('⚠️ Cannot initialize Firebase sync: Firestore UID is not a Firebase Auth UID:', firestoreUid);
+                      }
+                    }
+                  })
+                  .catch((error) => {
+                    findUserByEmailInProgressRef.current = false;
+                    // Silent fail - local user data is already set
+                    console.warn('Could not find Firestore user:', error);
+                  });
+              }
+            }
           }
 
           // Load sync status (debounced to avoid excessive calls)

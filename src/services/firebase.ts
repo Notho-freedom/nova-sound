@@ -589,51 +589,91 @@ class FirebaseService {
     }
   }
 
-  // Find user by email in Firestore
+  // Find user by email using Admin SDK via API endpoint
+  // This bypasses Firestore security rules which don't allow client-side email queries
   async findUserByEmail(email: string): Promise<UserProfile | null> {
-    if (!db || !email) {
+    if (!email) {
       return null;
     }
 
-    // Note: Don't check navigator.onLine - it's unreliable in Electron
-    // Let Firebase SDK handle offline scenarios naturally
-
     try {
-      // Query Firestore for user with this email
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
-      const querySnapshot = await getDocs(q);
+      // Normalize email (lowercase, trim) to match how it's stored in Firestore
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Get ID token for authentication
+      // Try Firebase token first (for Firebase Auth users)
+      let idToken = await this.getIdToken();
+      
+      // If no Firebase token, try to get OAuth token from manual auth service
+      // (for users who use manual OAuth instead of Firebase Auth)
+      if (!idToken) {
+        try {
+          const { authService } = await import('@/services/auth');
+          idToken = await authService.getIdToken();
+        } catch (authServiceError) {
+          // Auth service not available or not initialized - this is fine
+          // We'll just proceed without token (will fail auth, but that's expected)
+        }
+      }
+      
+      if (!idToken) {
+        // Don't log warning if auth is not initialized yet (normal during startup)
+        // The caller should handle this gracefully
+        return null;
+      }
 
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        return userDoc.data() as UserProfile;
+      // Call API endpoint that uses Admin SDK
+      const response = await fetch(
+        `/api/users/find-by-email?email=${encodeURIComponent(normalizedEmail)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // User not found - this is a valid case, not an error
+          return null;
+        }
+        
+        if (response.status === 401) {
+          console.warn("⚠️ Authentication failed when searching user by email");
+          return null;
+        }
+
+        // Log other errors but don't throw
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.warn("⚠️ API error when searching user by email:", errorData.error || response.statusText);
+        return null;
       }
+
+      const data = await response.json();
+      
+      if (data.found && data.user) {
+        return data.user as UserProfile;
+      }
+
+      return null;
     } catch (error: unknown) {
-      const firestoreError = error as { code?: string; message?: string };
+      const networkError = error as { code?: string; message?: string };
       
-      // Handle offline/network errors gracefully
-      if (firestoreError.code === 'unavailable' || 
-          firestoreError.code === 'failed-precondition' ||
-          firestoreError.message?.includes('offline') ||
-          firestoreError.message?.includes('network')) {
-        console.warn("⚠️ Firestore query failed (network issue), returning null");
+      // Handle network errors gracefully
+      if (networkError.code === 'ENOTFOUND' || 
+          networkError.message?.includes('fetch') ||
+          networkError.message?.includes('network') ||
+          networkError.message?.includes('Failed to fetch')) {
+        console.warn("⚠️ Network error when searching user by email (offline or connectivity issue)");
         return null;
       }
       
-      // Handle permission errors gracefully (Firestore rules may not allow query by email)
-      if (firestoreError.code === 'permission-denied' ||
-          firestoreError.message?.includes('permission') ||
-          firestoreError.message?.includes('Missing or insufficient permissions')) {
-        console.warn("⚠️ Firestore permission denied for email query - this is normal if rules restrict queries");
-        return null;
-      }
-      
-      console.warn("⚠️ Firestore query error:", firestoreError.message || error);
+      console.warn("⚠️ Error searching user by email:", networkError.message || error);
       // Don't throw - return null to allow graceful fallback
       return null;
     }
-
-    return null;
   }
 
   // Sign in with Google
@@ -1061,8 +1101,21 @@ class FirebaseService {
 
   // Get ID token for backend calls
   async getIdToken(forceRefresh: boolean = false): Promise<string | null> {
+    // Try to get current user from auth first (more reliable)
+    if (auth && auth.currentUser && !auth.currentUser.isAnonymous) {
+      try {
+        const token = await auth.currentUser.getIdToken(forceRefresh);
+        if (token) {
+          return token;
+        }
+      } catch (error) {
+        // Fall through to check this.currentUser
+      }
+    }
+    
     if (!this.currentUser) {
-      console.warn("getIdToken: No current user available");
+      // Don't log warning if auth is not initialized yet (normal during startup)
+      // or if we're in the middle of authentication flow
       return null;
     }
     
