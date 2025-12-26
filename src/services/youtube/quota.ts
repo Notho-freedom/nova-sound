@@ -193,27 +193,31 @@ class YouTubeQuotaManager {
   }
 
   private loadBudget(): QuotaBudget {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // S'assurer que toutes les propriétés existent
-        return {
-          ...this.createNewBudget(),
-          ...parsed,
-        };
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          // S'assurer que toutes les propriétés existent
+          return {
+            ...this.createNewBudget(),
+            ...parsed,
+          };
+        }
+      } catch (e) {
+        console.warn('[YouTubeQuota] Erreur chargement budget:', e);
       }
-    } catch (e) {
-      console.warn('[YouTubeQuota] Erreur chargement budget:', e);
     }
     return this.createNewBudget();
   }
 
   private saveBudget(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.budget));
-    } catch (e) {
-      console.warn('[YouTubeQuota] Erreur sauvegarde budget:', e);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.budget));
+      } catch (e) {
+        console.warn('[YouTubeQuota] Erreur sauvegarde budget:', e);
+      }
     }
   }
 

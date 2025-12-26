@@ -160,22 +160,24 @@ class YouTubeCache {
       return memEntry.data as T;
     }
 
-    // 2. Vérifier localStorage
-    try {
-      const stored = localStorage.getItem(this.STORAGE_PREFIX + key);
-      if (stored) {
-        const entry: CacheEntry<T> = JSON.parse(stored);
-        if (Date.now() < entry.expiresAt) {
-          // Remettre en cache mémoire
-          this.memoryCache.set(key, entry);
-          return entry.data;
-        } else {
-          // Nettoyer l'entrée expirée
-          localStorage.removeItem(this.STORAGE_PREFIX + key);
+    // 2. Vérifier localStorage (uniquement côté client)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = localStorage.getItem(this.STORAGE_PREFIX + key);
+        if (stored) {
+          const entry: CacheEntry<T> = JSON.parse(stored);
+          if (Date.now() < entry.expiresAt) {
+            // Remettre en cache mémoire
+            this.memoryCache.set(key, entry);
+            return entry.data;
+          } else {
+            // Nettoyer l'entrée expirée
+            localStorage.removeItem(this.STORAGE_PREFIX + key);
+          }
         }
+      } catch (e) {
+        console.warn('[YouTubeCache] Erreur lecture localStorage:', e);
       }
-    } catch (e) {
-      console.warn('[YouTubeCache] Erreur lecture localStorage:', e);
     }
 
     return null;
@@ -200,8 +202,8 @@ class YouTubeCache {
     this.enforceMemoryLimit();
     this.memoryCache.set(key, memEntry);
 
-    // 2. Stocker en localStorage (sauf si memoryOnly)
-    if (!options?.memoryOnly) {
+    // 2. Stocker en localStorage (sauf si memoryOnly, uniquement côté client)
+    if (!options?.memoryOnly && typeof window !== 'undefined' && window.localStorage) {
       try {
         const storageEntry: CacheEntry<T> = {
           data,
@@ -227,6 +229,8 @@ class YouTubeCache {
   }
 
   private enforceStorageLimit(): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    
     try {
       const keys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -264,49 +268,55 @@ class YouTubeCache {
       }
     }
 
-    // Nettoyer localStorage
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key?.startsWith(this.STORAGE_PREFIX)) {
-          try {
-            const entry = JSON.parse(localStorage.getItem(key) || '{}');
-            if (now >= entry.expiresAt) {
+    // Nettoyer localStorage (uniquement côté client)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key?.startsWith(this.STORAGE_PREFIX)) {
+            try {
+              const entry = JSON.parse(localStorage.getItem(key) || '{}');
+              if (now >= entry.expiresAt) {
+                localStorage.removeItem(key);
+              }
+            } catch {
               localStorage.removeItem(key);
             }
-          } catch {
-            localStorage.removeItem(key);
           }
         }
+      } catch (e) {
+        console.warn('[YouTubeCache] Erreur nettoyage localStorage:', e);
       }
-    } catch (e) {
-      console.warn('[YouTubeCache] Erreur nettoyage localStorage:', e);
     }
   }
 
   clear(): void {
     this.memoryCache.clear();
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key?.startsWith(this.STORAGE_PREFIX)) {
-          localStorage.removeItem(key);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key?.startsWith(this.STORAGE_PREFIX)) {
+            localStorage.removeItem(key);
+          }
         }
+      } catch (e) {
+        console.warn('[YouTubeCache] Erreur clear localStorage:', e);
       }
-    } catch (e) {
-      console.warn('[YouTubeCache] Erreur clear localStorage:', e);
     }
   }
 
   getStats(): { memoryItems: number; storageItems: number } {
     let storageItems = 0;
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        if (localStorage.key(i)?.startsWith(this.STORAGE_PREFIX)) {
-          storageItems++;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          if (localStorage.key(i)?.startsWith(this.STORAGE_PREFIX)) {
+            storageItems++;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
     
     return {
       memoryItems: this.memoryCache.size,
