@@ -174,12 +174,17 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           
           // If no Firebase Auth user or anonymous, create Firestore user and initialize sync
           if (!firebaseUser || firebaseUser.isAnonymous) {
-            console.log('🔄 FirebaseProvider: Manual OAuth user detected, creating Firestore user:', manualUser.email);
+            const firestoreUserId = manualUser.uid;
             
-            // Create or get Firestore user for manual OAuth user
+            // Prevent multiple calls for the same user
+            if (initializedUserIdRef.current === firestoreUserId || syncInProgressRef.current) {
+              return; // Already processed or in progress
+            }
+            
+            syncInProgressRef.current = true;
+            
             try {
-              // Try to create/get user in Firestore using the manual OAuth UID
-              const firestoreUserId = manualUser.uid;
+              console.log('🔄 FirebaseProvider: Manual OAuth user detected, creating Firestore user:', manualUser.email);
               
               // IMPORTANT: Ensure user profile exists in Firestore BEFORE initializing sync
               // This ensures the user document is available for sync operations
@@ -193,25 +198,37 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               await firebaseSyncService.initializeSync(firestoreUserId);
               console.log('✅ FirebaseProvider: Sync initialized for manual OAuth user');
               
+              // Mark as initialized
+              initializedUserIdRef.current = firestoreUserId;
+              lastSyncUserIdRef.current = firestoreUserId;
+              
               // Synchroniser automatiquement le profil Firestore avec Stripe (seulement si première fois)
-              if (lastSyncUserIdRef.current !== firestoreUserId) {
-                await syncProfileWithStripe(firestoreUserId, true); // skipRefresh=true pour éviter la boucle
-              }
+              await syncProfileWithStripe(firestoreUserId, true); // skipRefresh=true pour éviter la boucle
             } catch (syncError) {
               console.error('❌ FirebaseProvider: Failed to initialize sync for manual OAuth user:', syncError);
               if (checkAttempts < maxCheckAttempts) {
                 setTimeout(checkManualAuthUser, 5000);
               }
+            } finally {
+              syncInProgressRef.current = false;
             }
           } else if (firebaseUser && !firebaseUser.isAnonymous) {
             // Firebase user exists, initialize sync
-            console.log('🔄 FirebaseProvider: Firebase user exists, initializing sync');
-            await firebaseSyncService.initializeSync(firebaseUser.uid);
-            console.log('✅ FirebaseProvider: Sync initialized for Firebase user');
-            
-            // Synchroniser automatiquement le profil Firestore avec Stripe (seulement si première fois)
-            if (lastSyncUserIdRef.current !== firebaseUser.uid) {
-              await syncProfileWithStripe(firebaseUser.uid, true); // skipRefresh=true pour éviter la boucle
+            if (initializedUserIdRef.current !== firebaseUser.uid && !syncInProgressRef.current) {
+              syncInProgressRef.current = true;
+              try {
+                console.log('🔄 FirebaseProvider: Firebase user exists, initializing sync');
+                await firebaseSyncService.initializeSync(firebaseUser.uid);
+                console.log('✅ FirebaseProvider: Sync initialized for Firebase user');
+                
+                initializedUserIdRef.current = firebaseUser.uid;
+                lastSyncUserIdRef.current = firebaseUser.uid;
+                
+                // Synchroniser automatiquement le profil Firestore avec Stripe (seulement si première fois)
+                await syncProfileWithStripe(firebaseUser.uid, true); // skipRefresh=true pour éviter la boucle
+              } finally {
+                syncInProgressRef.current = false;
+              }
             }
           }
         } else {
