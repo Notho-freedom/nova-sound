@@ -34,6 +34,7 @@ import { getCoverUrl } from "@/lib/audio";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PlaylistTableSkeleton } from "@/components/ui/skeletons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
@@ -876,8 +877,8 @@ export const ArtistView = memo(({
                             </div>
                           )}
                           {loadingPlaylistId === playlist.id && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              <Loader2 className="w-5 h-5 animate-spin text-white" />
+                            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center">
+                              <Skeleton className="w-full h-full rounded-lg" />
                             </div>
                           )}
                         </div>
@@ -1005,10 +1006,7 @@ export const ArtistView = memo(({
                             className="border-t border-border/30"
                           >
                             {loadingPlaylistId === playlist.id ? (
-                              <div className="p-6 flex items-center justify-center">
-                                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                                <span className="ml-2 text-sm text-muted-foreground">Chargement...</span>
-                              </div>
+                              <PlaylistTableSkeleton count={5} />
                             ) : playlistTracks.length > 0 ? (
                               <div className="max-h-[400px] overflow-y-auto">
                                 <table className="w-full">

@@ -4,7 +4,7 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { useYouTubePlayer, type YouTubeQuality } from "@/hooks/useYouTubePlayer";
 import { extractYouTubeVideoId } from "@/lib/youtube";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface YouTubePlayerProps {
   videoId: string;
@@ -295,9 +295,8 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
       {audioOnly && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background via-background/90 to-background/80">
           {isLoading && (
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Chargement...</p>
+            <div className="w-full h-full flex items-center justify-center">
+              <Skeleton className="w-32 h-32 rounded-lg" />
             </div>
           )}
           {error && (
@@ -311,10 +310,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
       {/* Loading overlay */}
       {!audioOnly && isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 pointer-events-none">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Chargement...</p>
-          </div>
+          <Skeleton className="w-full h-full rounded-none" />
         </div>
       )}
       

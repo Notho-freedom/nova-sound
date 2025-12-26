@@ -4,8 +4,9 @@
 
 "use client";
 
-import { Calendar, Music, Disc, Clock, ExternalLink, Loader2 } from 'lucide-react';
+import { Calendar, Music, Disc, Clock, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAlbumMetadata } from '@/hooks/useArtistMetadata';
 import type { AlbumMetadata } from '@/types/artist-metadata';
 
@@ -28,9 +29,20 @@ export function AlbumMetadata({
 
   if (isLoading) {
     return (
-      <div className={cn('flex items-center justify-center p-8', className)}>
-        <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        <span className="ml-2 text-sm text-muted-foreground">Chargement des métadonnées...</span>
+      <div className={cn('space-y-4 p-8', className)}>
+        <div className="flex items-center gap-4">
+          <Skeleton className="w-24 h-24 rounded-lg flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
       </div>
     );
   }

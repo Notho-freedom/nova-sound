@@ -261,8 +261,8 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
           >
             {recognizing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyse...
+                <Wand2 className="w-4 h-4 mr-2" />
+                Analyse en cours...
               </>
             ) : (
               <>
@@ -1791,11 +1791,11 @@ export const SettingsView = () => {
                     <div className="space-y-3">
                       {/* Server-side Bunny configuration status */}
                       {bunnyStatusLoading ? (
-                        <div className="p-3 rounded-lg bg-muted/30 border border-border/50 animate-pulse">
-                          <p className="text-sm text-muted-foreground flex items-center gap-2">
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            Vérification de la configuration...
-                          </p>
+                        <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-3/4" />
+                          </div>
                         </div>
                       ) : bunnyStatus?.configured ? (
                         <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -2020,8 +2020,10 @@ export const SettingsView = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SettingsCard title="Plan actuel" icon={Crown}>
                 {subscriptionLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+                  <div className="space-y-4 py-4">
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-10 w-full" />
                   </div>
                 ) : subscriptionStatus ? (
                   <div className="space-y-4">

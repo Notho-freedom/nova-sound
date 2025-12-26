@@ -11,12 +11,12 @@ import {
   MapPin, 
   Globe, 
   Music, 
-  ExternalLink, 
-  Loader2,
+  ExternalLink,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useArtistMetadata } from '@/hooks/useArtistMetadata';
 import type { ArtistMetadata } from '@/types/artist-metadata';
 
@@ -43,9 +43,20 @@ export function ArtistMetadata({
 
   if (isLoading) {
     return (
-      <div className={cn('flex items-center justify-center p-8', className)}>
-        <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        <span className="ml-2 text-sm text-muted-foreground">Chargement des métadonnées...</span>
+      <div className={cn('space-y-4 p-8', className)}>
+        <div className="flex items-center gap-4">
+          <Skeleton className="w-24 h-24 rounded-full flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
       </div>
     );
   }

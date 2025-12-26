@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { Video } from "@/types/music";
 import { useVideoPlayer } from "@/hooks/useVideoPlayer";
@@ -214,9 +215,8 @@ export const CinemaMode = ({
       {/* Loading Indicator */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-white/80 text-sm">Chargement...</p>
+          <div className="w-full h-full">
+            <Skeleton className="w-full h-full rounded-none" />
           </div>
         </div>
       )}

@@ -28,6 +28,7 @@ const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => (
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, Music, Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -2033,10 +2034,12 @@ export const DesktopApp = () => {
               currentView === "videos" && "overflow-hidden"
             )}>
               <Suspense fallback={
-                <div className="h-full w-full flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm text-muted-foreground">Chargement...</span>
+                <div className="h-full w-full p-8 space-y-6">
+                  <Skeleton className="h-8 w-48" />
+                  <div className="space-y-4">
+                    <Skeleton className="h-32 w-full rounded-lg" />
+                    <Skeleton className="h-32 w-full rounded-lg" />
+                    <Skeleton className="h-32 w-full rounded-lg" />
                   </div>
                 </div>
               }>

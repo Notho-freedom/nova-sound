@@ -1003,8 +1003,8 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                   </div>
                   {autocompleteLoading && (
                     <div className="p-2 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Recherche de suggestions...
+                      <Skeleton className="w-3 h-3 rounded-full" />
+                      <Skeleton className="h-3 w-32" />
                     </div>
                   )}
                 </div>
@@ -1415,9 +1415,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
                   <h2 className="text-xl font-semibold">Suggestions basées sur vos artistes</h2>
                 </div>
                 {loadingArtistSuggestions ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
+                  <VideoGridSkeleton count={8} />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {artistSuggestions.map((result, index) => (

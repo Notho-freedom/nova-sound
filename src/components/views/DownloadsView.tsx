@@ -650,8 +650,8 @@ export const DownloadsView = () => {
               onClick={refreshUploadedFiles}
               disabled={loadingUploaded}
                   >
-              <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "animate-spin")} />
-              Actualiser
+              <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "opacity-50")} />
+              {loadingUploaded ? "Actualisation..." : "Actualiser"}
                   </Button>
                 </div>
 

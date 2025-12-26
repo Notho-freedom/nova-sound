@@ -4,8 +4,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { User, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { User, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useArtistImage } from '@/hooks/useArtistImage';
 import type { ArtistImage } from '@/types/artist-image';
 
@@ -80,7 +81,7 @@ export function ArtistImage({
 
       {/* Loading */}
       {isLoading && showLoading && !displayImage && (
-        <Loader2 className="w-1/2 h-1/2 text-primary/50 animate-spin" />
+        <Skeleton className="w-full h-full rounded-full" />
       )}
 
       {/* Fallback */}

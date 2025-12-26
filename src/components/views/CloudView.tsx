@@ -650,7 +650,7 @@ export const CloudView = () => {
             </Dialog>
             
             <Button variant="outline" size="sm" onClick={refreshUploadedFiles} disabled={loadingUploaded}>
-              <RefreshCw className={cn("w-4 h-4", loadingUploaded && "animate-spin")} />
+              <RefreshCw className={cn("w-4 h-4", loadingUploaded && "opacity-50")} />
             </Button>
           </div>
         }

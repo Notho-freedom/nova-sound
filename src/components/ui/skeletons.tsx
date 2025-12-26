@@ -333,6 +333,21 @@ export const SearchAlbumCardSkeleton = () => (
 );
 
 /**
+ * Skeleton pour un tableau de tracks de playlist (pour ArtistView)
+ */
+export const PlaylistTableSkeleton = ({ count = 5 }: { count?: number }) => (
+  <div className="max-h-[400px] overflow-y-auto">
+    <table className="w-full">
+      <tbody>
+        {Array.from({ length: count }).map((_, i) => (
+          <TableRowSkeleton key={`playlist-table-${i}`} />
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+/**
  * Skeleton pour les résultats de recherche
  */
 export const SearchResultsSkeleton = () => (

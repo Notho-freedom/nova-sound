@@ -1,4 +1,5 @@
 import { X, GripVertical, Play, Pause, Radio, Clock, Loader2, ListMusic, Youtube, Music2, Trash2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -334,9 +335,17 @@ export const QueuePanel = ({
           {/* Similaire: Flux YouTube pour tracks YouTube, tracks locaux pour tracks locaux */}
           <TabsContent value="similar" className="p-4 mt-0">
             {loadingYouTubeSimilar && currentTrack?.mediaSource === 'youtube' ? (
-              <div className="text-center py-8 text-muted-foreground text-sm flex flex-col items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Chargement du flux YouTube...</span>
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={`similar-skeleton-${i}`} className="flex items-center gap-3 p-2 rounded-lg">
+                    <Skeleton className="w-12 h-12 rounded-lg flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                ))}
               </div>
             ) : similarTracksForDisplay.length > 0 ? (
               <div>

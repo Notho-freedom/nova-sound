@@ -586,7 +586,7 @@ export const SearchView = ({
                 )}
                 {youtubeLoading && (
                   <div className="mr-4">
-                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    <Skeleton className="w-5 h-5 rounded-full" />
                   </div>
                 )}
               </div>
@@ -739,8 +739,8 @@ export const SearchView = ({
                       {youtubeLoading && searchResults.tracks.length > 0 && (
                         <div className="mb-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
                           <div className="flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                            <span className="text-sm text-primary">Recherche YouTube en cours...</span>
+                            <Skeleton className="w-4 h-4 rounded-full" />
+                            <Skeleton className="h-4 w-40" />
                           </div>
                         </div>
                       )}

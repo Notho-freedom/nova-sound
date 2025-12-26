@@ -6,8 +6,9 @@
 "use client";
 
 import { useState } from 'react';
-import { Brain, Sparkles, FileText, Users, TrendingUp, AlertTriangle, Loader2 } from 'lucide-react';
+import { Brain, Sparkles, FileText, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { AIAnalysisResult } from '@/hooks/useAudioAI';
 
@@ -172,9 +173,12 @@ export function AIAnalysisPanel({ analysis, onStartAI, className }: AIAnalysisPa
         {activeTab === 'transcription' && analysis.isPro && (
           <div className="space-y-2">
             {analysis.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                <span className="ml-2 text-sm text-muted-foreground">Analyse en cours...</span>
+              <div className="space-y-3 py-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
               </div>
             ) : analysis.transcription ? (
               <div className="bg-white/5 rounded p-3">
@@ -205,8 +209,13 @@ export function AIAnalysisPanel({ analysis, onStartAI, className }: AIAnalysisPa
         {activeTab === 'sentiment' && analysis.isPro && (
           <div className="space-y-2">
             {analysis.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <div className="space-y-2 py-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={`sentiment-skeleton-${i}`} className="bg-white/5 rounded p-2 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                ))}
               </div>
             ) : analysis.sentiment && analysis.sentiment.length > 0 ? (
               <div className="space-y-2">
@@ -244,8 +253,14 @@ export function AIAnalysisPanel({ analysis, onStartAI, className }: AIAnalysisPa
         {activeTab === 'chapters' && analysis.isPro && (
           <div className="space-y-2">
             {analysis.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <div className="space-y-2 py-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={`chapter-skeleton-${i}`} className="bg-white/5 rounded p-3 space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                ))}
               </div>
             ) : analysis.chapters && analysis.chapters.length > 0 ? (
               <div className="space-y-2">
