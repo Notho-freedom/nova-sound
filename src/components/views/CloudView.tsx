@@ -87,7 +87,8 @@ interface ServerInfo {
 export const CloudView = () => {
   const { 
     nexusAuthenticated, 
-    nexusIsPro, 
+    nexusIsPro,
+    nexusUser,
     cloudinaryConfigured,
     cloudinaryConfig,
   } = useCloudSync();
