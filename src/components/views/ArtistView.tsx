@@ -26,6 +26,7 @@ import {
   X,
   ListMusic,
   Loader2,
+  Save,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -158,6 +159,7 @@ export const ArtistView = memo(({
   // State for expanded playlist
   const [expandedPlaylistId, setExpandedPlaylistId] = useState<string | null>(null);
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
+  const [convertingPlaylistId, setConvertingPlaylistId] = useState<string | null>(null);
 
   // Get artist tracks from the library
   const artistTracks = useMemo(() => {
@@ -846,70 +848,17 @@ export const ArtistView = memo(({
                       <div
                         className="flex items-center gap-4 p-4"
                         onClick={async () => {
-                          // Convertir la playlist YouTube en playlist locale et ouvrir dans PlaylistView
-                          if (onOpenPlaylist && createPlaylistFromYouTube) {
-                            try {
-                              // Charger les vidéos de la playlist YouTube
-                              const youtubeTracks = await loadPlaylistVideos(playlist.id);
-                              
-                              if (youtubeTracks.length === 0) {
-                                console.warn('Aucune vidéo trouvée dans la playlist YouTube');
-                                return;
-                              }
-                              
-                              // IMPORTANT: Les tracks YouTube doivent être stockés dans un cache
-                              // pour qu'ils soient accessibles dans PlaylistView
-                              const trackIds = youtubeTracks.map(t => t.id);
-                              
-                              // Vérifier si la playlist existe déjà (par externalId)
-                              const existingPlaylist = playlists.find(
-                                p => p.externalId === playlist.id && p.mediaSource === 'youtube'
-                              );
-                              
-                              let targetPlaylistId: string;
-                              
-                              if (existingPlaylist) {
-                                // La playlist existe déjà, l'ouvrir
-                                targetPlaylistId = existingPlaylist.id;
-                              } else {
-                                // Créer une nouvelle playlist locale depuis YouTube
-                                const newPlaylist = await createPlaylistFromYouTube(
-                                  playlist.id,
-                                  playlist.title,
-                                  trackIds,
-                                  playlist.thumbnailUrl
-                                );
-                                
-                                if (!newPlaylist) {
-                                  console.error('Impossible de créer la playlist');
-                                  return;
-                                }
-                                
-                                targetPlaylistId = newPlaylist.id;
-                              }
-                              
-                              // Stocker les tracks YouTube dans le cache global
-                              // pour qu'ils soient accessibles dans PlaylistView
-                              if (typeof window !== 'undefined') {
-                                window.dispatchEvent(new CustomEvent('youtube-tracks-loaded', {
-                                  detail: { playlistId: targetPlaylistId, tracks: youtubeTracks }
-                                }));
-                              }
-                              
-                              // Ouvrir la playlist
-                              onOpenPlaylist(targetPlaylistId);
-                            } catch (error) {
-                              console.error('Erreur lors de la conversion de la playlist YouTube:', error);
-                            }
+                          // Expand/collapse la playlist pour visualiser son contenu
+                          if (expandedPlaylistId === playlist.id) {
+                            setExpandedPlaylistId(null);
+                            setPlaylistTracks([]);
                           } else {
-                            // Fallback: expand/collapse comme avant
-                            if (expandedPlaylistId === playlist.id) {
-                              setExpandedPlaylistId(null);
-                              setPlaylistTracks([]);
-                            } else {
-                              setExpandedPlaylistId(playlist.id);
+                            setExpandedPlaylistId(playlist.id);
+                            try {
                               const tracks = await loadPlaylistVideos(playlist.id);
                               setPlaylistTracks(tracks);
+                            } catch (error) {
+                              console.error('Erreur lors du chargement de la playlist:', error);
                             }
                           }
                         }}
@@ -957,6 +906,85 @@ export const ArtistView = memo(({
                             }}
                           >
                             <Play className="w-4 h-4 fill-current" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 w-9 p-0"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!onOpenPlaylist || !createPlaylistFromYouTube) return;
+                              
+                              // Charger les tracks si nécessaire
+                              let tracks = playlistTracks;
+                              if (tracks.length === 0 || expandedPlaylistId !== playlist.id) {
+                                tracks = await loadPlaylistVideos(playlist.id);
+                                setPlaylistTracks(tracks);
+                              }
+                              
+                              if (tracks.length === 0) {
+                                console.warn('Aucune vidéo trouvée dans la playlist YouTube');
+                                return;
+                              }
+                              
+                              try {
+                                setConvertingPlaylistId(playlist.id);
+                                
+                                // Vérifier si la playlist existe déjà (par externalId)
+                                const existingPlaylist = playlists.find(
+                                  p => p.externalId === playlist.id && p.mediaSource === 'youtube'
+                                );
+                                
+                                let targetPlaylistId: string;
+                                
+                                if (existingPlaylist) {
+                                  // La playlist existe déjà, l'ouvrir
+                                  targetPlaylistId = existingPlaylist.id;
+                                } else {
+                                  // Créer une nouvelle playlist locale depuis YouTube
+                                  const trackIds = tracks.map(t => t.id);
+                                  const newPlaylist = await createPlaylistFromYouTube(
+                                    playlist.id,
+                                    playlist.title,
+                                    trackIds,
+                                    playlist.thumbnailUrl
+                                  );
+                                  
+                                  if (!newPlaylist) {
+                                    console.error('Impossible de créer la playlist');
+                                    setConvertingPlaylistId(null);
+                                    return;
+                                  }
+                                  
+                                  targetPlaylistId = newPlaylist.id;
+                                }
+                                
+                                // Stocker les tracks YouTube dans le cache global
+                                // pour qu'ils soient accessibles dans PlaylistView
+                                if (typeof window !== 'undefined') {
+                                  window.dispatchEvent(new CustomEvent('youtube-tracks-loaded', {
+                                    detail: { playlistId: targetPlaylistId, tracks: tracks }
+                                  }));
+                                }
+                                
+                                // Ouvrir la playlist
+                                onOpenPlaylist(targetPlaylistId);
+                                setConvertingPlaylistId(null);
+                              } catch (error) {
+                                console.error('Erreur lors de la conversion de la playlist YouTube:', error);
+                                setConvertingPlaylistId(null);
+                              }
+                            }}
+                            disabled={convertingPlaylistId === playlist.id || loadingPlaylistId === playlist.id}
+                            title={playlists.find(p => p.externalId === playlist.id && p.mediaSource === 'youtube')
+                              ? 'Ouvrir la playlist'
+                              : 'Sauvegarder / Convertir en locale'}
+                          >
+                            {convertingPlaylistId === playlist.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4" />
+                            )}
                           </Button>
                           <ChevronRight 
                             className={cn(
