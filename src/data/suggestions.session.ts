@@ -3,6 +3,8 @@
  * Cache mémoire + calculs lourds mis en cache
  */
 
+import { YouTube } from '@/services/youtube';
+
 interface YouTubeSuggestion {
   videoId: string;
   title: string;
@@ -33,9 +35,17 @@ export async function getYouTubeSuggestions(): Promise<YouTubeSuggestion[]> {
   // Démarrer un nouveau chargement (calculs lourds)
   loadPromise = (async () => {
     try {
-      // Import dynamique pour éviter de charger si pas nécessaire
-      const { generateYouTubeSuggestions } = await import('@/services/youtube-suggestions');
-      const suggestions = await generateYouTubeSuggestions();
+      // Utiliser le service YouTube unifié pour les suggestions
+      const result = await YouTube.search('popular music', 20);
+      
+      // result est un YouTubeSearchResult, on accède à result.videos
+      const videos = Array.isArray(result) ? result : (result as any).videos || [];
+      
+      const suggestions: YouTubeSuggestion[] = videos.map((video: { videoId: string; title: string; thumbnailUrl?: string }) => ({
+        videoId: video.videoId,
+        title: video.title,
+        thumbnailUrl: video.thumbnailUrl,
+      }));
       
       cachedSuggestions = suggestions;
       cacheTimestamp = Date.now();
@@ -69,4 +79,3 @@ export function getCachedSuggestions(): YouTubeSuggestion[] | null {
   }
   return null;
 }
-

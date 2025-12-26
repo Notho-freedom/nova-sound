@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { NowPlayingBar } from "./NowPlayingBar";
@@ -10,19 +10,20 @@ import { NotificationsPanel } from "./NotificationsPanel";
 import { ArtistInfoPanel } from "./ArtistInfoPanel";
 import { UpdateNotification } from "./UpdateNotification";
 import { lazy, Suspense } from "react";
-import { HomeView } from "./views/HomeView";
-import { SearchView } from "./views/SearchView";
-import { LibraryView } from "./views/LibraryView";
-import { PlaylistView } from "./views/PlaylistView";
-import { SettingsView } from "./views/SettingsView";
-import { NotificationsView } from "./views/NotificationsView";
-import { ArtistView } from "./views/ArtistView";
 
-// Lazy load heavy components
+// Lazy load ALL heavy view components for better initial load
+const HomeView = lazy(() => import("./views/HomeView").then(m => ({ default: m.HomeView })));
+const SearchView = lazy(() => import("./views/SearchView").then(m => ({ default: m.SearchView })));
+const LibraryView = lazy(() => import("./views/LibraryView").then(m => ({ default: m.LibraryView })));
+const PlaylistView = lazy(() => import("./views/PlaylistView").then(m => ({ default: m.PlaylistView })));
+const SettingsView = lazy(() => import("./views/SettingsView").then(m => ({ default: m.SettingsView })));
+const NotificationsView = lazy(() => import("./views/NotificationsView").then(m => ({ default: m.NotificationsView })));
+const ArtistView = lazy(() => import("./views/ArtistView").then(m => ({ default: m.ArtistView })));
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
 const DownloadsView = lazy(() => import("./views/DownloadsView").then(m => ({ default: m.DownloadsView })));
 const CloudView = lazy(() => import("./views/CloudView").then(m => ({ default: m.CloudView })));
 const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })));
+
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -1916,10 +1917,13 @@ export const DesktopApp = () => {
             playlists={playlists}
             currentView={currentView} 
             onViewChange={(view) => {
-              setShowInlinePlayer(false);
-              setCurrentView(view);
-              // Clear album selection when changing views
-              if (view !== "albums") setAlbumToOpen(null);
+              // Use startTransition for non-urgent navigation updates
+              startTransition(() => {
+                setShowInlinePlayer(false);
+                setCurrentView(view);
+                // Clear album selection when changing views
+                if (view !== "albums") setAlbumToOpen(null);
+              });
             }}
             favoritesCount={favoriteTracks.length}
             notificationsCount={notifications.length}
@@ -1939,21 +1943,30 @@ export const DesktopApp = () => {
               showInlinePlayer && "flex items-center justify-center",
               currentView === "videos" && "overflow-hidden"
             )}>
-              {showInlinePlayer ? (
-                <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
-                  {currentViewContent}
+              <Suspense fallback={
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-muted-foreground">Chargement...</span>
+                  </div>
                 </div>
-              ) : currentView === "videos" ? (
-                <div className="h-full w-full relative">
-                  {currentViewContent}
-                </div>
-              ) : (
-                <ScrollArea className="h-full w-full">
-                  <div className="animate-in fade-in duration-200">
+              }>
+                {showInlinePlayer ? (
+                  <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
                     {currentViewContent}
                   </div>
-                </ScrollArea>
-              )}
+                ) : currentView === "videos" ? (
+                  <div className="h-full w-full relative">
+                    {currentViewContent}
+                  </div>
+                ) : (
+                  <ScrollArea className="h-full w-full">
+                    <div className="animate-in fade-in duration-200">
+                      {currentViewContent}
+                    </div>
+                  </ScrollArea>
+                )}
+              </Suspense>
             </div>
 
             {/* Queue Panel */}

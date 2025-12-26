@@ -174,21 +174,21 @@ export function useCloudSync(): UseCloudSyncReturn {
         const localGoogleUser = authService.getCurrentUser();
         
         // PRIORITY 1: If there's already a non-anonymous Firebase user, use it
-        if (firebaseUser && !firebaseUser.isAnonymous) {
+        if (firebaseUser !== null && !firebaseUser!.isAnonymous) {
           // Try to get profile, if not loaded yet, load it
           let profile = firebaseService.getUserProfile();
           if (!profile) {
             console.log("📥 Profile not loaded yet, loading from Firestore...");
-            profile = await firebaseService.loadUserProfileById(firebaseUser.uid);
+            profile = await firebaseService.loadUserProfileById(firebaseUser!.uid);
           }
           
-          if (profile) {
-            setNexusUser(profile);
+          if (profile !== null) {
+            setNexusUser(profile!);
             setNexusAuthenticated(true);
             // Use profile directly instead of isPro() to ensure we have the latest data
-            setNexusIsPro(profile.plan === 'pro' && profile.subscriptionStatus === 'active');
+            setNexusIsPro(profile!.plan === 'pro' && profile!.subscriptionStatus === 'active');
             anonymousUserInitRef.current = true;
-            console.log("✅ Using existing Firebase Google user:", firebaseUser.email, "isPro:", profile.plan === 'pro');
+            console.log("✅ Using existing Firebase Google user:", firebaseUser!.email, "isPro:", profile!.plan === 'pro');
             
             // NOTE: La synchronisation Stripe/Firebase est maintenant gérée par AuthOrchestrator
             // On ne fait que mettre à jour l'UI ici
@@ -200,9 +200,9 @@ export function useCloudSync(): UseCloudSyncReturn {
         // PRIORITY 2: If there's a local Google user but no Firebase user
         // NOTE: L'AuthOrchestrator gère maintenant toute la logique d'authentification
         // On ne fait que mettre à jour l'UI basique ici si nécessaire
-        if (localGoogleUser && localGoogleUser.email && !firebaseUser) {
+        if (localGoogleUser !== null && localGoogleUser!.email !== null && firebaseUser === null) {
           // Prevent multiple calls for the same user - CHECK FIRST
-          const userKey = localGoogleUser.email || localGoogleUser.uid || 'anonymous';
+          const userKey = localGoogleUser!.email ?? localGoogleUser!.uid ?? 'anonymous';
           if (lastProcessedAuthUserRef.current === userKey) {
             // Already processed, skip silently
             return;
@@ -222,7 +222,7 @@ export function useCloudSync(): UseCloudSyncReturn {
         // PRIORITY 3: If no Firebase user exists and no Google user, create anonymous user
         // Note: Don't check navigator.onLine - it's unreliable in Electron
         // Let Firebase SDK handle offline scenarios naturally
-        if (!firebaseUser && !localGoogleUser) {
+        if (firebaseUser === null && localGoogleUser === null) {
           // Mark as initializing to prevent multiple creations
           anonymousUserInitRef.current = true;
           
@@ -235,7 +235,7 @@ export function useCloudSync(): UseCloudSyncReturn {
             // This can happen if Firebase already had a Google user persisted
             const hasValidEmail = !!anonymousProfile.email && anonymousProfile.email.includes('@');
             const currentUser = firebaseService.getCurrentUser();
-            const isActuallyAuthenticated = hasValidEmail || (currentUser && !currentUser.isAnonymous);
+            const isActuallyAuthenticated = hasValidEmail || (currentUser !== null && !currentUser!.isAnonymous);
             
             if (isActuallyAuthenticated) {
               // This is actually a Google user, not anonymous
@@ -271,12 +271,12 @@ export function useCloudSync(): UseCloudSyncReturn {
             anonymousUserInitRef.current = false;
             throw anonError;
           }
-        } else if (firebaseUser && firebaseUser.isAnonymous) {
+        } else if (firebaseUser !== null && firebaseUser!.isAnonymous) {
           // Firebase anonymous user exists - check if we should link with Google
           const profile = firebaseService.getUserProfile();
           
           // If there's a local Google user, merge it (Google data takes priority)
-          if (localGoogleUser && localGoogleUser.email && profile && !googleMergeInProgressRef.current) {
+          if (localGoogleUser !== null && localGoogleUser!.email !== null && profile !== null && !googleMergeInProgressRef.current) {
             googleMergeInProgressRef.current = true; // Set flag to prevent concurrent merges
             console.log("🔄 Merging local Google user with existing Firebase anonymous user (Google data takes priority)");
             try {
@@ -287,9 +287,9 @@ export function useCloudSync(): UseCloudSyncReturn {
               const currentFirebaseUser = firebaseService.getCurrentUser();
               
               // Check if Google account already exists in Firestore first
-              const existingGoogleUser = await firebaseService.findUserByEmail(localGoogleUser.email);
+              const existingGoogleUser = await firebaseService.findUserByEmail(localGoogleUser!.email!);
               
-              if (existingGoogleUser && currentFirebaseUser && existingGoogleUser.uid !== currentFirebaseUser.uid) {
+              if (existingGoogleUser !== null && currentFirebaseUser !== null && existingGoogleUser!.uid !== currentFirebaseUser!.uid) {
                 // Google account exists with different UID - sign in to existing account instead of linking
                 console.log("🔍 Google account exists with different UID, signing in directly");
                 
@@ -303,8 +303,8 @@ export function useCloudSync(): UseCloudSyncReturn {
                   // Sign in to existing Google account
                   const credential = GoogleAuthProvider.credential(idToken, accessToken);
                   const authInstance = auth;
-                  if (authInstance) {
-                    await signInWithCredential(authInstance, credential);
+                  if (authInstance !== null) {
+                    await signInWithCredential(authInstance!, credential);
                   
                     // Get updated profile
                     const mergedProfile = firebaseService.getUserProfile();
@@ -323,25 +323,24 @@ export function useCloudSync(): UseCloudSyncReturn {
                   }
                 }
                 googleMergeInProgressRef.current = false; // Reset flag if sign-in failed
-              } else if (currentFirebaseUser && currentFirebaseUser.isAnonymous) {
+              } else if (currentFirebaseUser !== null && currentFirebaseUser!.isAnonymous) {
                 // Safe to link - we have an anonymous user
                 const accessToken = await authService.getAccessToken();
                 const idToken = await authService.getIdToken();
                 
-                if (accessToken && idToken) {
+                if (accessToken && idToken && localGoogleUser !== null) {
                   console.log("🔗 Linking Google account to anonymous user");
                   
                   // Pass Google user data to prioritize it during merge
                   const googleUserData = {
-                    email: localGoogleUser.email,
-                    displayName: localGoogleUser.displayName,
-                    photoURL: localGoogleUser.photoURL || undefined,
+                    email: localGoogleUser!.email ?? '',
+                    displayName: localGoogleUser!.displayName ?? '',
+                    photoURL: localGoogleUser!.photoURL ?? undefined,
                   };
                   
-                  // Link Google account to anonymous Firebase user (Google data takes priority)
                   const mergedProfile = await firebaseService.linkWithGoogleCredential(
-                    idToken, 
-                    accessToken,
+                    idToken!, 
+                    accessToken!,
                     googleUserData
                   );
                   
