@@ -39,26 +39,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
-    // Toute la logique d'authentification est maintenant gérée par AuthOrchestrator
-    // On s'abonne aux changements d'état Firebase pour relancer l'orchestration si nécessaire
-    // MAIS seulement si l'utilisateur change vraiment (évite les boucles)
-    let lastFirebaseUid: string | null = null;
-    const unsubscribe = firebaseService.onAuthStateChange((user) => {
-      const currentUid = user?.uid || null;
-      // Relancer l'orchestration seulement si l'UID a changé
-      if (currentUid !== lastFirebaseUid) {
-        lastFirebaseUid = currentUid;
-        orchestrateAuth().catch((error) => {
-          console.error('Error re-orchestrating auth after Firebase state change:', error);
-        });
-      }
-    });
+    // NOTE: Le listener onAuthStateChange est DÉSACTIVÉ
+    // L'AuthOrchestrator gère maintenant toute l'authentification et se déclenche automatiquement
+    // Ce listener causait des appels multiples à orchestrateAuth() lors des re-renders
+    // L'AuthOrchestrator est appelé une seule fois au démarrage ci-dessus
 
     // Nettoyage
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
       initRef.current = false;
     };
   }, []);

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, memo } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -27,7 +27,7 @@ interface TitleBarProps {
   onToggleNotifications?: () => void
 }
 
-export const TitleBar = ({
+const TitleBarComponent = ({
   title = "NEXUS",
   onOpenSettings,
   uploadProgress,
@@ -39,24 +39,8 @@ export const TitleBar = ({
   const electronAPI = getElectronAPI()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
   
-  // Debug: Log auth state changes in TitleBar
-  if (typeof window !== 'undefined') {
-    console.log('🎯 TitleBar auth state:', {
-      authenticated: nexusAuthenticated,
-      user: nexusUser?.email || nexusUser?.displayName || 'N/A',
-      isPro: nexusIsPro,
-    });
-  }
-
-  // React to auth state changes
-  useEffect(() => {
-    console.log('🔄 TitleBar: Auth state updated', {
-      authenticated: nexusAuthenticated,
-      hasUser: !!nexusUser,
-      userEmail: nexusUser?.email,
-      isPro: nexusIsPro,
-    });
-  }, [nexusAuthenticated, nexusUser, nexusIsPro]);
+  // NOTE: Logs supprimés pour améliorer les performances
+  // Les logs causaient des re-renders inutiles lors de la navigation
 
   const handleLogout = async () => {
     await nexusLogout()
@@ -294,3 +278,6 @@ export const TitleBar = ({
     </div>
   )
 }
+
+// Mémoriser le composant pour éviter les re-renders inutiles lors de la navigation
+export const TitleBar = memo(TitleBarComponent)

@@ -227,6 +227,37 @@ export const Sidebar = ({
   // Enrich playlists with metadata (covers, duration, artists)
   const playlistMetadata = usePlaylistMetadata(playlists, tracks);
 
+  // Wrapper pour mesurer les temps de réponse au clic sur les nav items
+  const handleViewChangeWithMetrics = (newView: ViewType, source: string) => {
+    const startTime = performance.now();
+    const timestamp = new Date().toISOString();
+    
+    console.log(`🖱️ [Sidebar] Clic sur nav item:`, {
+      view: newView,
+      source,
+      timestamp,
+      previousView: currentView,
+      startTime: startTime.toFixed(2),
+    });
+
+    // Appeler la fonction de changement de vue
+    onViewChange(newView);
+
+    // Mesurer le temps après le changement (asynchrone pour capturer le re-render)
+    requestAnimationFrame(() => {
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      
+      console.log(`⏱️ [Sidebar] Temps de réponse:`, {
+        view: newView,
+        source,
+        duration: `${duration.toFixed(2)}ms`,
+        timestamp: new Date().toISOString(),
+        performance: duration < 16 ? '✅ Excellent (< 16ms)' : duration < 50 ? '✅ Bon (< 50ms)' : duration < 100 ? '⚠️ Acceptable (< 100ms)' : '❌ Lent (> 100ms)',
+      });
+    });
+  };
+
   const handleCollapsedChange = (value: boolean) => {
     if (onCollapsedChange) {
       onCollapsedChange(value);
@@ -324,7 +355,7 @@ export const Sidebar = ({
                   icon={item.icon}
                   label={item.label}
                   isActive={currentView === item.id}
-                  onClick={() => onViewChange(item.id)}
+                  onClick={() => handleViewChangeWithMetrics(item.id, `mainNav-${item.label}`)}
                   badge={item.id === "notifications" ? notificationsCount : undefined}
                   collapsed={collapsed}
                 />
@@ -341,7 +372,7 @@ export const Sidebar = ({
                     icon={item.icon}
                     label={item.label}
                     isActive={currentView === item.id}
-                    onClick={() => onViewChange(item.id)}
+                    onClick={() => handleViewChangeWithMetrics(item.id, `library-${item.label}`)}
                     badge={item.id === "favorites" ? favoritesCount : undefined}
                     collapsed={collapsed}
                     color={item.color}
@@ -360,7 +391,7 @@ export const Sidebar = ({
                     icon={item.icon}
                     label={item.label}
                     isActive={currentView === item.id}
-                    onClick={() => onViewChange(item.id)}
+                    onClick={() => handleViewChangeWithMetrics(item.id, `media-${item.label}`)}
                     collapsed={collapsed}
                   />
                 ))}
@@ -377,7 +408,7 @@ export const Sidebar = ({
                     icon={item.icon}
                     label={item.label}
                     isActive={currentView === item.id}
-                    onClick={() => onViewChange(item.id)}
+                    onClick={() => handleViewChangeWithMetrics(item.id, `local-${item.label}`)}
                     collapsed={collapsed}
                   />
                 ))}
@@ -420,13 +451,13 @@ export const Sidebar = ({
                       key={playlist.id}
                       playlist={playlist}
                       onPlay={() => {
-                        onViewChange("playlists")
+                        handleViewChangeWithMetrics("playlists", `playlist-play-${playlist.id}`)
                         if (onPlayPlaylist) {
                           onPlayPlaylist(playlist.id)
                         }
                       }}
                       onShuffle={() => {
-                        onViewChange("playlists")
+                        handleViewChangeWithMetrics("playlists", `playlist-shuffle-${playlist.id}`)
                         if (onShufflePlaylist) {
                           onShufflePlaylist(playlist.id)
                         }
@@ -442,10 +473,10 @@ export const Sidebar = ({
                           notifySuccess(message)
                         }
                       }}
-                      onView={() => onViewChange("playlists")}
+                      onView={() => handleViewChangeWithMetrics("playlists", `playlist-view-${playlist.id}`)}
                     >
                       <div
-                        onClick={() => onViewChange("playlists")}
+                        onClick={() => handleViewChangeWithMetrics("playlists", `playlist-item-${playlist.id}`)}
                         className={cn(
                           "w-full flex items-center gap-3 px-3 py-2 rounded-lg group cursor-pointer",
                           "text-foreground/85 bg-white/1.5 border border-white/4",
@@ -532,7 +563,7 @@ export const Sidebar = ({
 
                   {playlists.length > 5 && (
                     <button
-                      onClick={() => onViewChange("playlists")}
+                      onClick={() => handleViewChangeWithMetrics("playlists", "playlist-see-all")}
                       className={cn(
                         "w-full px-4 py-2 text-xs font-medium",
                         "text-primary/70 hover:text-primary",
@@ -553,7 +584,7 @@ export const Sidebar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => onViewChange("playlists")}
+                    onClick={() => handleViewChangeWithMetrics("playlists", "playlist-collapsed")}
                     className={cn(
                       "w-full flex items-center justify-center px-3 py-3 rounded-xl",
                       "text-muted-foreground hover:text-foreground hover:bg-white/5",
@@ -587,7 +618,7 @@ export const Sidebar = ({
               icon={Settings}
               label="Paramètres"
               isActive={currentView === "settings"}
-              onClick={() => onViewChange("settings")}
+              onClick={() => handleViewChangeWithMetrics("settings", "settings")}
               collapsed={collapsed}
             />
           </div>

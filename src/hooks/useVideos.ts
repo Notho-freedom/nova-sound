@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Video, ScanProgress } from "@/types/music";
+import { getVideos, invalidateVideosCache, updateVideosCache, getCachedVideos } from "@/data/videos.session";
 
 interface UseVideosReturn {
   videos: Video[];
@@ -15,8 +16,10 @@ interface UseVideosReturn {
 }
 
 export function useVideos(): UseVideosReturn {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Hook passif : lit depuis la session de données
+  const cached = getCachedVideos();
+  const [videos, setVideos] = useState<Video[]>(cached || []);
+  const [loading, setLoading] = useState(cached === null);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +27,7 @@ export function useVideos(): UseVideosReturn {
   // Check if running in Electron using centralized detector
   const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
 
-  // Load videos on mount
+  // Load videos on mount (avec cache)
   useEffect(() => {
     const loadVideos = async () => {
       if (!isElectron) {
@@ -34,21 +37,9 @@ export function useVideos(): UseVideosReturn {
       }
 
       try {
-        if (!window.electronAPI) {
-          setVideos([]);
-          setLoading(false);
-          return;
-        }
-        const videoLibrary = await window.electronAPI.getVideos();
-        console.log("Loaded videos from Electron:", videoLibrary);
-        // Log thumbnail status for debugging
-        const videosWithThumbs = videoLibrary?.filter(v => v.thumbnailUrl) || [];
-        const videosWithoutThumbs = videoLibrary?.filter(v => !v.thumbnailUrl) || [];
-        console.log(`Videos with thumbnails: ${videosWithThumbs.length}, without: ${videosWithoutThumbs.length}`);
-        if (videosWithoutThumbs.length > 0) {
-          console.log("Sample videos without thumbnails:", videosWithoutThumbs.slice(0, 3).map(v => ({ id: v.id, title: v.title, filePath: v.filePath })));
-        }
-        setVideos(videoLibrary || []);
+        // Utiliser la session de données (cache + promesse partagée)
+        const videoLibrary = await getVideos();
+        setVideos(videoLibrary);
       } catch (err) {
         console.error("Failed to load videos:", err);
         setError("Erreur lors du chargement des vidéos");
@@ -71,8 +62,9 @@ export function useVideos(): UseVideosReturn {
       if (progress.phase === "complete") {
         setScanning(false);
         setScanProgress(null);
-        // Reload videos after scan to ensure we have all videos
-        window.electronAPI!.getVideos().then(setVideos).catch(console.error);
+        // Invalider le cache et recharger après le scan
+        invalidateVideosCache();
+        getVideos().then(setVideos).catch(console.error);
       }
     });
 
@@ -177,8 +169,9 @@ export function useVideos(): UseVideosReturn {
 
     try {
       await window.electronAPI!.addVideoFiles?.(filePaths);
-      // Refresh videos list
-      const videoLibrary = await window.electronAPI!.getVideos();
+      // Invalider le cache et recharger
+      invalidateVideosCache();
+      const videoLibrary = await getVideos();
       setVideos(videoLibrary);
     } catch (err) {
       console.error("Failed to add video files:", err);
@@ -192,8 +185,9 @@ export function useVideos(): UseVideosReturn {
 
     try {
       await window.electronAPI!.addVideoFromUrl?.(url, title);
-      // Refresh videos list
-      const videoLibrary = await window.electronAPI!.getVideos();
+      // Invalider le cache et recharger
+      invalidateVideosCache();
+      const videoLibrary = await getVideos();
       setVideos(videoLibrary);
     } catch (err) {
       console.error("Failed to add video from URL:", err);
@@ -201,13 +195,16 @@ export function useVideos(): UseVideosReturn {
     }
   }, [isElectron]);
 
-  // Refresh videos
+  // Refresh videos (invalide le cache)
   const refreshVideos = useCallback(async () => {
     if (!isElectron) return;
 
+    // Invalider le cache
+    invalidateVideosCache();
+
     setLoading(true);
     try {
-      const videoLibrary = await window.electronAPI!.getVideos();
+      const videoLibrary = await getVideos();
       setVideos(videoLibrary);
     } catch (err) {
       console.error("Failed to refresh videos:", err);

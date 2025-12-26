@@ -49,13 +49,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
       const authenticated = !!user && (!user.isAnonymous || hasValidEmail) || hasManualAuth;
       const isPro = profile?.plan === 'pro' && profile?.subscriptionStatus === 'active';
       
-      console.log('📊 SyncStatusIndicator: Updating auth state', { 
-        authenticated, 
-        email: user?.email || profileEmail || manualAuthUser?.email,
-        isPro,
-        hasProfile: !!profile,
-        hasManualAuth
-      });
+      // NOTE: Logs supprimés pour améliorer les performances
       
       setIsAuthenticated(authenticated);
       setUserEmail(user?.email || profileEmail || manualAuthUser?.email || null);
@@ -74,9 +68,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
         authUnsubscribe = firebaseService.onAuthStateChange((user) => {
           if (!mounted) return;
           
-          console.log('🔄 SyncStatusIndicator: Auth state changed', { 
-            user: user ? { uid: user.uid, email: user.email, isAnonymous: user.isAnonymous } : null
-          });
+          // NOTE: Logs supprimés pour améliorer les performances
           
           // Update auth state immediately (async)
           updateAuthState();
@@ -113,7 +105,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
           
           // Only update if we detect authentication but state shows not authenticated
           if (shouldBeAuthenticated && !isAuthenticated) {
-            console.log('🔄 SyncStatusIndicator: Profile detected, updating auth state');
+            // NOTE: Logs supprimés pour améliorer les performances
             await updateAuthState();
             // Stop polling once authenticated
             if (profileCheckInterval) clearInterval(profileCheckInterval);
@@ -277,7 +269,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
         if (currentUser && !currentUser.isAnonymous) {
           const idToken = await firebaseService.getIdToken();
           if (idToken) {
-            console.log('🔄 SyncStatusIndicator: Synchronisation Stripe ↔ Firestore...');
+            // NOTE: Logs supprimés pour améliorer les performances
             const syncResponse = await fetch('/api/stripe/sync-profile', {
               method: 'POST',
               headers: {
@@ -287,7 +279,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
             });
             
             if (syncResponse.ok) {
-              console.log('✅ SyncStatusIndicator: Profil Stripe synchronisé');
+              // NOTE: Logs supprimés pour améliorer les performances
               // Ne pas appeler refreshProfile() ici - le listener Firestore mettra à jour l'UI automatiquement
               // Cela évite de déclencher une nouvelle synchronisation
             } else {

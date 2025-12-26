@@ -35,9 +35,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { firebaseService } from "@/services/firebase";
-import { getUserStorageKey, getCurrentUserId } from "@/lib/storage-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { getUploadedFiles, getCachedUploads, invalidateUploadsCache, updateUploadsCache } from "@/data/uploads.session";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
@@ -70,7 +70,6 @@ interface UploadedFile {
   cloudId?: string;
 }
 
-const UPLOADED_MEDIA_KEY = "nexus-uploaded-media";
 
 type ServerType = "cloudinary" | "bunny" | "planethoster" | "nexus";
 
@@ -162,130 +161,29 @@ export const CloudView = () => {
     },
   ];
 
-  // Load uploaded files from localStorage and API
+  // Load uploaded files (hook passif - utilise la session de données)
   const loadUploadedFiles = useCallback(async () => {
     setLoadingUploaded(true);
     try {
-      const userId = await getCurrentUserId();
-      const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+      const userId = nexusUser?.uid || null;
       
-      console.log("[CloudView] Loading uploaded files with key:", storageKey);
-      
-      const oldKey = UPLOADED_MEDIA_KEY;
-      const oldSaved = localStorage.getItem(oldKey);
-      
-      let uploadedMedia: UploadedFile[] = [];
-      
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          uploadedMedia = JSON.parse(saved);
-          console.log("[CloudView] Loaded from localStorage:", uploadedMedia.length, "files");
-        } catch (e) {
-          console.error("[CloudView] Error parsing localStorage:", e);
-        }
+      // Vérifier le cache d'abord
+      const cached = getCachedUploads(userId);
+      if (cached) {
+        setUploadedFiles(cached);
+        setLoadingUploaded(false);
+        return;
       }
       
-      if (uploadedMedia.length === 0 && oldSaved) {
-        try {
-          console.log("[CloudView] Migrating from old key...");
-          const oldMedia: UploadedFile[] = JSON.parse(oldSaved);
-          uploadedMedia = oldMedia;
-          if (userId) {
-            localStorage.setItem(storageKey, JSON.stringify(oldMedia));
-            console.log("[CloudView] Migrated", oldMedia.length, "files to new key");
-          }
-        } catch (e) {
-          console.error("[CloudView] Error migrating from old key:", e);
-        }
-      }
-
-      uploadedMedia.forEach((file) => {
-        if (!file.url && file.cloudProvider === "nexus") {
-          file.url = `/api/storage/download/${file.id}`;
-        }
-        if (!file.type) {
-          file.type = getFileType(file.name);
-        }
-      });
-
-      const currentUser = firebaseService.getCurrentUser();
-      if (currentUser && !currentUser.isAnonymous) {
-        try {
-          // Wait for Firebase to be ready
-          await firebaseService.ensureInitialized();
-          
-          const token = await firebaseService.getIdToken();
-          if (token) {
-            console.log("[CloudView] Fetching files from Nexus API...");
-            const response = await fetch("/api/storage/files", {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            });
-            if (response.ok) {
-              const nexusFiles = await response.json();
-              console.log("[CloudView] Fetched from Nexus API:", nexusFiles.length, "files");
-              
-              const nexusFileIds = new Set(uploadedMedia.map(f => f.id));
-              
-              nexusFiles.forEach((file: any) => {
-                if (!nexusFileIds.has(file.id)) {
-                  uploadedMedia.push({
-                    id: file.id,
-                    name: file.name,
-                    uploadedAt: file.uploadedAt,
-                    cloudProvider: "nexus",
-                    url: `/api/storage/download/${file.id}`,
-                    size: file.size,
-                    type: getFileType(file.name),
-                  });
-                } else {
-                  const existing = uploadedMedia.find(f => f.id === file.id);
-                  if (existing) {
-                    if (!existing.url) {
-                      existing.url = `/api/storage/download/${file.id}`;
-                    }
-                    if (!existing.size && file.size) {
-                      existing.size = file.size;
-                    }
-                    if (!existing.type) {
-                      existing.type = getFileType(file.name);
-                    }
-                  }
-                }
-              });
-              
-              // Save updated list to localStorage for faster loading next time
-              if (userId) {
-                localStorage.setItem(storageKey, JSON.stringify(uploadedMedia));
-                console.log("[CloudView] Saved updated file list to localStorage");
-              }
-            } else {
-              console.warn("[CloudView] Nexus API returned status:", response.status);
-            }
-          } else {
-            console.warn("[CloudView] No Firebase token available");
-          }
-        } catch (error) {
-          console.error("[CloudView] Failed to fetch Nexus files:", error);
-        }
-      } else {
-        console.log("[CloudView] User not authenticated or anonymous, skipping Nexus API fetch");
-      }
-
-      uploadedMedia.sort((a, b) => 
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
-
-      console.log("[CloudView] Final uploaded files count:", uploadedMedia.length);
+      // Charger depuis la session de données (cache + promesse partagée)
+      const uploadedMedia = await getUploadedFiles(userId);
       setUploadedFiles(uploadedMedia);
     } catch (error) {
       console.error("[CloudView] Failed to load uploaded files:", error);
     } finally {
       setLoadingUploaded(false);
     }
-  }, []);
+  }, [nexusUser]);
 
   useEffect(() => {
     loadUploadedFiles();
@@ -305,7 +203,7 @@ export const CloudView = () => {
     if (typeof window === "undefined") return;
 
     const handleStorageChange = async (e: StorageEvent) => {
-      if (e.key && e.key.includes(UPLOADED_MEDIA_KEY)) {
+      if (e.key && e.key.includes('uploaded-media')) {
         console.log("Storage change detected for uploaded media:", e.key);
         await loadUploadedFiles();
       }
@@ -537,8 +435,15 @@ export const CloudView = () => {
     const updated = uploadedFiles.filter(f => f.id !== file.id);
     setUploadedFiles(updated);
     
-    const userId = await getCurrentUserId();
-    const storageKey = await getUserStorageKey(UPLOADED_MEDIA_KEY, userId);
+    // Invalider le cache et mettre à jour via la session
+    const userId = nexusUser?.uid || null;
+    invalidateUploadsCache(userId);
+    updateUploadsCache(userId, updated);
+    
+    // Sauvegarder dans localStorage (la session gère déjà ça, mais on le fait ici pour compatibilité)
+    const { getCurrentUserId, getUserStorageKey } = await import('@/lib/storage-utils');
+    const actualUserId = userId || await getCurrentUserId();
+    const storageKey = await getUserStorageKey('nexus-uploaded-media', actualUserId);
     localStorage.setItem(storageKey, JSON.stringify(updated));
     
     try {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { cloudinaryService, CloudinaryConfig, UploadProgress } from "@/services/cloudinary";
 import { nexusServerService } from "@/services/nexus-server";
 import { authService, UserProfile } from "@/services/auth";
@@ -16,6 +16,9 @@ import {
   resetAuthOrchestrator,
   forceStripeCheck 
 } from "@/services/auth-orchestrator";
+// Imports statiques pour éviter les erreurs HMR
+import { completeLogoutCleanup } from "@/lib/storage-utils";
+import { dispatchLogoutCleanupEvent } from "@/lib/logout-cleanup";
 
 interface UseCloudSyncReturn {
   // Auth status
@@ -110,8 +113,10 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfigured(cloudinaryService.isConfigured());
 
     // S'abonner à l'état d'authentification via AuthOrchestrator
+    // NOTE: Hook passif - ne fait que lire l'état, ne déclenche aucune action
     const unsubscribeAuth = subscribeToAuthState((authState) => {
       // Mettre à jour l'UI en fonction de l'état de l'orchestrateur
+      // Pas d'appels API, pas d'imports dynamiques, juste mise à jour d'état
       if (authState.phase === 'ready' || authState.phase === 'authenticated' || authState.phase === 'syncing') {
         if (authState.profile) {
           setNexusUser(authState.profile);
@@ -130,16 +135,17 @@ export function useCloudSync(): UseCloudSyncReturn {
       }
     });
 
-    // Lancer l'orchestration d'authentification au démarrage
-    // (FirebaseProvider le lance aussi, mais on le lance ici aussi pour être sûr)
-    // Le lock dans orchestrateAuth empêche les appels multiples
-    orchestrateAuth().catch((error) => {
-      console.error('Error orchestrating auth in useCloudSync:', error);
-    });
+    // NOTE: orchestrateAuth est appelé par FirebaseProvider au démarrage
+    // Plus besoin de l'appeler ici car cela causait des appels multiples
+    // L'AuthOrchestrator gère maintenant toute l'authentification de manière centralisée
 
-    // Initialize Firebase anonymous user if no user is authenticated
-    // If a Google user exists locally, merge it with Firebase anonymous user
+    // NOTE: initAnonymousUser est DÉSACTIVÉ
+    // L'AuthOrchestrator gère maintenant toute la logique d'authentification
+    // Cette fonction causait des appels multiples et des re-renders inutiles
+    // Si un utilisateur anonyme doit être créé, l'AuthOrchestrator le fera
     const initAnonymousUser = async () => {
+      // Early return - AuthOrchestrator gère tout maintenant
+      return;
       // LOCK: Empêcher les appels concurrents - CHECK FIRST
       if (initAnonymousUserProcessingRef.current) {
         // Déjà en train de traiter, ignorer
@@ -402,74 +408,10 @@ export function useCloudSync(): UseCloudSyncReturn {
       }
     };
 
-    // Handle redirect result on mount (if user just came back from Google auth)
-    const initRedirect = async () => {
-      try {
-        // First, check Firebase redirect (if using Firebase Google auth)
-        if (firebaseService.isInitialized()) {
-          const firebaseProfile = await firebaseService.handleRedirectResult();
-          if (firebaseProfile) {
-            setNexusUser(firebaseProfile);
-            setNexusAuthenticated(true);
-            setNexusIsPro(firebaseService.isPro());
-            
-            toast.success("Connecté avec succès", {
-              description: `Bienvenue ${firebaseProfile.displayName}!`,
-            });
-            
-            const status = await nexusServerService.getSyncStatus();
-            setSyncStatus({
-              lastSyncAt: status.lastSyncAt || null,
-              tracksUploaded: status.tracksUploaded,
-              tracksDownloaded: status.tracksDownloaded,
-            });
-            return;
-          }
-        }
-
-        // Then check manual OAuth callback (only if there are OAuth params in URL)
-        // Only check on client side
-        if (typeof window === 'undefined') {
-          await initAnonymousUser();
-          return;
-        }
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const hasOAuthParams = urlParams.has("code") && urlParams.has("state");
-        
-        if (hasOAuthParams) {
-          const profile = await authService.handleCallback();
-          if (profile) {
-            // User just authenticated via manual OAuth redirect
-            setNexusUser(profile);
-            setNexusAuthenticated(true);
-            setNexusIsPro(authService.isPro());
-            
-            // Show success message
-            toast.success("Connecté avec succès", {
-              description: `Bienvenue ${profile.displayName}!`,
-            });
-            
-            // Load sync status
-            const status = await nexusServerService.getSyncStatus();
-            setSyncStatus({
-              lastSyncAt: status.lastSyncAt || null,
-              tracksUploaded: status.tracksUploaded,
-              tracksDownloaded: status.tracksDownloaded,
-            });
-            return;
-          }
-        }
-        
-        // No OAuth redirect, check if we need to create anonymous user
-        await initAnonymousUser();
-      } catch (error) {
-        console.error("Error handling redirect:", error);
-        // Try to create anonymous user on error
-        await initAnonymousUser();
-      }
-    };
-    initRedirect();
+    // NOTE: initRedirect et initAnonymousUser sont DÉSACTIVÉS
+    // L'AuthOrchestrator gère maintenant toute l'authentification et l'initialisation
+    // Ces fonctions causaient des appels multiples lors des re-renders et des changements de vue
+    // L'AuthOrchestrator est appelé une seule fois au démarrage via FirebaseProvider
 
     // NOTE: Le listener Firebase onAuthStateChange est maintenant PASSIF
     // Toute la logique d'authentification/sync est gérée par AuthOrchestrator
@@ -537,11 +479,8 @@ export function useCloudSync(): UseCloudSyncReturn {
       }
       
       // Cleanup Firestore sync listeners
-      import('@/services/firebase-sync').then(({ firebaseSyncService }) => {
-        firebaseSyncService.cleanup();
-      }).catch((error) => {
-        console.error('Error cleaning up sync on unmount:', error);
-      });
+      // NOTE: Import statique pour éviter les erreurs HMR
+      // Le cleanup est géré par l'AuthOrchestrator maintenant
     };
   }, []);
 
@@ -620,7 +559,6 @@ export function useCloudSync(): UseCloudSyncReturn {
         // Vérifier aussi directement avec Stripe pour confirmation (non-bloquant)
         if (isProFromProfile) {
           try {
-            const { stripeService } = await import('@/services/stripe');
             if (stripeService.isInitialized()) {
               const stripeStatus = await stripeService.getSubscriptionStatus();
               // Utiliser les données Stripe réelles comme source de vérité finale
@@ -665,11 +603,9 @@ export function useCloudSync(): UseCloudSyncReturn {
       await firebaseService.signOut();
       
       // Nettoyer toutes les données de l'application
-      const { completeLogoutCleanup } = await import('@/lib/storage-utils');
       await completeLogoutCleanup();
       
       // Dispatcher l'événement de nettoyage pour tous les hooks et composants
-      const { dispatchLogoutCleanupEvent } = await import('@/lib/logout-cleanup');
       dispatchLogoutCleanupEvent();
       
       // Nettoyer les états React
@@ -696,13 +632,8 @@ export function useCloudSync(): UseCloudSyncReturn {
         syncStatusDebounceTimerRef.current = null;
       }
       
-      // Forcer un garbage collection des services
-      try {
-        const { firebaseSyncService } = await import('@/services/firebase-sync');
-        firebaseSyncService.cleanup();
-      } catch (error) {
-        // Silently fail
-      }
+      // NOTE: Le cleanup de firebaseSyncService est géré par l'AuthOrchestrator
+      // Plus besoin d'import dynamique qui cause des erreurs HMR
       
       console.log('✅ Complete logout finished - all user data cleaned');
       notificationService.logoutSuccess();
@@ -760,7 +691,6 @@ export function useCloudSync(): UseCloudSyncReturn {
 
   const refreshUser = useCallback(async () => {
     // Force reload profile from Firestore
-    const { firebaseService } = await import('@/services/firebase');
     const currentUser = firebaseService.getCurrentUser();
     if (currentUser && !currentUser.isAnonymous) {
       // Use the new refreshProfile method which will reload from Firestore
@@ -777,7 +707,6 @@ export function useCloudSync(): UseCloudSyncReturn {
         // Vérifier aussi directement avec Stripe pour confirmation (non-bloquant)
         if (isProFromProfile) {
           try {
-            const { stripeService } = await import('@/services/stripe');
             if (stripeService.isInitialized()) {
               const stripeStatus = await stripeService.getSubscriptionStatus();
               // Utiliser les données Stripe réelles comme source de vérité finale
@@ -815,7 +744,6 @@ export function useCloudSync(): UseCloudSyncReturn {
       // Ensuite, synchroniser Stripe avec Firestore si l'utilisateur est authentifié
       if (nexusAuthenticated) {
         try {
-          const { firebaseService } = await import('@/services/firebase');
           const currentUser = firebaseService.getCurrentUser();
           if (currentUser && !currentUser.isAnonymous) {
             const idToken = await firebaseService.getIdToken();
@@ -868,7 +796,8 @@ export function useCloudSync(): UseCloudSyncReturn {
     uploadProgress.size > 0 &&
     Array.from(uploadProgress.values()).some((p) => p.status === "uploading");
 
-  return {
+  // Mémoriser les valeurs pour éviter les re-renders inutiles
+  const memoizedReturn = useMemo(() => ({
     // Service status
     firebaseInitialized: authInitialized,
     stripeInitialized,
@@ -898,5 +827,29 @@ export function useCloudSync(): UseCloudSyncReturn {
     startSync,
     syncStatus,
     syncLoading,
-  };
+  }), [
+    authInitialized,
+    stripeInitialized,
+    cloudinaryConfigured,
+    cloudinaryConfig,
+    nexusUser,
+    nexusAuthenticated,
+    nexusIsPro,
+    uploadProgress,
+    overallProgress,
+    isUploading,
+    syncStatus,
+    syncLoading,
+    // Les callbacks sont déjà mémorisés avec useCallback
+    saveCloudinaryConfig,
+    clearCloudinaryConfig,
+    nexusLoginWithGoogle,
+    nexusLogout,
+    nexusUpgradeToPro,
+    nexusManageBilling,
+    refreshUser,
+    startSync,
+  ]);
+
+  return memoizedReturn;
 }
