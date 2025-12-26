@@ -1369,7 +1369,7 @@ export const DesktopApp = () => {
       case "playlists":
         return (
           <PlaylistView
-            tracks={tracks}
+            tracks={libraryTracks}
             playlists={playlists}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
@@ -1912,6 +1912,8 @@ export const DesktopApp = () => {
 
           {/* Sidebar */}
           <Sidebar 
+            tracks={libraryTracks}
+            playlists={playlists}
             currentView={currentView} 
             onViewChange={(view) => {
               setShowInlinePlayer(false);

@@ -639,11 +639,11 @@ export const PlaylistView = memo(({
                               loading="lazy"
                             />
                           </div>
-                          <p className="font-medium text-sm truncate">{track.title}</p>
+                          <p className="font-medium text-sm truncate max-w-xs">{track.title}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground truncate">{track.artist}</td>
-                      <td className="px-4 py-3 text-right text-sm text-muted-foreground font-mono hidden md:table-cell">
+                      <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-xs">{track.artist}</td>
+                      <td className="px-4 py-3 text-right text-sm text-muted-foreground font-mono hidden md:table-cell max-w-xs">
                         {formatDuration(track.duration)}
                       </td>
                     </motion.tr>
@@ -731,7 +731,7 @@ export const PlaylistView = memo(({
                 <h1 className="text-2xl font-bold font-display text-white">
                   {isRemoving ? "Retirer des titres" : "Ajouter des titres"}
                 </h1>
-                <p className="text-sm text-white/70">{selectedPlaylist.name}</p>
+                <p className="text-sm text-white/70 truncate max-w-md">{selectedPlaylist.name}</p>
               </div>
               <Badge variant="secondary" className="ml-auto bg-white/10 text-white border-white/20">
                 {isRemoving ? "Nettoyage" : "Enrichissement"}
@@ -802,10 +802,10 @@ export const PlaylistView = memo(({
                           <div className="w-10 h-10 rounded-lg overflow-hidden">
                             <img src={getCoverUrl(track.coverUrl)} alt="" className="w-full h-full object-cover" />
                           </div>
-                          <p className="font-medium text-sm truncate">{track.title}</p>
+                          <p className="font-medium text-sm truncate max-w-lg">{track.title}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{track.artist}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-xs">{track.artist}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -902,7 +902,7 @@ export const PlaylistView = memo(({
                     </div>
                   ) : (
                     <div className="flex items-start gap-3">
-                      <h1 className="text-3xl font-display font-bold text-white drop-shadow-sm">{selectedPlaylist.name}</h1>
+                      <h1 className="text-3xl font-display font-bold text-white drop-shadow-sm truncate max-w-2xl">{selectedPlaylist.name}</h1>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -914,7 +914,7 @@ export const PlaylistView = memo(({
                     </div>
                   )}
                   {selectedPlaylist.description && (
-                    <p className="text-sm text-white/70">{selectedPlaylist.description}</p>
+                    <p className="text-sm text-white/70 truncate max-w-2xl">{selectedPlaylist.description}</p>
                   )}
                   <div className="flex flex-wrap gap-2 text-sm text-white/80">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20">

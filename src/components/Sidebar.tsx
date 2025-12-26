@@ -22,14 +22,17 @@ import {
   Cloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { usePlaylists } from "@/hooks/usePlaylists";
+import { usePlaylistMetadata } from "@/hooks/usePlaylistMetadata";
 import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/useNotifications";
 import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
+import type { Track, Playlist } from "@/types/music";
 
 export type ViewType = 
   | "home" 
@@ -52,6 +55,8 @@ export type ViewType =
   | "notifications";
 
 interface SidebarProps {
+  tracks?: Track[];
+  playlists?: Playlist[];
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
   favoritesCount?: number;
@@ -198,6 +203,8 @@ const SectionTitle = ({
 };
 
 export const Sidebar = ({ 
+  tracks = [],
+  playlists: propPlaylists,
   currentView, 
   onViewChange, 
   favoritesCount,
@@ -209,10 +216,16 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? internalCollapsed;
-  const { playlists, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
+  const hookPlaylists = usePlaylists();
+  // Use prop playlists if provided (from DesktopApp), otherwise use hook playlists
+  const playlists = propPlaylists ?? hookPlaylists.playlists;
+  const { createPlaylist, updatePlaylist, deletePlaylist } = hookPlaylists;
   const { notifySuccess } = useNotifications();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
+  
+  // Enrich playlists with metadata (covers, duration, artists)
+  const playlistMetadata = usePlaylistMetadata(playlists, tracks);
 
   const handleCollapsedChange = (value: boolean) => {
     if (onCollapsedChange) {
@@ -400,7 +413,9 @@ export const Sidebar = ({
                 </SectionTitle>
 
                 <div className="space-y-1">
-                  {playlists.slice(0, 5).map((playlist) => (
+                  {playlists.slice(0, 5).map((playlist) => {
+                    const metadata = playlistMetadata.find(m => m.playlist.id === playlist.id);
+                    return (
                     <PlaylistContextMenu
                       key={playlist.id}
                       playlist={playlist}
@@ -432,41 +447,84 @@ export const Sidebar = ({
                       <div
                         onClick={() => onViewChange("playlists")}
                         className={cn(
-                          "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl group cursor-pointer",
-                          "text-muted-foreground hover:text-foreground",
-                          "hover:bg-white/5 active:bg-white/10",
-                          "transition-all duration-300 ease-out",
+                          "w-full flex items-center gap-3 px-3 py-2 rounded-lg group cursor-pointer",
+                          "text-foreground/85 bg-white/1.5 border border-white/4",
+                          "hover:bg-white/3 hover:border-white/6",
+                          "transition-all duration-200 ease-out",
                         )}
                       >
-                        <div
-                          className={cn(
-                            "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
-                            "bg-gradient-to-br from-primary/20 to-secondary/20",
-                            "group-hover:from-primary/30 group-hover:to-secondary/30",
-                            "transition-all duration-300 group-hover:scale-105",
+                        <div className="flex-shrink-0">
+                          {metadata && metadata.coverUrls.some(c => c) ? (
+                            <div className="grid grid-cols-2 gap-1 w-8 h-8 rounded-md overflow-hidden border border-white/8 shadow-sm">
+                              {metadata.coverUrls.map((coverUrl, idx) => (
+                                <div
+                                  key={idx}
+                                  className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center"
+                                >
+                                  {coverUrl ? (
+                                    <img
+                                      src={coverUrl}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <Music className="w-1.5 h-1.5 text-white/40" />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : metadata?.coverUrl ? (
+                            <div
+                              className={cn(
+                                "w-8 h-8 rounded-md flex items-center justify-center",
+                                "border border-white/8 overflow-hidden",
+                                "shadow-sm",
+                              )}
+                            >
+                              <img
+                                src={metadata.coverUrl}
+                                alt={playlist.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className={cn(
+                                "w-8 h-8 rounded-md flex items-center justify-center",
+                                "bg-gradient-to-br from-primary/30 to-secondary/30",
+                                "border border-white/8",
+                              )}
+                            >
+                              <Music className="w-3.5 h-3.5 text-white/60" />
+                            </div>
                           )}
-                        >
-                          <Music className="w-4 h-4 text-primary" />
                         </div>
                         <div className="flex-1 text-left min-w-0">
-                          <p className="text-sm font-medium truncate">{playlist.name}</p>
-                          <p className="text-[11px] text-muted-foreground/60">{playlist.trackIds.length} titres</p>
+                          <p className="text-xs font-medium truncate">{playlist.name}</p>
+                          <p className="text-[10px] text-muted-foreground/60">
+                            {metadata?.trackCount || 0} titres
+                            {metadata && metadata.trackCount > 0 && (
+                              <>
+                                {" • "}
+                                {Math.floor(metadata.totalDuration / 60)}m
+                              </>
+                            )}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (onPlayPlaylist) onPlayPlaylist(playlist.id)
-                            }}
-                            aria-label={`Lire la playlist ${playlist.name}`}
-                            className="p-1 rounded-md hover:bg-white/10 text-muted-foreground hover:text-primary transition-colors"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (onPlayPlaylist) onPlayPlaylist(playlist.id)
+                          }}
+                          aria-label={`Lire la playlist ${playlist.name}`}
+                          className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/15 transition-colors"
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                        </button>
                       </div>
                     </PlaylistContextMenu>
-                  ))}
+                  );
+                  })}
 
                   {playlists.length === 0 && (
                     <p className="px-4 py-6 text-xs text-muted-foreground/40 italic text-center">Aucune playlist</p>

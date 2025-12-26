@@ -24,12 +24,20 @@ export function usePlaylists(): UsePlaylistsReturn {
 
   // Load playlists on mount and listen to Firebase sync updates
   useEffect(() => {
+    const emitLocalUpdate = (lists: Playlist[]) => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: lists }));
+      }
+    };
+
     const loadPlaylists = async () => {
       if (!isElectron) {
         // Use localStorage in web mode
         const stored = localStorage.getItem("nexus-playlists");
         if (stored) {
-          setPlaylists(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setPlaylists(parsed);
+          emitLocalUpdate(parsed);
         }
         setLoading(false);
         return;
@@ -43,6 +51,7 @@ export function usePlaylists(): UsePlaylistsReturn {
         }
         const lists = await window.electronAPI.getPlaylists();
         setPlaylists(lists);
+        emitLocalUpdate(lists);
       } catch (err) {
         console.error("Failed to load playlists:", err);
       } finally {
@@ -60,8 +69,10 @@ export function usePlaylists(): UsePlaylistsReturn {
     };
 
     window.addEventListener('firebase-playlists-update', handlePlaylistsUpdate as EventListener);
+    window.addEventListener('local-playlists-update', handlePlaylistsUpdate as EventListener);
     return () => {
       window.removeEventListener('firebase-playlists-update', handlePlaylistsUpdate as EventListener);
+      window.removeEventListener('local-playlists-update', handlePlaylistsUpdate as EventListener);
     };
   }, [isElectron]);
 
@@ -100,6 +111,9 @@ export function usePlaylists(): UsePlaylistsReturn {
             const { firebaseSyncService } = await import('@/services/firebase-sync');
             const updatedPlaylists = [...playlists, playlist];
             firebaseSyncService.queueSync('playlists', updatedPlaylists);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: updatedPlaylists }));
+            }
           } catch (error) {
             console.error('Error syncing playlists to Firebase:', error);
           }
@@ -146,6 +160,9 @@ export function usePlaylists(): UsePlaylistsReturn {
             const { firebaseSyncService } = await import('@/services/firebase-sync');
             const updatedPlaylists = playlists.map((p) => (p.id === id ? updated! : p));
             firebaseSyncService.queueSync('playlists', updatedPlaylists);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: updatedPlaylists }));
+            }
           } catch (error) {
             console.error('Error syncing playlists to Firebase:', error);
           }
@@ -163,12 +180,23 @@ export function usePlaylists(): UsePlaylistsReturn {
   const deletePlaylist = useCallback(
     async (id: string) => {
       try {
-        const playlistToDelete = playlists.find((p) => p.id === id);
         if (isElectron && window.electronAPI) {
           await window.electronAPI.deletePlaylist(id);
         }
-        const updatedPlaylists = playlists.filter((p) => p.id !== id);
+        
+        let playlistToDelete: Playlist | undefined;
+        const updatedPlaylists = playlists.filter((p) => {
+          if (p.id === id) {
+            playlistToDelete = p;
+            return false;
+          }
+          return true;
+        });
+        
         setPlaylists(updatedPlaylists);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: updatedPlaylists }));
+        }
         
         // Sync to Firebase
         try {
@@ -229,6 +257,13 @@ export function usePlaylists(): UsePlaylistsReturn {
       if (playlist) {
         const newPlaylist = playlist; // Capture for closure
         setPlaylists((prev) => [...prev, newPlaylist]);
+        setPlaylists((prev) => {
+          const next = [...prev, newPlaylist];
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: next }));
+          }
+          return next;
+        });
       }
       return playlist;
     } catch (err) {

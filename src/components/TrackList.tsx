@@ -121,7 +121,7 @@ export const TrackList = memo(({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
               <p className={cn(
-                "font-medium truncate transition-colors",
+                "font-medium truncate transition-colors truncate",
                 index === currentTrackIndex ? "text-primary neon-text-cyan" : "text-foreground"
               )}>
                 {track.title}

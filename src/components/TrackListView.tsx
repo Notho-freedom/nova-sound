@@ -165,23 +165,23 @@ export const TrackListView = memo(({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                        <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                        <p className={cn("text-sm font-medium truncate max-w-xs", isCurrentTrack ? "text-primary" : "text-foreground")}>
                           {track.title}
                         </p>
                           {isUploaded?.(track.id) && (
                             <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                        <p className="text-xs text-muted-foreground truncate max-w-xs">{track.artist}</p>
                       </div>
                     </div>
                         </TrackContextMenu>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <div className="text-sm font-medium">{track.title}</div>
-                      <div className="text-xs text-muted-foreground">{track.artist}</div>
-                      {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                      <div className="text-sm font-medium truncate max-w-xs">{track.title}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-xs">{track.artist}</div>
+                      {track.album && <div className="text-xs text-muted-foreground mt-1 truncate max-w-xs">{track.album}</div>}
                       <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
                     </TooltipContent>
                   </Tooltip>
