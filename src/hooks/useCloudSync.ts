@@ -9,6 +9,13 @@ import { isElectron } from "@/lib/electron-detector";
 import { toast } from "sonner";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 import { auth } from "@/services/firebase";
+import { 
+  subscribeToAuthState, 
+  getAuthState, 
+  orchestrateAuth, 
+  resetAuthOrchestrator,
+  forceStripeCheck 
+} from "@/services/auth-orchestrator";
 
 interface UseCloudSyncReturn {
   // Auth status
@@ -102,6 +109,34 @@ export function useCloudSync(): UseCloudSyncReturn {
     setCloudinaryConfig(config);
     setCloudinaryConfigured(cloudinaryService.isConfigured());
 
+    // S'abonner à l'état d'authentification via AuthOrchestrator
+    const unsubscribeAuth = subscribeToAuthState((authState) => {
+      // Mettre à jour l'UI en fonction de l'état de l'orchestrateur
+      if (authState.phase === 'ready' || authState.phase === 'authenticated' || authState.phase === 'syncing') {
+        if (authState.profile) {
+          setNexusUser(authState.profile);
+          setNexusAuthenticated(true);
+          setNexusIsPro(authState.isPro);
+        }
+      } else if (authState.phase === 'anonymous') {
+        // Utilisateur anonyme
+        setNexusAuthenticated(false);
+        setNexusIsPro(false);
+      } else if (authState.phase === 'boot' || authState.phase === 'error') {
+        // État initial ou erreur
+        if (authState.phase === 'error') {
+          console.error('AuthOrchestrator error:', authState.error);
+        }
+      }
+    });
+
+    // Lancer l'orchestration d'authentification au démarrage
+    // (FirebaseProvider le lance aussi, mais on le lance ici aussi pour être sûr)
+    // Le lock dans orchestrateAuth empêche les appels multiples
+    orchestrateAuth().catch((error) => {
+      console.error('Error orchestrating auth in useCloudSync:', error);
+    });
+
     // Initialize Firebase anonymous user if no user is authenticated
     // If a Google user exists locally, merge it with Firebase anonymous user
     const initAnonymousUser = async () => {
@@ -149,46 +184,16 @@ export function useCloudSync(): UseCloudSyncReturn {
             anonymousUserInitRef.current = true;
             console.log("✅ Using existing Firebase Google user:", firebaseUser.email, "isPro:", profile.plan === 'pro');
             
-            // Synchroniser automatiquement le profil Firestore avec Stripe au démarrage
-            // Cela garantit que Firestore est toujours à jour avec les données Stripe réelles
-            try {
-              const { stripeService } = await import('@/services/stripe');
-              if (stripeService.isInitialized()) {
-                const idToken = await firebaseService.getIdToken();
-                if (idToken) {
-                  console.log('🔄 useCloudSync: Synchronisation automatique Firestore ↔ Stripe au démarrage...');
-                  const syncResponse = await fetch('/api/stripe/sync-profile', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${idToken}`,
-                    },
-                  });
-                  
-                  if (syncResponse.ok) {
-                    console.log('✅ useCloudSync: Profil synchronisé avec Stripe au démarrage');
-                    // Ne pas appeler refreshProfile() ici - le listener Firestore mettra à jour l'UI automatiquement
-                    // Mettre à jour l'état avec le profil actuel
-                    const currentProfile = firebaseService.getUserProfile();
-                    if (currentProfile) {
-                      setNexusUser(currentProfile);
-                      setNexusIsPro(currentProfile.plan === 'pro' && currentProfile.subscriptionStatus === 'active');
-                    }
-                  } else {
-                    console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation:', await syncResponse.text());
-                  }
-                }
-              }
-            } catch (error) {
-              console.warn('⚠️ useCloudSync: Erreur lors de la synchronisation Stripe (non-bloquant):', error);
-            }
+            // NOTE: La synchronisation Stripe/Firebase est maintenant gérée par AuthOrchestrator
+            // On ne fait que mettre à jour l'UI ici
             
             return;
           }
         }
         
-        // PRIORITY 2: If there's a local Google user but no Firebase user, update UI immediately
-        // Then try to sync with Firebase if possible
+        // PRIORITY 2: If there's a local Google user but no Firebase user
+        // NOTE: L'AuthOrchestrator gère maintenant toute la logique d'authentification
+        // On ne fait que mettre à jour l'UI basique ici si nécessaire
         if (localGoogleUser && localGoogleUser.email && !firebaseUser) {
           // Prevent multiple calls for the same user - CHECK FIRST
           const userKey = localGoogleUser.email || localGoogleUser.uid || 'anonymous';
@@ -199,114 +204,10 @@ export function useCloudSync(): UseCloudSyncReturn {
           
           // Mark as processed IMMEDIATELY to prevent concurrent processing
           lastProcessedAuthUserRef.current = userKey;
-          
-          console.log("🔍 Google user found locally (", localGoogleUser.email, "). Updating UI immediately.");
-          
-          // Update UI immediately with the Google user
-          setNexusUser(localGoogleUser);
-          setNexusAuthenticated(true);
-          setNexusIsPro(authService.isPro());
           anonymousUserInitRef.current = true;
           
-          // Try to sync with Firebase if possible
-          // Only if Firebase is initialized AND we haven't already processed this email
-          if (firebaseService.isInitialized() && lastFindUserByEmailRef.current !== localGoogleUser.email) {
-            lastFindUserByEmailRef.current = localGoogleUser.email;
-            
-            // Use the UID from the local profile if it's a Firebase Auth UID
-            const localUid = localGoogleUser.uid;
-            const isLocalFirebaseUid = localUid && localUid.length === 28 && !localUid.includes('@') && !localUid.includes('user_');
-            
-            if (isLocalFirebaseUid) {
-              // Local profile already has Firebase Auth UID, use it directly
-              console.log("✅ Using Firebase Auth UID from local profile:", localUid);
-              
-              // Initialize Firebase sync using the Firebase Auth UID from local profile
-              if (!syncInitializedRef.current || lastUserIdRef.current !== localUid) {
-                try {
-                  const { firebaseSyncService } = await import('@/services/firebase-sync');
-                  await firebaseSyncService.initializeSync(localUid);
-                  console.log('✅ Firebase sync initialized using Firebase Auth UID from local profile:', localUid);
-                  syncInitializedRef.current = true;
-                  lastUserIdRef.current = localUid;
-                } catch (syncError) {
-                  console.error('Error initializing Firebase sync for local Google user:', syncError);
-                }
-              }
-              
-              // Try to get latest profile from Firestore (optional, for plan/subscription data)
-              // Only if not already initialized to avoid infinite loop
-              if (!syncInitializedRef.current) {
-                firebaseService.findUserByEmail(localGoogleUser.email)
-                  .then(async (existingUser) => {
-                    if (existingUser) {
-                      console.log("✅ Found existing Google user in Firestore, syncing...");
-                      // Update with Firestore data (more complete)
-                      setNexusUser(existingUser);
-                      setNexusIsPro(existingUser.plan === 'pro');
-                    }
-                  })
-                  .catch((error) => {
-                    // Silent fail - local user data is already set
-                    console.warn('Could not find Firestore user (using local profile):', error);
-                  });
-              }
-            } else {
-              // Local profile doesn't have Firebase Auth UID, try to get it from Firestore
-              // But only if Firebase Auth is ready (has a current user)
-              const firebaseCurrentUser = firebaseService.getCurrentUser();
-              if (firebaseCurrentUser && !firebaseCurrentUser.isAnonymous) {
-                firebaseService.findUserByEmail(localGoogleUser.email)
-                  .then(async (existingUser) => {
-                    if (existingUser) {
-                      console.log("✅ Found existing Google user in Firestore, syncing...");
-                      // Update with Firestore data (more complete)
-                      setNexusUser(existingUser);
-                      setNexusIsPro(existingUser.plan === 'pro');
-                      
-                      // Check if Firestore user has Firebase Auth UID
-                      const firestoreUid = existingUser.uid;
-                      const isFirestoreFirebaseUid = firestoreUid && firestoreUid.length === 28 && !firestoreUid.includes('@') && !firestoreUid.includes('user_');
-                      
-                      if (isFirestoreFirebaseUid && (!syncInitializedRef.current || lastUserIdRef.current !== firestoreUid)) {
-                        // Initialize Firebase sync using Firebase Auth UID from Firestore
-                        try {
-                          const { firebaseSyncService } = await import('@/services/firebase-sync');
-                          await firebaseSyncService.initializeSync(firestoreUid);
-                          console.log('✅ Firebase sync initialized using Firebase Auth UID from Firestore:', firestoreUid);
-                          syncInitializedRef.current = true;
-                          lastUserIdRef.current = firestoreUid;
-                        } catch (syncError) {
-                          console.error('Error initializing Firebase sync for local Google user:', syncError);
-                        }
-                      } else if (!isFirestoreFirebaseUid) {
-                        console.warn('⚠️ Firestore UID is not a Firebase Auth UID, cannot initialize sync:', firestoreUid);
-                      }
-                    }
-                  })
-                  .catch((error) => {
-                    // Silent fail - local user data is already set
-                    console.warn("⚠️ Could not sync with Firestore, using local user data");
-                  });
-              } else {
-                // Firebase Auth not ready yet, will be handled by auth state change listener
-                console.log("⏳ Firebase Auth not ready yet, will sync when auth state changes");
-              }
-            }
-          }
-          
-          // Load sync status
-          nexusServerService.getSyncStatus()
-            .then((status) => {
-              setSyncStatus({
-                lastSyncAt: status.lastSyncAt || null,
-                tracksUploaded: status.tracksUploaded,
-                tracksDownloaded: status.tracksDownloaded,
-              });
-            })
-            .catch((error) => {
-              console.error("Error loading sync status:", error);
-            });
+          // NOTE: L'UI est mise à jour par l'AuthOrchestrator via subscribeToAuthState
+          // On ne fait rien ici pour éviter les conflits
           
           // Don't create anonymous user - user is already authenticated with Google
           return;
@@ -570,373 +471,47 @@ export function useCloudSync(): UseCloudSyncReturn {
     };
     initRedirect();
 
-    // Subscribe to Firebase auth state changes (priority - uses merged Google data from Firestore)
+    // NOTE: Le listener Firebase onAuthStateChange est maintenant PASSIF
+    // Toute la logique d'authentification/sync est gérée par AuthOrchestrator
+    // On garde juste un listener passif pour mettre à jour l'UI si nécessaire
     let unsubscribeFirebase: (() => void) | null = null;
     if (firebaseService.isInitialized()) {
-      unsubscribeFirebase = firebaseService.onAuthStateChange(async (firebaseUser) => {
-        if (firebaseUser) {
-          // Always get the latest profile from Firestore (contains merged Google data with priority)
-          let profile = firebaseService.getUserProfile();
-          // If profile is not loaded yet, load it from Firestore
-          if (!profile && !firebaseUser.isAnonymous) {
-            console.log("📥 onAuthStateChange: Profile not loaded yet, loading from Firestore...");
-            profile = await firebaseService.loadUserProfileById(firebaseUser.uid);
-          }
-          if (profile) {
-            // Update UI with profile from Firestore (Google data is prioritized during merge)
-            setNexusUser(profile);
-            // Consider authenticated if:
-            // 1. User is NOT anonymous (has Google account linked in Firebase), OR
-            // 2. Profile has a valid email (Google data was merged even if Firebase user is still anonymous)
-            const hasValidEmail = !!profile.email && profile.email.includes('@');
-            const isAuthenticated = !firebaseUser.isAnonymous || hasValidEmail;
-            setNexusAuthenticated(isAuthenticated);
-            // Check isPro from profile directly (more reliable than firebaseService.isPro())
-            const isPro = profile.plan === 'pro' && profile.subscriptionStatus === 'active';
-            setNexusIsPro(isPro);
-            
-            // Initialize Firebase sync ONLY ONCE per user session
-            // Check if this is a new user or if sync hasn't been initialized yet
-            // Also initialize sync for users with valid email (even if Firebase user is anonymous)
-            if (isAuthenticated) {
-              const currentUserId = firebaseUser.uid;
-              
-              // Only initialize if it's a different user or sync hasn't been initialized
-              if (lastUserIdRef.current !== currentUserId || !syncInitializedRef.current) {
-                try {
-                  const { firebaseSyncService } = await import('@/services/firebase-sync');
-                  await firebaseSyncService.initializeSync(currentUserId);
-                  syncInitializedRef.current = true;
-                  lastUserIdRef.current = currentUserId;
-                  
-                  // Load sync status only once during initialization
-                  try {
-                    const status = await nexusServerService.getSyncStatus();
-                    setSyncStatus({
-                      lastSyncAt: status.lastSyncAt || null,
-                      tracksUploaded: status.tracksUploaded,
-                      tracksDownloaded: status.tracksDownloaded,
-                    });
-                  } catch (error) {
-                    // Silently fail
-                    setSyncStatus({
-                      lastSyncAt: null,
-                      tracksUploaded: 0,
-                      tracksDownloaded: 0,
-                    });
-                  }
-                } catch (error) {
-                  console.error('Error initializing Firebase sync:', error);
-                }
-              }
-              // If sync is already initialized for this user, skip everything
-              // This prevents re-initialization and status loading on every auth state change
-            }
-          }
-        } else {
-          // Firebase user signed out - cleanup sync listeners
-          try {
-            const { firebaseSyncService } = await import('@/services/firebase-sync');
-            firebaseSyncService.cleanup();
-          } catch (error) {
-            // Silently fail
-          }
-          
-          // Reset flags
-          syncInitializedRef.current = false;
-          lastUserIdRef.current = null;
-          lastProcessedAuthUserRef.current = null;
-          lastStripeSyncEmailRef.current = null;
-          stripeSyncInProgressRef.current = false;
-          lastFindUserByEmailRef.current = null;
-          findUserByEmailInProgressRef.current = false;
-          
-          setNexusUser(null);
-          setNexusAuthenticated(false);
-          setNexusIsPro(false);
+      unsubscribeFirebase = firebaseService.onAuthStateChange((firebaseUser) => {
+        // Listener passif : seulement mettre à jour l'UI basique si AuthOrchestrator n'a pas encore fait
+        // L'AuthOrchestrator gère toute la logique d'authentification et de sync
+        if (!firebaseUser) {
+          // User signed out - l'AuthOrchestrator gérera le cleanup
+          // On ne fait rien ici pour éviter les conflits
+        }
+      });
+    }
+
+    // NOTE: L'ancien listener authService.onAuthStateChange est DÉSACTIVÉ
+    // Toute la logique d'authentification est maintenant gérée par AuthOrchestrator
+    // On garde juste un listener passif pour le sync status (debounced)
+    const unsubscribeAuthService = authService.onAuthStateChange((user) => {
+      // Listener passif : seulement mettre à jour le sync status (debounced)
+      // L'UI et l'authentification sont gérées par AuthOrchestrator
+      if (syncStatusDebounceTimerRef.current) {
+        clearTimeout(syncStatusDebounceTimerRef.current);
+      }
+      syncStatusDebounceTimerRef.current = setTimeout(async () => {
+        try {
+          const status = await nexusServerService.getSyncStatus();
+          setSyncStatus({
+            lastSyncAt: status.lastSyncAt || null,
+            tracksUploaded: status.tracksUploaded,
+            tracksDownloaded: status.tracksDownloaded,
+          });
+        } catch (error) {
+          console.error("Error loading sync status:", error);
           setSyncStatus({
             lastSyncAt: null,
             tracksUploaded: 0,
             tracksDownloaded: 0,
           });
         }
-      });
-    }
-
-    // Subscribe to manual auth state changes (fallback for non-Firebase users)
-    // This listener updates UI immediately when a Google user is detected
-    const unsubscribeAuth = authService.onAuthStateChange(async (user) => {
-      // DEBOUNCE: Annuler le timer précédent si un nouvel appel arrive rapidement
-      if (authStateChangeDebounceTimerRef.current) {
-        clearTimeout(authStateChangeDebounceTimerRef.current);
-      }
-      
-      // Debounce: Attendre 100ms avant de traiter pour éviter les appels multiples très rapides
-      authStateChangeDebounceTimerRef.current = setTimeout(async () => {
-        // LOCK: Empêcher les appels concurrents - CHECK FIRST
-        if (authStateChangeProcessingRef.current) {
-          // Déjà en train de traiter un changement d'état, ignorer
-          return;
-        }
-        
-        // Marquer comme en cours de traitement IMMÉDIATEMENT
-        authStateChangeProcessingRef.current = true;
-        
-        try {
-        // Always update UI if user exists and Firebase user doesn't exist or is different
-        if (user) {
-        const firebaseUser = firebaseService.getCurrentUser();
-
-        // Update UI if no Firebase user or if Firebase user is different
-        if (!firebaseUser || (firebaseUser.isAnonymous && !user.isAnonymous)) {
-          // Prevent processing the same user multiple times - CHECK FIRST, before any async operations
-          const userKey = user.email || user.uid || 'anonymous';
-          if (lastProcessedAuthUserRef.current === userKey) {
-            // Already processed this user, skip silently
-            return;
-          }
-          
-          // Mark as processed IMMEDIATELY to prevent concurrent processing
-          lastProcessedAuthUserRef.current = userKey;
-          
-          console.log("useCloudSync: Manual auth state changed, user:", user.email || user.displayName || "Anonymous");
-
-          // Verify token is available (only for non-anonymous users)
-          if (!user.isAnonymous) {
-            try {
-              const token = await authService.getAccessToken();
-              console.log("useCloudSync: Token available:", token ? "✓" : "✗");
-              if (!token) {
-                console.warn("useCloudSync: Failed to obtain access token, but continuing without it");
-              }
-            } catch (tokenError) {
-              console.error("useCloudSync: Error getting token:", tokenError);
-              // Don't throw, just log the error - continue with UI update
-            }
-          }
-
-          // Update UI immediately
-          setNexusUser(user);
-          setNexusAuthenticated(!user.isAnonymous);
-          setNexusIsPro(authService.isPro());
-
-          // Try to sync with Stripe to get the real subscription status
-          // This is important when Firestore lookup fails or profile has stale data
-          // Use refs to prevent multiple concurrent calls for the same user
-          // Double-check to prevent race conditions - CHECK BEFORE any async operations
-          if (!user.isAnonymous && user.email) {
-            // Check if already synced or in progress - if so, skip Stripe sync but continue with rest
-            if (!stripeSyncInProgressRef.current && lastStripeSyncEmailRef.current !== user.email) {
-              // Mark as in progress and syncing IMMEDIATELY to prevent concurrent calls
-              stripeSyncInProgressRef.current = true;
-              lastStripeSyncEmailRef.current = user.email; // Mark as syncing to prevent duplicates
-              
-              try {
-                const token = await authService.getAccessToken();
-                if (token) {
-                  console.log('🔄 useCloudSync: Syncing with Stripe to get real subscription status...');
-                  const response = await fetch('/api/stripe/subscription-status', {
-                    headers: {
-                      'Authorization': `Bearer ${token}`,
-                    },
-                  });
-                  
-                  if (response.ok) {
-                    const stripeData = await response.json();
-                    console.log('✅ useCloudSync: Stripe subscription status:', stripeData);
-                    
-                    if (stripeData.isActive && stripeData.plan === 'pro') {
-                      setNexusIsPro(true);
-                      console.log('✅ useCloudSync: User is Pro (verified from Stripe)');
-                      
-                      // Update local auth service cache
-                      // lastStripeSyncEmailRef is already set, so this will only run once per email
-                      authService.updateUserPlan('pro', 'active');
-                    }
-                  } else {
-                    console.warn('⚠️ useCloudSync: Failed to get Stripe subscription status');
-                    // Reset flags on error so we can retry later
-                    if (lastStripeSyncEmailRef.current === user.email) {
-                      lastStripeSyncEmailRef.current = null;
-                    }
-                    stripeSyncInProgressRef.current = false;
-                  }
-                } else {
-                  // No token available, reset flags
-                  if (lastStripeSyncEmailRef.current === user.email) {
-                    lastStripeSyncEmailRef.current = null;
-                  }
-                  stripeSyncInProgressRef.current = false;
-                }
-              } catch (stripeError) {
-                console.warn('⚠️ useCloudSync: Error syncing with Stripe (non-blocking):', stripeError);
-                // Reset flags on error
-                if (lastStripeSyncEmailRef.current === user.email) {
-                  lastStripeSyncEmailRef.current = null;
-                }
-                stripeSyncInProgressRef.current = false;
-              }
-              // Note: We don't reset stripeSyncInProgressRef in finally because we want to keep it set
-              // to prevent duplicate calls. It will be reset on error or when a different user logs in.
-            }
-          }
-
-          // Try to sync with Firestore if Firebase is initialized
-          if (firebaseService.isInitialized() && user.email && !user.isAnonymous) {
-            // Prevent multiple calls for the same email (avoid infinite loop)
-            // Also check if we're already processing this user
-            // If already processed, skip Firestore sync but don't return (allow other code to continue)
-            const shouldSkipFirestoreSync = (lastFindUserByEmailRef.current === user.email && syncInitializedRef.current) || 
-                findUserByEmailInProgressRef.current;
-            
-            if (!shouldSkipFirestoreSync) {
-              // Use the UID from the profile directly (should be Firebase Auth UID after createGoogleProfile)
-              // This is more reliable than findUserByEmail which might return old data
-              const profileUid = user.uid;
-              const isFirebaseUid = profileUid && profileUid.length === 28 && !profileUid.includes('@') && !profileUid.includes('user_');
-              
-              if (isFirebaseUid) {
-                // Profile already has Firebase Auth UID, use it directly
-                console.log("✅ Using Firebase Auth UID from profile:", profileUid);
-                
-                // Try to get latest profile from Firestore (optional, for plan/subscription data)
-                // Only if not already initialized and not already in progress to avoid infinite loop
-                const wasAlreadyProcessed = lastFindUserByEmailRef.current === user.email;
-                if (!syncInitializedRef.current && !findUserByEmailInProgressRef.current && !wasAlreadyProcessed) {
-                  findUserByEmailInProgressRef.current = true;
-                  lastFindUserByEmailRef.current = user.email; // Mark as processed
-                  
-                  firebaseService.findUserByEmail(user.email)
-                    .then(async (existingUser) => {
-                      findUserByEmailInProgressRef.current = false;
-                      if (existingUser) {
-                        console.log("✅ Syncing with Firestore user data");
-                        setNexusUser(existingUser);
-                        setNexusIsPro(existingUser.plan === 'pro');
-                      }
-                    })
-                    .catch((error) => {
-                      findUserByEmailInProgressRef.current = false;
-                      // Silent fail - use local profile
-                      console.warn('Could not find Firestore user (using local profile):', error);
-                    });
-                } else if (!wasAlreadyProcessed) {
-                  // Mark as processed even if we skip the findUserByEmail call
-                  lastFindUserByEmailRef.current = user.email;
-                }
-                
-                // Initialize Firebase sync using the Firebase Auth UID from profile
-                // Only if not already initialized for this UID
-                if (lastUserIdRef.current !== profileUid) {
-                  try {
-                    const { firebaseSyncService } = await import('@/services/firebase-sync');
-                    await firebaseSyncService.initializeSync(profileUid);
-                    console.log('✅ Firebase sync initialized using Firebase Auth UID from profile:', profileUid);
-                    syncInitializedRef.current = true;
-                    lastUserIdRef.current = profileUid;
-                  } catch (syncError) {
-                    console.error('Error initializing Firebase sync for manual OAuth user:', syncError);
-                  }
-                } else if (syncInitializedRef.current && lastUserIdRef.current === profileUid) {
-                  // Already initialized for this UID, skip silently (don't return, allow other code to continue)
-                }
-              } else {
-                // Profile doesn't have Firebase Auth UID yet, try to get it from Firestore
-                // Only if not already processed and not already in progress
-                if (lastFindUserByEmailRef.current !== user.email && !findUserByEmailInProgressRef.current) {
-                  console.log("⚠️ Profile UID is not a Firebase Auth UID, trying to find in Firestore...");
-                  lastFindUserByEmailRef.current = user.email;
-                  findUserByEmailInProgressRef.current = true;
-                  
-                  firebaseService.findUserByEmail(user.email)
-                    .then(async (existingUser) => {
-                      findUserByEmailInProgressRef.current = false;
-                      if (existingUser) {
-                        console.log("✅ Syncing with Firestore user data");
-                        setNexusUser(existingUser);
-                        setNexusIsPro(existingUser.plan === 'pro');
-                        
-                        // Check if Firestore user has Firebase Auth UID
-                        const firestoreUid = existingUser.uid;
-                        const isFirestoreFirebaseUid = firestoreUid && firestoreUid.length === 28 && !firestoreUid.includes('@') && !firestoreUid.includes('user_');
-                        
-                        if (isFirestoreFirebaseUid && lastUserIdRef.current !== firestoreUid) {
-                          // Initialize Firebase sync using Firebase Auth UID from Firestore
-                          try {
-                            const { firebaseSyncService } = await import('@/services/firebase-sync');
-                            await firebaseSyncService.initializeSync(firestoreUid);
-                            console.log('✅ Firebase sync initialized using Firebase Auth UID from Firestore:', firestoreUid);
-                            syncInitializedRef.current = true;
-                            lastUserIdRef.current = firestoreUid;
-                          } catch (syncError) {
-                            console.error('Error initializing Firebase sync for manual OAuth user:', syncError);
-                          }
-                        } else if (!isFirestoreFirebaseUid) {
-                          console.warn('⚠️ Cannot initialize Firebase sync: Firestore UID is not a Firebase Auth UID:', firestoreUid);
-                        }
-                      }
-                    })
-                    .catch((error) => {
-                      findUserByEmailInProgressRef.current = false;
-                      // Silent fail - local user data is already set
-                      console.warn('Could not find Firestore user:', error);
-                    });
-                }
-              }
-            }
-          }
-
-          // Load sync status (debounced to avoid excessive calls)
-          if (syncStatusDebounceTimerRef.current) {
-            clearTimeout(syncStatusDebounceTimerRef.current);
-          }
-          syncStatusDebounceTimerRef.current = setTimeout(async () => {
-            try {
-              const status = await nexusServerService.getSyncStatus();
-              setSyncStatus({
-                lastSyncAt: status.lastSyncAt || null,
-                tracksUploaded: status.tracksUploaded,
-                tracksDownloaded: status.tracksDownloaded,
-              });
-            } catch (error) {
-              console.error("Error loading sync status:", error);
-              setSyncStatus({
-                lastSyncAt: null,
-                tracksUploaded: 0,
-                tracksDownloaded: 0,
-              });
-            }
-          }, 1000); // 1 second debounce
-        }
-      } else if (!user && (!firebaseService.isInitialized() || !firebaseService.getCurrentUser())) {
-        // Only clear if no Firebase user exists
-        setNexusUser(null);
-        setNexusAuthenticated(false);
-        setNexusIsPro(false);
-        setSyncStatus({
-          lastSyncAt: null,
-          tracksUploaded: 0,
-          tracksDownloaded: 0,
-        });
-        
-        // Cleanup sync
-        try {
-          const { firebaseSyncService } = await import('@/services/firebase-sync');
-          firebaseSyncService.cleanup();
-          syncInitializedRef.current = false;
-          lastUserIdRef.current = null;
-        } catch (error) {
-          // Silent fail
-        }
-        
-        // Reset processed user on logout
-        lastProcessedAuthUserRef.current = null;
-      }
-      } finally {
-        // TOUJOURS libérer le lock, même en cas d'erreur
-        authStateChangeProcessingRef.current = false;
-      }
-    }, 100); // 100ms debounce pour éviter les appels multiples très rapides
+      }, 1000); // 1 second debounce
     });
 
     // Subscribe to upload progress
@@ -949,7 +524,10 @@ export function useCloudSync(): UseCloudSyncReturn {
       if (unsubscribeFirebase) {
         unsubscribeFirebase();
       }
-      unsubscribeAuth();
+      unsubscribeAuth(); // AuthOrchestrator subscription
+      if (typeof unsubscribeAuthService !== 'undefined') {
+        unsubscribeAuthService(); // Legacy authService subscription
+      }
       unsubscribeProgress();
       
       // Clear debounce timer
