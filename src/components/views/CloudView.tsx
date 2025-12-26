@@ -88,6 +88,7 @@ export const CloudView = () => {
   const { 
     nexusAuthenticated, 
     nexusIsPro, 
+    nexusUser,
     cloudinaryConfigured,
     cloudinaryConfig,
   } = useCloudSync();
