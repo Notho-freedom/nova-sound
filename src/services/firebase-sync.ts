@@ -243,6 +243,12 @@ class FirebaseSyncService {
         setTimeout(deferredInit, 500);
       }
       
+      // Setup realtime listeners for bidirectional sync (if enabled)
+      // This is done after initial load to avoid conflicts
+      setTimeout(() => {
+        this.setupRealtimeListeners(userId);
+      }, 1000);
+      
       // Start periodic sync (every hour) - différé
       setTimeout(() => this.startPeriodicSync(userId), 2000);
       
@@ -253,12 +259,9 @@ class FirebaseSyncService {
       
       this.isInitialized = true;
       
-      // Verify sync is working by checking listeners
-      if (this.syncListeners.size === 0) {
-        console.warn('⚠️ Firebase sync initialized but no listeners were set up');
-      } else {
-        console.log(`✅ Firebase sync active with ${this.syncListeners.size} listener(s):`, Array.from(this.syncListeners.keys()));
-      }
+      // Note: Real-time listeners are disabled by default (realtimeListenersEnabled = false)
+      // This is intentional - we use initial load + unidirectional sync (Local → Firebase)
+      // So it's normal to have 0 listeners - the warning is expected
     } catch (error) {
       console.error('Error initializing sync:', error);
       this.cleanup();
@@ -1469,6 +1472,11 @@ class FirebaseSyncService {
 
   // Cleanup listeners
   cleanup(): void {
+    // Prevent multiple cleanups if already cleaned up
+    if (!this.isInitialized && this.syncListeners.size === 0 && !this.currentUserId) {
+      return; // Already cleaned up
+    }
+    
     console.log(`🔄 Cleaning up Firebase sync (${this.syncListeners.size} listeners)`);
     this.syncListeners.forEach((unsubscribe) => {
       try {

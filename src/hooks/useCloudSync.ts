@@ -688,17 +688,26 @@ export function useCloudSync(): UseCloudSyncReturn {
                     setNexusIsPro(true);
                     console.log('✅ useCloudSync: User is Pro (verified from Stripe)');
                     
-                    // Update local auth service cache
-                    authService.updateUserPlan('pro', 'active');
+                    // Update local auth service cache only if not already updated
+                    // This prevents multiple updates when the listener fires multiple times
+                    if (lastStripeSyncEmailRef.current !== user.email) {
+                      authService.updateUserPlan('pro', 'active');
+                    }
                   }
                 } else {
                   console.warn('⚠️ useCloudSync: Failed to get Stripe subscription status');
                 }
+              } else {
+                // No token available, reset flag
+                stripeSyncInProgressRef.current = false;
               }
             } catch (stripeError) {
               console.warn('⚠️ useCloudSync: Error syncing with Stripe (non-blocking):', stripeError);
             } finally {
-              stripeSyncInProgressRef.current = false;
+              // Always reset flag, but only if this is still the same email
+              if (lastStripeSyncEmailRef.current === user.email || !lastStripeSyncEmailRef.current) {
+                stripeSyncInProgressRef.current = false;
+              }
             }
           }
 
