@@ -86,23 +86,28 @@ export class BrowserAudioAnalyzer {
         if (connectError.name === 'InvalidStateError' && 
             (connectError.message.includes('already connected') || 
              connectError.message.includes('HTMLMediaElement already connected'))) {
-          console.warn('L\'élément média est déjà connecté, utilisation de captureStream() comme fallback');
-          
           // Utiliser captureStream() si disponible (pour vidéos)
           if ('captureStream' in mediaElement && typeof (mediaElement as any).captureStream === 'function') {
             try {
               const stream = (mediaElement as any).captureStream();
+              // Vérifier que le stream a des pistes audio
+              if (stream.getAudioTracks().length === 0) {
+                throw new Error('ANALYSIS_UNAVAILABLE');
+              }
               const streamSource = this.audioContext.createMediaStreamSource(stream);
               streamSource.connect(this.analyser);
               // Ne pas connecter à destination pour éviter la double sortie
               this.source = streamSource as any; // Type cast pour compatibilité
-            } catch (streamError) {
-              console.warn('Erreur avec captureStream(), analyse non disponible:', streamError);
-              throw new Error('Impossible d\'analyser cet élément média (déjà connecté à une autre source)');
+              // Succès avec captureStream
+              return;
+            } catch (streamError: any) {
+              // Si captureStream échoue aussi, on retourne silencieusement
+              // L'analyse ne sera simplement pas disponible pour cet élément
+              throw new Error('ANALYSIS_UNAVAILABLE');
             }
           } else {
             // Si captureStream n'est pas disponible, on ne peut pas analyser
-            throw new Error('Impossible d\'analyser cet élément média. Il est déjà connecté à une autre source audio.');
+            throw new Error('ANALYSIS_UNAVAILABLE');
           }
         } else {
           throw connectError;
@@ -115,7 +120,10 @@ export class BrowserAudioAnalyzer {
       this.frequencyData = new Float32Array(bufferLength);
       this.waveformData = new Float32Array(bufferLength);
     } catch (error) {
-      console.error('Erreur lors de l\'initialisation de l\'analyseur audio:', error);
+      // Ne logger que en développement pour éviter de polluer la console
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Analyseur audio non disponible:', error instanceof Error ? error.message : error);
+      }
       // Nettoyer en cas d'erreur
       this.dispose();
       throw error;
@@ -127,7 +135,12 @@ export class BrowserAudioAnalyzer {
    */
   startAnalysis(callback: (analysis: BrowserAudioAnalysis) => void): void {
     if (!this.analyser || !this.frequencyData || !this.waveformData) {
-      throw new Error('Analyseur non initialisé. Appelez initialize() d\'abord.');
+      // Ne pas lancer d'erreur, juste retourner silencieusement
+      // L'analyseur peut ne pas être disponible pour certaines sources
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Analyseur non initialisé. L\'analyse audio n\'est pas disponible pour cette source.');
+      }
+      return;
     }
 
     if (this.isAnalyzing) {

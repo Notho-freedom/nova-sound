@@ -83,27 +83,70 @@ function isMediaFile(filePath: string): boolean {
  * Extract file paths from command line arguments
  */
 function getFileArgsFromArgs(): string[] {
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('🔵 [CLI] Processing initial command line arguments');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('📋 [CLI] Full process.argv:', JSON.stringify(process.argv, null, 2));
+  
   const args = process.argv.slice(1); // Skip node/electron path
+  console.log('📋 [CLI] Arguments to process (after skipping node/electron):', JSON.stringify(args, null, 2));
+  console.log('📊 [CLI] Total arguments:', args.length);
+  
   const files: string[] = [];
   
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    console.log(`  📝 [CLI] Processing argument [${i}]: "${arg}"`);
+    
     // Skip CLI flags
     if (arg.startsWith('--') || arg.startsWith('-')) {
+      console.log(`  ⏭️  [CLI] Skipping CLI flag: "${arg}"`);
       continue;
     }
     
     // Check if it's a file path (contains drive letter on Windows or starts with / on Unix)
     if (arg.includes(path.sep) || arg.match(/^[A-Za-z]:/)) {
+      console.log(`  ✅ [CLI] Argument looks like a file path`);
       // Check if file exists and is a media file
       try {
-        if (fs.existsSync(arg) && isMediaFile(arg)) {
-          files.push(path.resolve(arg));
+        const resolvedPath = path.resolve(arg);
+        console.log(`  🔄 [CLI] Resolved path: "${resolvedPath}"`);
+        
+        if (fs.existsSync(resolvedPath)) {
+          const stats = fs.statSync(resolvedPath);
+          console.log(`  📊 [CLI] File stats:`, {
+            isFile: stats.isFile(),
+            isDirectory: stats.isDirectory(),
+            size: stats.size,
+            extension: path.extname(resolvedPath).toLowerCase()
+          });
+          
+          if (isMediaFile(resolvedPath)) {
+            files.push(resolvedPath);
+            console.log(`  ✅ [CLI] Found valid media file: "${resolvedPath}"`);
+          } else {
+            console.log(`  ⚠️  [CLI] File exists but is not a valid media file`);
+          }
+        } else {
+          console.log(`  ❌ [CLI] File does not exist: "${resolvedPath}"`);
         }
       } catch (error) {
-        // Ignore errors, just skip this file
+        // Log error but continue processing other files
+        console.error(`  ❌ [CLI] Error processing file path "${arg}":`, error);
       }
+    } else {
+      console.log(`  ⏭️  [CLI] Argument does not look like a file path, skipping`);
     }
   }
+  
+  console.log(`📊 [CLI] Total files found: ${files.length}`);
+  if (files.length > 0) {
+    console.log('📋 [CLI] Files to open:');
+    files.forEach((file, index) => {
+      console.log(`  ${index + 1}. ${file}`);
+    });
+  }
+  console.log('═══════════════════════════════════════════════════════════');
   
   return files;
 }
@@ -112,41 +155,57 @@ function getFileArgsFromArgs(): string[] {
  * Open a media file in the player
  */
 function openMediaFile(filePath: string): void {
+  console.log('🎵 [CLI] openMediaFile() called with:', filePath);
+  
   if (!mainWindow) {
-    console.warn('Main window not ready, file will be opened when window is created');
+    console.warn('⚠️  [CLI] Main window not ready, file will be opened when window is created');
     return;
   }
   
   const normalizedPath = path.resolve(filePath);
+  console.log('🔄 [CLI] Normalized path:', normalizedPath);
   
   // Send file to renderer process
+  console.log('📤 [CLI] Sending file:open event to renderer...');
   mainWindow.webContents.send('file:open', normalizedPath);
   
   // Focus window
   if (mainWindow.isMinimized()) {
+    console.log('⬆️  [CLI] Window was minimized, restoring...');
     mainWindow.restore();
   }
   mainWindow.focus();
+  console.log('✅ [CLI] Window focused');
   
-  console.log('Opening media file:', normalizedPath);
+  console.log('✅ [CLI] Media file opened successfully:', normalizedPath);
 }
 
 /**
  * Handle files passed as command line arguments
  */
 function handleFileArgs(): void {
+  console.log('🔵 [CLI] Handling file arguments from initial startup...');
   const files = getFileArgsFromArgs();
   
   if (files.length > 0) {
-    console.log('Files passed as arguments:', files);
+    console.log('🚀 [CLI] Opening files from initial command line...');
     
     // If window is ready, open files immediately
     if (mainWindow) {
-      files.forEach(file => openMediaFile(file));
+      console.log('✅ [CLI] Window is ready, opening files immediately...');
+      files.forEach((file, index) => {
+        console.log(`  🎵 [CLI] Opening file ${index + 1}/${files.length}: "${file}"`);
+        openMediaFile(file);
+      });
+      console.log('✅ [CLI] All files opened successfully');
     } else {
       // Store files to open when window is ready
+      console.log('💾 [CLI] Window not ready, storing files to open when ready...');
       (app as any).pendingFiles = files;
+      console.log(`💾 [CLI] Stored ${files.length} file(s) to open when window is ready`);
     }
+  } else {
+    console.log('ℹ️  [CLI] No files found in command line arguments');
   }
 }
 
@@ -1150,21 +1209,32 @@ if (!gotTheLock) {
 } else {
   // Handle second instance (when user opens file with "Open with..." while app is running)
   app.on('second-instance', (event, commandLine, workingDirectory) => {
-    console.log('Second instance detected (Open with...):', commandLine);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔵 [CLI] Second instance detected (Open with...)');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📋 [CLI] Command line arguments:', JSON.stringify(commandLine, null, 2));
+    console.log('📁 [CLI] Working directory:', workingDirectory || process.cwd());
+    console.log('📊 [CLI] Total arguments:', commandLine.length);
     
     // Focus the main window if it exists
     if (mainWindow) {
+      console.log('🪟 [CLI] Main window exists, focusing...');
       if (mainWindow.isMinimized()) {
+        console.log('⬆️  [CLI] Window was minimized, restoring...');
         mainWindow.restore();
       }
       mainWindow.focus();
+      console.log('✅ [CLI] Window focused');
     } else {
       // Window doesn't exist yet, create it
+      console.log('🆕 [CLI] Main window does not exist, creating...');
       createWindow();
     }
     
     // Extract file paths from command line (robust parsing for Windows "Open with")
     const files: string[] = [];
+    
+    console.log('🔍 [CLI] Parsing command line arguments for file paths...');
     
     // On Windows, commandLine includes the executable path as first element
     // File paths can be:
@@ -1174,12 +1244,15 @@ if (!gotTheLock) {
     
     for (let i = 1; i < commandLine.length; i++) {
       const arg = commandLine[i];
+      console.log(`  📝 [CLI] Processing argument [${i}]: "${arg}"`);
       
       // Skip CLI flags and options
       if (arg.startsWith('--') || arg.startsWith('-')) {
+        console.log(`  ⏭️  [CLI] Skipping CLI flag: "${arg}"`);
         // Skip value for flags that take arguments
         if (arg === '--port' || arg === '-p' || arg === '--music-dir' || arg === '-m') {
           i++; // Skip the next argument (the value)
+          console.log(`  ⏭️  [CLI] Skipping flag value: "${commandLine[i]}"`);
         }
         continue;
       }
@@ -1188,6 +1261,7 @@ if (!gotTheLock) {
       let filePath = arg;
       if (filePath.startsWith('"') && filePath.endsWith('"')) {
         filePath = filePath.slice(1, -1);
+        console.log(`  📦 [CLI] Unquoted path: "${filePath}"`);
       }
       
       // Check if it looks like a file path
@@ -1202,38 +1276,71 @@ if (!gotTheLock) {
         path.isAbsolute(filePath);
       
       if (isPathLike) {
+        console.log(`  ✅ [CLI] Argument looks like a file path`);
         try {
           // Resolve path (handle both absolute and relative)
           const resolvedPath = path.isAbsolute(filePath) 
             ? path.normalize(filePath)
             : path.resolve(workingDirectory || process.cwd(), filePath);
           
+          console.log(`  🔄 [CLI] Resolved path: "${resolvedPath}"`);
+          
           // Verify file exists and is a media file
           if (fs.existsSync(resolvedPath)) {
             const stats = fs.statSync(resolvedPath);
+            console.log(`  📊 [CLI] File stats:`, {
+              isFile: stats.isFile(),
+              isDirectory: stats.isDirectory(),
+              size: stats.size,
+              extension: path.extname(resolvedPath).toLowerCase()
+            });
+            
             if (stats.isFile() && isMediaFile(resolvedPath)) {
               files.push(resolvedPath);
-              console.log('Found media file:', resolvedPath);
+              console.log(`  ✅ [CLI] Found valid media file: "${resolvedPath}"`);
+            } else {
+              console.log(`  ⚠️  [CLI] File exists but is not a valid media file`);
             }
+          } else {
+            console.log(`  ❌ [CLI] File does not exist: "${resolvedPath}"`);
           }
         } catch (error) {
           // Log error but continue processing other files
-          console.warn(`Error processing file path "${filePath}":`, error);
+          console.error(`  ❌ [CLI] Error processing file path "${filePath}":`, error);
         }
+      } else {
+        console.log(`  ⏭️  [CLI] Argument does not look like a file path, skipping`);
       }
+    }
+    
+    console.log(`📊 [CLI] Total files found: ${files.length}`);
+    if (files.length > 0) {
+      console.log('📋 [CLI] Files to open:');
+      files.forEach((file, index) => {
+        console.log(`  ${index + 1}. ${file}`);
+      });
     }
     
     // Open files in existing window (or wait for window to be ready)
     if (files.length > 0) {
       if (mainWindow && !mainWindow.isDestroyed()) {
         // Window is ready, open files immediately
-        files.forEach(file => openMediaFile(file));
+        console.log('🚀 [CLI] Window is ready, opening files immediately...');
+        files.forEach((file, index) => {
+          console.log(`  🎵 [CLI] Opening file ${index + 1}/${files.length}: "${file}"`);
+          openMediaFile(file);
+        });
+        console.log('✅ [CLI] All files opened successfully');
       } else {
         // Window not ready yet, store files to open when ready
         (app as any).pendingFiles = ((app as any).pendingFiles || []).concat(files);
-        console.log(`Stored ${files.length} file(s) to open when window is ready`);
+        console.log(`💾 [CLI] Window not ready, stored ${files.length} file(s) to open when ready`);
       }
+    } else {
+      console.log('⚠️  [CLI] No valid media files found in command line arguments');
     }
+    
+    console.log('═══════════════════════════════════════════════════════════');
   });
 }
 
@@ -1391,8 +1498,25 @@ app.whenReady().then(async () => {
   
   // Handle pending files (files passed before window was ready)
   if ((app as any).pendingFiles) {
-    (app as any).pendingFiles.forEach((file: string) => openMediaFile(file));
+    const pendingFiles = (app as any).pendingFiles as string[];
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🔵 [CLI] Opening pending files (files passed before window was ready)');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log(`📊 [CLI] Total pending files: ${pendingFiles.length}`);
+    console.log('📋 [CLI] Pending files:');
+    pendingFiles.forEach((file, index) => {
+      console.log(`  ${index + 1}. ${file}`);
+    });
+    
+    console.log('🚀 [CLI] Opening pending files...');
+    pendingFiles.forEach((file: string, index: number) => {
+      console.log(`  🎵 [CLI] Opening pending file ${index + 1}/${pendingFiles.length}: "${file}"`);
+      openMediaFile(file);
+    });
+    
     delete (app as any).pendingFiles;
+    console.log('✅ [CLI] All pending files opened successfully');
+    console.log('═══════════════════════════════════════════════════════════');
   }
 
   // Handle CLI options for reset and cache clearing

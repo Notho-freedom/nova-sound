@@ -170,6 +170,8 @@ export const HomeView = memo(({
   }, []);
 
   // Memoized data
+  // IMPORTANT: displayRecent et displayFavorites sont calculés à partir de recentTracks et favoriteTracks
+  // Ces données ne sont JAMAIS supprimées par les fonctions de lecture
   const displayRecent = useMemo(() => 
     recentTracks.length > 0 
       ? getUniqueTracks(recentTracks).slice(0, 20) 
@@ -193,6 +195,8 @@ export const HomeView = memo(({
 
   const topGenres = useMemo(() => genres.slice(0, 8), [genres]);
 
+  // IMPORTANT: Ces données sont calculées à partir de l'historique et ne sont JAMAIS supprimées
+  // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
   const recentArtists = useMemo(() => {
     if (!stats?.recentArtists) return [];
     return stats.recentArtists.slice(0, 10);

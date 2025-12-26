@@ -8,6 +8,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { ArtistInfoPanel } from "./ArtistInfoPanel";
+// import { KaraokePanel } from "./KaraokePanel"; // DÉSACTIVÉ - Système karaoke désactivé
 import { UpdateNotification } from "./UpdateNotification";
 import { lazy, Suspense } from "react";
 
@@ -45,6 +46,7 @@ import { toast } from "sonner";
 import type { Track } from "@/types/music";
 import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 import { useAudioVibes } from "@/hooks/useAudioVibes";
+import { useAudioAI } from "@/hooks/useAudioAI";
 import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer";
 import { extractYouTubeVideoId } from "@/lib/youtube";
 
@@ -163,12 +165,33 @@ export const DesktopApp = () => {
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
 
   // Audio element ref for real playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // YouTube Player ref pour lecture persistante en arrière-plan
   const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+
+  // Audio AI Analysis - DÉSACTIVÉ TEMPORAIREMENT
+  // TODO: Réactiver le système d'analyse audio plus tard
+  // const audioUrl = currentTrack?.filePath 
+  //   ? (getAudioSrc(currentTrack.filePath) ?? undefined)
+  //   : (currentTrack?.mediaSource === 'youtube' && currentTrack?.youtubeVideoId
+  //     ? `https://www.youtube.com/watch?v=${currentTrack.youtubeVideoId}`
+  //     : undefined);
+  
+  // const { analysis: audioAnalysis, startBrowserAnalysis, startAIAnalysis, isPro: isAudioAIPro } = useAudioAI({
+  //   mediaElement: audioRef.current,
+  //   audioUrl: audioUrl,
+  //   autoStart: true,
+  //   enableAI: false,
+  // });
+  
+  // Valeurs par défaut pour éviter les erreurs
+  const audioAnalysis = null;
+  const startAIAnalysis = () => {};
+  const isAudioAIPro = false;
   
   // Durée du player YouTube (pour les tracks YouTube où currentTrack.duration peut être 0)
   const [youtubeDuration, setYoutubeDuration] = useState(0);
@@ -914,6 +937,8 @@ export const DesktopApp = () => {
   }, [queueIsShuffled]);
 
   // Playlist handlers
+  // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handlePlayPlaylist = useCallback((playlistId: string) => {
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) {
@@ -935,7 +960,7 @@ export const DesktopApp = () => {
       return;
     }
 
-    // Set queue and start playing
+    // Remplace uniquement la file d'attente (UI) - ne supprime aucune autre donnée
     setQueue(playlistTracks);
     setCurrentIndex(0);
     setIsPlaying(true);
@@ -944,6 +969,8 @@ export const DesktopApp = () => {
     notifySuccess(message);
   }, [playlists, libraryTracks, setQueue, setCurrentIndex, notifySuccess, notifyError]);
 
+  // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handleShufflePlaylist = useCallback((playlistId: string) => {
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) {
@@ -968,7 +995,7 @@ export const DesktopApp = () => {
     // Shuffle tracks
     const shuffled = [...playlistTracks].sort(() => Math.random() - 0.5);
 
-    // Set queue and start playing
+    // Remplace uniquement la file d'attente (UI) - ne supprime aucune autre donnée
     setQueue(shuffled);
     setCurrentIndex(0);
     setIsPlaying(true);
@@ -988,6 +1015,8 @@ export const DesktopApp = () => {
   }, [tracks, currentTrackIndex, removeFromQueue]);
 
   // Handlers for PlaylistView - play/shuffle tracks by IDs
+  // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handlePlayTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
       .map(id => libraryTracks.find(t => t.id === id))
@@ -1000,16 +1029,18 @@ export const DesktopApp = () => {
       return;
     }
 
-    // Remplacer la file sans passer par un clear intermédiaire
+    // Remplace uniquement la file d'attente (UI) - ne supprime aucune autre donnée
     setQueue(tracksToPlay);
     setCurrentIndex(0);
     setIsPlaying(true);
     const message = `Lecture de ${tracksToPlay.length} titre${tracksToPlay.length > 1 ? 's' : ''}`;
     toast.success(message);
     notifySuccess(message);
-  }, [libraryTracks, clearQueue, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
+  }, [libraryTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
 
   // Lecture d'une liste de tracks (remplace entièrement la file)
+  // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handlePlayTrackList = useCallback((trackList: Track[], startIndex: number = 0) => {
     const validTracks = trackList.filter(Boolean);
     if (validTracks.length === 0) {
@@ -1019,7 +1050,7 @@ export const DesktopApp = () => {
     }
 
     const clampedIndex = Math.max(0, Math.min(startIndex, validTracks.length - 1));
-    // Remplacer la file sans effacer d'autres caches
+    // Remplace uniquement la file d'attente (UI) - ne supprime aucune autre donnée
     setQueue(validTracks);
     setCurrentIndex(clampedIndex);
     setIsPlaying(true);
@@ -1035,6 +1066,8 @@ export const DesktopApp = () => {
     toast.success('File vidée');
   }, [clearQueue]);
 
+  // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handleShuffleTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
       .map(id => libraryTracks.find(t => t.id === id))
@@ -1050,6 +1083,7 @@ export const DesktopApp = () => {
     // Shuffle tracks
     const shuffled = [...tracksToPlay].sort(() => Math.random() - 0.5);
 
+    // Remplace uniquement la file d'attente (UI) - ne supprime aucune autre donnée
     setQueue(shuffled);
     setCurrentIndex(0);
     setIsPlaying(true);
@@ -1204,6 +1238,8 @@ export const DesktopApp = () => {
   }, []);
 
   // Get favorite tracks (without duplicates)
+  // IMPORTANT: Ces données sont calculées à partir des favoris et ne sont JAMAIS supprimées
+  // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
   const favoriteTracks = useMemo(() => {
     return getUniqueTracks(tracks.filter(track => isFavorite(track.id)));
   }, [tracks, isFavorite, getUniqueTracks]);
@@ -1225,6 +1261,8 @@ export const DesktopApp = () => {
   }, [history, tracks, libraryTracks, getUniqueTracks]);
 
   // Get recently played tracks from history (for HomeView) - without duplicates
+  // IMPORTANT: Ces données sont calculées à partir de l'historique et ne sont JAMAIS supprimées
+  // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
   const recentTracks = useMemo(() => {
     const mapped = history
       .map(h => tracks.find(t => t.id === h.trackId))
@@ -1385,7 +1423,7 @@ export const DesktopApp = () => {
             loading={libraryLoading}
           />
         );
-      case "recent":
+      case "recent": {
         // Get cover images for recent tracks
         const recentCovers = recentTracks.filter(t => t.coverUrl).slice(0, 4);
         const addedCovers = recentlyAddedTracks.filter(t => t.coverUrl).slice(0, 4);
@@ -1655,6 +1693,7 @@ export const DesktopApp = () => {
             </div>
           </div>
         );
+      }
       case "albums":
         return (
           <LibraryView
@@ -1939,7 +1978,7 @@ export const DesktopApp = () => {
             
             <div className={cn(
               "flex-1 transition-all duration-300 relative",
-              (isQueueOpen || isLyricsOpen || isNotificationsOpen || isArtistInfoOpen) && "mr-80",
+                    (isQueueOpen || isLyricsOpen || isNotificationsOpen || isArtistInfoOpen) && "mr-80", // isKaraokeOpen retiré
               showInlinePlayer && "flex items-center justify-center",
               currentView === "videos" && "overflow-hidden"
             )}>
@@ -2032,6 +2071,18 @@ export const DesktopApp = () => {
                 />
               </div>
             )}
+
+            {/* Karaoké Panel - DÉSACTIVÉ */}
+            {/* {isKaraokeOpen && (
+              <div className="absolute right-0 top-0 bottom-0 z-20 w-80 animate-in slide-in-from-right duration-300">
+                <KaraokePanel
+                  isOpen={isKaraokeOpen}
+                  onClose={() => setIsKaraokeOpen(false)}
+                  currentTrack={currentTrack}
+                  audioElement={audioRef.current}
+                />
+              </div>
+            )} */}
           </div>
         </div>
 
@@ -2079,11 +2130,25 @@ export const DesktopApp = () => {
                 setIsQueueOpen(false);
                 setIsLyricsOpen(false);
                 setIsNotificationsOpen(false);
+                // setIsKaraokeOpen(false); // DÉSACTIVÉ
               }
             }}
             onNavigateToAlbum={handleNavigateToAlbum}
             onNavigateToArtist={handleNavigateToArtist}
             isQueueOpen={isQueueOpen}
+            audioAnalysis={audioAnalysis}
+            onStartAIAnalysis={startAIAnalysis}
+            isAudioAIPro={isAudioAIPro}
+            // onShowKaraoke - DÉSACTIVÉ - Système karaoke désactivé
+            // onShowKaraoke={() => {
+            //   setIsKaraokeOpen(!isKaraokeOpen);
+            //   if (!isKaraokeOpen) {
+            //     setIsQueueOpen(false);
+            //     setIsLyricsOpen(false);
+            //     setIsNotificationsOpen(false);
+            //     setIsArtistInfoOpen(false);
+            //   }
+            // }}
           />
         )}
 

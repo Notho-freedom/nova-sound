@@ -143,28 +143,65 @@ export function useAudioAI(options: UseAudioAIOptions) {
 
     analyzer.initialize(mediaElement)
       .then(() => {
-        if (autoStart) {
-          analyzer.startAnalysis((browserAnalysis) => {
+        // Vérifier que l'analyseur est toujours valide avant de démarrer
+        if (analyzerRef.current === analyzer && autoStart) {
+          try {
+            analyzer.startAnalysis((browserAnalysis) => {
+              setAnalysis(prev => ({
+                ...prev,
+                browserAnalysis,
+                error: null,
+              }));
+            });
+          } catch (startError) {
+            // Si le démarrage échoue, on continue sans erreur
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('Impossible de démarrer l\'analyse audio:', startError);
+            }
             setAnalysis(prev => ({
               ...prev,
-              browserAnalysis,
+              browserAnalysis: null,
               error: null,
             }));
-          });
+          }
         }
       })
       .catch((error) => {
-        console.error('Erreur lors de l\'initialisation de l\'analyseur:', error);
-        setAnalysis(prev => ({
-          ...prev,
-          error: error instanceof Error && error.message.includes('déjà connecté')
-            ? 'L\'élément média est déjà utilisé par un autre analyseur'
-            : 'Impossible d\'initialiser l\'analyseur audio. L\'analyse native peut ne pas être disponible pour cette source.',
-        }));
-        if (analyzerRef.current) {
+        // Nettoyer l'analyseur en cas d'erreur
+        if (analyzerRef.current === analyzer) {
           analyzerRef.current.dispose();
           analyzerRef.current = null;
         }
+        
+        // Si l'analyse n'est pas disponible (élément déjà utilisé), on continue sans erreur
+        const isUnavailable = error instanceof Error && 
+          (error.message === 'ANALYSIS_UNAVAILABLE' || 
+           error.message.includes('ANALYSIS_UNAVAILABLE') ||
+           error.message.includes('already connected'));
+        
+        if (isUnavailable) {
+          // L'analyse n'est pas disponible mais ce n'est pas une erreur critique
+          // On continue avec une analyse vide (silencieusement en production)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Analyse audio non disponible (élément média déjà utilisé)');
+          }
+          setAnalysis(prev => ({
+            ...prev,
+            browserAnalysis: null,
+            error: null, // Pas d'erreur, juste indisponible
+          }));
+          return;
+        }
+        
+        // Pour les autres erreurs, on les log mais on continue
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Analyse audio non disponible:', error);
+        }
+        setAnalysis(prev => ({
+          ...prev,
+          browserAnalysis: null,
+          error: null, // Ne pas bloquer l'UI avec une erreur
+        }));
       });
 
     return () => {
@@ -179,13 +216,25 @@ export function useAudioAI(options: UseAudioAIOptions) {
   // Démarrer l'analyse native
   const startBrowserAnalysis = useCallback(() => {
     if (analyzerRef.current && mediaElement) {
-      analyzerRef.current.startAnalysis((browserAnalysis) => {
+      try {
+        analyzerRef.current.startAnalysis((browserAnalysis) => {
+          setAnalysis(prev => ({
+            ...prev,
+            browserAnalysis,
+            error: null,
+          }));
+        });
+      } catch (error) {
+        // Si l'analyseur n'est pas initialisé, on ne fait rien
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Impossible de démarrer l\'analyse audio:', error);
+        }
         setAnalysis(prev => ({
           ...prev,
-          browserAnalysis,
+          browserAnalysis: null,
           error: null,
         }));
-      });
+      }
     }
   }, [mediaElement]);
 

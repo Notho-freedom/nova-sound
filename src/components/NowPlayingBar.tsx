@@ -22,6 +22,8 @@ import {
   Users,
   Airplay,
   Sparkles,
+  Brain,
+  TrendingUp,
 } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
@@ -38,6 +40,7 @@ import type { Track } from "@/types/music"
 import { toast } from "sonner"
 import { useNotifications } from "@/hooks/useNotifications"
 import { useState } from "react"
+import type { AIAnalysisResult } from "@/hooks/useAudioAI"
 
 interface NowPlayingBarProps {
   currentTrack: Track
@@ -67,6 +70,10 @@ interface NowPlayingBarProps {
   onNavigateToArtist?: () => void
   isQueueOpen: boolean
   youtubeDuration?: number
+  audioAnalysis?: AIAnalysisResult | null
+  onStartAIAnalysis?: () => void
+  isAudioAIPro?: boolean
+  // onShowKaraoke?: () => void // DÉSACTIVÉ - Système karaoke désactivé
 }
 
 const formatTime = (seconds: number) => {
@@ -102,6 +109,10 @@ export const NowPlayingBar = ({
   onNavigateToArtist,
   isQueueOpen,
   youtubeDuration,
+  audioAnalysis,
+  onStartAIAnalysis,
+  isAudioAIPro = false,
+  // onShowKaraoke, // DÉSACTIVÉ
 }: NowPlayingBarProps) => {
   const [isHoveringProgress, setIsHoveringProgress] = useState(false)
   const [isHoveringVolume, setIsHoveringVolume] = useState(false)
@@ -375,6 +386,77 @@ export const NowPlayingBar = ({
 
             {/* Right: Secondary Controls */}
             <div className="flex items-center gap-1 w-[280px] justify-end flex-shrink-0">
+              {/* Audio Analysis / AI */}
+              {audioAnalysis && (
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        if (audioAnalysis.isPro && !audioAnalysis.transcription && onStartAIAnalysis) {
+                          onStartAIAnalysis();
+                          toast.info("Analyse IA en cours...", { duration: 3000 });
+                        } else if (!audioAnalysis.isPro) {
+                          toast.info("Passez à Pro pour accéder à l'analyse IA avancée", { duration: 4000 });
+                        } else {
+                          toast.info("Analyse disponible", { duration: 2000 });
+                        }
+                      }}
+                      className={cn(
+                        "p-2 rounded-full transition-all duration-300 relative",
+                        audioAnalysis.browserAnalysis?.hasVoice 
+                          ? "text-primary bg-primary/10" 
+                          : "text-muted-foreground/50 hover:text-primary",
+                        "hover:bg-primary/10 active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      )}
+                    >
+                      <Brain className="w-4 h-4" />
+                      {/* Indicateur de sentiment si disponible */}
+                      {audioAnalysis.sentiment && audioAnalysis.sentiment.length > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      )}
+                      {/* Indicateur Pro */}
+                      {isAudioAIPro && (
+                        <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-primary" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="space-y-1">
+                      {audioAnalysis.browserAnalysis && (
+                        <>
+                          <p className="text-xs font-semibold">Analyse Audio</p>
+                          <p className="text-xs text-muted-foreground">
+                            Voix: {audioAnalysis.browserAnalysis.hasVoice ? "Détectée" : "Non détectée"}
+                          </p>
+                          {audioAnalysis.browserAnalysis.pitch && (
+                            <p className="text-xs text-muted-foreground">
+                              Pitch: {audioAnalysis.browserAnalysis.pitch.toFixed(0)} Hz
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {audioAnalysis.sentiment && audioAnalysis.sentiment.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-white/10">
+                          <p className="text-xs font-semibold flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            Sentiment
+                          </p>
+                          {audioAnalysis.sentiment.slice(0, 2).map((s, i) => (
+                            <p key={i} className="text-xs text-muted-foreground">
+                              {s.sentiment} ({Math.round(s.confidence * 100)}%)
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {isAudioAIPro && !audioAnalysis.transcription && (
+                        <p className="text-xs text-primary mt-2">Cliquez pour lancer l'analyse IA</p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
               {/* Artist Info */}
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
@@ -393,6 +475,26 @@ export const NowPlayingBar = ({
                 </TooltipTrigger>
                 <TooltipContent>Profil artiste</TooltipContent>
               </Tooltip>
+
+              {/* Karaoké - DÉSACTIVÉ */}
+              {/* {onShowKaraoke && (
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={onShowKaraoke}
+                      className={cn(
+                        "p-2 rounded-full transition-all duration-300",
+                        "text-muted-foreground/50 hover:text-primary",
+                        "hover:bg-primary/10 active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      )}
+                    >
+                      <Mic2 className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Karaoké</TooltipContent>
+                </Tooltip>
+              )} */}
 
               {/* Lyrics */}
               <Tooltip delayDuration={0}>

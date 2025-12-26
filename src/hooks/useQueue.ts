@@ -134,6 +134,9 @@ export function useQueue(initialTracks: Track[] = []): UseQueueReturn {
   }, []);
 
   // Clear entire queue
+  // IMPORTANT: Cette fonction vide UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
+  // Elle ne supprime que les clés spécifiques à la queue dans localStorage
   const clearQueue = useCallback(() => {
     setQueueState((prev) => ({
       tracks: [],
@@ -145,6 +148,7 @@ export function useQueue(initialTracks: Track[] = []): UseQueueReturn {
     if (typeof window !== 'undefined') {
       try {
         // Persister un état vide plutôt que supprimer les clés pour éviter tout reset global
+        // On utilise setItem avec un tableau vide, pas removeItem, pour ne pas affecter d'autres données
         localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify([]));
         localStorage.setItem(QUEUE_INDEX_STORAGE_KEY, '0');
       } catch (error) {
@@ -201,6 +205,8 @@ export function useQueue(initialTracks: Track[] = []): UseQueueReturn {
   }, []);
 
   // Set entire queue (replace all tracks)
+  // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
+  // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const setQueue = useCallback((tracks: Track[]) => {
     setQueueState({
       tracks,
