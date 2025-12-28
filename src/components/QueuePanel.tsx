@@ -32,11 +32,15 @@ const formatTime = (seconds: number) => {
 const TrackItem = ({ 
   track, 
   onClick, 
-  showGrip = false 
+  showGrip = false,
+  onNavigateToArtist,
+  onNavigateToAlbum
 }: { 
   track: Track; 
   onClick: () => void; 
   showGrip?: boolean;
+  onNavigateToArtist?: (artist: string) => void;
+  onNavigateToAlbum?: (album: string, artist: string) => void;
 }) => (
   <Tooltip>
     <TooltipTrigger asChild>
@@ -73,8 +77,28 @@ const TrackItem = ({
     </TooltipTrigger>
     <TooltipContent>
       <div className="text-sm font-medium">{track.title}</div>
-      <div className="text-xs text-muted-foreground">{track.artist}</div>
-      {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+      <div className="text-xs text-muted-foreground">
+        {onNavigateToArtist ? (
+          <button
+            className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+            onClick={e => { e.stopPropagation(); onNavigateToArtist(track.artist); }}
+          >
+            {track.artist}
+          </button>
+        ) : track.artist}
+      </div>
+      {track.album && (
+        <div className="text-xs text-muted-foreground mt-1">
+          {onNavigateToAlbum ? (
+            <button
+              className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+              onClick={e => { e.stopPropagation(); onNavigateToAlbum(track.album, track.artist); }}
+            >
+              {track.album}
+            </button>
+          ) : track.album}
+        </div>
+      )}
       <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
     </TooltipContent>
   </Tooltip>
@@ -92,7 +116,15 @@ export const QueuePanel = ({
   currentTrack: propCurrentTrack,
   onRemoveFromQueue,
   onClearQueue,
-}: QueuePanelProps) => {
+  onNavigateToArtist,
+  onNavigateToAlbum,
+}: QueuePanelProps & {
+  onNavigateToArtist?: (artist: string) => void;
+  onNavigateToAlbum?: (album: string, artist: string) => void;
+}) => {
+  // Patch: always define these to avoid ReferenceError
+  const _onNavigateToArtist = typeof onNavigateToArtist === 'function' ? onNavigateToArtist : undefined;
+  const _onNavigateToAlbum = typeof onNavigateToAlbum === 'function' ? onNavigateToAlbum : undefined;
   const currentTrack = propCurrentTrack || tracks[currentTrackIndex];
   const [queueFilter, setQueueFilter] = useState<'all' | 'youtube' | 'local'>('all');
 
@@ -302,6 +334,8 @@ export const QueuePanel = ({
                           <TrackItem
                             track={track}
                             onClick={() => onPlayTrack?.(track)}
+                            onNavigateToArtist={_onNavigateToArtist}
+                            onNavigateToAlbum={_onNavigateToAlbum}
                           />
                         </div>
 
@@ -370,6 +404,8 @@ export const QueuePanel = ({
                       key={`${track.id}-${index}`}
                       track={track}
                       onClick={() => onPlayTrack?.(track)}
+                      onNavigateToArtist={_onNavigateToArtist}
+                      onNavigateToAlbum={_onNavigateToAlbum}
                     />
                   ))}
                 </div>
@@ -392,6 +428,8 @@ export const QueuePanel = ({
                     key={`${track.id}-${index}`}
                     track={track}
                     onClick={() => onPlayTrack?.(track)}
+                    onNavigateToArtist={_onNavigateToArtist}
+                    onNavigateToAlbum={_onNavigateToAlbum}
                   />
                 ))}
               </div>

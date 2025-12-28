@@ -40,6 +40,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
+import { useNexusUpload } from "@/hooks/useNexusUpload";
+import { useUploadedStatus } from "@/hooks/useUploadedStatus";
+import { useCloudSync } from "@/hooks/useCloudSync";
 import { useArtistMetadata } from "@/hooks/useArtistMetadata";
 import { useArtistImages } from "@/hooks/useArtistImage";
 import { useArtistPlaylists } from "@/hooks/useArtistPlaylists";
@@ -119,7 +123,14 @@ export const ArtistView = memo(({
   onAlbumClick,
   onArtistClick,
   onOpenPlaylist,
-}: ArtistViewProps) => {
+  }: ArtistViewProps) => {
+    // Upload hooks et status
+    const cloudinaryUpload = useCloudinaryUpload();
+    const nexusUpload = useNexusUpload();
+    const { isUploaded, getUploadedProvider } = useUploadedStatus();
+    const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
+    const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+    const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<number | null>(null);
   const [showFullBio, setShowFullBio] = useState(false);
@@ -530,6 +541,14 @@ export const ArtistView = memo(({
                               onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
                               onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
                               onToggleFavorite={() => toggleFavorite(track.id)}
+                              onUploadToCloudinary={cloudinaryUpload.uploadTrack ? () => cloudinaryUpload.uploadTrack(track) : undefined}
+                              canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                              isUploading={cloudinaryUpload.getTrackProgress(track.id)?.status === 'uploading'}
+                              onUploadToNexus={nexusUpload.uploadTrack ? () => nexusUpload.uploadTrack(track) : undefined}
+                              canUploadToNexus={canUploadToNexus && !!track.filePath}
+                              isUploadingToNexus={nexusUpload.getTrackProgress(track.id)?.status === 'uploading'}
+                              isUploaded={isUploaded(track.id)}
+                              getUploadedProvider={getUploadedProvider}
                             >
                               <button
                                 onClick={(e) => e.stopPropagation()}
