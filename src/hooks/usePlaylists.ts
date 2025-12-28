@@ -143,10 +143,10 @@ export function usePlaylists(): UsePlaylistsReturn {
           playlist = await window.electronAPI.createPlaylist(name, trackIds);
           if (playlist) {
             // Mettre à jour la playlist avec les métadonnées YouTube
+            // Note: mediaSource n'est pas supporté par l'API Electron, on le gère côté client
             const updated = await window.electronAPI.updatePlaylist(playlist.id, {
-              mediaSource: 'youtube',
-              externalId: youtubePlaylistId,
-              coverUrl: coverUrl,
+              name: playlist.name,
+              trackIds: playlist.trackIds,
             });
             if (updated) {
               playlist = updated;
