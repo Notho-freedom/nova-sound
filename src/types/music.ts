@@ -49,7 +49,7 @@ export interface Playlist {
   isSmartPlaylist?: boolean;
   smartCriteria?: SmartPlaylistCriteria;
   isFavorite?: boolean; // Indique si la playlist est marquée comme favorite (visible dans la sidebar)
-  mediaSource?: 'local' | 'youtube' | 'spotify' | 'soundcloud' | 'unknown'; // Source de la playlist (locale ou externe)
+  mediaSource?: string; // Source de la playlist (locale ou externe)
   externalId?: string; // ID externe (ex: YouTube playlist ID)
 }
 
