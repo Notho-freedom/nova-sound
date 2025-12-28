@@ -20,6 +20,8 @@ import {
   Settings,
   Play,
   Cloud,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -66,6 +68,11 @@ interface SidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void;
   onPlayPlaylist?: (playlistId: string) => void;
   onShufflePlaylist?: (playlistId: string) => void;
+  // Navigation history
+  canGoBack?: boolean;
+  canGoForward?: boolean;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
 }
 
 const mainNavItems = [
@@ -215,6 +222,10 @@ export const Sidebar = ({
   onCollapsedChange,
   onPlayPlaylist,
   onShufflePlaylist,
+  canGoBack = false,
+  canGoForward = false,
+  onGoBack,
+  onGoForward,
 }: SidebarProps) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? internalCollapsed;
@@ -329,6 +340,71 @@ export const Sidebar = ({
             )}
           </div>
         </div>
+
+        {/* Navigation History Buttons */}
+        {!collapsed && (onGoBack || onGoForward) && (
+          <div className="flex items-center gap-1 px-4 py-2 border-b border-white/5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onGoBack}
+                  disabled={!canGoBack}
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200",
+                    canGoBack 
+                      ? "text-muted-foreground hover:text-foreground hover:bg-white/5 active:scale-95" 
+                      : "text-muted-foreground/30 cursor-not-allowed"
+                  )}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Retour (Alt+←)
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onGoForward}
+                  disabled={!canGoForward}
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200",
+                    canGoForward 
+                      ? "text-muted-foreground hover:text-foreground hover:bg-white/5 active:scale-95" 
+                      : "text-muted-foreground/30 cursor-not-allowed"
+                  )}
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Suivant (Alt+→)
+              </TooltipContent>
+            </Tooltip>
+            <span className="ml-2 text-xs text-muted-foreground/50 truncate capitalize">
+              {currentView === 'home' ? 'Accueil' : 
+               currentView === 'search' ? 'Rechercher' :
+               currentView === 'library' ? 'Bibliothèque' :
+               currentView === 'favorites' ? 'Favoris' :
+               currentView === 'playlists' ? 'Playlists' :
+               currentView === 'recent' ? 'Récents' :
+               currentView === 'albums' ? 'Albums' :
+               currentView === 'artists' ? 'Artistes' :
+               currentView === 'videos' ? 'Vidéos' :
+               currentView === 'local' ? 'Fichiers Locaux' :
+               currentView === 'downloads' ? 'Téléchargements' :
+               currentView === 'cloud' ? 'Cloud' :
+               currentView === 'settings' ? 'Paramètres' :
+               currentView === 'notifications' ? 'Notifications' :
+               currentView === 'artist-detail' ? 'Artiste' :
+               currentView === 'album-detail' ? 'Album' :
+               currentView === 'audio-senses' ? 'Sens Audio' :
+               currentView === 'player' ? 'Lecteur' :
+               currentView}
+            </span>
+          </div>
+        )}
 
         {/* Collapse Toggle Button */}
         <button

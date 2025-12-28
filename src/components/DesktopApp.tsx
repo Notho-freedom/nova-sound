@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
+import { useViewNavigation } from "@/hooks/useViewNavigation";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
 import { FullscreenPlayer } from "./FullscreenPlayer";
@@ -180,8 +181,20 @@ export const DesktopApp = () => {
   }, [recordPlayback, addToHistory]);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<ViewType>("home");
-  const [previousView, setPreviousView] = useState<ViewType>("home");
+  
+  // Navigation orchestrator with history
+  const { 
+    currentView, 
+    navigateTo, 
+    goBack, 
+    goForward, 
+    canGoBack, 
+    canGoForward,
+    viewParams 
+  } = useViewNavigation();
+  
+  // Alias for compatibility with existing code
+  const setCurrentView = navigateTo;
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isShuffle, setIsShuffle] = useState(queueIsShuffled);
@@ -1154,13 +1167,12 @@ export const DesktopApp = () => {
   const handleShowPlayer = useCallback(() => {
     if (showInlinePlayer) {
       setShowInlinePlayer(false);
-      setCurrentView(previousView);
+      goBack(); // Use navigation history to go back
     } else {
-      setPreviousView(currentView);
       setShowInlinePlayer(true);
       setCurrentView("player");
     }
-  }, [showInlinePlayer, currentView, previousView]);
+  }, [showInlinePlayer, goBack, setCurrentView]);
 
   // Écouter les événements pour jouer des vidéos YouTube comme audio
   useEffect(() => {
@@ -1186,7 +1198,6 @@ export const DesktopApp = () => {
       
       // Naviguer vers le player inline
       if (!showInlinePlayer) {
-        setPreviousView(currentView);
         setShowInlinePlayer(true);
         setCurrentView("player");
       }
@@ -1199,7 +1210,7 @@ export const DesktopApp = () => {
     return () => {
       window.removeEventListener('youtube-audio-play', handleYouTubeAudioPlay as unknown as EventListener);
     };
-  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect, showInlinePlayer, currentView, previousView]);
+  }, [tracks, queue.tracks.length, addToQueueNext, setCurrentIndex, handleTrackSelect, showInlinePlayer, setCurrentView]);
 
   // Écouter les événements pour ajouter les vidéos YouTube à l'historique audio
   useEffect(() => {
@@ -2030,6 +2041,10 @@ export const DesktopApp = () => {
             onCollapsedChange={setSidebarCollapsed}
             onPlayPlaylist={handlePlayPlaylist}
             onShufflePlaylist={handleShufflePlaylist}
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            onGoBack={goBack}
+            onGoForward={goForward}
           />
 
           {/* Content Area */}
