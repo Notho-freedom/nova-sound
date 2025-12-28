@@ -158,7 +158,6 @@ export function usePlaylists(): UsePlaylistsReturn {
                 coverUrl: coverUrl,
               };
             }
-            setPlaylists((prev) => [...prev, playlist!]);
           }
         } else {
           // Web mode
@@ -172,21 +171,26 @@ export function usePlaylists(): UsePlaylistsReturn {
             externalId: youtubePlaylistId,
             coverUrl: coverUrl,
           };
-          setPlaylists((prev) => [...prev, playlist!]);
         }
         
-        // Sync to Firebase
+        // Mettre à jour l'état et synchroniser avec Firebase en une seule opération
         if (playlist) {
-          try {
-            const { firebaseSyncService } = await import('@/services/firebase-sync');
-            const updatedPlaylists = [...playlists, playlist];
-            firebaseSyncService.queueSync('playlists', updatedPlaylists);
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: updatedPlaylists }));
-            }
-          } catch (error) {
-            console.error('Error syncing YouTube playlist to Firebase:', error);
-          }
+          setPlaylists((currentPlaylists) => {
+            const updatedPlaylists = [...currentPlaylists, playlist!];
+            // Sync to Firebase de manière asynchrone
+            (async () => {
+              try {
+                const { firebaseSyncService } = await import('@/services/firebase-sync');
+                firebaseSyncService.queueSync('playlists', updatedPlaylists);
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('local-playlists-update', { detail: updatedPlaylists }));
+                }
+              } catch (error) {
+                console.error('Error syncing YouTube playlist to Firebase:', error);
+              }
+            })();
+            return updatedPlaylists;
+          });
           // Notify user
           notificationService.playlistCreated(playlist.name);
         }

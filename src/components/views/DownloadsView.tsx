@@ -104,7 +104,7 @@ export const DownloadsView = () => {
         
         // Vérifier le cache d'abord
         const cached = getCachedUploads(userId);
-        if (cached) {
+        if (cached && cached.length >= 0) {
           setUploadedFiles(cached);
           setLoadingUploaded(false);
           return;
@@ -112,9 +112,10 @@ export const DownloadsView = () => {
         
         // Charger depuis la session de données (cache + promesse partagée)
         const uploadedMedia = await getUploadedFiles(userId);
-        setUploadedFiles(uploadedMedia);
+        setUploadedFiles(uploadedMedia || []);
       } catch (error) {
         console.error("[DownloadsView] Failed to load uploaded files:", error);
+        setUploadedFiles([]);
       } finally {
         setLoadingUploaded(false);
       }
