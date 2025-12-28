@@ -34,6 +34,8 @@ export interface Playlist {
   coverUrl?: string;
   createdAt: string;
   updatedAt: string;
+  mediaSource?: string; // 'youtube' ou undefined
+  externalId?: string; // id de la playlist YouTube
 }
 
 export interface HistoryEntry {

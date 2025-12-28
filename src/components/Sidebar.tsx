@@ -72,6 +72,7 @@ const mainNavItems = [
   { id: "home" as ViewType, icon: Home, label: "Accueil" },
   { id: "search" as ViewType, icon: Search, label: "Rechercher" },
   { id: "library" as ViewType, icon: Library, label: "Bibliothèque" },
+  { id: "playlists" as ViewType, icon: ListMusic, label: "Playlists" },
   { id: "notifications" as ViewType, icon: Bell, label: "Notifications" },
 ];
 
@@ -226,7 +227,7 @@ export const Sidebar = ({
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
   
   // Gestion centralisée des playlists favorites
-  const { isFavorite: isPlaylistFavorite, favoritePlaylistIds } = usePlaylistFavorites();
+  const { isFavorite: isPlaylistFavorite, toggleFavorite: togglePlaylistFavorite, favoritePlaylistIds } = usePlaylistFavorites();
   
   // Filtrer pour ne montrer que les playlists favorites dans la sidebar
   // Utiliser directement favoritePlaylistIds pour que le filtre se mette à jour immédiatement

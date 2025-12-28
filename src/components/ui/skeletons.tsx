@@ -1,3 +1,30 @@
+/**
+ * Skeleton pour une liste de notifications
+ */
+export const NotificationListSkeleton = ({ count = 6 }: { count?: number }) => (
+  <div className="space-y-3">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={`notif-skeleton-${i}`} className="p-4 rounded-lg border border-border/30 bg-card/30 flex items-start gap-3 animate-pulse">
+        <Skeleton className="w-6 h-6 rounded-full mt-0.5" />
+        <div className="flex-1 min-w-0 space-y-2">
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-3 w-3/4" />
+          <Skeleton className="h-3 w-1/3" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+/**
+ * Skeleton pour une grille de playlists
+ */
+export const PlaylistGridSkeleton = ({ count = 12 }: { count?: number }) => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+    {Array.from({ length: count }).map((_, i) => (
+      <PlaylistCardSkeleton key={`playlist-skeleton-${i}`} />
+    ))}
+  </div>
+);
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 /**

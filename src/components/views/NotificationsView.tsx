@@ -1,3 +1,4 @@
+import { NotificationListSkeleton } from "@/components/ui/skeletons";
 import { useState } from "react";
 import { Bell, Check, AlertCircle, Info, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export const NotificationsView = () => {
+    const [loading, setLoading] = useState(false); // Remplacer par vrai loading si async
   const { notifications, clearNotifications, enabled, setEnabled } = useNotifications();
   const [filter, setFilter] = useState<"all" | "success" | "error" | "warning" | "info">("all");
 
@@ -115,7 +117,9 @@ export const NotificationsView = () => {
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-6">
-          {filteredNotifications.length === 0 ? (
+          {loading ? (
+            <NotificationListSkeleton count={6} />
+          ) : filteredNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Bell className="w-16 h-16 text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-medium text-foreground mb-2">
@@ -124,7 +128,7 @@ export const NotificationsView = () => {
               <p className="text-sm text-muted-foreground">
                 {filter === "all"
                   ? "Vous n'avez pas encore de notifications"
-                  : `Aucune notification de type "${filter}"`}
+                  : `Aucune notification de type \"${filter}\"`}
               </p>
             </div>
           ) : (

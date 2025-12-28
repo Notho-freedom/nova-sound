@@ -43,7 +43,7 @@ import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { usePlaylistFavorites } from "@/hooks/usePlaylistFavorites";
-import { AlbumGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
+import { PlaylistGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
 import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/PageLayout";
 import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
 
@@ -1122,7 +1122,7 @@ export const PlaylistView = memo(({
 
       {/* Loading */}
       {loading ? (
-        viewMode === "grid" ? <AlbumGridSkeleton count={12} /> : <TrackTableSkeleton count={8} />
+        viewMode === "grid" ? <PlaylistGridSkeleton count={12} /> : <TrackTableSkeleton count={8} />
       ) : filteredPlaylists.length === 0 ? (
         <EmptyState
           icon={<ListMusic className="w-10 h-10 text-primary" />}
