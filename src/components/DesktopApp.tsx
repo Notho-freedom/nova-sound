@@ -45,11 +45,11 @@ import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Track } from "@/types/music";
-import { VibrantUI, BassPulse } from "@/components/VibrantUI";
-import { useAudioVibes } from "@/hooks/useAudioVibes";
-import { useAudioAI } from "@/hooks/useAudioAI";
+//import { VibrantUI, BassPulse } from "@/components/VibrantUI";
+//import { useAudioVibes } from "@/hooks/useAudioVibes";
+//import { useAudioAI } from "@/hooks/useAudioAI";
 import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer";
-import { extractYouTubeVideoId } from "@/lib/youtube";
+//import { extractYouTubeVideoId } from "@/lib/youtube";
 
 export const DesktopApp = () => {
   // Initialize theme hook to ensure theme is loaded and applied on mount
