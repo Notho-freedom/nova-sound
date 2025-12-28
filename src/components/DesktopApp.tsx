@@ -1289,16 +1289,23 @@ export const DesktopApp = () => {
   // Get favorite tracks (without duplicates)
   // IMPORTANT: Ces données sont calculées à partir des favoris et ne sont JAMAIS supprimées
   // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
+  // BUGFIX: Utiliser allTracks au lieu de tracks pour éviter que les favoris soient vides
+  // quand une playlist est jouée (car tracks devient queue.tracks qui ne contient que la playlist)
   const favoriteTracks = useMemo(() => {
-    return getUniqueTracks(tracks.filter(track => isFavorite(track.id)));
-  }, [tracks, isFavorite, getUniqueTracks]);
+    return getUniqueTracks(allTracks.filter(track => isFavorite(track.id)));
+  }, [allTracks, isFavorite, getUniqueTracks]);
 
   // Get recently played tracks from history (for QueuePanel) - without duplicates
   // Inclut les tracks de la queue (qui peuvent contenir des tracks YouTube)
+  // BUGFIX: Utiliser allTracks comme source principale pour les lookups
   const historyTracks = useMemo(() => {
     const mapped = history
       .map(h => {
-        // Chercher d'abord dans la queue (qui contient tous les tracks actifs, y compris YouTube)
+        // Chercher d'abord dans allTracks (bibliothèque + YouTube cache)
+        const trackInAll = allTracks.find(t => t.id === h.trackId);
+        if (trackInAll) return trackInAll;
+        
+        // Ensuite chercher dans la queue active (pour les tracks YouTube en cours)
         const trackInQueue = tracks.find(t => t.id === h.trackId);
         if (trackInQueue) return trackInQueue;
         
@@ -1307,17 +1314,19 @@ export const DesktopApp = () => {
       })
       .filter((t): t is Track => t !== undefined);
     return getUniqueTracks(mapped).slice(0, 50);
-  }, [history, tracks, libraryTracks, getUniqueTracks]);
+  }, [history, allTracks, tracks, libraryTracks, getUniqueTracks]);
 
   // Get recently played tracks from history (for HomeView) - without duplicates
   // IMPORTANT: Ces données sont calculées à partir de l'historique et ne sont JAMAIS supprimées
   // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
+  // BUGFIX: Utiliser allTracks au lieu de tracks pour éviter que les écoutes récentes soient vides
+  // quand une playlist est jouée (car tracks devient queue.tracks qui ne contient que la playlist)
   const recentTracks = useMemo(() => {
     const mapped = history
-      .map(h => tracks.find(t => t.id === h.trackId))
+      .map(h => allTracks.find(t => t.id === h.trackId))
       .filter((t): t is Track => t !== undefined);
     return getUniqueTracks(mapped).slice(0, 20);
-  }, [history, tracks, getUniqueTracks]);
+  }, [history, allTracks, getUniqueTracks]);
 
   // Get recently added tracks (sorted by addedAt date) - without duplicates
   const recentlyAddedTracks = useMemo(() => {
