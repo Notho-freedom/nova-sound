@@ -71,6 +71,15 @@ export const DesktopApp = () => {
         newMap.set(playlistId, tracks);
         return newMap;
       });
+
+      // Persister les tracks dans le cache local (pour survive au redémarrage)
+      try {
+        import('@/lib/youtube-track-cache').then(({ cacheYouTubeTrack }) => {
+          tracks.forEach(t => {
+            try { if (t.mediaSource === 'youtube') cacheYouTubeTrack(t); } catch (e) { /* ignore */ }
+          });
+        }).catch(() => {});
+      } catch {}
     };
     
     window.addEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
@@ -1164,6 +1173,15 @@ export const DesktopApp = () => {
     const handleYouTubeAudioPlay = async (event: CustomEvent<Track>) => {
       const track = event.detail;
       
+      // Cache la track YouTube pour persistance (metadata) si nécessaire
+      if (track.mediaSource === 'youtube') {
+        try {
+          import('@/lib/youtube-track-cache').then(({ cacheYouTubeTrack }) => {
+            try { cacheYouTubeTrack(track); } catch (e) { /* ignore */ }
+          }).catch(() => {});
+        } catch {}
+      }
+
       // Ajouter le track à la queue s'il n'y est pas déjà
       const existingIndex = tracks.findIndex(t => t.id === track.id);
       if (existingIndex >= 0) {
@@ -1206,6 +1224,12 @@ export const DesktopApp = () => {
       const track = tracks.find(t => t.id === trackId);
       if (track) {
         console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', track.title);
+        // Cache la track YouTube si nécessaire (pour persistance des métadonnées)
+        if (track.mediaSource === 'youtube') {
+          import('@/lib/youtube-track-cache').then(({ cacheYouTubeTrack }) => {
+            try { cacheYouTubeTrack(track); } catch (e) { /* ignore */ }
+          }).catch(() => {});
+        }
         addToHistory(trackId, videoId);
       } else {
         // Si le track n'est pas encore dans la queue, l'ajouter à l'historique quand même

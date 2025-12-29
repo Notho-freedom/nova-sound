@@ -122,7 +122,20 @@ export const TrackContextMenu = ({
           </ContextMenuSubContent>
         </ContextMenuSub>
 
-        <ContextMenuItem onClick={onToggleFavorite}>
+        <ContextMenuItem onClick={() => {
+          try {
+            // Cache la track YouTube pour la rendre persistante si besoin
+            if (track.mediaSource === 'youtube') {
+              // Importer dynamiquement pour éviter d'alourdir le bundle
+              import('@/lib/youtube-track-cache').then(({ cacheYouTubeTrack }) => {
+                try { cacheYouTubeTrack(track); } catch (e) { /* ignore */ }
+              }).catch(() => {});
+            }
+          } catch (e) {
+            // Ignore les erreurs de cache
+          }
+          onToggleFavorite();
+        }}>
           <Heart
             className={`w-4 h-4 mr-2 ${isFavorite ? "fill-red-500 text-red-500" : ""}`}
           />
