@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { useCloudSync } from "@/hooks/useCloudSync"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
 import { firebaseService } from "@/services/firebase"
+import { firebaseSyncService } from "@/services/firebase-sync"
 import { getElectronAPI, isElectron } from "@/lib/electron-detector"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { cn } from "@/lib/utils"
@@ -444,7 +445,7 @@ const TitleBarComponent = ({
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
                       <button className={cn(
-                        "flex items-center gap-1.5 px-2 py-1 rounded-md transition-all hover:bg-white/[0.04]",
+                        "flex items-center gap-1.5 px-2 py-1 rounded-full transition-all hover:bg-white/[0.04]",
                         syncStatus === "syncing" && "bg-primary/5 border border-primary/10",
                         syncStatus === "synced" && "bg-green-500/5 border border-green-500/10",
                         syncStatus === "error" && "bg-destructive/5 border border-destructive/10",
@@ -468,7 +469,7 @@ const TitleBarComponent = ({
                   <DropdownMenuLabel>
                     <div className="flex items-center gap-2">
                       <div className={cn(
-                        "p-1.5 rounded-md",
+                        "p-1.5 rounded-full flex items-center justify-center",
                         syncStatus === "syncing" && "bg-primary/10",
                         syncStatus === "synced" && "bg-green-500/10",
                         syncStatus === "error" && "bg-destructive/10",
@@ -510,13 +511,45 @@ const TitleBarComponent = ({
                   </div>
                   <DropdownMenuSeparator className="bg-white/[0.04]" />
                   <DropdownMenuItem 
-                    onClick={() => {
+                    onClick={async () => {
+                      if (syncStatus === "syncing" || syncStatus === "offline") return;
+                      
                       window.dispatchEvent(new CustomEvent("nexus-sync-start"))
-                      firebaseService.getCurrentUser()?.reload()
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent("nexus-sync-complete"))
-                      }, 1000)
                       setIsSyncPopoverOpen(false)
+                      
+                      try {
+                        // Synchroniser Firebase d'abord (avec logging complet et comparaison)
+                        await firebaseSyncService.forceSyncNow();
+                        
+                        // Ensuite, synchroniser Stripe avec Firestore
+                        try {
+                          const currentUser = firebaseService.getCurrentUser();
+                          if (currentUser && !currentUser.isAnonymous) {
+                            const idToken = await firebaseService.getIdToken();
+                            if (idToken) {
+                              const syncResponse = await fetch('/api/stripe/sync-profile', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  Authorization: `Bearer ${idToken}`,
+                                },
+                              });
+                              
+                              if (!syncResponse.ok) {
+                                console.warn('⚠️ TitleBar: Erreur lors de la synchronisation Stripe:', await syncResponse.text());
+                              }
+                            }
+                          }
+                        } catch (stripeError) {
+                          // Ne pas bloquer la synchronisation Firebase si Stripe échoue
+                          console.warn('⚠️ TitleBar: Erreur lors de la synchronisation Stripe (non-bloquant):', stripeError);
+                        }
+                        
+                        window.dispatchEvent(new CustomEvent("nexus-sync-complete"))
+                      } catch (error) {
+                        console.error("TitleBar: Manual sync failed:", error);
+                        window.dispatchEvent(new CustomEvent("nexus-sync-error"))
+                      }
                     }}
                     className="cursor-pointer gap-2 text-xs"
                     disabled={syncStatus === "syncing"}

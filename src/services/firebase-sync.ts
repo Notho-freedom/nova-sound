@@ -1575,11 +1575,48 @@ class FirebaseSyncService {
     if (!userId) {
       const { firebaseService } = await import('./firebase');
       const currentUser = firebaseService.getCurrentUser();
-      if (!currentUser || currentUser.isAnonymous) {
+      const profile = firebaseService.getUserProfile();
+      const profileEmail = profile?.email;
+      
+      // Check manual OAuth auth service as well
+      let manualAuthUser = null;
+      try {
+        const { authService } = await import('./auth');
+        manualAuthUser = authService.getCurrentUser();
+      } catch (error) {
+        // Auth service not available, continue with Firebase only
+      }
+      
+      // Consider authenticated if:
+      // 1. Firebase user is NOT anonymous, OR
+      // 2. Profile has a valid email (Google data was merged), OR
+      // 3. Manual OAuth user exists
+      const hasValidEmail = !!profileEmail && profileEmail.includes('@');
+      const hasManualAuth = !!manualAuthUser && !!manualAuthUser.email;
+      const isAuthenticated = !!currentUser && (!currentUser.isAnonymous || hasValidEmail) || hasManualAuth;
+      
+      if (!isAuthenticated) {
         console.warn('Cannot force sync: no authenticated user');
+        console.log('Debug - currentUser:', currentUser);
+        console.log('Debug - currentUser.isAnonymous:', currentUser?.isAnonymous);
+        console.log('Debug - profile email:', profileEmail);
+        console.log('Debug - manualAuthUser:', manualAuthUser);
         return;
       }
-      userId = currentUser.uid;
+      
+      // Get userId from Firebase or manual auth
+      if (currentUser) {
+        userId = currentUser.uid;
+      } else if (manualAuthUser) {
+        // For manual OAuth users, use their ID
+        userId = manualAuthUser.uid || manualAuthUser.id;
+      }
+      
+      if (!userId) {
+        console.warn('Cannot force sync: no user ID available after auth check');
+        return;
+      }
+      
       // Initialize sync if not already done
       if (!this.isInitialized) {
         await this.initializeSync(userId);
@@ -1592,12 +1629,193 @@ class FirebaseSyncService {
     }
 
     try {
+      console.log('🔄 ===== DÉBUT SYNC MANUELLE =====');
+      console.log('👤 User ID:', userId);
+      
+      // Récupérer les données locales
+      const localData = await this.getCurrentLocalData();
+      console.log('📦 Données locales récupérées:');
+      console.log('  - Settings:', localData.settings ? 'Présent' : 'Absent');
+      console.log('  - Favorites:', localData.favorites?.length || 0, 'éléments');
+      console.log('  - History:', localData.history?.length || 0, 'entrées');
+      console.log('  - Theme:', localData.theme || 'Non défini');
+      console.log('  - Volume:', localData.volume !== undefined ? localData.volume : 'Non défini');
+      console.log('  - Playlists: (chargement séparé)');
+      console.log('  - Equalizer Presets:', localData.equalizerPresets?.length || 0, 'presets');
+      console.log('  - Uploaded Media:', localData.uploadedMedia?.length || 0, 'fichiers');
+      
+      // Charger les playlists locales
+      const localPlaylists = this.loadFromLocalStorage<Playlist[]>('nexus-playlists') || [];
+      console.log('  - Playlists:', localPlaylists.length, 'playlists');
+      
       // Save all local data to Firestore
+      console.log('💾 Envoi vers Firebase...');
       await this.saveToFirestore(userId);
-      console.log('Force sync completed successfully');
+      
+      // Save playlists
+      if (localPlaylists.length > 0) {
+        console.log('💾 Envoi des playlists vers Firebase...');
+        await this.savePlaylistsToFirestore(userId, localPlaylists);
+      }
+      
+      console.log('✅ Sync vers Firebase terminée');
+      
+      // Attendre un peu pour laisser Firestore se mettre à jour
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Vérifier la cohérence en rechargeant depuis Firebase
+      console.log('🔍 ===== VÉRIFICATION POST-SYNC =====');
+      await this.compareLocalWithFirebase(userId);
+      
+      console.log('✅ ===== FIN SYNC MANUELLE =====');
     } catch (error) {
-      console.error('Force sync failed:', error);
+      console.error('❌ Force sync failed:', error);
       throw error;
+    }
+  }
+
+  // Comparer les données locales avec Firebase
+  async compareLocalWithFirebase(userId: string): Promise<void> {
+    const db = getFirestoreInstance();
+    if (!db || !userId) {
+      console.error('❌ Cannot compare: Firestore not initialized or no user ID');
+      return;
+    }
+
+    try {
+      console.log('🔍 Récupération des données Firebase...');
+      
+      // Charger depuis Firebase
+      const userDataRef = doc(db, 'users', userId, 'appData', 'data');
+      const userDataSnap = await getDoc(userDataRef);
+      
+      if (!userDataSnap.exists()) {
+        console.warn('⚠️ Aucune donnée Firebase trouvée pour cet utilisateur');
+        return;
+      }
+      
+      const firebaseData = userDataSnap.data() as UserAppData;
+      const localData = await this.getCurrentLocalData();
+      
+      console.log('📊 ===== COMPARAISON LOCALE vs FIREBASE =====');
+      
+      // Settings
+      const settingsMatch = JSON.stringify(localData.settings) === JSON.stringify(firebaseData.settings);
+      console.log('⚙️ Settings:', settingsMatch ? '✅ IDENTIQUE' : '❌ DIFFÉRENT');
+      if (!settingsMatch) {
+        console.log('   Local:', localData.settings);
+        console.log('   Firebase:', firebaseData.settings);
+      }
+      
+      // Favorites
+      const localFavs = (localData.favorites || []).sort();
+      const firebaseFavs = (firebaseData.favorites || []).sort();
+      const favsMatch = JSON.stringify(localFavs) === JSON.stringify(firebaseFavs);
+      console.log('⭐ Favorites:', favsMatch ? '✅ IDENTIQUE' : '❌ DIFFÉRENT');
+      console.log('   Local:', localFavs.length, 'éléments');
+      console.log('   Firebase:', firebaseFavs.length, 'éléments');
+      if (!favsMatch) {
+        const onlyLocal = localFavs.filter(f => !firebaseFavs.includes(f));
+        const onlyFirebase = firebaseFavs.filter(f => !localFavs.includes(f));
+        if (onlyLocal.length) console.log('   Uniquement local:', onlyLocal);
+        if (onlyFirebase.length) console.log('   Uniquement Firebase:', onlyFirebase);
+      }
+      
+      // History
+      const localHistory = localData.history || [];
+      const firebaseHistory = firebaseData.history || [];
+      const historyMatch = localHistory.length === firebaseHistory.length;
+      console.log('📜 History:', historyMatch ? '✅ IDENTIQUE (longueur)' : '❌ DIFFÉRENT');
+      console.log('   Local:', localHistory.length, 'entrées');
+      console.log('   Firebase:', firebaseHistory.length, 'entrées');
+      
+      if (!historyMatch && localHistory.length > 0 && firebaseHistory.length > 0) {
+        // Comparer les 5 premières entrées
+        console.log('   Comparaison des 5 premières entrées:');
+        for (let i = 0; i < Math.min(5, localHistory.length, firebaseHistory.length); i++) {
+          const localEntry = localHistory[i];
+          const firebaseEntry = firebaseHistory[i];
+          const match = localEntry.trackId === firebaseEntry.trackId;
+          console.log(`     ${i + 1}. ${match ? '✅' : '❌'} ${localEntry.trackId} (local: ${localEntry.playCount}, firebase: ${firebaseEntry.playCount})`);
+        }
+      }
+      
+      // Theme
+      const themeMatch = localData.theme === firebaseData.theme;
+      console.log('🎨 Theme:', themeMatch ? '✅ IDENTIQUE' : '❌ DIFFÉRENT');
+      if (!themeMatch) {
+        console.log('   Local:', localData.theme);
+        console.log('   Firebase:', firebaseData.theme);
+      }
+      
+      // Volume
+      const volumeMatch = localData.volume === firebaseData.volume;
+      console.log('🔊 Volume:', volumeMatch ? '✅ IDENTIQUE' : '❌ DIFFÉRENT');
+      if (!volumeMatch) {
+        console.log('   Local:', localData.volume);
+        console.log('   Firebase:', firebaseData.volume);
+      }
+      
+      // Equalizer Presets
+      const localEq = localData.equalizerPresets || [];
+      const firebaseEq = firebaseData.equalizerPresets || [];
+      const eqMatch = localEq.length === firebaseEq.length;
+      console.log('🎚️ Equalizer Presets:', eqMatch ? '✅ IDENTIQUE (longueur)' : '❌ DIFFÉRENT');
+      console.log('   Local:', localEq.length, 'presets');
+      console.log('   Firebase:', firebaseEq.length, 'presets');
+      
+      // Uploaded Media
+      const localMedia = localData.uploadedMedia || [];
+      const firebaseMedia = firebaseData.uploadedMedia || [];
+      const mediaMatch = localMedia.length === firebaseMedia.length;
+      console.log('📁 Uploaded Media:', mediaMatch ? '✅ IDENTIQUE (longueur)' : '❌ DIFFÉRENT');
+      console.log('   Local:', localMedia.length, 'fichiers');
+      console.log('   Firebase:', firebaseMedia.length, 'fichiers');
+      
+      // Playlists
+      const playlistsRef = collection(db, 'users', userId, 'playlists');
+      const playlistsSnap = await getDocs(playlistsRef);
+      const firebasePlaylists: Playlist[] = [];
+      playlistsSnap.forEach((doc) => {
+        firebasePlaylists.push({ id: doc.id, ...doc.data() } as Playlist);
+      });
+      
+      const localPlaylists = this.loadFromLocalStorage<Playlist[]>('nexus-playlists') || [];
+      const playlistsMatch = localPlaylists.length === firebasePlaylists.length;
+      console.log('📋 Playlists:', playlistsMatch ? '✅ IDENTIQUE (longueur)' : '❌ DIFFÉRENT');
+      console.log('   Local:', localPlaylists.length, 'playlists');
+      console.log('   Firebase:', firebasePlaylists.length, 'playlists');
+      
+      if (!playlistsMatch) {
+        const localIds = new Set(localPlaylists.map(p => p.id));
+        const firebaseIds = new Set(firebasePlaylists.map(p => p.id));
+        const onlyLocal = localPlaylists.filter(p => !firebaseIds.has(p.id));
+        const onlyFirebase = firebasePlaylists.filter(p => !localIds.has(p.id));
+        if (onlyLocal.length) console.log('   Uniquement local:', onlyLocal.map(p => p.name));
+        if (onlyFirebase.length) console.log('   Uniquement Firebase:', onlyFirebase.map(p => p.name));
+      }
+      
+      // Résumé
+      console.log('\n📊 ===== RÉSUMÉ =====');
+      const allMatch = settingsMatch && favsMatch && historyMatch && themeMatch && volumeMatch && eqMatch && mediaMatch && playlistsMatch;
+      if (allMatch) {
+        console.log('✅ TOUTES LES DONNÉES SONT SYNCHRONISÉES');
+      } else {
+        console.log('⚠️ CERTAINES DONNÉES DIFFÈRENT');
+        const issues: string[] = [];
+        if (!settingsMatch) issues.push('Settings');
+        if (!favsMatch) issues.push('Favorites');
+        if (!historyMatch) issues.push('History');
+        if (!themeMatch) issues.push('Theme');
+        if (!volumeMatch) issues.push('Volume');
+        if (!eqMatch) issues.push('Equalizer');
+        if (!mediaMatch) issues.push('Uploaded Media');
+        if (!playlistsMatch) issues.push('Playlists');
+        console.log('   Différences détectées dans:', issues.join(', '));
+      }
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la comparaison:', error);
     }
   }
 }

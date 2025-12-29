@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useVideos } from "@/hooks/useVideos";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
 import { firebaseService } from "@/services/firebase";
 import { authService } from "@/services/auth";
 import { useTheme, type Theme } from "@/hooks/useTheme";
@@ -1963,52 +1964,44 @@ export const SettingsView = () => {
                 </div>
               </SettingsCard>
 
-              {/* Sync Status */}
-              <SettingsCard title="Synchronisation" icon={RefreshCw} className="lg:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="p-4 rounded-lg bg-muted/30 text-center">
-                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-2xl font-bold font-mono">{syncStatus.tracksUploaded}</p>
-                    <p className="text-xs text-muted-foreground">Fichiers uploadés</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/30 text-center">
-                    <Download className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-2xl font-bold font-mono">{syncStatus.tracksDownloaded}</p>
-                    <p className="text-xs text-muted-foreground">Fichiers téléchargés</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/30 text-center">
-                    <HardDrive className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-2xl font-bold font-mono">
-                      {nexusUser ? `${Math.round(nexusUser.storageUsed / (1024 * 1024))} Mo` : "0 Mo"}
+              {/* Firebase Sync Status */}
+              <SettingsCard title="Synchronisation Firebase" icon={Cloud} className="lg:col-span-2">
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-secondary/5 border border-primary/10">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Synchronisation automatique de vos données (favoris, historique, playlists, paramètres) avec Firebase Cloud.
                     </p>
-                    <p className="text-xs text-muted-foreground">Espace utilisé</p>
+                    <SyncStatusIndicator collapsed={false} className="w-full" />
                   </div>
-                </div>
-
-                {isUploading && (
-                  <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Upload en cours...</span>
-                      <span className="text-primary font-mono">{overallProgress}%</span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg bg-muted/30 text-center">
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-2xl font-bold font-mono">{syncStatus.tracksUploaded}</p>
+                      <p className="text-xs text-muted-foreground">Fichiers uploadés</p>
                     </div>
-                    <Progress value={overallProgress} className="h-1.5" />
+                    <div className="p-4 rounded-lg bg-muted/30 text-center">
+                      <Download className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-2xl font-bold font-mono">{syncStatus.tracksDownloaded}</p>
+                      <p className="text-xs text-muted-foreground">Fichiers téléchargés</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-muted/30 text-center">
+                      <HardDrive className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-2xl font-bold font-mono">
+                        {nexusUser ? `${Math.round(nexusUser.storageUsed / (1024 * 1024))} Mo` : "0 Mo"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Espace utilisé</p>
+                    </div>
                   </div>
-                )}
 
-                <div className="flex gap-3">
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    onClick={handleStartSync}
-                    disabled={(!nexusAuthenticated && !cloudinaryConfigured) || syncLoading}
-                  >
-                    <RefreshCw className={cn("w-4 h-4 mr-2", syncLoading && "animate-spin")} />
-                    {syncLoading ? "Synchronisation..." : "Synchroniser maintenant"}
-                  </Button>
-                  {syncStatus.lastSyncAt && (
-                    <p className="text-xs text-muted-foreground self-center">
-                      Dernière sync: {new Date(syncStatus.lastSyncAt).toLocaleString()}
-                    </p>
+                  {isUploading && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-muted-foreground">Upload en cours...</span>
+                        <span className="text-primary font-mono">{overallProgress}%</span>
+                      </div>
+                      <Progress value={overallProgress} className="h-1.5" />
+                    </div>
                   )}
                 </div>
               </SettingsCard>
