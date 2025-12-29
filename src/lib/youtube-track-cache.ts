@@ -9,6 +9,9 @@ import type { Track } from "@/types/music";
 const CACHE_KEY = "nexus-youtube-tracks-cache";
 const MAX_CACHE_SIZE = 500; // Limiter la taille du cache
 
+// In-memory fallback for environments without localStorage (tests, SSR)
+let inMemoryYouTubeCache: Map<string, Track> | null = null;
+
 interface CachedYouTubeTrack {
   track: Track;
   cachedAt: string;
@@ -18,11 +21,19 @@ interface CachedYouTubeTrack {
  * Récupère le cache des tracks YouTube
  */
 export function getYouTubeTracksCache(): Map<string, Track> {
-  if (typeof window === 'undefined') return new Map();
-  
+  // Use in-memory fallback in environments without window/localStorage
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    if (!inMemoryYouTubeCache) inMemoryYouTubeCache = new Map();
+    return inMemoryYouTubeCache;
+  }
+
   try {
     const stored = localStorage.getItem(CACHE_KEY);
-    if (!stored) return new Map();
+    if (!stored) {
+      // If there's an in-memory cache (tests or previous runtime), return it
+      if (inMemoryYouTubeCache) return inMemoryYouTubeCache;
+      return new Map();
+    }
     
     const data: Record<string, CachedYouTubeTrack> = JSON.parse(stored);
     const cache = new Map<string, Track>();
@@ -52,7 +63,13 @@ export function getYouTubeTracksCache(): Map<string, Track> {
  * Sauvegarde le cache des tracks YouTube
  */
 export function saveYouTubeTracksCache(cache: Map<string, Track>): void {
-  if (typeof window === 'undefined') return;
+  // In node/ssr/test env, persist in-memory
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    inMemoryYouTubeCache = new Map(cache);
+    // eslint-disable-next-line no-console
+    console.debug('[YouTube Track Cache] Saving to inMemory cache keys:', Array.from(inMemoryYouTubeCache.keys()));
+    return;
+  }
   
   try {
     // Limiter la taille du cache
@@ -68,6 +85,8 @@ export function saveYouTubeTracksCache(cache: Map<string, Track>): void {
     });
     
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    // Also keep an in-memory mirror for environments where localStorage may not persist during tests
+    inMemoryYouTubeCache = new Map(cache);
   } catch (error) {
     console.error('[YouTube Track Cache] Erreur lors de la sauvegarde du cache:', error);
   }
@@ -89,7 +108,34 @@ export function cacheYouTubeTrack(track: Track): void {
  */
 export function getCachedYouTubeTrack(trackId: string): Track | null {
   const cache = getYouTubeTracksCache();
-  return cache.get(trackId) || null;
+  // Direct match by stored key
+  const direct = cache.get(trackId);
+  if (direct) return direct;
+
+  // Match by youtubeVideoId (common case if favorites store videoId or variant)
+  for (const track of cache.values()) {
+    if (track.youtubeVideoId === trackId) return track;
+  }
+
+  // Sometimes track ids are of the form 'youtube-audio-<videoId>' or 'youtube-<videoId>' or 'yt-track-<id>'
+  // Strip known prefixes and try matching the remainder against youtubeVideoId
+  let extractedId = trackId;
+  if (trackId.startsWith('youtube-audio-')) {
+    extractedId = trackId.substring('youtube-audio-'.length);
+  } else if (trackId.startsWith('youtube-')) {
+    extractedId = trackId.substring('youtube-'.length);
+  } else if (trackId.startsWith('yt-track-')) {
+    extractedId = trackId.substring('yt-track-'.length);
+  }
+  
+  if (extractedId !== trackId) {
+    for (const track of cache.values()) {
+      if (track.youtubeVideoId === extractedId) return track;
+    }
+  }
+
+  // No match
+  return null;
 }
 
 /**
