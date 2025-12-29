@@ -2039,21 +2039,20 @@ export const SettingsView = () => {
           </TabsContent>
 
           {/* Subscription Tab */}
-          <TabsContent value="subscription" className="mt-6 space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SettingsCard title="Plan actuel" icon={Crown}>
-                {subscriptionLoading ? (
-                  <div className="space-y-4 py-4">
-                    <Skeleton className="h-6 w-32" />
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ) : subscriptionStatus ? (
-                  <div className="space-y-4">
-                    {/* Bouton de synchronisation manuelle */}
-                    <div className="flex justify-end">
+          <TabsContent value="subscription" className="mt-6 space-y-6">
+            {/* Section supérieure moderne */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Carte Plan actuel */}
+              <div className="lg:col-span-1">
+                <div className="h-full rounded-xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-sm overflow-hidden">
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Crown className="w-5 h-5 text-primary" />
+                        Votre plan
+                      </h3>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={async () => {
                           if (!nexusAuthenticated) return;
@@ -2073,235 +2072,506 @@ export const SettingsView = () => {
                                 });
                                 
                                 if (syncResponse.ok) {
-                                  toast.success('Profil synchronisé avec Stripe');
-                                  // Forcer le rafraîchissement du profil
+                                  toast.success('Synchronisé avec Stripe');
                                   await fbService.refreshProfile();
-                                  // Recharger le statut depuis Stripe
                                   const status = await stripeService.getSubscriptionStatus();
                                   setSubscriptionStatus(status);
                                 } else {
                                   const error = await syncResponse.json();
-                                  toast.error('Erreur de synchronisation', {
-                                    description: error.error || 'Impossible de synchroniser avec Stripe',
+                                  toast.error('Erreur de sync', {
+                                    description: error.error || 'Impossible de synchroniser',
                                   });
                                 }
                               }
                             }
                           } catch (error) {
-                            console.error('Erreur lors de la synchronisation:', error);
+                            console.error('Erreur sync:', error);
                             toast.error('Erreur de synchronisation');
                           } finally {
                             setSubscriptionLoading(false);
                           }
                         }}
                         disabled={subscriptionLoading || !nexusAuthenticated}
-                        className="gap-2"
+                        className="gap-1.5"
                       >
-                        <RefreshCw className={cn("w-4 h-4", subscriptionLoading && "animate-spin")} />
-                        Synchroniser avec Stripe
+                        <RefreshCw className={cn("w-3.5 h-3.5", subscriptionLoading && "animate-spin")} />
+                        <span className="text-xs">Sync</span>
                       </Button>
                     </div>
-                    <div className="text-center py-4">
-                      <div className={cn(
-                        "inline-block px-4 py-2 rounded-lg text-sm font-medium mb-3",
-                        subscriptionStatus.isActive && subscriptionStatus.plan === "pro"
-                          ? "bg-primary/20 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {subscriptionStatus.isActive && subscriptionStatus.plan === "pro" ? "Plan Pro" : "Plan Gratuit"}
+
+                    {subscriptionLoading ? (
+                      <div className="space-y-3 py-4">
+                        <Skeleton className="h-6 w-24" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
                       </div>
-                      
-                      {/* Détails de l'abonnement */}
-                      <div className="mt-4 space-y-3 text-left">
-                        <div className="p-3 rounded-lg border border-border/50 bg-card/50 space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Statut:</span>
-                            <span className={cn(
-                              "font-medium",
-                              subscriptionStatus.status === "active" ? "text-green-500" :
-                              subscriptionStatus.status === "canceled" ? "text-red-500" :
-                              subscriptionStatus.status === "past_due" ? "text-yellow-500" :
-                              "text-muted-foreground"
-                            )}>
-                              {subscriptionStatus.status === "active" ? "Actif" :
-                               subscriptionStatus.status === "canceled" ? "Annulé" :
-                               subscriptionStatus.status === "past_due" ? "En retard" :
-                               subscriptionStatus.status === "trialing" ? "Essai" :
-                               subscriptionStatus.status}
-                            </span>
+                    ) : subscriptionStatus ? (
+                      <>
+                        <div className="text-center py-6">
+                          <div className={cn(
+                            "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-3",
+                            subscriptionStatus.isActive && subscriptionStatus.plan === "pro"
+                              ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary border-2 border-primary/30"
+                              : "bg-muted/50 text-muted-foreground border-2 border-border/50"
+                          )}>
+                            {subscriptionStatus.isActive && subscriptionStatus.plan === "pro" ? (
+                              <>
+                                <Crown className="w-4 h-4" />
+                                Plan Pro
+                              </>
+                            ) : (
+                              "Plan Gratuit"
+                            )}
                           </div>
                           
-                          {subscriptionStatus.isActive && subscriptionStatus.currentPeriodEnd && (
-                            <>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground flex items-center gap-1">
-                                  <Calendar className="w-3.5 h-3.5" />
-                                  Prochain renouvellement:
-                                </span>
-                                <span className="font-medium">
-                                  {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("fr-FR", {
-                                    day: "2-digit",
-                                    month: "long",
-                                    year: "numeric"
-                                  })}
-                                </span>
-                              </div>
-                              
-                              {subscriptionStatus.currentPeriodEnd && (
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">Jours restants:</span>
-                                  <span className="font-medium">
+                          <div className="mt-4 space-y-2">
+                            <div className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/30">
+                              <span className="text-muted-foreground">Statut</span>
+                              <span className={cn(
+                                "font-medium flex items-center gap-1.5",
+                                subscriptionStatus.status === "active" ? "text-green-500" :
+                                subscriptionStatus.status === "canceled" ? "text-red-500" :
+                                subscriptionStatus.status === "past_due" ? "text-yellow-500" :
+                                "text-muted-foreground"
+                              )}>
+                                <div className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  subscriptionStatus.status === "active" ? "bg-green-500" :
+                                  subscriptionStatus.status === "canceled" ? "bg-red-500" :
+                                  subscriptionStatus.status === "past_due" ? "bg-yellow-500" :
+                                  "bg-muted-foreground"
+                                )} />
+                                {subscriptionStatus.status === "active" ? "Actif" :
+                                 subscriptionStatus.status === "canceled" ? "Annulé" :
+                                 subscriptionStatus.status === "past_due" ? "En retard" :
+                                 subscriptionStatus.status === "trialing" ? "Essai" :
+                                 subscriptionStatus.status}
+                              </span>
+                            </div>
+                            
+                            {subscriptionStatus.isActive && subscriptionStatus.currentPeriodEnd && (
+                              <>
+                                <div className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/30">
+                                  <span className="text-muted-foreground flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    Renouvellement
+                                  </span>
+                                  <span className="font-medium text-xs">
+                                    {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("fr-FR", {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric"
+                                    })}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-primary/5">
+                                  <span className="text-muted-foreground">Jours restants</span>
+                                  <span className="font-bold text-primary">
                                     {Math.ceil((new Date(subscriptionStatus.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} jours
                                   </span>
                                 </div>
-                              )}
-                            </>
-                          )}
-                          
-                          {subscriptionStatus.cancelAtPeriodEnd && (
-                            <div className="flex items-center gap-2 text-sm text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20">
-                              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                              <span>Annulation programmée à la fin de la période</span>
-                            </div>
-                          )}
+                              </>
+                            )}
+                            
+                            {subscriptionStatus.cancelAtPeriodEnd && (
+                              <div className="flex items-center gap-2 text-xs text-yellow-600 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20 mt-3">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                <span>Annulation programmée en fin de période</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        
+                        {subscriptionStatus.isActive && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full mt-4"
+                            onClick={handleManageBilling}
+                            disabled={subscriptionLoading}
+                          >
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Gérer la facturation
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-sm text-muted-foreground">
+                          {nexusAuthenticated
+                            ? "Chargement..."
+                            : "Connectez-vous pour voir votre plan"}
+                        </p>
                       </div>
-                      
-                      {subscriptionStatus.isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={handleManageBilling}
-                          disabled={subscriptionLoading}
-                        >
-                          <CreditCard className="w-4 h-4 mr-2" />
-                          Gérer l'abonnement
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground">
-                      {nexusAuthenticated
-                        ? "Chargement du statut d'abonnement..."
-                        : "Connectez-vous pour voir votre abonnement"}
-                    </p>
-                  </div>
-                )}
-              </SettingsCard>
+                </div>
+              </div>
 
-              <SettingsCard title="Passer au Pro" icon={Sparkles}>
+              {/* Cartes Plans Pro */}
+              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {!nexusAuthenticated ? (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Connectez-vous pour accéder aux plans Pro
+                  <div className="md:col-span-2 rounded-xl border border-border/50 bg-card/50 p-8 text-center">
+                    <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
+                    <h3 className="text-lg font-bold mb-2">Débloquez le Plan Pro</h3>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Connectez-vous pour accéder aux plans Pro et profiter de toutes les fonctionnalités
                     </p>
                     <Button
                       variant="default"
-                      size="sm"
+                      size="lg"
                       onClick={handleGoogleSignIn}
                       disabled={authLoading}
+                      className="gap-2"
                     >
+                      <User className="w-4 h-4" />
                       Se connecter
                     </Button>
                   </div>
-                ) : !stripeInitialized ? (
-                  <div className="text-center py-6">
-                    <ConfigAlert configured={false} service="Stripe" />
+                ) : !stripeInitialized || !API_BASE_URL ? (
+                  <div className="md:col-span-2 rounded-xl border border-border/50 bg-card/50 p-8 text-center">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+                    <h3 className="text-lg font-bold mb-2">Configuration requise</h3>
                     <p className="text-sm text-muted-foreground">
-                      Stripe n'est pas configuré
-                    </p>
-                  </div>
-                ) : !API_BASE_URL || API_BASE_URL === "" ? (
-                  <div className="text-center py-6">
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
-                      <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                      <p className="text-xs text-yellow-500">
-                        Backend API non configuré. Ajoutez NEXT_PUBLIC_API_URL dans .env pour activer les abonnements.
-                      </p>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Les fonctionnalités d'abonnement nécessitent un backend API configuré.
+                      {!stripeInitialized ? "Stripe n'est pas configuré" : "API Backend non configurée"}
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <div className="p-4 rounded-lg border border-border/50 bg-card/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-medium">Plan Mensuel</h4>
-                            <p className="text-xs text-muted-foreground">Facturé chaque mois</p>
+                  <>
+                    {/* Plan Mensuel */}
+                    <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="p-6 space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Crown className="w-5 h-5 text-primary" />
+                              <h3 className="text-lg font-bold">Pro Mensuel</h3>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Facturation mensuelle</p>
                           </div>
-                          <Crown className="w-5 h-5 text-primary" />
                         </div>
-                        <div className="mt-3">
-                          <Button
-                            variant={subscriptionStatus?.plan === "pro" ? "outline" : "default"}
-                            size="sm"
-                            className="w-full"
-                            onClick={handleUpgradeMonthly}
-                            disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
-                          >
-                            {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
-                              ? "Plan actuel"
-                              : "Choisir ce plan"}
-                          </Button>
+                        
+                        <div className="py-4">
+                          <div className="text-4xl font-bold text-primary">9,99€</div>
+                          <p className="text-xs text-muted-foreground mt-1">par mois</p>
                         </div>
-                      </div>
-
-                      <div className="p-4 rounded-lg border-2 border-primary/50 bg-primary/5">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-medium">Plan Annuel</h4>
-                            <p className="text-xs text-muted-foreground">Facturé chaque année</p>
-                            <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-primary/20 text-primary rounded">
-                              Économisez 20%
-                            </span>
-                          </div>
-                          <Crown className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="mt-3">
-                          <Button
-                            variant={subscriptionStatus?.plan === "pro" ? "outline" : "default"}
-                            size="sm"
-                            className="w-full"
-                            onClick={handleUpgradeYearly}
-                            disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
-                          >
-                            {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
-                              ? "Plan actuel"
-                              : "Choisir ce plan"}
-                          </Button>
-                        </div>
+                        
+                        <ul className="space-y-2 text-xs">
+                          <li className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            Stockage illimité
+                          </li>
+                          <li className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            Sync automatique
+                          </li>
+                          <li className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            Support prioritaire
+                          </li>
+                        </ul>
+                        
+                        <Button
+                          variant={subscriptionStatus?.plan === "pro" ? "outline" : "default"}
+                          size="lg"
+                          className="w-full"
+                          onClick={handleUpgradeMonthly}
+                          disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
+                        >
+                          {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
+                            ? "Plan actuel"
+                            : "Choisir ce plan"}
+                        </Button>
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-border/30">
-                      <h5 className="text-sm font-medium mb-2">Avantages du Plan Pro :</h5>
-                      <ul className="space-y-1.5 text-xs text-muted-foreground">
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-primary" />
-                          Stockage cloud illimité
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-primary" />
-                          Synchronisation automatique
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-primary" />
-                          Support prioritaire
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-primary" />
-                          Accès aux fonctionnalités avancées
-                        </li>
-                      </ul>
+                    {/* Plan Annuel */}
+                    <div className="rounded-xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 to-secondary/5 overflow-hidden hover:shadow-xl transition-shadow relative">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                        <span className="inline-block px-4 py-1 text-xs font-bold bg-gradient-to-r from-primary to-secondary text-white rounded-full shadow-lg">
+                          ⭐ ÉCONOMISEZ 20%
+                        </span>
+                      </div>
+                      <div className="p-6 space-y-4 mt-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Crown className="w-5 h-5 text-primary" />
+                              <h3 className="text-lg font-bold">Pro Annuel</h3>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Facturation annuelle</p>
+                          </div>
+                        </div>
+                        
+                        <div className="py-4">
+                          <div className="text-4xl font-bold text-primary">95,90€</div>
+                          <p className="text-xs text-muted-foreground line-through opacity-60 mt-1">119,88€</p>
+                          <p className="text-xs font-medium text-primary mt-1">Soit 7,99€/mois</p>
+                        </div>
+                        
+                        <ul className="space-y-2 text-xs">
+                          <li className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            Tous les avantages Pro
+                          </li>
+                          <li className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            <span className="font-medium text-primary">-20% d'économie</span>
+                          </li>
+                          <li className="flex items-center gap-2 text-muted-foreground">
+                            <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                            Accès anticipé aux nouveautés
+                          </li>
+                        </ul>
+                        
+                        <Button
+                          variant={subscriptionStatus?.plan === "pro" ? "outline" : "default"}
+                          size="lg"
+                          className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                          onClick={handleUpgradeYearly}
+                          disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
+                            ? "Plan actuel"
+                            : "Choisir l'annuel"}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Comparaison des plans */}
+            <div className="mt-6">
+              <SettingsCard title="Comparez nos offres" icon={Sparkles} className="col-span-full">
+                <div className="space-y-6">
+                  {/* En-tête de comparaison */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Colonne vide pour aligner avec les noms de fonctionnalités */}
+                    <div className="hidden md:block"></div>
+                    
+                    {/* Colonne Gratuit */}
+                    <div className="text-center">
+                      <div className="p-4 rounded-t-xl bg-gradient-to-b from-muted/50 to-muted/20 border border-border/50">
+                        <h3 className="text-lg font-bold">Gratuit</h3>
+                        <p className="text-2xl font-bold mt-2">0€</p>
+                        <p className="text-xs text-muted-foreground">Pour toujours</p>
+                      </div>
+                    </div>
+                    
+                    {/* Colonne Pro Mensuel */}
+                    <div className="text-center">
+                      <div className="p-4 rounded-t-xl bg-gradient-to-b from-primary/20 to-primary/5 border-2 border-primary/30">
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <Crown className="w-4 h-4 text-primary" />
+                          <h3 className="text-lg font-bold text-primary">Pro Mensuel</h3>
+                        </div>
+                        <p className="text-2xl font-bold mt-2">9,99€</p>
+                        <p className="text-xs text-muted-foreground">Par mois</p>
+                      </div>
+                    </div>
+                    
+                    {/* Colonne Pro Annuel */}
+                    <div className="text-center relative">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                        <span className="inline-block px-3 py-1 text-xs font-bold bg-gradient-to-r from-primary to-secondary text-white rounded-full shadow-lg">
+                          ⭐ MEILLEURE OFFRE
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-t-xl bg-gradient-to-b from-primary/30 to-primary/10 border-2 border-primary/50">
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <Crown className="w-4 h-4 text-primary" />
+                          <h3 className="text-lg font-bold text-primary">Pro Annuel</h3>
+                        </div>
+                        <div className="mt-2">
+                          <p className="text-2xl font-bold">95,90€</p>
+                          <p className="text-xs text-muted-foreground line-through opacity-60">119,88€</p>
+                        </div>
+                        <p className="text-xs font-medium text-primary mt-1">-20% d'économie</p>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  {/* Tableau de comparaison */}
+                  <div className="space-y-1">
+                    {/* Catégorie: Stockage & Sync */}
+                    <div className="pt-4 pb-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Stockage & Synchronisation</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Stockage cloud</div>
+                      <div className="text-center text-sm text-muted-foreground">500 Mo</div>
+                      <div className="text-center text-sm font-medium text-primary">Illimité ✨</div>
+                      <div className="text-center text-sm font-medium text-primary">Illimité ✨</div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Synchronisation automatique</div>
+                      <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Sauvegarde Firebase</div>
+                      <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Upload de médias</div>
+                      <div className="text-center text-sm text-muted-foreground">50 fichiers max</div>
+                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
+                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
+                    </div>
+
+                    {/* Catégorie: Fonctionnalités */}
+                    <div className="pt-4 pb-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Fonctionnalités</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Bibliothèque musicale locale</div>
+                      <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Streaming YouTube</div>
+                      <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Playlists personnalisées</div>
+                      <div className="text-center text-sm text-muted-foreground">10 max</div>
+                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
+                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Equalizer avancé</div>
+                      <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Visualiseur audio</div>
+                      <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Mode Karaoke</div>
+                      <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Téléchargement offline</div>
+                      <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Analyse de vibes musicales</div>
+                      <div className="text-center text-sm text-muted-foreground">Limité</div>
+                      <div className="text-center text-sm font-medium text-primary">Complet ✨</div>
+                      <div className="text-center text-sm font-medium text-primary">Complet ✨</div>
+                    </div>
+
+                    {/* Catégorie: Support & Accès */}
+                    <div className="pt-4 pb-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Support & Accès anticipé</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Support technique</div>
+                      <div className="text-center text-sm text-muted-foreground">Standard</div>
+                      <div className="text-center text-sm font-medium text-primary">Prioritaire ⚡</div>
+                      <div className="text-center text-sm font-medium text-primary">Prioritaire ⚡</div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Mises à jour</div>
+                      <div className="text-center text-sm text-muted-foreground">Normales</div>
+                      <div className="text-center text-sm font-medium text-primary">Accès anticipé 🚀</div>
+                      <div className="text-center text-sm font-medium text-primary">Accès anticipé 🚀</div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Badge exclusif</div>
+                      <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
+                      <div className="text-center text-sm font-medium text-primary">👑 Pro</div>
+                      <div className="text-center text-sm font-medium text-primary">👑 Pro</div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
+                      <div className="text-sm font-medium">Nouvelle fonctionnalités Beta</div>
+                      <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                      <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
+                    </div>
+                  </div>
+
+                  {/* Boutons d'action */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-6">
+                    {/* Colonne vide pour aligner */}
+                    <div className="hidden md:block"></div>
+                    
+                    <div className="text-center">
+                      <Button variant="outline" size="lg" className="w-full" disabled>
+                        Plan actuel
+                      </Button>
+                    </div>
+                    <div className="text-center">
+                      <Button 
+                        variant={subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd ? "outline" : "default"}
+                        size="lg" 
+                        className="w-full bg-primary hover:bg-primary/90"
+                        onClick={handleUpgradeMonthly}
+                        disabled={subscriptionLoading || !nexusAuthenticated || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
+                      >
+                        <Crown className="w-4 h-4 mr-2" />
+                        {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
+                          ? "Plan actuel"
+                          : "Passer au Pro"}
+                      </Button>
+                    </div>
+                    <div className="text-center">
+                      <Button 
+                        variant={subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd ? "outline" : "default"}
+                        size="lg" 
+                        className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                        onClick={handleUpgradeYearly}
+                        disabled={subscriptionLoading || !nexusAuthenticated || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
+                          ? "Plan actuel"
+                          : "Choisir l'annuel"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Note de bas de page */}
+                  <div className="pt-4 text-center border-t border-border/30">
+                    <p className="text-xs text-muted-foreground">
+                      💳 Tous les paiements sont sécurisés par Stripe • 🔒 Résiliable à tout moment • ✨ Garantie satisfait ou remboursé 30 jours
+                    </p>
+                  </div>
+                </div>
               </SettingsCard>
             </div>
           </TabsContent>
