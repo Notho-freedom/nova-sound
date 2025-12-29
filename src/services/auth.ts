@@ -789,6 +789,14 @@ class AuthService {
         this.electronOAuthUnsubscribe = null;
       }
 
+      // Recharger l'app après un succès de login pour garantir que l'UI soit à jour
+      setTimeout(() => {
+        console.log('🔄 Reloading app after successful login...');
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }, 500);
+
       return profile;
     } catch (error) {
       console.error("Error handling Electron OAuth callback:", error);

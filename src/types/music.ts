@@ -79,8 +79,10 @@ export interface Artist {
 export interface HistoryEntry {
   trackId: string;
   playedAt: string;
+  playCount: number;
   duration: number;
-  completedPercentage: number;
+  completedPercentage?: number;
+  youtubeVideoId?: string;
 }
 
 export interface Settings {

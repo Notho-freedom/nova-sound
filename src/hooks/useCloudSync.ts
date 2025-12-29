@@ -636,6 +636,14 @@ export function useCloudSync(): UseCloudSyncReturn {
       
       console.log('✅ Complete logout finished - all user data cleaned');
       notificationService.logoutSuccess();
+      
+      // Recharger l'app après le logout pour garantir un état propre
+      setTimeout(() => {
+        console.log('🔄 Reloading app after logout...');
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }, 500);
     } catch (error: any) {
       console.error("Logout error:", error);
       notificationService.error("Erreur lors de la déconnexion");

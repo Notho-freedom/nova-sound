@@ -582,13 +582,58 @@ class FirebaseSyncService {
       }
     }
     
-    // History
+    // History (merge = union intelligent avec préservation des playCount les plus élevés)
     const historyAction = this.intelligentCompare(localData.history, firebaseData.history, 'array');
     if (historyAction === 'use-firebase') {
       console.log(`📥 History: Local empty → Restoring ${firebaseData.history?.length || 0} entries from Firebase`);
       this.saveToLocalStorage('nexus-play-history', firebaseData.history);
       window.dispatchEvent(new CustomEvent('firebase-history-update', { detail: { history: firebaseData.history } }));
       changesApplied++;
+    } else if (historyAction === 'merge') {
+      const localHistory = localData.history || [];
+      const firebaseHistory = firebaseData.history || [];
+      
+      // Merger intelligemment: garder le playCount le plus élevé pour chaque track
+      const merged = new Map<string, HistoryEntry>();
+      
+      // D'abord ajouter l'historique local
+      localHistory.forEach(entry => {
+        merged.set(entry.trackId, entry);
+      });
+      
+      // Puis fusionner avec Firebase (garder le playCount le plus élevé et la date la plus récente)
+      firebaseHistory.forEach(firebaseEntry => {
+        const existing = merged.get(firebaseEntry.trackId);
+        if (!existing) {
+          merged.set(firebaseEntry.trackId, firebaseEntry);
+        } else {
+          // Garder l'entrée avec le playCount le plus élevé
+          const maxPlayCount = Math.max(existing.playCount, firebaseEntry.playCount);
+          const mostRecent = new Date(firebaseEntry.playedAt) > new Date(existing.playedAt) 
+            ? firebaseEntry.playedAt 
+            : existing.playedAt;
+          
+          merged.set(firebaseEntry.trackId, {
+            ...existing,
+            playCount: maxPlayCount,
+            playedAt: mostRecent,
+            duration: Math.max(existing.duration || 0, firebaseEntry.duration || 0),
+          });
+        }
+      });
+      
+      const mergedArray = Array.from(merged.values())
+        .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime())
+        .slice(0, 1000); // Max 1000 entrées
+      
+      if (mergedArray.length > localHistory.length) {
+        console.log(`📥 History: Merging ${localHistory.length} local + ${firebaseHistory.length} Firebase = ${mergedArray.length} total`);
+        this.saveToLocalStorage('nexus-play-history', mergedArray);
+        window.dispatchEvent(new CustomEvent('firebase-history-update', { detail: { history: mergedArray } }));
+        changesApplied++;
+      } else {
+        console.log('✓ History: No new entries to merge');
+      }
     } else {
       console.log('✓ History: Keeping local');
     }

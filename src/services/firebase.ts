@@ -699,6 +699,15 @@ class FirebaseService {
           
           // Force UI update
           this.authStateListeners.forEach((listener) => listener(user));
+          
+          // Recharger l'app après un succès de login Firebase pour garantir que l'UI soit à jour
+          setTimeout(() => {
+            console.log('🔄 Reloading app after successful Firebase login...');
+            if (typeof window !== 'undefined') {
+              window.location.reload();
+            }
+          }, 500);
+          
           return;
         } catch (popupError: unknown) {
           const error = popupError as { code?: string; message?: string };
