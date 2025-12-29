@@ -1974,24 +1974,54 @@ export const SettingsView = () => {
                     <SyncStatusIndicator collapsed={false} className="w-full" />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-lg bg-muted/30 text-center">
-                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-2xl font-bold font-mono">{syncStatus.tracksUploaded}</p>
-                      <p className="text-xs text-muted-foreground">Fichiers uploadés</p>
+                  {/* Détails du processus */}
+                  <div className="p-4 rounded-lg bg-muted/20 space-y-3">
+                    <h4 className="text-sm font-medium text-foreground">Processus de synchronisation</h4>
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                      <div className="flex items-start gap-2">
+                        <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
+                        <div>
+                          <span className="font-medium text-foreground">Direction:</span> Local → Firebase (backup mode)
+                          <p className="text-[11px] mt-0.5">Vos données locales sont sauvegardées automatiquement toutes les heures</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
+                        <div>
+                          <span className="font-medium text-foreground">Données synchronisées:</span> Settings, Favoris, Historique, Playlists, Thème, Volume, Equalizer
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
+                        <div>
+                          <span className="font-medium text-foreground">Vérification:</span> Comparaison automatique Local vs Firebase après chaque sync
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
+                        <div>
+                          <span className="font-medium text-foreground">Logs détaillés:</span> Consultez la console pour voir toutes les données synchronisées
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 rounded-lg bg-muted/30 text-center">
-                      <Download className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-2xl font-bold font-mono">{syncStatus.tracksDownloaded}</p>
-                      <p className="text-xs text-muted-foreground">Fichiers téléchargés</p>
+                  </div>
+                  
+                  {/* Résumé sync */}
+                  <div className="flex items-center justify-between text-sm px-2 py-1.5 rounded-lg bg-muted/20">
+                    <div className="flex items-center gap-4">
+                      <span className="text-muted-foreground">
+                        <span className="font-mono text-foreground">{syncStatus.tracksUploaded}</span> fichiers uploadés
+                      </span>
+                      <span className="text-muted-foreground">•</span>
+                      <span className="text-muted-foreground">
+                        <span className="font-mono text-foreground">{Math.round((nexusUser?.storageUsed || 0) / (1024 * 1024))} Mo</span> utilisés
+                      </span>
                     </div>
-                    <div className="p-4 rounded-lg bg-muted/30 text-center">
-                      <HardDrive className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-2xl font-bold font-mono">
-                        {nexusUser ? `${Math.round(nexusUser.storageUsed / (1024 * 1024))} Mo` : "0 Mo"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Espace utilisé</p>
-                    </div>
+                    {syncStatus.lastSyncAt && (
+                      <span className="text-xs text-muted-foreground">
+                        Dernière sync: {new Date(syncStatus.lastSyncAt).toLocaleTimeString()}
+                      </span>
+                    )}
                   </div>
 
                   {isUploading && (
