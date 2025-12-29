@@ -34,6 +34,7 @@ import { useNexusUpload } from "@/hooks/useNexusUpload"
 import { useUploadedStatus } from "@/hooks/useUploadedStatus"
 import { useCloudSync } from "@/hooks/useCloudSync"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
+import { usePlayHistory } from "@/hooks/usePlayHistory"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -271,6 +272,9 @@ export const SearchView = ({
   const canUploadToBunny = nexusIsPro && nexusAuthenticated
   const canUploadToNexus = nexusIsPro && nexusAuthenticated
 
+  // Play history hook
+  const { history } = usePlayHistory()
+
   // YouTube search hook
   const {
     results: youtubeResults,
@@ -468,26 +472,71 @@ export const SearchView = ({
     }
   }, [query, tracks, youtubeTracks, getUniqueTracks])
 
-  // Get unique genres from tracks
-  const genres = useMemo(() => {
-    const genreSet = new Set<string>()
-    tracks.forEach((t) => {
-      if (t.genre) genreSet.add(t.genre)
+  // Dynamic data based on user's library
+  const dynamicData = useMemo(() => {
+    // Top played artists from history
+    const artistPlayCounts = new Map<string, { count: number; track: Track }>()
+    history.forEach((entry) => {
+      const track = tracks.find((t) => t.id === entry.trackId)
+      if (track) {
+        const current = artistPlayCounts.get(track.artist) || { count: 0, track }
+        artistPlayCounts.set(track.artist, { count: current.count + entry.playCount, track })
+      }
     })
-    return Array.from(genreSet).slice(0, 6)
-  }, [tracks])
+    const topArtists = Array.from(artistPlayCounts.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 8)
+      .map(([name, data]) => ({ name, playCount: data.count, coverUrl: data.track.coverUrl }))
 
-  // Browse categories
-  const browseCategories = [
-    { name: "Électronique", color: "bg-gradient-to-br from-cyan-500 to-blue-600" },
-    { name: "Synthwave", color: "bg-gradient-to-br from-pink-500 to-purple-600" },
-    { name: "Ambient", color: "bg-gradient-to-br from-emerald-500 to-teal-600" },
-    { name: "Cyberpunk", color: "bg-gradient-to-br from-amber-500 to-orange-600" },
-    { name: "Lo-Fi", color: "bg-gradient-to-br from-indigo-500 to-violet-600" },
-    { name: "Techno", color: "bg-gradient-to-br from-rose-500 to-pink-600" },
-    { name: "Rock", color: "bg-gradient-to-br from-red-500 to-rose-600" },
-    { name: "Hip Hop", color: "bg-gradient-to-br from-yellow-500 to-amber-600" },
-  ]
+    // Recently added tracks (last 12) - using reverse order as proxy for recently added
+    const recentTracks = [...tracks].slice(-12).reverse()
+
+    // Get real genres from library with counts
+    const genreMap = new Map<string, { count: number; coverUrl: string }>()
+    tracks.forEach((t) => {
+      if (t.genre) {
+        const current = genreMap.get(t.genre) || { count: 0, coverUrl: t.coverUrl }
+        genreMap.set(t.genre, { count: current.count + 1, coverUrl: t.coverUrl || current.coverUrl })
+      }
+    })
+    const genres = Array.from(genreMap.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 8)
+      .map(([name, data]) => ({ name, count: data.count, coverUrl: data.coverUrl }))
+
+    // Recommended based on favorites
+    const favoriteTrackIds = tracks.filter((t) => isFavorite(t.id)).map((t) => t.id)
+    const favoriteArtists = new Set(
+      tracks.filter((t) => favoriteTrackIds.includes(t.id)).map((t) => t.artist)
+    )
+    const recommended = tracks
+      .filter((t) => !favoriteTrackIds.includes(t.id) && favoriteArtists.has(t.artist))
+      .slice(0, 8)
+
+    return {
+      topArtists,
+      recentTracks,
+      genres,
+      recommended,
+    }
+  }, [tracks, history, isFavorite])
+
+  // Fallback browse categories if no genres
+  const browseCategories = dynamicData.genres.length > 0 
+    ? dynamicData.genres.map((g) => ({ 
+        name: g.name, 
+        color: "bg-gradient-to-br from-primary/60 to-secondary/60",
+        count: g.count,
+        coverUrl: g.coverUrl || undefined
+      }))
+    : [
+        { name: "Électronique", color: "bg-gradient-to-br from-cyan-500 to-blue-600", count: 0, coverUrl: undefined },
+        { name: "Synthwave", color: "bg-gradient-to-br from-pink-500 to-purple-600", count: 0, coverUrl: undefined },
+        { name: "Ambient", color: "bg-gradient-to-br from-emerald-500 to-teal-600", count: 0, coverUrl: undefined },
+        { name: "Cyberpunk", color: "bg-gradient-to-br from-amber-500 to-orange-600", count: 0, coverUrl: undefined },
+        { name: "Lo-Fi", color: "bg-gradient-to-br from-indigo-500 to-violet-600", count: 0, coverUrl: undefined },
+        { name: "Techno", color: "bg-gradient-to-br from-rose-500 to-pink-600", count: 0, coverUrl: undefined },
+      ]
 
   const handleSearch = (term: string) => {
     const cleaned = term.trim()
@@ -841,60 +890,191 @@ export const SearchView = ({
                   </section>
                 )}
 
-                {/* Browse Categories */}
-                <section>
+                {/* Top Artists */}
+                {dynamicData.topArtists.length > 0 && (
+                  <motion.section
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-5 h-5 text-emerald-400" />
+                      <h2 className="font-display text-lg font-semibold">Vos artistes les plus écoutés</h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                      {dynamicData.topArtists.map((artist, idx) => (
+                        <motion.button
+                          key={artist.name}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: idx * 0.05 }}
+                          onClick={() => handleSearch(artist.name)}
+                          className="flex flex-col items-center gap-2 group"
+                        >
+                          <div className="relative w-full aspect-square rounded-full overflow-hidden ring-2 ring-white/10 group-hover:ring-primary/50 transition-all duration-300">
+                            <img
+                              src={getCoverUrl(artist.coverUrl) || "/placeholder.svg"}
+                              alt={artist.name}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <Play className="w-5 h-5 text-white fill-current" />
+                            </div>
+                          </div>
+                          <div className="text-center w-full">
+                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                              {artist.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{artist.playCount} écoutes</p>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.section>
+                )}
+
+                {/* Recent Tracks */}
+                {dynamicData.recentTracks.length > 0 && (
+                  <motion.section
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <Clock className="w-5 h-5 text-cyan-400" />
+                      <h2 className="font-display text-lg font-semibold">Récemment ajoutés</h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {dynamicData.recentTracks.map((track, idx) => {
+                        const trackIndex = tracks.findIndex((t) => t.id === track.id)
+                        return (
+                          <motion.button
+                            key={track.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.04 }}
+                            onClick={() => trackIndex !== -1 && onTrackSelect(trackIndex)}
+                            className="group text-left rounded-xl overflow-hidden bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.03]"
+                          >
+                            <div className="relative aspect-square overflow-hidden">
+                              <img
+                                src={getCoverUrl(track.coverUrl) || "/placeholder.svg"}
+                                alt={track.title}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-3">
+                                <Play className="w-8 h-8 text-white fill-current drop-shadow-lg" />
+                              </div>
+                            </div>
+                            <div className="p-3">
+                              <p className="text-sm font-medium truncate">{track.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                            </div>
+                          </motion.button>
+                        )
+                      })}
+                    </div>
+                  </motion.section>
+                )}
+
+                {/* Browse Categories/Genres */}
+                <motion.section
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
                   <div className="flex items-center gap-2 mb-4">
                     <Sparkles className="w-5 h-5 text-primary" />
-                    <h2 className="font-display text-lg font-semibold">Explorer par genre</h2>
+                    <h2 className="font-display text-lg font-semibold">
+                      {dynamicData.genres.length > 0 ? "Vos genres" : "Explorer par genre"}
+                    </h2>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {browseCategories.map((cat) => (
-                      <CategoryCard
+                    {browseCategories.map((cat, idx) => (
+                      <motion.div
                         key={cat.name}
-                        name={cat.name}
-                        color={cat.color}
-                        onClick={() => handleSearch(cat.name)}
-                      />
-                    ))}
-                  </div>
-                </section>
-
-                {/* Trending / Popular suggestion */}
-                <section>
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="w-5 h-5 text-emerald-400" />
-                    <h2 className="font-display text-lg font-semibold">Suggestions de recherche</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {[
-                      "Daft Punk",
-                      "Synthwave Mix",
-                      "Ambient Music",
-                      "Electronic Dance",
-                      "Chill Beats",
-                      "Night Drive",
-                    ].map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        onClick={() => handleSearch(suggestion)}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-xl",
-                          "bg-white/5 hover:bg-white/10 border border-white/5 hover:border-primary/20",
-                          "transition-all duration-300",
-                          "text-left group",
-                        )}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
                       >
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center flex-shrink-0">
-                          <Search className="w-4 h-4 text-primary" />
-                        </div>
-                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                          {suggestion}
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </button>
+                        <button
+                          onClick={() => handleSearch(cat.name)}
+                          className={cn(
+                            "group relative h-28 rounded-2xl overflow-hidden w-full",
+                            "transition-all duration-300 ease-out",
+                            "hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02]",
+                          )}
+                        >
+                          {cat.coverUrl ? (
+                            <>
+                              <img
+                                src={getCoverUrl(cat.coverUrl)}
+                                alt={cat.name}
+                                className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-70 group-hover:scale-110 transition-all duration-500"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-br from-primary/60 to-secondary/80" />
+                            </>
+                          ) : (
+                            <div className={cn("absolute inset-0", cat.color)} />
+                          )}
+                          <div
+                            className="absolute inset-0 opacity-30"
+                            style={{
+                              backgroundImage: `radial-gradient(circle at 80% 20%, white 0%, transparent 50%)`,
+                            }}
+                          />
+                          <div className="relative h-full flex items-end p-4">
+                            <div>
+                              <h3 className="font-display font-bold text-white text-lg drop-shadow-lg">
+                                {cat.name}
+                              </h3>
+                              {cat.count && cat.count > 0 && (
+                                <p className="text-xs text-white/80 mt-1">{cat.count} titres</p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      </motion.div>
                     ))}
                   </div>
-                </section>
+                </motion.section>
+
+                {/* Recommended Tracks */}
+                {dynamicData.recommended.length > 0 && (
+                  <motion.section
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles className="w-5 h-5 text-purple-400" />
+                      <h2 className="font-display text-lg font-semibold">Recommandés pour vous</h2>
+                      <span className="text-xs text-muted-foreground">Basé sur vos favoris</span>
+                    </div>
+                    <div className="space-y-1 bg-white/5 rounded-2xl p-2">
+                      {dynamicData.recommended.map((track, idx) => {
+                        const trackIndex = tracks.findIndex((t) => t.id === track.id)
+                        const isCurrentTrack = currentTrackIndex === trackIndex
+                        return (
+                          <motion.div
+                            key={track.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                          >
+                            <SearchTrackItem
+                              track={track}
+                              isPlaying={isPlaying}
+                              isCurrent={isCurrentTrack}
+                              onPlay={() => trackIndex !== -1 && onTrackSelect(trackIndex)}
+                            />
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  </motion.section>
+                )}
               </div>
             )}
           </div>
