@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle } from "lucide-react"
+import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -281,14 +281,13 @@ const TitleBarComponent = ({
                       {quickResults.map((track) => (
                         <li key={`quick-${track.id}`} className="group relative">
                           <button
-                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 text-left transition-colors"
+                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 transition-colors text-left"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
-                              const term = track.title || track.artist || localSearchQuery
-                              setLocalSearchQuery(term || "")
-                              addToSearchHistory(term || "")
-                              onSearch(term || "")
                               onQuickPlayTrack?.(track)
+                              if (track.artist) {
+                                onOpenArtistView?.(track.artist)
+                              }
                               setIsSearchFocused(false)
                             }}
                           >
@@ -301,21 +300,38 @@ const TitleBarComponent = ({
                                 {track.artist} • {track.album}
                               </p>
                             </div>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-[11px] text-muted-foreground mr-2">
                               {track.duration ? Math.max(1, Math.round(track.duration / 60)) : 0}m
                             </span>
                           </button>
-                          <button
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md bg-white/5 hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-all"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (track.artist) onOpenArtistView?.(track.artist)
-                            }}
-                            title="Voir l'artiste"
-                          >
-                            <UserCircle className="w-4 h-4 text-muted-foreground" />
-                          </button>
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              className="p-1.5 rounded-md bg-primary/10 hover:bg-primary/20 transition-all"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onQuickPlayTrack?.(track)
+                                setIsSearchFocused(false)
+                              }}
+                              title="Lire seulement"
+                            >
+                              <Play className="w-4 h-4 text-primary" />
+                            </button>
+                            <button
+                              className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-all"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (track.artist) {
+                                  onOpenArtistView?.(track.artist)
+                                  setIsSearchFocused(false)
+                                }
+                              }}
+                              title="Voir l'artiste seulement"
+                            >
+                              <UserCircle className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>
