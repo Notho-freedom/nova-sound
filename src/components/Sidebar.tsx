@@ -31,7 +31,7 @@ import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/useNotifications";
-import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
+
 import type { Track, Playlist } from "@/types/music";
 
 export type ViewType = 
@@ -626,13 +626,6 @@ export const Sidebar = ({
               collapsed={collapsed}
             />
           </div>
-
-          {/* Sync Status */}
-          {!collapsed && (
-            <div className="mt-4 px-2">
-              <SyncStatusIndicator />
-            </div>
-          )}
         </div>
 
         {/* Create Playlist Modal */}

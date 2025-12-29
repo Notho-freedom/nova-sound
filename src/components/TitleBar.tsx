@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play, ArrowLeft, ArrowRight } from "lucide-react"
+import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { useCloudSync } from "@/hooks/useCloudSync"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
+import { firebaseService } from "@/services/firebase"
 import { getElectronAPI, isElectron } from "@/lib/electron-detector"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { cn } from "@/lib/utils"
@@ -64,6 +65,48 @@ const TitleBarComponent = ({
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
   const { results: ytResults, search: searchYouTube, loading: ytLoading } = useYouTubeSearch()
   const [quickResults, setQuickResults] = useState<Track[]>([])
+
+  // Firebase Sync Status
+  type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline"
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle")
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+  const [isSyncPopoverOpen, setIsSyncPopoverOpen] = useState(false)
+
+  useEffect(() => {
+    const handleSyncStart = () => setSyncStatus("syncing")
+    const handleSyncComplete = () => {
+      setSyncStatus("synced")
+      setLastSyncTime(new Date())
+      setTimeout(() => setSyncStatus("idle"), 3000)
+    }
+    const handleSyncError = () => {
+      setSyncStatus("error")
+      setTimeout(() => setSyncStatus("idle"), 5000)
+    }
+
+    window.addEventListener("nexus-sync-start", handleSyncStart)
+    window.addEventListener("nexus-sync-complete", handleSyncComplete)
+    window.addEventListener("nexus-sync-error", handleSyncError)
+
+    return () => {
+      window.removeEventListener("nexus-sync-start", handleSyncStart)
+      window.removeEventListener("nexus-sync-complete", handleSyncComplete)
+      window.removeEventListener("nexus-sync-error", handleSyncError)
+    }
+  }, [])
+
+  const formatLastSync = () => {
+    if (!lastSyncTime) return "Jamais synchronisé"
+    const now = new Date()
+    const diff = now.getTime() - lastSyncTime.getTime()
+    const minutes = Math.floor(diff / 60000)
+    
+    if (minutes < 1) return "À l'instant"
+    if (minutes < 60) return `Il y a ${minutes} min`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `Il y a ${hours}h`
+    return lastSyncTime.toLocaleDateString()
+  }
 
   // Sync local search with prop
   useEffect(() => {
@@ -394,6 +437,97 @@ const TitleBarComponent = ({
           </div>
 
           <div className="flex items-center gap-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            {/* Firebase Sync Indicator */}
+            {nexusAuthenticated && (
+              <DropdownMenu open={isSyncPopoverOpen} onOpenChange={setIsSyncPopoverOpen}>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button className={cn(
+                        "flex items-center gap-1.5 px-2 py-1 rounded-md transition-all hover:bg-white/[0.04]",
+                        syncStatus === "syncing" && "bg-primary/5 border border-primary/10",
+                        syncStatus === "synced" && "bg-green-500/5 border border-green-500/10",
+                        syncStatus === "error" && "bg-destructive/5 border border-destructive/10",
+                        syncStatus === "idle" && "bg-primary/5 border border-primary/10 opacity-70"
+                      )}>
+                        {syncStatus === "syncing" && <RefreshCw className="w-3 h-3 text-primary animate-spin" />}
+                        {syncStatus === "synced" && <Check className="w-3 h-3 text-green-500" />}
+                        {syncStatus === "error" && <AlertCircle className="w-3 h-3 text-destructive" />}
+                        {syncStatus === "idle" && <Cloud className="w-3 h-3 text-primary" />}
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {syncStatus === "syncing" && "Synchronisation..."}
+                    {syncStatus === "synced" && "Synchronisé"}
+                    {syncStatus === "error" && "Erreur de sync"}
+                    {syncStatus === "idle" && "Cloud connecté"}
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-64 glass-card-elevated">
+                  <DropdownMenuLabel>
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "p-1.5 rounded-md",
+                        syncStatus === "syncing" && "bg-primary/10",
+                        syncStatus === "synced" && "bg-green-500/10",
+                        syncStatus === "error" && "bg-destructive/10",
+                        syncStatus === "idle" && "bg-primary/10"
+                      )}>
+                        {syncStatus === "syncing" && <RefreshCw className="w-4 h-4 text-primary animate-spin" />}
+                        {syncStatus === "synced" && <Check className="w-4 h-4 text-green-500" />}
+                        {syncStatus === "error" && <AlertCircle className="w-4 h-4 text-destructive" />}
+                        {syncStatus === "idle" && <Cloud className="w-4 h-4 text-primary" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          {syncStatus === "syncing" && "Synchronisation en cours"}
+                          {syncStatus === "synced" && "Synchronisé"}
+                          {syncStatus === "error" && "Erreur de synchronisation"}
+                          {syncStatus === "idle" && "Cloud connecté"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {formatLastSync()}
+                        </p>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-white/[0.04]" />
+                  <div className="px-2 py-2 space-y-2">
+                    <div className="flex items-start gap-2 text-xs">
+                      <User className="w-4 h-4 text-muted-foreground mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-muted-foreground text-[10px]">Compte</p>
+                        <p className="text-foreground truncate">{nexusUser?.email || "Non connecté"}</p>
+                      </div>
+                    </div>
+                    {nexusIsPro && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Crown className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-primary font-medium">Plan Pro</span>
+                      </div>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator className="bg-white/[0.04]" />
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("nexus-sync-start"))
+                      firebaseService.getCurrentUser()?.reload()
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent("nexus-sync-complete"))
+                      }, 1000)
+                      setIsSyncPopoverOpen(false)
+                    }}
+                    className="cursor-pointer gap-2 text-xs"
+                    disabled={syncStatus === "syncing"}
+                  >
+                    <RefreshCw className={cn("w-3.5 h-3.5", syncStatus === "syncing" && "animate-spin")} />
+                    Synchroniser maintenant
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
