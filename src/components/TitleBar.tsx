@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play } from "lucide-react"
+import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play, ArrowLeft, ArrowRight } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -32,6 +32,10 @@ interface TitleBarProps {
   onQuickPlayTrack?: (track: Track) => void
   onOpenSearchPage?: (query?: string) => void
   onOpenArtistView?: (artist?: string) => void
+  canGoBack?: boolean
+  canGoForward?: boolean
+  onGoBack?: () => void
+  onGoForward?: () => void
 }
 
 const TitleBarComponent = ({
@@ -45,6 +49,10 @@ const TitleBarComponent = ({
   onQuickPlayTrack,
   onOpenSearchPage,
   onOpenArtistView,
+  canGoBack = false,
+  canGoForward = false,
+  onGoBack,
+  onGoForward,
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
@@ -172,11 +180,51 @@ const TitleBarComponent = ({
             </div>
           </div>
 
+          {/* Navigation buttons + Search bar together */}
+          <div className="flex-0 w-1/3 flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            {/* Navigation buttons - VSCode style (next to search) */}
+            <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onGoBack}
+                  disabled={!canGoBack}
+                  className={cn(
+                    "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200",
+                    canGoBack
+                      ? "text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08]"
+                      : "text-muted-foreground/30 cursor-not-allowed"
+                  )}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Retour</TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onGoForward}
+                  disabled={!canGoForward}
+                  className={cn(
+                    "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200",
+                    canGoForward
+                      ? "text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08]"
+                      : "text-muted-foreground/30 cursor-not-allowed"
+                  )}
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Suivant</TooltipContent>
+            </Tooltip>
+          </div>
+
           {onSearch && (
-            <div className="flex-1 max-w-xl mx-4 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <div className="flex-1 flex items-center gap-0 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <div
                 className={cn(
-                  "relative flex items-center h-7 rounded-md transition-all duration-200",
+                  "relative w-full flex items-center h-7 rounded-md transition-all duration-200",
                   "bg-white/[0.04] hover:bg-white/[0.06]",
                   isSearchFocused && "bg-white/[0.08] ring-1 ring-primary/30"
                 )}
@@ -239,7 +287,7 @@ const TitleBarComponent = ({
               </div>
 
               {isSearchFocused && localSearchQuery.trim().length >= 2 && (
-                <div className="absolute left-0 right-0 top-full mt-2 rounded-lg border border-white/10 bg-card/95 backdrop-blur-xl shadow-xl overflow-hidden z-[70]">
+                <div className="fixed left-0 right-0 top-11 mx-auto w-[calc(100%-160px)] max-w-xl rounded-lg border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[9999]" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
                   <div className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-muted-foreground/80 border-b border-white/5">
                     <div className="flex items-center gap-2">
                       <span>Résultats YouTube</span>
@@ -341,13 +389,7 @@ const TitleBarComponent = ({
             </div>
           )}
 
-          {uploadProgress !== undefined && uploadProgress > 0 && uploadProgress < 100 && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/10" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-              <Cloud className="w-3.5 h-3.5 text-primary animate-pulse" />
-              <span className="text-xs text-muted-foreground">Sync</span>
-              <span className="text-xs font-mono text-primary">{uploadProgress}%</span>
-            </div>
-          )}
+          </div>
 
           <div className="flex items-center gap-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             <Tooltip delayDuration={0}>

@@ -2089,6 +2089,10 @@ export const DesktopApp = () => {
               setSelectedArtist(artistName);
               setCurrentView("artist-detail");
             }}
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            onGoBack={goBack}
+            onGoForward={goForward}
           />
 
         {/* Main Content */}
