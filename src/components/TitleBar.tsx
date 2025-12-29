@@ -170,8 +170,10 @@ const TitleBarComponent = ({
               <div className="absolute inset-0 rounded-lg bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-display text-sm tracking-[0.2em] text-gradient font-bold">{title}</span>
-              <span className="text-[10px] text-muted-foreground/60 font-mono">v1.0.0</span>
+              <div className="flex flex-col">
+                <span className="font-display text-sm tracking-[0.2em] text-gradient font-bold">{title}</span>
+                <span className="text-[10px] text-muted-foreground/60 font-mono">v1.0.0</span>
+              </div>
               {!electronEnv && (
                 <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-medium tracking-wide">
                   WEB
