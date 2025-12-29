@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle } from "lucide-react"
+import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, Play, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, FileText, Edit3, Eye, Compass, PlayCircle, Terminal as TerminalIcon, HelpCircle, FolderOpen } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -66,6 +66,8 @@ const TitleBarComponent = ({
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
   const { results: ytResults, search: searchYouTube, loading: ytLoading } = useYouTubeSearch()
   const [quickResults, setQuickResults] = useState<Track[]>([])
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const hideMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Firebase Sync Status
   type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline"
@@ -95,6 +97,26 @@ const TitleBarComponent = ({
       window.removeEventListener("nexus-sync-error", handleSyncError)
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (hideMenuTimeoutRef.current) clearTimeout(hideMenuTimeoutRef.current)
+    }
+  }, [])
+
+  const openMenuWithHover = (menu: string) => {
+    if (hideMenuTimeoutRef.current) clearTimeout(hideMenuTimeoutRef.current)
+    setOpenMenu(menu)
+  }
+
+  const scheduleMenuClose = () => {
+    if (hideMenuTimeoutRef.current) clearTimeout(hideMenuTimeoutRef.current)
+    hideMenuTimeoutRef.current = setTimeout(() => setOpenMenu(null), 220)
+  }
+
+  const cancelMenuClose = () => {
+    if (hideMenuTimeoutRef.current) clearTimeout(hideMenuTimeoutRef.current)
+  }
 
   const formatLastSync = () => {
     if (!lastSyncTime) return "Jamais synchronisé"
@@ -183,6 +205,17 @@ const TitleBarComponent = ({
     if (electronAPI) await electronAPI.close()
   }
 
+  const handleSyncNow = async () => {
+    window.dispatchEvent(new CustomEvent("nexus-sync-start"))
+    try {
+      await firebaseSyncService.forceSyncNow()
+      window.dispatchEvent(new CustomEvent("nexus-sync-complete"))
+    } catch (error) {
+      console.error("Menubar: Manual sync failed:", error)
+      window.dispatchEvent(new CustomEvent("nexus-sync-error"))
+    }
+  }
+
   const autoSuggestion = (() => {
     const q = localSearchQuery.trim().toLowerCase()
     if (!q) return ""
@@ -224,6 +257,232 @@ const TitleBarComponent = ({
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Menubar (Nexus app style) + Navigation buttons + Search bar together */}
+          <div className="hidden xl:flex items-center gap-0.5 ml-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            {/* Musique */}
+            <DropdownMenu open={openMenu === "musique"} onOpenChange={(v) => setOpenMenu(v ? "musique" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("musique")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Musique</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-52 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-play-toggle"))}>
+                  <PlayCircle className="w-3.5 h-3.5" />
+                  Lecture / Pause
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-play-prev"))}>
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Piste précédente
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-play-next"))}>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  Piste suivante
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.06]" />
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-new-playlist"))}>
+                  <FileText className="w-3.5 h-3.5" />
+                  Nouvelle playlist
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Bibliothèque */}
+            <DropdownMenu open={openMenu === "bibliotheque"} onOpenChange={(v) => setOpenMenu(v ? "bibliotheque" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("bibliotheque")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Bibliothèque</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-52 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-open-files", { detail: { multiple: true } }))}>
+                  <FileText className="w-3.5 h-3.5" />
+                  Ouvrir des fichiers…
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-open-folders", { detail: { multiple: true } }))}>
+                  <FolderOpen className="w-3.5 h-3.5" />
+                  Ouvrir des dossiers…
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.06]" />
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-import-library"))}>
+                  <FileText className="w-3.5 h-3.5" />
+                  Importer la bibliothèque
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.06]" />
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-nav", { detail: { target: "home" } }))}>
+                  <Compass className="w-3.5 h-3.5" />
+                  Accueil
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-nav", { detail: { target: "library" } }))}>
+                  <Compass className="w-3.5 h-3.5" />
+                  Bibliothèque
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => onOpenSearchPage?.("") }>
+                  <Search className="w-3.5 h-3.5" />
+                  Rechercher
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Cloud */}
+            <DropdownMenu open={openMenu === "cloud"} onOpenChange={(v) => setOpenMenu(v ? "cloud" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("cloud")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Cloud</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-48 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={handleSyncNow}>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Synchroniser maintenant
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-clear-cache"))}>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Nettoyer le cache
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Lecture */}
+            <DropdownMenu open={openMenu === "lecture"} onOpenChange={(v) => setOpenMenu(v ? "lecture" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("lecture")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Lecture</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-56 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-toggle-mini-player"))}>
+                  <Eye className="w-3.5 h-3.5" />
+                  Basculer mini lecteur
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-open-now-playing"))}>
+                  <PlayCircle className="w-3.5 h-3.5" />
+                  En cours de lecture
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-open-queue"))}>
+                  <Play className="w-3.5 h-3.5" />
+                  File d'attente
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Affichage */}
+            <DropdownMenu open={openMenu === "affichage"} onOpenChange={(v) => setOpenMenu(v ? "affichage" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("affichage")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Affichage</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-56 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-toggle-sidebar"))}>
+                  <Eye className="w-3.5 h-3.5" />
+                  Basculer la sidebar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Compte */}
+            <DropdownMenu open={openMenu === "compte"} onOpenChange={(v) => setOpenMenu(v ? "compte" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("compte")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Compte</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-52 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => onOpenSettings?.()}>
+                  <Settings className="w-3.5 h-3.5" />
+                  Paramètres
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-open-subscription"))}>
+                  <Crown className="w-3.5 h-3.5" />
+                  Abonnement
+                </DropdownMenuItem>
+                {electronAPI && (
+                  <>
+                    <DropdownMenuSeparator className="bg-white/[0.06]" />
+                    <DropdownMenuItem className="gap-2 text-xs" onClick={handleClose}>
+                      <X className="w-3.5 h-3.5" />
+                      Quitter
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Aide */}
+            <DropdownMenu open={openMenu === "aide"} onOpenChange={(v) => setOpenMenu(v ? "aide" : null)}>
+              <DropdownMenuTrigger
+                asChild
+                onMouseEnter={() => openMenuWithHover("aide")}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Aide</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-60 glass-card-elevated"
+                onMouseEnter={cancelMenuClose}
+                onMouseLeave={scheduleMenuClose}
+              >
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.open("https://github.com/Notho-freedom/nova-sound", "_blank") }>
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  Documentation & code source
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-check-updates"))}>
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  Rechercher des mises à jour
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/[0.06]" />
+                <DropdownMenuItem className="gap-2 text-xs" onClick={() => window.dispatchEvent(new CustomEvent("nexus-about"))}>
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  À propos de NEXUS
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Navigation buttons + Search bar together */}
