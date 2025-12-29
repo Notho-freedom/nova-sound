@@ -2080,6 +2080,15 @@ export const DesktopApp = () => {
             }}
             searchQuery={searchQuery}
             onQuickPlayTrack={handlePlayTrack}
+            onOpenSearchPage={(q) => {
+              setSearchQuery(q || "");
+              setCurrentView("search");
+            }}
+            onOpenArtistView={(artistName) => {
+              if (!artistName) return;
+              setSelectedArtist(artistName);
+              setCurrentView("artist-detail");
+            }}
           />
 
         {/* Main Content */}

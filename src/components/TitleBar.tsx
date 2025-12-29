@@ -2,11 +2,9 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef, memo } from "react"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { memo, useEffect, useRef, useState } from "react"
 import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,12 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { useCloudSync } from "@/hooks/useCloudSync"
-import { isElectron, getElectronAPI } from "@/lib/electron-detector"
+import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
+import { getElectronAPI, isElectron } from "@/lib/electron-detector"
+import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { cn } from "@/lib/utils"
 import type { Track } from "@/types/music"
-import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
-import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 
 interface TitleBarProps {
   title?: string
@@ -31,6 +30,8 @@ interface TitleBarProps {
   onSearch?: (query: string) => void
   searchQuery?: string
   onQuickPlayTrack?: (track: Track) => void
+  onOpenSearchPage?: (query?: string) => void
+  onOpenArtistView?: (artist?: string) => void
 }
 
 const TitleBarComponent = ({
@@ -39,26 +40,29 @@ const TitleBarComponent = ({
   uploadProgress,
   hasNotifications = false,
   onToggleNotifications,
-    searchQuery = "",
+  searchQuery = "",
   onSearch,
   onQuickPlayTrack,
+  onOpenSearchPage,
+  onOpenArtistView,
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSearchedRef = useRef<string>("")
   const electronEnv = isElectron()
   const electronAPI = getElectronAPI()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
   const { results: ytResults, search: searchYouTube, loading: ytLoading } = useYouTubeSearch()
   const [quickResults, setQuickResults] = useState<Track[]>([])
-  
-  // Sync local search with prop
-    useEffect(() => {
-      setLocalSearchQuery(searchQuery)
-    }, [searchQuery])
 
-  // Debounced YouTube search for overlay
+  // Sync local search with prop
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery)
+  }, [searchQuery])
+
+  // Debounced YouTube search for overlay (avoid repeat on same query)
   useEffect(() => {
     const q = localSearchQuery.trim()
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -66,13 +70,18 @@ const TitleBarComponent = ({
       setQuickResults([])
       return
     }
+    const normalized = q.toLowerCase()
+    if (normalized === lastSearchedRef.current && quickResults.length > 0) {
+      return
+    }
     debounceRef.current = setTimeout(() => {
       searchYouTube(q)
+      lastSearchedRef.current = normalized
     }, 300)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [localSearchQuery, searchYouTube])
+  }, [localSearchQuery, searchYouTube, quickResults.length])
 
   // Convert YouTube results to tracks (limit 10)
   useEffect(() => {
@@ -103,18 +112,12 @@ const TitleBarComponent = ({
     }
   }
 
-  
-  // NOTE: Logs supprimés pour améliorer les performances
-  // Les logs causaient des re-renders inutiles lors de la navigation
-
   const handleLogout = async () => {
     await nexusLogout()
   }
 
   const handleMinimize = async () => {
-    if (electronAPI) {
-      await electronAPI.minimize()
-    }
+    if (electronAPI) await electronAPI.minimize()
   }
 
   const handleMaximize = async () => {
@@ -125,10 +128,15 @@ const TitleBarComponent = ({
   }
 
   const handleClose = async () => {
-    if (electronAPI) {
-      await electronAPI.close()
-    }
+    if (electronAPI) await electronAPI.close()
   }
+
+  const autoSuggestion = (() => {
+    const q = localSearchQuery.trim().toLowerCase()
+    if (!q) return ""
+    const candidate = quickResults.find((t) => t.title?.toLowerCase().startsWith(q) || t.artist?.toLowerCase().startsWith(q))
+    return candidate?.title || ""
+  })()
 
   return (
     <div className="relative z-50">
@@ -149,11 +157,7 @@ const TitleBarComponent = ({
           <div className="flex items-center gap-3">
             <div className="relative group">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-all duration-300 overflow-hidden">
-                <img 
-                  src="/icon.png" 
-                  alt="NEXUS" 
-                  className="w-7 h-7 object-contain"
-                />
+                <img src="/icon.png" alt="NEXUS" className="w-7 h-7 object-contain" />
               </div>
               <div className="absolute inset-0 rounded-lg bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
             </div>
@@ -168,12 +172,8 @@ const TitleBarComponent = ({
             </div>
           </div>
 
-          {/* Search Bar - VS Code style */}
           {onSearch && (
-            <div
-              className="flex-1 max-w-xl mx-4 relative"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-            >
+            <div className="flex-1 max-w-xl mx-4 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <div
                 className={cn(
                   "relative flex items-center h-7 rounded-md transition-all duration-200",
@@ -182,41 +182,49 @@ const TitleBarComponent = ({
                 )}
               >
                 <Search className="w-3.5 h-3.5 text-muted-foreground/60 ml-2.5 flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Rechercher..."
-                  value={localSearchQuery}
-                  onChange={(e) => {
-                    const next = e.target.value
-                    setLocalSearchQuery(next)
-                    onSearch(next)
-                  }}
-                  onFocus={() => setIsSearchFocused(true)}
-                  onBlur={() => {
-                    // Delay to allow click on overlay
-                    setTimeout(() => setIsSearchFocused(false), 120)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && localSearchQuery.trim()) {
-                      const term = localSearchQuery.trim()
-                      addToSearchHistory(term)
-                      onSearch(term)
-                      if (quickResults[0]) {
-                        onQuickPlayTrack?.(quickResults[0])
-                      }
-                    }
-                    if (e.key === "Escape") {
-                      setLocalSearchQuery("")
-                      onSearch("")
-                      e.currentTarget.blur()
-                    }
-                  }}
-                  className={cn(
-                    "flex-1 h-full px-2 bg-transparent border-0 outline-none",
-                    "text-sm text-foreground placeholder:text-muted-foreground/40",
-                    "focus:placeholder:text-muted-foreground/60"
+                <div className="relative flex-1 h-full">
+                  {autoSuggestion && localSearchQuery && autoSuggestion.toLowerCase().startsWith(localSearchQuery.trim().toLowerCase()) && (
+                    <div className="absolute inset-0 flex items-center px-2 pointer-events-none text-sm text-muted-foreground/35">
+                      <span className="text-transparent select-none">{localSearchQuery}</span>
+                      <span>{autoSuggestion.slice(localSearchQuery.length)}</span>
+                    </div>
                   )}
-                />
+                  <input
+                    type="text"
+                    placeholder="Rechercher..."
+                    value={localSearchQuery}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setLocalSearchQuery(next)
+                      onSearch(next)
+                    }}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 120)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && localSearchQuery.trim()) {
+                        const term = localSearchQuery.trim()
+                        addToSearchHistory(term)
+                        onSearch(term)
+                        if (quickResults[0]) onQuickPlayTrack?.(quickResults[0])
+                      }
+                      if (e.key === "Tab" && autoSuggestion) {
+                        e.preventDefault()
+                        setLocalSearchQuery(autoSuggestion)
+                        onSearch(autoSuggestion)
+                      }
+                      if (e.key === "Escape") {
+                        setLocalSearchQuery("")
+                        onSearch("")
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    className={cn(
+                      "w-full h-full px-2 bg-transparent border-0 outline-none relative z-10",
+                      "text-sm text-foreground placeholder:text-muted-foreground/40",
+                      "focus:placeholder:text-muted-foreground/60"
+                    )}
+                  />
+                </div>
                 {localSearchQuery && (
                   <button
                     onClick={() => {
@@ -230,13 +238,54 @@ const TitleBarComponent = ({
                 )}
               </div>
 
-              {/* Quick results overlay */}
               {isSearchFocused && localSearchQuery.trim().length >= 2 && (
                 <div className="absolute left-0 right-0 top-full mt-2 rounded-lg border border-white/10 bg-card/95 backdrop-blur-xl shadow-xl overflow-hidden z-[70]">
-                  <div className="flex items-center justify-between px-3 py-2 text-[11px] text-muted-foreground/80 border-b border-white/5">
-                    <span>Résultats YouTube</span>
-                    {ytLoading && <span className="animate-pulse">Chargement…</span>}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-muted-foreground/80 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                      <span>Résultats YouTube</span>
+                      {ytLoading && <span className="animate-pulse">Chargement…</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 transition-all"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          const term = localSearchQuery.trim()
+                          if (term) {
+                            addToSearchHistory(term)
+                            onSearch(term)
+                          }
+                          onOpenSearchPage?.(term)
+                        }}
+                      >
+                        Page recherche
+                      </button>
+                      <button
+                        className="text-[11px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 transition-all"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          const targetArtist = quickResults[0]?.artist || localSearchQuery.trim()
+                          if (targetArtist) onOpenArtistView?.(targetArtist)
+                        }}
+                      >
+                        Artiste view
+                      </button>
+                    </div>
                   </div>
+                  {ytLoading && (
+                    <div className="grid grid-cols-1 gap-1 px-3 py-2">
+                      {Array.from({ length: 3 }).map((_, idx) => (
+                        <div key={`sk-${idx}`} className="flex items-center gap-3 py-2">
+                          <div className="w-10 h-10 rounded-md bg-white/5 animate-pulse" />
+                          <div className="flex-1 space-y-1">
+                            <div className="h-3 rounded bg-white/5 animate-pulse" />
+                            <div className="h-3 w-1/2 rounded bg-white/5 animate-pulse" />
+                          </div>
+                          <div className="w-8 h-3 rounded bg-white/5 animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {quickResults.length === 0 && !ytLoading ? (
                     <div className="px-3 py-2 text-xs text-muted-foreground">Aucun résultat</div>
                   ) : (
@@ -255,11 +304,18 @@ const TitleBarComponent = ({
                               setIsSearchFocused(false)
                             }}
                           >
+                            <div className="w-10 h-10 rounded-md overflow-hidden flex-shrink-0 ring-1 ring-white/10">
+                              <img src={track.coverUrl || "/placeholder.svg"} alt={track.title} className="w-full h-full object-cover" />
+                            </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate text-foreground">{track.title}</p>
-                              <p className="text-xs text-muted-foreground truncate">{track.artist} • {track.album}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {track.artist} • {track.album}
+                              </p>
                             </div>
-                            <span className="text-[11px] text-muted-foreground">{track.duration ? Math.max(1, Math.round(track.duration / 60)) : 0}m</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {track.duration ? Math.max(1, Math.round(track.duration / 60)) : 0}m
+                            </span>
                           </button>
                         </li>
                       ))}
@@ -271,10 +327,7 @@ const TitleBarComponent = ({
           )}
 
           {uploadProgress !== undefined && uploadProgress > 0 && uploadProgress < 100 && (
-            <div
-              className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/10"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-            >
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/10" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <Cloud className="w-3.5 h-3.5 text-primary animate-pulse" />
               <span className="text-xs text-muted-foreground">Sync</span>
               <span className="text-xs font-mono text-primary">{uploadProgress}%</span>
@@ -282,7 +335,6 @@ const TitleBarComponent = ({
           )}
 
           <div className="flex items-center gap-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            {/* Notifications */}
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button
@@ -290,7 +342,7 @@ const TitleBarComponent = ({
                   className={cn(
                     "w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-300 group relative",
                     "hover:bg-white/[0.04] active:scale-95",
-                    hasNotifications && "text-primary",
+                    hasNotifications && "text-primary"
                   )}
                 >
                   <Bell className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -305,7 +357,6 @@ const TitleBarComponent = ({
               <TooltipContent side="bottom">Notifications</TooltipContent>
             </Tooltip>
 
-            {/* User Avatar */}
             {nexusAuthenticated && nexusUser ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -339,9 +390,7 @@ const TitleBarComponent = ({
                           Pro
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-muted text-muted-foreground">
-                          Gratuit
-                        </span>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-muted text-muted-foreground">Gratuit</span>
                       )}
                     </div>
                   </DropdownMenuLabel>
@@ -351,10 +400,7 @@ const TitleBarComponent = ({
                     Paramètres
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/[0.04]" />
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    className="cursor-pointer text-red-400 focus:text-red-400 gap-2 py-2.5"
-                  >
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-400 focus:text-red-400 gap-2 py-2.5">
                     <LogOut className="w-4 h-4" />
                     Se déconnecter
                   </DropdownMenuItem>
@@ -363,10 +409,7 @@ const TitleBarComponent = ({
             ) : (
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
-                  <button
-                    onClick={onOpenSettings}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group"
-                  >
+                  <button onClick={onOpenSettings} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group">
                     <User className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </button>
                 </TooltipTrigger>
@@ -374,30 +417,22 @@ const TitleBarComponent = ({
               </Tooltip>
             )}
 
-            {/* Settings */}
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <button
-                  onClick={onOpenSettings}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group"
-                >
+                <button onClick={onOpenSettings} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group">
                   <Settings className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:rotate-90 transition-all duration-500" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Paramètres</TooltipContent>
             </Tooltip>
 
-            {/* Separator */}
             {electronEnv && <div className="w-px h-5 bg-white/[0.06] mx-1" />}
 
             {electronEnv && (
               <>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={handleMinimize}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group"
-                    >
+                    <button onClick={handleMinimize} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group">
                       <Minus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                     </button>
                   </TooltipTrigger>
@@ -405,10 +440,7 @@ const TitleBarComponent = ({
                 </Tooltip>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={handleMaximize}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group"
-                    >
+                    <button onClick={handleMaximize} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group">
                       {isMaximized ? (
                         <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground rotate-90 transition-colors" />
                       ) : (
@@ -420,10 +452,7 @@ const TitleBarComponent = ({
                 </Tooltip>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={handleClose}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-500/20 transition-all duration-300 group"
-                    >
+                    <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-500/20 transition-all duration-300 group">
                       <X className="w-4 h-4 text-muted-foreground group-hover:text-red-400 transition-colors" />
                     </button>
                   </TooltipTrigger>
@@ -432,7 +461,6 @@ const TitleBarComponent = ({
               </>
             )}
 
-            {/* Web version indicator */}
             {!electronEnv && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground/60 ml-2">
                 <Sparkles className="w-3 h-3" />
@@ -446,5 +474,4 @@ const TitleBarComponent = ({
   )
 }
 
-// Mémoriser le composant pour éviter les re-renders inutiles lors de la navigation
 export const TitleBar = memo(TitleBarComponent)

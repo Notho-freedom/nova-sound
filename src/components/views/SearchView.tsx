@@ -551,6 +551,44 @@ export const SearchView = ({
     if (cleaned) saveToHistory(cleaned)
   }
 
+  const suggestionPool = useMemo(() => {
+    const pool: string[] = []
+    pool.push(...searchHistory)
+    searchResults.tracks.forEach((t) => {
+      if (t.title) pool.push(t.title)
+      if (t.artist) pool.push(t.artist)
+    })
+    youtubeTracks.forEach((t) => {
+      if (t.title) pool.push(t.title)
+      if (t.artist) pool.push(t.artist)
+    })
+    return pool
+  }, [searchHistory, searchResults.tracks, youtubeTracks])
+
+  const autoCompleteSuggestion = useMemo(() => {
+    const base = query.trim().toLowerCase()
+    if (!base) return ""
+    const found = suggestionPool.find((s) => s && s.toLowerCase().startsWith(base))
+    return found || ""
+  }, [query, suggestionPool])
+
+  const inlineSuggestions = useMemo(() => {
+    if (!query.trim()) return searchHistory.slice(0, 4)
+    const base = query.trim().toLowerCase()
+    const relatedArtists = searchResults.tracks
+      .map((t) => t.artist)
+      .filter((a) => a && a.toLowerCase().includes(base))
+    const relatedTitles = searchResults.tracks
+      .map((t) => t.title)
+      .filter((t) => t && t.toLowerCase().includes(base))
+    const merged = [...searchHistory.filter((h) => h.toLowerCase().includes(base)), ...relatedArtists, ...relatedTitles]
+    const unique: string[] = []
+    merged.forEach((m) => {
+      if (m && !unique.some((u) => u.toLowerCase() === m.toLowerCase())) unique.push(m)
+    })
+    return unique.slice(0, 4)
+  }, [query, searchHistory, searchResults.tracks])
+
   const hasResults =
     query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0)
 
@@ -597,36 +635,49 @@ export const SearchView = ({
                     )}
                   />
                 </div>
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  placeholder="Artistes, titres ou albums..."
-                  value={query}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setQuery(value)
-                    scheduleAutoSaveHistory(value)
-                  }}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const cleaned = query.trim()
-                      if (cleaned) {
-                        saveToHistory(cleaned)
-                        if (historySaveTimerRef.current) {
-                          clearTimeout(historySaveTimerRef.current)
-                          historySaveTimerRef.current = null
+                <div className="relative flex-1">
+                  {autoCompleteSuggestion && autoCompleteSuggestion.toLowerCase().startsWith(query.trim().toLowerCase()) && (
+                    <div className="absolute inset-0 flex items-center px-1 sm:px-2 pointer-events-none text-base text-muted-foreground/40">
+                      <span className="text-transparent select-none">{query}</span>
+                      <span>{autoCompleteSuggestion.slice(query.length)}</span>
+                    </div>
+                  )}
+                  <Input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Artistes, titres ou albums..."
+                    value={query}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setQuery(value)
+                      scheduleAutoSaveHistory(value)
+                    }}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const cleaned = query.trim()
+                        if (cleaned) {
+                          saveToHistory(cleaned)
+                          if (historySaveTimerRef.current) {
+                            clearTimeout(historySaveTimerRef.current)
+                            historySaveTimerRef.current = null
+                          }
                         }
                       }
-                    }
-                  }}
-                  className={cn(
-                    "flex-1 border-0 bg-transparent py-4 text-base",
-                    "focus-visible:ring-0 focus-visible:ring-offset-0",
-                    "placeholder:text-muted-foreground/50",
-                  )}
-                />
+                      if (e.key === "Tab" && autoCompleteSuggestion) {
+                        e.preventDefault()
+                        setQuery(autoCompleteSuggestion)
+                        scheduleAutoSaveHistory(autoCompleteSuggestion)
+                      }
+                    }}
+                    className={cn(
+                      "flex-1 border-0 bg-transparent py-4 text-base relative z-10",
+                      "focus-visible:ring-0 focus-visible:ring-offset-0",
+                      "placeholder:text-muted-foreground/50",
+                    )}
+                  />
+                </div>
                 {query && (
                   <button
                     onClick={() => setQuery("")}
@@ -646,6 +697,37 @@ export const SearchView = ({
                   </div>
                 )}
               </div>
+
+              <AnimatePresence>
+                {(youtubeLoading || loading) && query.trim().length >= 2 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="mt-3 grid grid-cols-1 gap-2"
+                  >
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <SearchTrackItemSkeleton key={`search-skel-${i}`} />
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {inlineSuggestions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {inlineSuggestions.map((s) => (
+                    <motion.button
+                      key={`sugg-${s}`}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => handleSearch(s)}
+                      className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all"
+                    >
+                      {s}
+                    </motion.button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {query ? (
