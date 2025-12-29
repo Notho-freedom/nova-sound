@@ -1608,8 +1608,8 @@ class FirebaseSyncService {
       if (currentUser) {
         userId = currentUser.uid;
       } else if (manualAuthUser) {
-        // For manual OAuth users, use their ID
-        userId = manualAuthUser.uid || manualAuthUser.id;
+        // For manual OAuth users, use their UID
+        userId = manualAuthUser.uid;
       }
       
       if (!userId) {
