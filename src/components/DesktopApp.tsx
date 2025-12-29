@@ -1269,6 +1269,46 @@ export const DesktopApp = () => {
     };
   }, [volume]);
 
+  // Lorsque les playlists locales sont chargées ou mises à jour, s'assurer
+  // que les tracks YouTube référencés sont présents dans le cache local
+  useEffect(() => {
+    const handleLocalPlaylistsUpdate = (event: CustomEvent) => {
+      const lists = event.detail as any[];
+      (async () => {
+        try {
+          const [{ ensurePlaylistTracksCached }, { fetchYouTubePlaylistVideos }, { cacheYouTubeTrack }] = await Promise.all([
+            import('@/lib/playlist-cache'),
+            import('@/lib/youtube-playlists'),
+            import('@/lib/youtube-track-cache'),
+          ]);
+          await ensurePlaylistTracksCached(lists, allTracks, { fetchYouTubePlaylistVideos, cacheYouTubeTrack });
+        } catch (err) {
+          console.warn('[DesktopApp] Error ensuring playlist tracks cached:', err);
+        }
+      })();
+    };
+
+    window.addEventListener('local-playlists-update', handleLocalPlaylistsUpdate as EventListener);
+
+    // Run once on mount with the current playlists state to populate cache after initial load
+    (async () => {
+      try {
+        const [{ ensurePlaylistTracksCached }, { fetchYouTubePlaylistVideos }, { cacheYouTubeTrack }] = await Promise.all([
+          import('@/lib/playlist-cache'),
+          import('@/lib/youtube-playlists'),
+          import('@/lib/youtube-track-cache'),
+        ]);
+        await ensurePlaylistTracksCached(playlists, allTracks, { fetchYouTubePlaylistVideos, cacheYouTubeTrack });
+      } catch (err) {
+        // Ignore
+      }
+    })();
+
+    return () => {
+      window.removeEventListener('local-playlists-update', handleLocalPlaylistsUpdate as EventListener);
+    };
+  }, [playlists, allTracks]);
+
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
     setShowInlinePlayer(false);
@@ -1312,8 +1352,10 @@ export const DesktopApp = () => {
   // BUGFIX: Utiliser allTracks au lieu de tracks pour éviter que les favoris soient vides
   // quand une playlist est jouée (car tracks devient queue.tracks qui ne contient que la playlist)
   const favoriteTracks = useMemo(() => {
-    return getUniqueTracks(allTracks.filter(track => isFavorite(track.id)));
-  }, [allTracks, isFavorite, getUniqueTracks]);
+    // Use resolver to fallback to YouTube cache when a favored track is not present in allTracks
+    const resolved: (Track | null)[] = favorites.map(id => getTrackFromAllOrCache(allTracks, id));
+    return getUniqueTracks(resolved.filter((t): t is Track => !!t));
+  }, [allTracks, isFavorite, getUniqueTracks, favorites]);
 
   // Get recently played tracks from history (for QueuePanel) - without duplicates
   // Inclut les tracks de la queue (qui peuvent contenir des tracks YouTube)

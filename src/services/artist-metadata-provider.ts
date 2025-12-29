@@ -212,6 +212,7 @@ export class ArtistMetadataProvider {
           source: 'cache',
           query: options.query,
           cached: true,
+          type: options.type,
         };
       }
     }
@@ -236,9 +237,11 @@ export class ArtistMetadataProvider {
           if (result.items.length > 0) {
             // Mettre en cache
             if (this.config.cache?.enabled) {
+              // store as array for search results
               this.cache.set(options.query, result.items, options.type, result.source);
             }
-            return result;
+            // Ensure the returned result includes the requested type
+            return { ...result, type: options.type };
           }
         }
       } catch (error) {
@@ -253,6 +256,7 @@ export class ArtistMetadataProvider {
       source: 'wikipedia',
       query: options.query,
       cached: false,
+      type: options.type,
     };
   }
 

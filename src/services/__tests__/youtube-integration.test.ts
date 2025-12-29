@@ -188,8 +188,8 @@ describe('YouTube Integration Tests', () => {
             }
             return null;
           }),
-          setItem: jest.fn(),
-          removeItem: jest.fn(),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
         },
         writable: true,
       });

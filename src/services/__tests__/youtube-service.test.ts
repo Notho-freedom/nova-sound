@@ -18,9 +18,17 @@ vi.mock('../youtube-prefetch');
 describe('YouTubeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset localStorage
+    // Provide a default localStorage mock with clear for tests
     if (typeof window !== 'undefined') {
-      localStorage.clear();
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: vi.fn(() => null),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn(),
+        },
+        writable: true,
+      });
     }
   });
 
@@ -122,9 +130,9 @@ describe('YouTubeService', () => {
       // Mock localStorage
       Object.defineProperty(window, 'localStorage', {
         value: {
-          getItem: jest.fn(() => 'test-api-key'),
-          setItem: jest.fn(),
-          removeItem: jest.fn(),
+          getItem: vi.fn(() => 'test-api-key'),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
         },
         writable: true,
       });
@@ -143,14 +151,14 @@ describe('YouTubeService', () => {
       // Mock localStorage avec historique
       Object.defineProperty(window, 'localStorage', {
         value: {
-          getItem: jest.fn((key) => {
+          getItem: vi.fn((key) => {
             if (key === 'nexus-search-history') {
               return JSON.stringify(['test query similar']);
             }
             return null;
           }),
-          setItem: jest.fn(),
-          removeItem: jest.fn(),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
         },
         writable: true,
       });
