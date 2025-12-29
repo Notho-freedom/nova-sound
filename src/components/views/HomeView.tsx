@@ -174,8 +174,8 @@ export const HomeView = memo(({
   // Ces données ne sont JAMAIS supprimées par les fonctions de lecture
   const displayRecent = useMemo(() => 
     recentTracks.length > 0 
-      ? getUniqueTracks(recentTracks).slice(0, 20) 
-      : getUniqueTracks(tracks).slice(0, 10),
+      ? getUniqueTracks(recentTracks).slice(0, 30) // Increased from 20 to 30
+      : getUniqueTracks(tracks).slice(0, 20), // Increased from 10 to 20
     [recentTracks, tracks, getUniqueTracks]
   );
   
@@ -190,16 +190,16 @@ export const HomeView = memo(({
   );
 
   const newTracks = useMemo(() => {
-    return getUniqueTracks(tracks).slice(-12).reverse();
+    return getUniqueTracks(tracks).slice(-20).reverse(); // Increased from 12 to 20
   }, [tracks, getUniqueTracks]);
 
-  const topGenres = useMemo(() => genres.slice(0, 8), [genres]);
+  const topGenres = useMemo(() => genres.slice(0, 16), [genres]); // Increased from 8 to 16
 
   // IMPORTANT: Ces données sont calculées à partir de l'historique et ne sont JAMAIS supprimées
   // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
   const recentArtists = useMemo(() => {
     if (!stats?.recentArtists) return [];
-    return stats.recentArtists.slice(0, 10);
+    return stats.recentArtists.slice(0, 20); // Increased from 10 to 20
   }, [stats]);
 
   // Hero slides
@@ -218,8 +218,8 @@ export const HomeView = memo(({
       });
     }
 
-    // Top artists
-    recentArtists.slice(0, 3).forEach(artist => {
+    // Top artists - use all available recent artists (not limited)
+    recentArtists.forEach(artist => {
       const artistTrack = tracks.find(t => t.artist === artist.name);
       if (artistTrack) {
         slides.push({
@@ -233,9 +233,9 @@ export const HomeView = memo(({
       }
     });
 
-    // Recent albums
+    // Recent albums (all available, not limited to 6)
     const seenAlbums = new Set<string>();
-    displayRecent.slice(0, 3).forEach(track => {
+    displayRecent.forEach(track => {
       const albumKey = `${track.album}-${track.artist}`;
       if (!seenAlbums.has(albumKey) && track.album !== "Album inconnu") {
         seenAlbums.add(albumKey);
@@ -250,7 +250,25 @@ export const HomeView = memo(({
       }
     });
 
-    return slides.slice(0, 6);
+    // Fallback: Add individual tracks as slides if we have fewer than 5 slides total
+    if (slides.length < 5) {
+      const seenTracks = new Set(slides.map(s => s.id));
+      displayRecent.forEach(track => {
+        if (slides.length < 12 && !seenTracks.has(track.id)) {
+          seenTracks.add(track.id);
+          slides.push({
+            id: track.id,
+            title: track.title,
+            subtitle: "Titre récent",
+            description: `${track.artist} • ${track.album}`,
+            imageUrl: getCoverUrl(track.coverUrl),
+            gradient: "from-primary/40 to-secondary/40",
+          });
+        }
+      });
+    }
+
+    return slides;
   }, [currentTrack, recentArtists, displayRecent, tracks]);
 
   // Quick play items (6 items for the grid)
