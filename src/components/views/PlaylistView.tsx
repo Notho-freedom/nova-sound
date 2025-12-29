@@ -123,7 +123,7 @@ const PlaylistCard = memo(({
 }) => {
   const playlistTracks = useMemo(() => 
     playlist.trackIds
-      .map((id) => tracks.find((t) => t.id === id))
+      .map((id) => getTrackFromAllOrCache(tracks, id))
       .filter((t): t is Track => !!t),
     [playlist.trackIds, tracks]
   );

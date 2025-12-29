@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { firebaseService } from '@/services/firebase';
-import { orchestrateAuth } from '@/services/auth-orchestrator';
 
 /**
  * Provider pour gérer l'initialisation Firebase une seule fois
@@ -20,23 +18,32 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     initRef.current = true;
 
-    // Gérer le résultat de redirection
-    firebaseService.handleRedirectResult().then(() => {
-      console.log('Firebase initialization complete');
-      setInitialized(true);
-      
-      // Lancer l'orchestration d'authentification
-      orchestrateAuth().catch((error) => {
-        console.error('Error orchestrating auth:', error);
+    // Import dynamique pour éviter les problèmes SSR
+    Promise.all([
+      import('@/services/firebase'),
+      import('@/services/auth-orchestrator')
+    ]).then(([{ firebaseService }, { orchestrateAuth }]) => {
+      // Gérer le résultat de redirection
+      return firebaseService.handleRedirectResult().then(() => {
+        console.log('Firebase initialization complete');
+        setInitialized(true);
+        
+        // Lancer l'orchestration d'authentification
+        return orchestrateAuth().catch((error) => {
+          console.error('Error orchestrating auth:', error);
+        });
+      }).catch((error) => {
+        console.error('Firebase initialization failed:', error);
+        setInitialized(true); // Continuer même en cas d'erreur
+        
+        // Lancer l'orchestration même en cas d'erreur
+        return orchestrateAuth().catch((orchestrateError) => {
+          console.error('Error orchestrating auth:', orchestrateError);
+        });
       });
     }).catch((error) => {
-      console.error('Firebase initialization failed:', error);
-      setInitialized(true); // Continuer même en cas d'erreur
-      
-      // Lancer l'orchestration même en cas d'erreur
-      orchestrateAuth().catch((orchestrateError) => {
-        console.error('Error orchestrating auth:', orchestrateError);
-      });
+      console.error('Failed to load Firebase services:', error);
+      setInitialized(true);
     });
 
     // NOTE: Le listener onAuthStateChange est DÉSACTIVÉ
