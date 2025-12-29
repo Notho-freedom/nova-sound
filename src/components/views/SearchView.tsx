@@ -259,13 +259,6 @@ export const SearchView = ({
   const historySaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestTypedQueryRef = useRef("")
   const inputRef = useRef<HTMLInputElement>(null)
-
-  // Update query when initialQuery changes
-  useEffect(() => {
-    if (initialQuery && initialQuery !== query) {
-      setQuery(initialQuery)
-    }
-  }, [initialQuery])
   
   // Hooks for context menu
   const playlistsResult = usePlaylists()
@@ -312,6 +305,11 @@ export const SearchView = ({
       }
     }
   }, [])
+
+  // Sync with external initialQuery (e.g., from TitleBar quick search)
+  useEffect(() => {
+    setQuery(initialQuery)
+  }, [initialQuery])
 
   // Cleanup timers on unmount
   useEffect(() => {

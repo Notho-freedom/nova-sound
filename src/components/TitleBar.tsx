@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, memo } from "react"
+import { useState, useEffect, useRef, memo } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -18,6 +18,9 @@ import {
 import { useCloudSync } from "@/hooks/useCloudSync"
 import { isElectron, getElectronAPI } from "@/lib/electron-detector"
 import { cn } from "@/lib/utils"
+import type { Track } from "@/types/music"
+import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
+import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 
 interface TitleBarProps {
   title?: string
@@ -26,6 +29,8 @@ interface TitleBarProps {
   hasNotifications?: boolean
   onToggleNotifications?: () => void
   onSearch?: (query: string) => void
+  searchQuery?: string
+  onQuickPlayTrack?: (track: Track) => void
 }
 
 const TitleBarComponent = ({
@@ -34,14 +39,70 @@ const TitleBarComponent = ({
   uploadProgress,
   hasNotifications = false,
   onToggleNotifications,
+    searchQuery = "",
   onSearch,
+  onQuickPlayTrack,
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchFocused, setSearchFocused] = useState(false)
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const electronEnv = isElectron()
   const electronAPI = getElectronAPI()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
+  const { results: ytResults, search: searchYouTube, loading: ytLoading } = useYouTubeSearch()
+  const [quickResults, setQuickResults] = useState<Track[]>([])
+  
+  // Sync local search with prop
+    useEffect(() => {
+      setLocalSearchQuery(searchQuery)
+    }, [searchQuery])
+
+  // Debounced YouTube search for overlay
+  useEffect(() => {
+    const q = localSearchQuery.trim()
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (q.length < 2) {
+      setQuickResults([])
+      return
+    }
+    debounceRef.current = setTimeout(() => {
+      searchYouTube(q)
+    }, 300)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [localSearchQuery, searchYouTube])
+
+  // Convert YouTube results to tracks (limit 10)
+  useEffect(() => {
+    if (!ytResults || ytResults.length === 0) {
+      setQuickResults([])
+      return
+    }
+    const converted = ytResults
+      .filter((r) => r.videoId && r.videoId !== "undefined")
+      .map((r) => youtubeVideoToTrack(r))
+      .slice(0, 10)
+    setQuickResults(converted)
+  }, [ytResults])
+
+  // Inject into shared search history (same key as SearchView)
+  const addToSearchHistory = (term: string) => {
+    const cleaned = term.trim()
+    if (!cleaned) return
+    try {
+      const raw = localStorage.getItem("nexus-search-history")
+      const existing: string[] = raw ? JSON.parse(raw) : []
+      const normalized = cleaned.toLowerCase()
+      const deduped = [cleaned, ...existing.filter((h) => h.trim().toLowerCase() !== normalized)]
+      const limited = deduped.slice(0, 8)
+      localStorage.setItem("nexus-search-history", JSON.stringify(limited))
+    } catch (e) {
+      console.warn("Cannot persist search history", e)
+    }
+  }
+
   
   // NOTE: Logs supprimés pour améliorer les performances
   // Les logs causaient des re-renders inutiles lors de la navigation
@@ -110,30 +171,43 @@ const TitleBarComponent = ({
           {/* Search Bar - VS Code style */}
           {onSearch && (
             <div
-              className="flex-1 max-w-xl mx-4"
+              className="flex-1 max-w-xl mx-4 relative"
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <div
                 className={cn(
                   "relative flex items-center h-7 rounded-md transition-all duration-200",
                   "bg-white/[0.04] hover:bg-white/[0.06]",
-                  searchFocused && "bg-white/[0.08] ring-1 ring-primary/30"
+                  isSearchFocused && "bg-white/[0.08] ring-1 ring-primary/30"
                 )}
               >
                 <Search className="w-3.5 h-3.5 text-muted-foreground/60 ml-2.5 flex-shrink-0" />
                 <input
                   type="text"
                   placeholder="Rechercher..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
+                  value={localSearchQuery}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    setLocalSearchQuery(next)
+                    onSearch(next)
+                  }}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => {
+                    // Delay to allow click on overlay
+                    setTimeout(() => setIsSearchFocused(false), 120)
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && searchQuery.trim()) {
-                      onSearch(searchQuery.trim())
+                    if (e.key === "Enter" && localSearchQuery.trim()) {
+                      const term = localSearchQuery.trim()
+                      addToSearchHistory(term)
+                      onSearch(term)
+                      if (quickResults[0]) {
+                        onQuickPlayTrack?.(quickResults[0])
+                      }
                     }
                     if (e.key === "Escape") {
-                      setSearchQuery("")
+                      setLocalSearchQuery("")
+                      onSearch("")
                       e.currentTarget.blur()
                     }
                   }}
@@ -143,10 +217,10 @@ const TitleBarComponent = ({
                     "focus:placeholder:text-muted-foreground/60"
                   )}
                 />
-                {searchQuery && (
+                {localSearchQuery && (
                   <button
                     onClick={() => {
-                      setSearchQuery("")
+                      setLocalSearchQuery("")
                       onSearch("")
                     }}
                     className="mr-1.5 p-0.5 rounded hover:bg-white/[0.08] transition-colors"
@@ -155,6 +229,44 @@ const TitleBarComponent = ({
                   </button>
                 )}
               </div>
+
+              {/* Quick results overlay */}
+              {isSearchFocused && localSearchQuery.trim().length >= 2 && (
+                <div className="absolute left-0 right-0 top-full mt-2 rounded-lg border border-white/10 bg-card/95 backdrop-blur-xl shadow-xl overflow-hidden z-[70]">
+                  <div className="flex items-center justify-between px-3 py-2 text-[11px] text-muted-foreground/80 border-b border-white/5">
+                    <span>Résultats YouTube</span>
+                    {ytLoading && <span className="animate-pulse">Chargement…</span>}
+                  </div>
+                  {quickResults.length === 0 && !ytLoading ? (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Aucun résultat</div>
+                  ) : (
+                    <ul className="divide-y divide-white/5 max-h-80 overflow-y-auto">
+                      {quickResults.map((track) => (
+                        <li key={`quick-${track.id}`}>
+                          <button
+                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 text-left transition-colors"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              const term = track.title || track.artist || localSearchQuery
+                              setLocalSearchQuery(term || "")
+                              addToSearchHistory(term || "")
+                              onSearch(term || "")
+                              onQuickPlayTrack?.(track)
+                              setIsSearchFocused(false)
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate text-foreground">{track.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{track.artist} • {track.album}</p>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">{track.duration ? Math.max(1, Math.round(track.duration / 60)) : 0}m</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
