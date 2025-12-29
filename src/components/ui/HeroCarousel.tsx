@@ -187,6 +187,24 @@ export const HeroCarousel = memo(({
     return () => clearInterval(timer);
   }, [autoPlay, isPaused, interval, goToNext, enhancedSlides.length]);
 
+  // Preload next slide image for smooth transitions
+  useEffect(() => {
+    if (enhancedSlides.length <= 1) return;
+    const nextIndex = (currentIndex + 1) % enhancedSlides.length;
+    const nextSlide = enhancedSlides[nextIndex];
+    if (!nextSlide?.imageUrl) return;
+
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = nextSlide.imageUrl;
+    document.head.appendChild(link);
+
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, [currentIndex, enhancedSlides]);
+
   if (enhancedSlides.length === 0) return null;
 
   const currentSlide = enhancedSlides[currentIndex];
@@ -277,7 +295,7 @@ export const HeroCarousel = memo(({
       </AnimatePresence>
 
       {/* Content */}
-      <div className="relative z-10 h-full flex flex-col justify-end p-8 md:p-12">
+      <div className="relative z-10 h-full flex flex-col justify-end p-6 sm:p-8 md:p-12">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -285,7 +303,7 @@ export const HeroCarousel = memo(({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="max-w-2xl"
+            className="w-full max-w-full md:max-w-2xl flex flex-col items-center md:items-start text-center md:text-left gap-2"
           >
             {/* Tag */}
             {currentSlide.subtitle && (
@@ -304,7 +322,7 @@ export const HeroCarousel = memo(({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="font-display text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-foreground"
+              className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-foreground"
               style={{
                 textShadow: "0 4px 30px rgba(0,0,0,0.5)",
               }}
@@ -318,7 +336,7 @@ export const HeroCarousel = memo(({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="text-lg text-muted-foreground mb-6 line-clamp-2"
+                className="text-base md:text-lg text-muted-foreground mb-6 line-clamp-3 md:line-clamp-2"
               >
                 {currentSlide.description}
               </motion.p>
@@ -329,12 +347,12 @@ export const HeroCarousel = memo(({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="flex items-center gap-4"
+              className="flex items-center gap-3 md:gap-4 flex-wrap justify-center md:justify-start"
             >
               <Button
                 size="lg"
                 onClick={() => onPlay?.(currentSlide)}
-                className="gap-2 px-8 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow"
+                className="gap-2 px-8 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow w-full sm:w-auto"
               >
                 <Play className="w-5 h-5 fill-current" />
                 Lecture
@@ -344,7 +362,7 @@ export const HeroCarousel = memo(({
                   variant="outline"
                   size="lg"
                   onClick={onShuffle}
-                  className="gap-2 bg-background/20 backdrop-blur-sm border-white/10 hover:bg-background/40"
+                  className="gap-2 bg-background/20 backdrop-blur-sm border-white/10 hover:bg-background/40 w-full sm:w-auto"
                 >
                   <Shuffle className="w-4 h-4" />
                   Aléatoire
@@ -363,37 +381,37 @@ export const HeroCarousel = memo(({
             aria-label="Slide précédent"
             title="Slide précédent"
             className={cn(
-              "absolute left-4 top-1/2 -translate-y-1/2 z-20",
-              "w-12 h-12 rounded-full flex items-center justify-center",
+              "hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-20",
+              "w-10 h-10 md:w-12 md:h-12 rounded-full items-center justify-center",
               "bg-background/30 backdrop-blur-md border border-white/10",
               "opacity-0 group-hover:opacity-100 transition-all duration-300",
               "hover:bg-background/50 hover:scale-110",
               "focus:outline-none focus:ring-2 focus:ring-primary/50"
             )}
           >
-            <ChevronLeft className="w-6 h-6 text-foreground" />
+            <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 text-foreground" />
           </button>
           <button
             onClick={goToNext}
             aria-label="Slide suivant"
             title="Slide suivant"
             className={cn(
-              "absolute right-4 top-1/2 -translate-y-1/2 z-20",
-              "w-12 h-12 rounded-full flex items-center justify-center",
+              "hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-20",
+              "w-10 h-10 md:w-12 md:h-12 rounded-full items-center justify-center",
               "bg-background/30 backdrop-blur-md border border-white/10",
               "opacity-0 group-hover:opacity-100 transition-all duration-300",
               "hover:bg-background/50 hover:scale-110",
               "focus:outline-none focus:ring-2 focus:ring-primary/50"
             )}
           >
-            <ChevronRight className="w-6 h-6 text-foreground" />
+            <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-foreground" />
           </button>
         </>
       )}
 
       {/* Dots indicator */}
       {enhancedSlides.length > 1 && (
-        <div className="absolute bottom-6 right-8 z-20 flex items-center gap-2">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-8 md:translate-x-0 z-20 flex items-center gap-2">
           {enhancedSlides.map((_, index) => (
             <button
               key={index}

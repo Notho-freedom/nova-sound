@@ -68,6 +68,8 @@ const TitleBarComponent = ({
   const [quickResults, setQuickResults] = useState<Track[]>([])
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const hideMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchContainerRef = useRef<HTMLDivElement | null>(null)
+  const [searchOverlayStyle, setSearchOverlayStyle] = useState<{ left: number; top: number; width: number } | null>(null)
 
   // Firebase Sync Status
   type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline"
@@ -117,6 +119,45 @@ const TitleBarComponent = ({
   const cancelMenuClose = () => {
     if (hideMenuTimeoutRef.current) clearTimeout(hideMenuTimeoutRef.current)
   }
+
+  const updateOverlayBounds = () => {
+    const el = searchContainerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setSearchOverlayStyle({ left: rect.left, top: rect.bottom + 4, width: rect.width })
+  }
+
+  const handleMenuKeyDown = (e: React.KeyboardEvent, menuName: string) => {
+    if (e.key === 'Escape') {
+      setOpenMenu(null)
+      e.preventDefault()
+    }
+  }
+
+  useEffect(() => {
+    if (!isSearchFocused) {
+      setSearchOverlayStyle(null)
+      return
+    }
+    updateOverlayBounds()
+
+    const onResize = () => updateOverlayBounds()
+    const onScroll = () => updateOverlayBounds()
+    window.addEventListener('resize', onResize)
+    window.addEventListener('scroll', onScroll, true)
+
+    let ro: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && searchContainerRef.current) {
+      ro = new ResizeObserver(() => updateOverlayBounds())
+      ro.observe(searchContainerRef.current)
+    }
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('scroll', onScroll, true)
+      if (ro) ro.disconnect()
+    }
+  }, [isSearchFocused])
 
   const formatLastSync = () => {
     if (!lastSyncTime) return "Jamais synchronisé"
@@ -248,9 +289,10 @@ const TitleBarComponent = ({
             </div>
             <div className="flex items-center gap-2">
               <div className="flex flex-col">
-                <span className="font-display text-[14px] tracking-wider bg-gradient-to-r from-primary via-foreground to-secondary bg-clip-text text-transparent font-bold">{title}</span>
+                <span className="font-display text-[10px] tracking-wider bg-gradient-to-r from-primary via-foreground to-secondary bg-clip-text text-transparent font-bold">{title}</span>
                 <span className="text-[10px] text-muted-foreground/60 font-mono">v1.0.0</span>
               </div>
+
               {!electronEnv && (
                 <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-medium tracking-wide">
                   WEB
@@ -260,15 +302,29 @@ const TitleBarComponent = ({
           </div>
 
           {/* Menubar (Nexus app style) + Navigation buttons + Search bar together */}
-          <div className="hidden xl:flex items-center gap-0.5 ml-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          <div
+            className="hidden md:flex flex-none items-center gap-0.5 sm:gap-1 ml-1 md:ml-2 flex-wrap overflow-x-auto max-w-[50vw]"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
+            {/* Menu labels for accessibility */}
+            {/* Hidden object for ARIA references */}
+            
             {/* Musique */}
             <DropdownMenu open={openMenu === "musique"} onOpenChange={(v) => setOpenMenu(v ? "musique" : null)}>
               <DropdownMenuTrigger
                 asChild
                 onMouseEnter={() => openMenuWithHover("musique")}
                 onMouseLeave={scheduleMenuClose}
+                onKeyDown={(e) => handleMenuKeyDown(e, "musique")}
               >
-                <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06]">Musique</button>
+                <button
+                  className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all"
+                  aria-label="Menu Musique - Lecture, pistes, playlists"
+                  aria-expanded={openMenu === "musique"}
+                  aria-haspopup="true"
+                >
+                  Musique
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
@@ -486,7 +542,10 @@ const TitleBarComponent = ({
           </div>
 
           {/* Navigation buttons + Search bar together */}
-          <div className="flex-0 w-1/3 flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          <div
+            className="flex-0 w-1/2 justify-center flex items-center gap-2 min-w-0"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
             {/* Navigation buttons - VSCode style (next to search) */}
             <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             <Tooltip delayDuration={0}>
@@ -526,13 +585,14 @@ const TitleBarComponent = ({
           </div>
 
           {onSearch && (
-            <div className="flex-1 flex items-center gap-0 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <div className="flex-0 w-full md:w-1/2 lg:w-2/3 xl:w-3/4 flex items-center gap-0 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <div
                 className={cn(
                   "relative w-full flex items-center h-7 rounded-md transition-all duration-200",
                   "bg-white/[0.04] hover:bg-white/[0.06]",
                   isSearchFocused && "bg-white/[0.08] ring-1 ring-primary/30"
                 )}
+                ref={searchContainerRef}
               >
                 <Search className="w-3.5 h-3.5 text-muted-foreground/60 ml-2.5 flex-shrink-0" />
                 <div className="relative flex-1 h-full">
@@ -591,8 +651,16 @@ const TitleBarComponent = ({
                 )}
               </div>
 
-              {isSearchFocused && localSearchQuery.trim().length >= 2 && (
-                <div className="fixed left-0 right-0 top-11 mx-auto w-[calc(100%-160px)] max-w-xl rounded-lg border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[9999]" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+              {isSearchFocused && localSearchQuery.trim().length >= 2 && searchOverlayStyle && (
+                <div
+                  className="fixed rounded-lg border border-white/10 bg-card/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[9999]"
+                  style={{
+                    WebkitAppRegion: "no-drag",
+                    left: searchOverlayStyle.left,
+                    top: searchOverlayStyle.top,
+                    width: searchOverlayStyle.width,
+                  } as React.CSSProperties}
+                >
                   <div className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-muted-foreground/80 border-b border-white/5">
                     <div className="flex items-center gap-2">
                       <span>Résultats YouTube</span>
@@ -696,7 +764,7 @@ const TitleBarComponent = ({
 
           </div>
 
-          <div className="flex items-center gap-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+          <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             {/* Firebase Sync Indicator */}
             {nexusAuthenticated && (
               <DropdownMenu open={isSyncPopoverOpen} onOpenChange={setIsSyncPopoverOpen}>
