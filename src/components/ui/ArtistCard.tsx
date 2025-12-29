@@ -21,7 +21,7 @@ export const ArtistCard = memo(({ name, imageUrl, trackCount, playCount, onClick
 
   const tooltipContent = (
     <div>
-      <div className="text-sm font-medium">{name}</div>
+      <div className="text-sm font-medium truncate max-w-xs">{name}</div>
       {trackCount !== undefined && (
         <div className="text-xs text-muted-foreground">
           {trackCount} titre{trackCount > 1 ? "s" : ""}
@@ -85,7 +85,7 @@ export const ArtistCard = memo(({ name, imageUrl, trackCount, playCount, onClick
 
         {/* Artist name */}
         <div className="text-center w-full">
-          <p className="font-medium text-sm truncate">{name}</p>
+          <p className="font-medium text-sm truncate max-w-[10rem]">{name}</p>
           {(trackCount !== undefined || playCount !== undefined) && (
             <p className="text-xs text-muted-foreground mt-0.5">
               {playCount !== undefined && playCount > 0
