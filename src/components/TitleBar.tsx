@@ -171,7 +171,7 @@ const TitleBarComponent = ({
             </div>
             <div className="flex items-center gap-2">
               <div className="flex flex-col">
-                <span className="font-display text-sm tracking-[0.2em] text-gradient font-bold">{title}</span>
+                <span className="font-display text-[14px] tracking-wider bg-gradient-to-r from-primary via-foreground to-secondary bg-clip-text text-transparent font-bold">{title}</span>
                 <span className="text-[10px] text-muted-foreground/60 font-mono">v1.0.0</span>
               </div>
               {!electronEnv && (

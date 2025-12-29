@@ -130,6 +130,7 @@ export const DesktopApp = () => {
   }, [libraryTracks, youtubeTracksCache]);
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory, recordPlayback } = usePlayHistory();
+console.log('History Tracks:', history.length, history);
   const { 
     playlists, 
     createPlaylist, 
@@ -2119,10 +2120,7 @@ export const DesktopApp = () => {
             onCollapsedChange={setSidebarCollapsed}
             onPlayPlaylist={handlePlayPlaylist}
             onShufflePlaylist={handleShufflePlaylist}
-            canGoBack={canGoBack}
-            canGoForward={canGoForward}
-            onGoBack={goBack}
-            onGoForward={goForward}
+
           />
 
           {/* Content Area */}
