@@ -11,13 +11,17 @@ import { youtubeQuotaManager } from '../youtube-quota-manager';
 // Mock des dépendances
 vi.mock('../youtube-provider');
 vi.mock('../youtube-cache');
-vi.mock('../youtube-quota-manager');
+// Note: do NOT mock the quota manager here because some tests rely on its real behavior (recordFailure/recordSuccess)
+// vi.mock('../youtube-quota-manager');
 vi.mock('../youtube-batch');
 vi.mock('../youtube-prefetch');
 
 describe('YouTubeService', () => {
   beforeEach(() => {
+    // Clear mocks and restore spies to avoid cross-test interference
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+
     // Provide a default localStorage mock with clear for tests
     if (typeof window !== 'undefined') {
       Object.defineProperty(window, 'localStorage', {
@@ -89,8 +93,8 @@ describe('YouTubeService', () => {
 
     it('devrait utiliser l\'API si le cache est vide et le quota est disponible', async () => {
       vi.mocked(youtubeCacheService.getSearch).mockResolvedValue(null);
-      vi.mocked(youtubeQuotaManager.canUseAPI).mockReturnValue(true);
-      vi.mocked(youtubeQuotaManager.canSearch).mockReturnValue(true);
+      vi.spyOn(youtubeQuotaManager, 'canUseAPI').mockReturnValue(true as any);
+      vi.spyOn(youtubeQuotaManager, 'canSearch').mockReturnValue(true as any);
 
       // Mock fetch
       global.fetch = vi.fn()
@@ -145,10 +149,16 @@ describe('YouTubeService', () => {
     });
 
     it('devrait utiliser le fallback si le quota est épuisé', async () => {
-      (youtubeCacheService.getSearch as jest.Mock).mockResolvedValue(null);
-      (youtubeQuotaManager.canUseAPI as jest.Mock).mockReturnValue(false);
+      // Reset and open circuit
+      youtubeQuotaManager.reset();
+      youtubeQuotaManager.recordFailure();
+      youtubeQuotaManager.recordFailure();
+      youtubeQuotaManager.recordFailure();
 
-      // Mock localStorage avec historique
+      // Provide mocked canUseAPI in addition to the opened circuit
+      vi.spyOn(youtubeQuotaManager, 'canUseAPI').mockReturnValue(false as any);
+
+      // Mock localStorage with history containing a similar query
       Object.defineProperty(window, 'localStorage', {
         value: {
           getItem: vi.fn((key) => {
@@ -163,9 +173,9 @@ describe('YouTubeService', () => {
         writable: true,
       });
 
-      // Mock cache avec recherche similaire
-      (youtubeCacheService.getSearch as jest.Mock)
-        .mockResolvedValueOnce(null) // Première recherche
+      // Sequence: first call for main query -> null, second for history -> returns cached results
+      vi.mocked(youtubeCacheService.getSearch)
+        .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
           id: 'search_hash',
           query: 'test query similar',
@@ -238,12 +248,32 @@ describe('YouTubeService', () => {
         message: null,
       };
 
+      // Ensure clean quota manager state so provider mock is authoritative for this unit test
+      youtubeQuotaManager.reset();
+      // Clear previous mocks to avoid interfering mocked canUseAPI from other tests
+      vi.clearAllMocks();
+
       vi.mocked(youtubeProvider.getSystemStatus).mockReturnValue(mockStatus);
 
       const result = youtubeService.getSystemStatus();
 
       expect(result).toEqual(mockStatus);
       expect(youtubeProvider.getSystemStatus).toHaveBeenCalled();
+    });
+
+    it('deterministic: should reflect circuit breaker state when quota manager opens the circuit', () => {
+      // Ensure clean state
+      youtubeQuotaManager.reset();
+
+      // Trigger failures to open circuit breaker
+      youtubeQuotaManager.recordFailure();
+      youtubeQuotaManager.recordFailure();
+      youtubeQuotaManager.recordFailure();
+
+      const status = youtubeService.getSystemStatus();
+
+      expect(status.canUseAPI).toBe(false);
+      expect(status.quotaState).toBe('EXHAUSTED');
     });
   });
 });

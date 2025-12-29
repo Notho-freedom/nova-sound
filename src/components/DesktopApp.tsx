@@ -52,6 +52,7 @@ import type { Track } from "@/types/music";
 import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer";
 import { getCachedYouTubeTrackByVideoId } from "@/lib/youtube-track-cache";
 import { mapHistoryEntriesToTracks } from "@/lib/history-utils";
+import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 //import { extractYouTubeVideoId } from "@/lib/youtube";
 
 export const DesktopApp = () => {

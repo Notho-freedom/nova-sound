@@ -67,6 +67,8 @@ export const TrackListView = memo(({
   onRemoveFromPlaylist,
   isUploaded,
   getUploadedProvider,
+  onNavigateToArtist,
+  onNavigateToAlbum,
 }: TrackListViewProps) => {
   return (
     <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden relative">

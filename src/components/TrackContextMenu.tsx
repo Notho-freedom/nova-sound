@@ -52,6 +52,10 @@ interface TrackContextMenuProps {
   onUploadToNexus?: () => void;
   canUploadToNexus?: boolean;
   isUploadingToNexus?: boolean;
+  // New optional upload state helpers
+  // Accept either a boolean (already-evaluated) or a function that can be called with a trackId
+  isUploaded?: boolean | ((trackId: string) => boolean);
+  getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
 }
 
 export const TrackContextMenu = ({
@@ -79,6 +83,8 @@ export const TrackContextMenu = ({
   onUploadToNexus,
   canUploadToNexus = false,
   isUploadingToNexus = false,
+  isUploaded,
+  getUploadedProvider,
 }: TrackContextMenuProps) => {
   return (
     <ContextMenu>

@@ -79,6 +79,8 @@ export interface MetadataSearchResult<T> {
   source: MetadataSource;
   query: string;
   cached: boolean;
+  // Optional: indicate the requested type for search results
+  type?: 'artist' | 'album' | 'track';
 }
 
 export interface MetadataProviderConfig {
