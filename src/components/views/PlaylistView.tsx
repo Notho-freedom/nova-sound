@@ -25,6 +25,7 @@ import {
 import { Track, Playlist } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl, formatDuration } from "@/lib/audio";
+import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -288,12 +289,14 @@ export const PlaylistView = memo(({
 
   // Get tracks for selected playlist
   // Les tracks YouTube sont maintenant inclus dans la prop `tracks` via le cache dans DesktopApp
+  // Pour les playlists YouTube, utiliser getTrackFromAllOrCache pour résoudre les trackIds via le cache
   const playlistTracks = useMemo(() => {
     if (!selectedPlaylist) return [];
     
     // Chercher les tracks dans la liste fournie (qui inclut maintenant les tracks YouTube en cache)
+    // Utiliser getTrackFromAllOrCache pour supporter les tracks en cache par youtubeVideoId
     return selectedPlaylist.trackIds
-      .map((id) => tracks.find((t) => t.id === id))
+      .map((id) => getTrackFromAllOrCache(tracks, id))
       .filter((t): t is Track => !!t);
   }, [selectedPlaylist, tracks]);
 

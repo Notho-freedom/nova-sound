@@ -63,6 +63,27 @@ export const DesktopApp = () => {
   // État pour stocker les tracks YouTube chargés dynamiquement
   const [youtubeTracksCache, setYoutubeTracksCache] = useState<Map<string, Track[]>>(new Map());
   
+  // Charger les tracks YouTube en cache au démarrage pour restaurer les playlists
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getYouTubeTracksCache } = await import('@/lib/youtube-track-cache');
+        const cachedTracks = getYouTubeTracksCache();
+        if (cachedTracks && cachedTracks.size > 0) {
+          // Mettre les tracks en cache dans un pseudo-playlist 'persistent-cache'
+          const cachedArray = Array.from(cachedTracks.values());
+          setYoutubeTracksCache(prev => {
+            const newMap = new Map(prev);
+            newMap.set('persistent-cache', cachedArray);
+            return newMap;
+          });
+        }
+      } catch (err) {
+        // Ignore errors loading cache
+      }
+    })();
+  }, []);
+  
   // Écouter les événements de chargement de tracks YouTube
   useEffect(() => {
     const handleYouTubeTracksLoaded = (event: CustomEvent<{ playlistId: string; tracks: Track[] }>) => {
