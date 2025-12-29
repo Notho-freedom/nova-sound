@@ -51,6 +51,7 @@ interface SearchViewProps {
   onAddToQueue?: (track: Track) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
   loading?: boolean;
+  initialQuery?: string;
 }
 
 const formatTime = (seconds: number) => {
@@ -248,8 +249,9 @@ export const SearchView = ({
   onAddToQueue,
   onAddToPlaylist,
   loading = false,
+  initialQuery = "",
 }: SearchViewProps) => {
-  const [query, setQuery] = useState("")
+  const [query, setQuery] = useState(initialQuery)
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [youtubeTracks, setYoutubeTracks] = useState<Track[]>([])
   const [isFocused, setIsFocused] = useState(false)
@@ -257,6 +259,13 @@ export const SearchView = ({
   const historySaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestTypedQueryRef = useRef("")
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Update query when initialQuery changes
+  useEffect(() => {
+    if (initialQuery && initialQuery !== query) {
+      setQuery(initialQuery)
+    }
+  }, [initialQuery])
   
   // Hooks for context menu
   const playlistsResult = usePlaylists()

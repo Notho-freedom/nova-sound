@@ -252,6 +252,7 @@ export const DesktopApp = () => {
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [playlistToOpen, setPlaylistToOpen] = useState<string | null>(null);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
 
   // Audio element ref for real playback
@@ -1336,6 +1337,13 @@ export const DesktopApp = () => {
     setShowInlinePlayer(false);
   }, []);
 
+  const handleGlobalSearch = useCallback((query: string) => {
+    setGlobalSearchQuery(query);
+    if (query.trim()) {
+      setCurrentView("search");
+    }
+  }, []);
+
   const handleNavigateToAlbum = useCallback(() => {
     if (!currentTrack) return;
     setShowInlinePlayer(false);
@@ -1498,6 +1506,7 @@ export const DesktopApp = () => {
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
             loading={libraryLoading}
+            initialQuery={globalSearchQuery}
           />
         );
       case "library":
@@ -2073,6 +2082,7 @@ export const DesktopApp = () => {
                 setIsQueueOpen(false);
               }
             }}
+            onSearch={handleGlobalSearch}
           />
 
         {/* Main Content */}

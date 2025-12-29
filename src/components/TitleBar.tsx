@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, memo } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles } from "lucide-react"
+import { Minus, Square, X, Copy, Settings, Cloud, Bell, User, LogOut, Crown, Sparkles, Search } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -25,6 +25,7 @@ interface TitleBarProps {
   uploadProgress?: number
   hasNotifications?: boolean
   onToggleNotifications?: () => void
+  onSearch?: (query: string) => void
 }
 
 const TitleBarComponent = ({
@@ -33,8 +34,11 @@ const TitleBarComponent = ({
   uploadProgress,
   hasNotifications = false,
   onToggleNotifications,
+  onSearch,
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchFocused, setSearchFocused] = useState(false)
   const electronEnv = isElectron()
   const electronAPI = getElectronAPI()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
@@ -102,6 +106,57 @@ const TitleBarComponent = ({
               )}
             </div>
           </div>
+
+          {/* Search Bar - VS Code style */}
+          {onSearch && (
+            <div
+              className="flex-1 max-w-xl mx-4"
+              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+            >
+              <div
+                className={cn(
+                  "relative flex items-center h-7 rounded-md transition-all duration-200",
+                  "bg-white/[0.04] hover:bg-white/[0.06]",
+                  searchFocused && "bg-white/[0.08] ring-1 ring-primary/30"
+                )}
+              >
+                <Search className="w-3.5 h-3.5 text-muted-foreground/60 ml-2.5 flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchQuery.trim()) {
+                      onSearch(searchQuery.trim())
+                    }
+                    if (e.key === "Escape") {
+                      setSearchQuery("")
+                      e.currentTarget.blur()
+                    }
+                  }}
+                  className={cn(
+                    "flex-1 h-full px-2 bg-transparent border-0 outline-none",
+                    "text-sm text-foreground placeholder:text-muted-foreground/40",
+                    "focus:placeholder:text-muted-foreground/60"
+                  )}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery("")
+                      onSearch("")
+                    }}
+                    className="mr-1.5 p-0.5 rounded hover:bg-white/[0.08] transition-colors"
+                  >
+                    <X className="w-3 h-3 text-muted-foreground/60" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {uploadProgress !== undefined && uploadProgress > 0 && uploadProgress < 100 && (
             <div
