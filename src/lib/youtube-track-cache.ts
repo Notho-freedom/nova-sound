@@ -93,6 +93,17 @@ export function getCachedYouTubeTrack(trackId: string): Track | null {
 }
 
 /**
+ * Récupère un track YouTube depuis le cache par videoId (youtubeVideoId)
+ */
+export function getCachedYouTubeTrackByVideoId(videoId: string): Track | null {
+  const cache = getYouTubeTracksCache();
+  for (const track of cache.values()) {
+    if (track.youtubeVideoId === videoId) return track;
+  }
+  return null;
+}
+
+/**
  * Récupère plusieurs tracks YouTube depuis le cache
  */
 export function getCachedYouTubeTracks(trackIds: string[]): Track[] {

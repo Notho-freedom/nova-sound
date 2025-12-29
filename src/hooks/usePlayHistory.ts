@@ -11,12 +11,13 @@ export interface HistoryEntry {
   playCount: number;
   duration: number;
   completedPercentage?: number;
+  youtubeVideoId?: string; // Ajout: id YouTube pour les tracks YouTube (persistance plus robuste)
 }
 
 interface UsePlayHistoryReturn {
   history: HistoryEntry[];
-  addToHistory: (trackId: string) => void;
-  recordPlayback: (trackId: string, duration: number, completedPercentage?: number) => void;
+  addToHistory: (trackId: string, youtubeVideoId?: string) => void;
+  recordPlayback: (trackId: string, duration: number, completedPercentage?: number, youtubeVideoId?: string) => void;
   clearHistory: () => void;
   getPlayCount: (trackId: string) => number;
   getLastPlayed: (trackId: string) => string | null;
@@ -135,31 +136,31 @@ export function usePlayHistory(): UsePlayHistoryReturn {
     };
   }, [history]);
 
-  const addToHistory = useCallback((trackId: string) => {
+  const addToHistory = useCallback((trackId: string, youtubeVideoId?: string) => {
     setHistory(prev => {
       const now = new Date().toISOString();
-      const existingIndex = prev.findIndex(h => h.trackId === trackId);
+      const existingIndex = prev.findIndex(h => h.trackId === trackId || (youtubeVideoId && h.youtubeVideoId === youtubeVideoId));
 
       if (existingIndex !== -1) {
         const updated = [...prev];
         const existing = updated.splice(existingIndex, 1)[0];
         return [
-          { ...existing, playedAt: now, playCount: existing.playCount + 1 },
+          { ...existing, playedAt: now, playCount: existing.playCount + 1, youtubeVideoId: youtubeVideoId || existing.youtubeVideoId },
           ...updated,
         ].slice(0, MAX_HISTORY_SIZE);
       }
 
       return [
-        { trackId, playedAt: now, playCount: 1, duration: 0 },
+        { trackId, playedAt: now, playCount: 1, duration: 0, youtubeVideoId },
         ...prev,
       ].slice(0, MAX_HISTORY_SIZE);
     });
   }, []);
 
-  const recordPlayback = useCallback((trackId: string, duration: number, completedPercentage?: number) => {
+  const recordPlayback = useCallback((trackId: string, duration: number, completedPercentage?: number, youtubeVideoId?: string) => {
     setHistory(prev => {
       const now = new Date().toISOString();
-      const existingEntries = prev.filter(h => h.trackId === trackId);
+      const existingEntries = prev.filter(h => h.trackId === trackId || (youtubeVideoId && h.youtubeVideoId === youtubeVideoId));
       const playCount = existingEntries.length > 0 
         ? Math.max(...existingEntries.map(e => e.playCount)) + 1 
         : 1;
@@ -171,6 +172,7 @@ export function usePlayHistory(): UsePlayHistoryReturn {
           playCount,
           duration,
           completedPercentage: completedPercentage ?? (duration > 0 ? 100 : 0),
+          youtubeVideoId,
         },
         ...prev,
       ].slice(0, MAX_HISTORY_SIZE);

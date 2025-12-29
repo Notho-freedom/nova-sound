@@ -50,6 +50,8 @@ import type { Track } from "@/types/music";
 //import { useAudioVibes } from "@/hooks/useAudioVibes";
 //import { useAudioAI } from "@/hooks/useAudioAI";
 import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer";
+import { getCachedYouTubeTrackByVideoId } from "@/lib/youtube-track-cache";
+import { mapHistoryEntriesToTracks } from "@/lib/history-utils";
 //import { extractYouTubeVideoId } from "@/lib/youtube";
 
 export const DesktopApp = () => {
@@ -352,24 +354,7 @@ export const DesktopApp = () => {
           : 100;
         
         // Enregistrer la session d'écoute de la piste précédente
-        recordPlaybackRef.current(previousTrackId, elapsedTime, completedPercentage);
-      }
-      
-      // Réinitialiser pour la nouvelle piste
-      playbackStartTimeRef.current = null;
-      playbackStartTrackIdRef.current = null;
-      accumulatedPlaybackTimeRef.current = 0;
-    }
-
-    // Démarrer le suivi pour la nouvelle piste
-    if (currentTrack) {
-      // Si c'est une nouvelle piste (différente de la précédente)
-      if (playbackStartTrackIdRef.current !== currentTrack.id) {
-        addToHistoryRef.current(currentTrack.id);
-        playbackStartTrackIdRef.current = currentTrack.id;
-        // Réinitialiser le temps accumulé seulement pour une nouvelle piste
-        accumulatedPlaybackTimeRef.current = 0;
-        lastTimeUpdateRef.current = Date.now();
+        recordPlaybackRef.current(previousTrackId, elapsedTime, completedPercentage, previousTrack?.youtubeVideoId);
       }
       
       if (isPlaying) {
@@ -458,7 +443,7 @@ export const DesktopApp = () => {
         
         // Enregistrer seulement si on a écouté au moins 5 secondes (éviter les clics accidentels)
         if (elapsedTime >= 5) {
-          recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage);
+          recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage, currentTrack.youtubeVideoId);
           // Réinitialiser pour la prochaine session
           accumulatedPlaybackTimeRef.current = 0;
         }
@@ -560,7 +545,7 @@ export const DesktopApp = () => {
         const completedPercentage = currentTrackData.duration > 0
           ? Math.min(100, (elapsedTime / currentTrackData.duration) * 100)
           : 100;
-        recordPlaybackRef.current(playbackStartTrackIdRef.current, elapsedTime, completedPercentage);
+        recordPlaybackRef.current(playbackStartTrackIdRef.current, elapsedTime, completedPercentage, currentTrackData.youtubeVideoId);
       }
       
       // Réinitialiser les refs après enregistrement pour éviter les conflits
@@ -609,7 +594,7 @@ export const DesktopApp = () => {
         const completedPercentage = currentTrackData.duration > 0
           ? Math.min(100, (elapsedTime / currentTrackData.duration) * 100)
           : 100;
-        recordPlaybackRef.current(playbackStartTrackIdRef.current, elapsedTime, completedPercentage);
+        recordPlaybackRef.current(playbackStartTrackIdRef.current, elapsedTime, completedPercentage, currentTrackData.youtubeVideoId);
       }
       
       // Réinitialiser les refs après enregistrement pour éviter les conflits
@@ -717,7 +702,7 @@ export const DesktopApp = () => {
           ? Math.min(100, (elapsedTime / currentTrack.duration) * 100)
           : 100;
         
-        recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage);
+        recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage, currentTrack.youtubeVideoId);
         
         // Réinitialiser pour la prochaine piste
         playbackStartTimeRef.current = null;
@@ -1215,18 +1200,18 @@ export const DesktopApp = () => {
   // Écouter les événements pour ajouter les vidéos YouTube à l'historique audio
   useEffect(() => {
     const handleYouTubeVideoPlayed = (event: CustomEvent<{ videoId: string; trackId: string; title: string }>) => {
-      const { trackId } = event.detail;
+      const { trackId, videoId } = event.detail;
       
       // Ajouter à l'historique audio si le track est dans la queue
       const track = tracks.find(t => t.id === trackId);
       if (track) {
         console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', track.title);
-        addToHistory(trackId);
+        addToHistory(trackId, videoId);
       } else {
         // Si le track n'est pas encore dans la queue, l'ajouter à l'historique quand même
         // Il sera synchronisé quand le track sera ajouté à la queue
         console.log('[DesktopApp] Track YouTube non trouvé dans la queue, ajout direct à l\'historique:', trackId);
-        addToHistory(trackId);
+        addToHistory(trackId, videoId);
       }
     };
 
@@ -1310,20 +1295,7 @@ export const DesktopApp = () => {
   // Inclut les tracks de la queue (qui peuvent contenir des tracks YouTube)
   // BUGFIX: Utiliser allTracks comme source principale pour les lookups
   const historyTracks = useMemo(() => {
-    const mapped = history
-      .map(h => {
-        // Chercher d'abord dans allTracks (bibliothèque + YouTube cache)
-        const trackInAll = allTracks.find(t => t.id === h.trackId);
-        if (trackInAll) return trackInAll;
-        
-        // Ensuite chercher dans la queue active (pour les tracks YouTube en cours)
-        const trackInQueue = tracks.find(t => t.id === h.trackId);
-        if (trackInQueue) return trackInQueue;
-        
-        // Sinon chercher dans la bibliothèque locale
-        return libraryTracks.find(t => t.id === h.trackId);
-      })
-      .filter((t): t is Track => t !== undefined);
+    const mapped = mapHistoryEntriesToTracks(history, allTracks, tracks, libraryTracks);
     return getUniqueTracks(mapped).slice(0, 50);
   }, [history, allTracks, tracks, libraryTracks, getUniqueTracks]);
 
@@ -1333,11 +1305,9 @@ export const DesktopApp = () => {
   // BUGFIX: Utiliser allTracks au lieu de tracks pour éviter que les écoutes récentes soient vides
   // quand une playlist est jouée (car tracks devient queue.tracks qui ne contient que la playlist)
   const recentTracks = useMemo(() => {
-    const mapped = history
-      .map(h => allTracks.find(t => t.id === h.trackId))
-      .filter((t): t is Track => t !== undefined);
+    const mapped = mapHistoryEntriesToTracks(history, allTracks, tracks, libraryTracks);
     return getUniqueTracks(mapped).slice(0, 20);
-  }, [history, allTracks, getUniqueTracks]);
+  }, [history, allTracks, tracks, libraryTracks, getUniqueTracks]);
 
   // Get recently added tracks (sorted by addedAt date) - without duplicates
   const recentlyAddedTracks = useMemo(() => {
@@ -2278,7 +2248,7 @@ export const DesktopApp = () => {
                   const completedPercentage = currentTrack.duration > 0
                     ? Math.min(100, (elapsedTime / currentTrack.duration) * 100)
                     : 100;
-                  recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage);
+                  recordPlaybackRef.current(currentTrack.id, elapsedTime, completedPercentage, currentTrack.youtubeVideoId);
                   playbackStartTimeRef.current = null;
                   playbackStartTrackIdRef.current = null;
                   accumulatedPlaybackTimeRef.current = 0;
@@ -2296,7 +2266,7 @@ export const DesktopApp = () => {
                 if (playing && currentTrack && (currentTrack.mediaSource as string) === 'youtube' && currentTrack.id) {
                   // Toujours ajouter à l'historique (addToHistory gère les doublons)
                   console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', currentTrack.title);
-                  addToHistory(currentTrack.id);
+                  addToHistory(currentTrack.id, currentTrack.youtubeVideoId);
                   
                   // Émettre l'événement pour VideosView
                   window.dispatchEvent(new CustomEvent('youtube-video-played', { 
