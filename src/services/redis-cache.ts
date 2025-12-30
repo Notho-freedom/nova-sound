@@ -63,12 +63,12 @@ export class RedisCacheService {
   async getVideo(videoId: string): Promise<YouTubeVideo | null> {
     if (!this.isAvailable) return null;
     try {
-      const response = await fetch(`${this.baseURL}/video/${videoId}`);
+      const response = await fetch(`${this.baseURL}/video/${videoId}`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
     } catch (e) {
-      console.warn('[RedisCacheService] Error getting video:', e);
+      // Silent fail for GET operations - expected in offline scenarios
       return null;
     }
   }
@@ -81,13 +81,18 @@ export class RedisCacheService {
         timestamp: Date.now(),
         expiresAt: Date.now() + this.CONFIG.videoTTL,
       };
-      await fetch(`${this.baseURL}/video/${video.videoId}`, {
+      const response = await fetch(`${this.baseURL}/video/${video.videoId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
       });
+      // Log non-200 responses but don't throw - offline-first
+      if (!response.ok) {
+        console.debug(`[RedisCacheService] Video sync failed (${response.status}), continuing with local cache`);
+      }
     } catch (e) {
-      console.warn('[RedisCacheService] Error setting video:', e);
+      // Silent fail - Redis sync is non-critical, continue with local cache
+      console.debug('[RedisCacheService] Video sync offline, using local cache only');
     }
   }
 
@@ -97,12 +102,11 @@ export class RedisCacheService {
     if (!this.isAvailable) return null;
     try {
       const key = `search:${query.toLowerCase().trim()}`;
-      const response = await fetch(`${this.baseURL}/search?key=${encodeURIComponent(key)}`);
+      const response = await fetch(`${this.baseURL}/search?key=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
     } catch (e) {
-      console.warn('[RedisCacheService] Error getting search:', e);
       return null;
     }
   }
@@ -116,13 +120,17 @@ export class RedisCacheService {
         timestamp: Date.now(),
         expiresAt: Date.now() + this.CONFIG.searchTTL,
       };
-      await fetch(`${this.baseURL}/search`, {
+      const response = await fetch(`${this.baseURL}/search`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, ...entry }),
+        signal: AbortSignal.timeout(3000),
       });
+      if (!response.ok) {
+        console.debug(`[RedisCacheService] Search sync failed (${response.status})`);
+      }
     } catch (e) {
-      console.warn('[RedisCacheService] Error setting search:', e);
+      console.debug('[RedisCacheService] Search sync offline');
     }
   }
 
@@ -131,12 +139,11 @@ export class RedisCacheService {
   async getPlaylist(playlistId: string): Promise<YouTubePlaylist | null> {
     if (!this.isAvailable) return null;
     try {
-      const response = await fetch(`${this.baseURL}/playlist/${playlistId}`);
+      const response = await fetch(`${this.baseURL}/playlist/${playlistId}`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
     } catch (e) {
-      console.warn('[RedisCacheService] Error getting playlist:', e);
       return null;
     }
   }
@@ -149,13 +156,17 @@ export class RedisCacheService {
         timestamp: Date.now(),
         expiresAt: Date.now() + this.CONFIG.playlistTTL,
       };
-      await fetch(`${this.baseURL}/playlist/${playlist.id}`, {
+      const response = await fetch(`${this.baseURL}/playlist/${playlist.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
+        signal: AbortSignal.timeout(3000),
       });
+      if (!response.ok) {
+        console.debug(`[RedisCacheService] Playlist sync failed (${response.status})`);
+      }
     } catch (e) {
-      console.warn('[RedisCacheService] Error setting playlist:', e);
+      console.debug('[RedisCacheService] Playlist sync offline');
     }
   }
 
@@ -163,12 +174,11 @@ export class RedisCacheService {
     if (!this.isAvailable) return null;
     try {
       const key = `playlist_videos:${playlistId}`;
-      const response = await fetch(`${this.baseURL}/playlist-videos?key=${encodeURIComponent(key)}`);
+      const response = await fetch(`${this.baseURL}/playlist-videos?key=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
     } catch (e) {
-      console.warn('[RedisCacheService] Error getting playlist videos:', e);
       return null;
     }
   }
@@ -182,13 +192,17 @@ export class RedisCacheService {
         timestamp: Date.now(),
         expiresAt: Date.now() + this.CONFIG.playlistVideosTTL,
       };
-      await fetch(`${this.baseURL}/playlist-videos`, {
+      const response = await fetch(`${this.baseURL}/playlist-videos`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, ...entry }),
+        signal: AbortSignal.timeout(3000),
       });
+      if (!response.ok) {
+        console.debug(`[RedisCacheService] Playlist videos sync failed (${response.status})`);
+      }
     } catch (e) {
-      console.warn('[RedisCacheService] Error setting playlist videos:', e);
+      console.debug('[RedisCacheService] Playlist videos sync offline');
     }
   }
 
@@ -267,12 +281,11 @@ export class RedisCacheService {
   async getTrack(trackId: string): Promise<Track | null> {
     if (!this.isAvailable) return null;
     try {
-      const response = await fetch(`${this.baseURL}/track/${trackId}`);
+      const response = await fetch(`${this.baseURL}/track/${trackId}`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
     } catch (e) {
-      console.warn('[RedisCacheService] Error getting track:', e);
       return null;
     }
   }
@@ -285,13 +298,17 @@ export class RedisCacheService {
         timestamp: Date.now(),
         expiresAt: Date.now() + this.CONFIG.trackTTL,
       };
-      await fetch(`${this.baseURL}/track/${track.id}`, {
+      const response = await fetch(`${this.baseURL}/track/${track.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
+        signal: AbortSignal.timeout(3000),
       });
+      if (!response.ok) {
+        console.debug(`[RedisCacheService] Track sync failed (${response.status})`);
+      }
     } catch (e) {
-      console.warn('[RedisCacheService] Error setting track:', e);
+      console.debug('[RedisCacheService] Track sync offline');
     }
   }
 
@@ -299,12 +316,11 @@ export class RedisCacheService {
     if (!this.isAvailable) return [];
     try {
       const keys = trackIds.join(',');
-      const response = await fetch(`${this.baseURL}/tracks?ids=${encodeURIComponent(keys)}`);
+      const response = await fetch(`${this.baseURL}/tracks?ids=${encodeURIComponent(keys)}`, { signal: AbortSignal.timeout(2000) });
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map((entry: any) => entry.data).filter(Boolean) : [];
     } catch (e) {
-      console.warn('[RedisCacheService] Error getting tracks:', e);
       return [];
     }
   }
@@ -318,13 +334,17 @@ export class RedisCacheService {
         timestamp: Date.now(),
         expiresAt: Date.now() + this.CONFIG.trackTTL,
       }));
-      await fetch(`${this.baseURL}/tracks`, {
+      const response = await fetch(`${this.baseURL}/tracks`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entries),
+        signal: AbortSignal.timeout(3000),
       });
+      if (!response.ok) {
+        console.debug(`[RedisCacheService] Tracks sync failed (${response.status})`);
+      }
     } catch (e) {
-      console.warn('[RedisCacheService] Error setting tracks:', e);
+      console.debug('[RedisCacheService] Tracks sync offline');
     }
   }
 

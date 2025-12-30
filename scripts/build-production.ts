@@ -162,11 +162,11 @@ function main() {
     runCommand('npm install', 'Installation des dépendances');
   }
 
-  // 3. Build Next.js
+  // 3. Build Next.js (une seule fois!)
   runCommand('npm run build', 'Build Next.js');
 
-  // 4. Build Electron
-  runCommand('npm run build:electron', 'Compilation Electron');
+  // 4. Compile Electron only (sans refaire le build Next.js)
+  runCommand('npm run compile:electron', 'Compilation Electron');
 
   // 5. Package with electron-builder
   const platform = process.platform;
