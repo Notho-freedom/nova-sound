@@ -103,12 +103,69 @@ export const FullscreenPlayer = ({
 }: FullscreenPlayerProps) => {
   const [showLyrics, setShowLyrics] = useState(false);
   const [lyrics, setLyrics] = useState<string | null>(null);
+  const [showControls, setShowControls] = useState(true);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastInteractionRef = useRef<number>(Date.now());
+  const INACTIVITY_DELAY = 3000; // 3 seconds
   
   // Détecter si c'est un track YouTube
   const isYouTube = currentTrack.mediaSource === 'youtube';
   const youtubeVideoId = currentTrack.youtubeVideoId || (isYouTube && currentTrack.filePath ? extractYouTubeVideoId(currentTrack.filePath) : null);
   // Utiliser uniquement la ref partagée (player persistant de DesktopApp)
   // Ne jamais créer de nouveau player ici pour éviter les doublures
+  
+  // Auto-hide controls on inactivity
+  const resetInactivityTimer = useCallback(() => {
+    lastInteractionRef.current = Date.now();
+    setShowControls(true);
+    
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+    
+    inactivityTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, INACTIVITY_DELAY);
+  }, []);
+
+  useEffect(() => {
+    // Set initial timeout
+    resetInactivityTimer();
+
+    const handleMouseMove = () => {
+      resetInactivityTimer();
+    };
+
+    const handleClick = () => {
+      resetInactivityTimer();
+    };
+
+    const handleKeyPress = () => {
+      resetInactivityTimer();
+    };
+
+    // Only add listeners when fullscreen player is active (not inline)
+    if (!isInline) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('click', handleClick);
+      window.addEventListener('keydown', handleKeyPress);
+
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('click', handleClick);
+        window.removeEventListener('keydown', handleKeyPress);
+        if (inactivityTimeoutRef.current) {
+          clearTimeout(inactivityTimeoutRef.current);
+        }
+      };
+    }
+
+    return () => {
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+      }
+    };
+  }, [isInline, resetInactivityTimer]);
   
   // État pour le player YouTube
   const [youtubeState, setYoutubeState] = useState({
@@ -626,12 +683,22 @@ useEffect(() => {
       <div className="relative z-10 flex w-full h-full">
         
         {/* Left Side - Album Art & Visualizer (60%) */}
-        <div className="flex-1 flex flex-col items-center justify-center relative p-12">
+        <motion.div 
+          animate={{
+            width: !isYouTube && !showControls ? '100%' : 'auto'
+          }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          className="flex-1 flex flex-col items-center justify-center relative p-12"
+        >
           
           {/* Header - Close & Title */}
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={{ 
+              opacity: showControls ? 1 : 0,
+              y: showControls ? 0 : -20,
+            }}
+            transition={{ duration: 0.3 }}
             className="absolute top-0 left-0 right-0 flex items-center justify-between p-6"
           >
             <motion.button
@@ -674,7 +741,10 @@ useEffect(() => {
           {/* Central Album Art with Premium Effects */}
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+            animate={{ 
+              scale: !isYouTube && !showControls ? 1.2 : 1,
+              opacity: isYouTube && !showControls ? 0 : 1,
+            }}
             transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.2 }}
             className="relative"
           >
@@ -734,7 +804,7 @@ useEffect(() => {
           {!isYouTube && (
             <motion.div 
               initial={{ opacity: 0 }}
-              animate={{ opacity: isPlaying ? 1 : 0.3 }}
+              animate={{ opacity: (isPlaying && showControls) ? 1 : 0 }}
               className="absolute bottom-32 left-1/2 -translate-x-1/2 flex items-end justify-center gap-1"
               style={{ width: '60%' }}
             >
@@ -753,18 +823,22 @@ useEffect(() => {
               ))}
             </motion.div>
           )}
-        </div>
+        </motion.div>
 
         {/* Right Side - Controls Panel (40%) */}
         <motion.div 
           initial={{ x: 100, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
+          animate={{ 
+            x: showControls ? 0 : 100,
+            opacity: showControls ? 1 : 0,
+          }}
+          transition={{ type: "spring", stiffness: 100, damping: 20, delay: showControls ? 0.3 : 0 }}
           className={cn(
-            "w-[420px] flex flex-col backdrop-blur-2xl border-l",
+            "w-[420px] flex flex-col backdrop-blur-2xl border-l transition-all duration-300",
             isYouTube 
               ? "bg-black/60 border-white/10" 
-              : "bg-background/40 border-white/5"
+              : "bg-background/40 border-white/5",
+            !showControls && "pointer-events-none"
           )}
         >
           {/* Track Info Section */}
@@ -909,9 +983,15 @@ useEffect(() => {
             {/* Volume Control */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ 
+                opacity: isYouTube && !showControls ? 0 : 1,
+                y: isYouTube && !showControls ? 20 : 0,
+              }}
               transition={{ delay: 0.7 }}
-              className="flex items-center gap-4 px-4 py-3 rounded-2xl bg-white/5 border border-white/5"
+              className={cn(
+                "flex items-center gap-4 px-4 py-3 rounded-2xl bg-white/5 border border-white/5 transition-all duration-300",
+                isYouTube && !showControls && "pointer-events-none"
+              )}
             >
               <motion.button
                 whileHover={{ scale: 1.1 }}
