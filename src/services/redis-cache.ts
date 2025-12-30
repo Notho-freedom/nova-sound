@@ -379,14 +379,21 @@ export class RedisCacheService {
   }
 
   /**
-   * Verify Redis connection
+   * Verify Redis connection with short timeout
+   * Returns false on any error (offline-first approach)
    */
   async isConnected(): Promise<boolean> {
     if (!this.isAvailable) return false;
     try {
-      const response = await fetch(`${this.baseURL}/health`);
-      return response.ok;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const response = await fetch(`${this.baseURL}?action=health`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response.ok && response.status === 200;
     } catch (e) {
+      // Silently fail - Redis is optional
       return false;
     }
   }

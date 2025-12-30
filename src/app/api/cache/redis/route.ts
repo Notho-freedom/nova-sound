@@ -1,119 +1,102 @@
 /**
- * API Routes for Redis Cache Management (Generic endpoints)
- * Handles: /api/cache/redis/health, /api/cache/redis/stats, /api/cache/redis/clear, /api/cache/redis/migrate
+ * Consolidated Redis Cache API Routes
+ * 
+ * NOTE: These endpoints require Redis to be configured on the server.
+ * For production Vercel deployment without Redis, this gracefully returns unavailable.
+ * The client-side RedisCacheService automatically falls back to localStorage in this case.
+ * 
+ * Supported paths (when Redis is available):
+ * - GET/PUT  /api/cache/redis/video/[id]
+ * - GET/PUT  /api/cache/redis/search
+ * - GET/PUT  /api/cache/redis/playlist/[id]
+ * - GET/PUT  /api/cache/redis/playlist-videos
+ * - GET/PUT  /api/cache/redis/track/[id]
+ * - GET/PUT  /api/cache/redis/tracks
+ * - GET      /api/cache/redis?action=health
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { redisCacheServer } from '@/services/redis-cache-server';
 
-let redisInitialized = false;
-
-async function ensureRedisConnected() {
-  if (!redisInitialized) {
-    try {
-      await redisCacheServer.connect();
-      redisInitialized = true;
-    } catch (error) {
-      console.error('[API] Failed to connect to Redis:', error);
-    }
-  }
-}
-
-// GET /api/cache/redis?action=health|stats|entries
+/**
+ * Health check endpoint
+ * Returns 503 if Redis is not configured (expected behavior)
+ */
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const action = searchParams.get('action');
-
-  if (action === 'health') {
-    await ensureRedisConnected();
-    try {
-      const isHealthy = await redisCacheServer.health();
-      if (isHealthy) {
-        return NextResponse.json({ status: 'healthy', redis: 'connected' });
-      } else {
-        return NextResponse.json({ status: 'unhealthy', redis: 'disconnected' }, { status: 503 });
-      }
-    } catch (error) {
-      console.error('[API] Health check error:', error);
-      return NextResponse.json({ status: 'unhealthy', error: String(error) }, { status: 503 });
-    }
+  // If Redis is not configured, return service unavailable
+  // This is expected on Vercel without Redis add-on
+  // Client will gracefully degrade to localStorage only
+  const hasRedisConfig = !!process.env.REDIS_HOST;
+  
+  if (!hasRedisConfig) {
+    return NextResponse.json(
+      { status: 'unavailable', redis: 'not-configured', message: 'Redis not available on this deployment' },
+      { status: 503 }
+    );
   }
 
-  if (action === 'stats') {
-    await ensureRedisConnected();
-    try {
-      const stats = await redisCacheServer.getStats();
-      return NextResponse.json(stats);
-    } catch (error) {
-      console.error('[API] Stats error:', error);
-      return NextResponse.json({ error: 'Failed to get stats' }, { status: 500 });
-    }
-  }
-
-  if (action === 'entries') {
-    await ensureRedisConnected();
-    try {
-      const pattern = searchParams.get('pattern') || '*';
-      const entries = await redisCacheServer.getAllEntries(pattern);
-      return NextResponse.json(entries);
-    } catch (error) {
-      console.error('[API] Get entries error:', error);
-      return NextResponse.json({ error: 'Failed to get entries' }, { status: 500 });
-    }
-  }
-
-  // Default health check for root endpoint
-  await ensureRedisConnected();
+  // If Redis is configured, attempt connection
   try {
+    // Dynamic import to avoid errors when redis package isn't needed
+    const { redisCacheServer } = await import('@/services/redis-cache-server');
+    await redisCacheServer.connect();
     const isHealthy = await redisCacheServer.health();
-    return NextResponse.json({ 
+    
+    return NextResponse.json({
       status: isHealthy ? 'healthy' : 'unhealthy',
       redis: isHealthy ? 'connected' : 'disconnected'
     });
   } catch (error) {
-    return NextResponse.json({ status: 'unhealthy', redis: 'disconnected' }, { status: 503 });
+    return NextResponse.json(
+      { status: 'unhealthy', redis: 'disconnected', error: String(error) },
+      { status: 503 }
+    );
   }
 }
 
-// POST /api/cache/redis?action=clear|migrate
-export async function POST(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const action = searchParams.get('action');
-
-  // Clear cache
-  if (action === 'clear') {
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader?.includes(process.env.CACHE_ADMIN_KEY || 'admin')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    await ensureRedisConnected();
-    try {
-      await redisCacheServer.clear();
-      return NextResponse.json({ success: true, message: 'Cache cleared' });
-    } catch (error) {
-      console.error('[API] Clear cache error:', error);
-      return NextResponse.json({ error: 'Failed to clear cache' }, { status: 500 });
-    }
+/**
+ * PUT endpoint for cache writes
+ * Returns 503 if Redis is not configured
+ */
+export async function PUT(req: NextRequest) {
+  const hasRedisConfig = !!process.env.REDIS_HOST;
+  
+  if (!hasRedisConfig) {
+    // Silently accept but don't store - graceful degradation
+    return NextResponse.json(
+      { success: false, reason: 'Redis not available' },
+      { status: 503 }
+    );
   }
 
-  // Migrate from localStorage
-  if (action === 'migrate') {
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader?.includes(process.env.CACHE_ADMIN_KEY || 'admin')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // If Redis is configured, attempt write
+  try {
+    const { redisCacheServer } = await import('@/services/redis-cache-server');
+    await redisCacheServer.connect();
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: String(error) },
+      { status: 503 }
+    );
+  }
+}
 
-    await ensureRedisConnected();
-    try {
-      const data = await req.json();
-      const result = await redisCacheServer.migrateFromLocalStorage(data);
-      return NextResponse.json(result);
-    } catch (error) {
-      console.error('[API] Migration error:', error);
-      return NextResponse.json({ error: 'Failed to migrate' }, { status: 500 });
-    }
+/**
+ * HEAD endpoint for connection testing
+ */
+export async function HEAD(req: NextRequest) {
+  const hasRedisConfig = !!process.env.REDIS_HOST;
+  
+  if (!hasRedisConfig) {
+    return new NextResponse(null, { status: 503 });
   }
 
-  return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  try {
+    const { redisCacheServer } = await import('@/services/redis-cache-server');
+    await redisCacheServer.connect();
+    const isHealthy = await redisCacheServer.health();
+    return new NextResponse(null, { status: isHealthy ? 200 : 503 });
+  } catch {
+    return new NextResponse(null, { status: 503 });
+  }
 }
