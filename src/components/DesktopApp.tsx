@@ -63,6 +63,19 @@ export const DesktopApp = () => {
   // État pour stocker les tracks YouTube chargés dynamiquement
   const [youtubeTracksCache, setYoutubeTracksCache] = useState<Map<string, Track[]>>(new Map());
   
+  // Initialize Redis cache migration on app startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const { ensureMigrated } = await import('@/lib/cache-migration');
+        const result = await ensureMigrated();
+        console.log('[DesktopApp] Cache migration result:', result);
+      } catch (err) {
+        console.warn('[DesktopApp] Cache migration failed:', err);
+      }
+    })();
+  }, []);
+  
   // Charger les tracks YouTube en cache au démarrage pour restaurer les playlists
   useEffect(() => {
     (async () => {

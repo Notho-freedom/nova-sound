@@ -611,7 +611,7 @@ export const SettingsView = () => {
       }
       // Fallback to env
       if (!savedYouTubeKey) {
-        savedYouTubeKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || "";
+        savedYouTubeKey = process.env.YOUTUBE_API_KEY || "";
       }
       setYoutubeApiKey(savedYouTubeKey);
       // Cacher la config si une clé existe déjà

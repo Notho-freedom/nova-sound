@@ -1,9 +1,16 @@
 /**
  * Cache unifié pour le système YouTube
- * Gère le cache mémoire et localStorage avec TTL
+ * 
+ * Three-layer architecture:
+ * - L1: Memory (10 min TTL) - Fastest, process memory
+ * - L2: localStorage (7 days TTL) - Persistent, browser-local
+ * - L3: Redis (7-30 days TTL) - Shared, distributed, all users
+ * 
+ * Gère le cache mémoire, localStorage et Redis avec TTL
  */
 
 import type { YouTubeVideo, YouTubePlaylist } from './types';
+import { redisCache } from '@/services/redis-cache';
 
 interface CacheEntry<T> {
   data: T;
@@ -153,14 +160,19 @@ class YouTubeCache {
 
   // ==================== MÉTHODES GÉNÉRIQUES ====================
 
+  /**
+   * Two-layer cache lookup (L1 & L2, synchronous):
+   * L1: Memory (<1ms)
+   * L2: localStorage (5-10ms)
+   */
   private get<T>(key: string): T | null {
-    // 1. Vérifier le cache mémoire
+    // 1. Vérifier le cache mémoire (L1)
     const memEntry = this.memoryCache.get(key);
     if (memEntry && Date.now() < memEntry.expiresAt) {
       return memEntry.data as T;
     }
 
-    // 2. Vérifier localStorage (uniquement côté client)
+    // 2. Vérifier localStorage (L2, uniquement côté client)
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         const stored = localStorage.getItem(this.STORAGE_PREFIX + key);
@@ -183,6 +195,81 @@ class YouTubeCache {
     return null;
   }
 
+  /**
+   * Three-layer cache lookup with async Redis fallback (L1 & L2 & L3)
+   * Used by components that can handle async operations
+   * L1: Memory (<1ms)
+   * L2: localStorage (5-10ms)
+   * L3: Redis (network latency, but shared across users)
+   */
+  async getAsync<T>(key: string): Promise<T | null> {
+    // First try sync L1 & L2
+    const data = this.get<T>(key);
+    if (data !== null) return data;
+
+    // Fall back to Redis L3
+    try {
+      const redisData = await this._getFromRedis<T>(key);
+      if (redisData) {
+        // Promote to L1 & L2
+        const entry: CacheEntry<T> = {
+          data: redisData,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + this.config.memoryTTL,
+        };
+        this.memoryCache.set(key, entry);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            localStorage.setItem(this.STORAGE_PREFIX + key, JSON.stringify(entry));
+          } catch (e) {
+            console.warn('[YouTubeCache] Failed to promote Redis hit to localStorage:', e);
+          }
+        }
+        return redisData;
+      }
+    } catch (e) {
+      console.warn('[YouTubeCache] Erreur lecture Redis:', e);
+    }
+
+    return null;
+  }
+
+  /**
+   * Helper to get data from Redis based on key type
+   */
+  private async _getFromRedis<T>(key: string): Promise<T | null> {
+    try {
+      if (key.startsWith('video:')) {
+        const videoId = key.replace('video:', '');
+        return (await redisCache.getVideo(videoId)) as T;
+      } else if (key.startsWith('search:')) {
+        const query = key.replace('search:', '');
+        return (await redisCache.getSearch(query)) as T;
+      } else if (key.startsWith('playlist:')) {
+        const playlistId = key.replace('playlist:', '');
+        return (await redisCache.getPlaylist(playlistId)) as T;
+      } else if (key.startsWith('playlist_videos:')) {
+        const playlistId = key.replace('playlist_videos:', '');
+        return (await redisCache.getPlaylistVideos(playlistId)) as T;
+      } else if (key.startsWith('suggestions:')) {
+        const videoId = key.replace('suggestions:', '');
+        return (await redisCache.getSuggestions(videoId)) as T;
+      } else if (key.startsWith('artist_playlists:')) {
+        const artistName = key.replace('artist_playlists:', '');
+        return (await redisCache.getArtistPlaylists(artistName)) as T;
+      }
+    } catch (e) {
+      console.warn('[YouTubeCache] Error getting from Redis:', e);
+    }
+    return null;
+  }
+
+  /**
+   * Three-layer cache write:
+   * L1: Memory (always)
+   * L2: localStorage (unless memoryOnly)
+   * L3: Redis (async, fire-and-forget, unless memoryOnly)
+   */
   private set<T>(
     key: string, 
     data: T, 
@@ -215,6 +302,47 @@ class YouTubeCache {
       } catch (e) {
         console.warn('[YouTubeCache] Erreur écriture localStorage:', e);
       }
+    }
+
+    // 3. Stocker en Redis (L3, asynchrone, fire-and-forget)
+    // Ne pas attendre, ne pas bloquer
+    if (!options?.memoryOnly) {
+      this._setInRedisAsync(key, data, storageTTL).catch(e => {
+        console.warn('[YouTubeCache] Erreur écriture Redis:', e);
+      });
+    }
+  }
+
+  /**
+   * Async Redis write (fire-and-forget)
+   */
+  private async _setInRedisAsync<T>(key: string, data: T, ttlMs: number): Promise<void> {
+    try {
+      if (key.startsWith('video:')) {
+        // data is already the YouTubeVideo object
+        await redisCache.setVideo(data as any);
+      } else if (key.startsWith('search:')) {
+        const query = key.replace('search:', '');
+        // data is the array of videos
+        await redisCache.setSearch(query, data as any);
+      } else if (key.startsWith('playlist:')) {
+        // data is already the YouTubePlaylist object
+        await redisCache.setPlaylist(data as any);
+      } else if (key.startsWith('playlist_videos:')) {
+        const playlistId = key.replace('playlist_videos:', '');
+        // data is the array of videos
+        await redisCache.setPlaylistVideos(playlistId, data as any);
+      } else if (key.startsWith('suggestions:')) {
+        const videoId = key.replace('suggestions:', '');
+        // data is the array of videos
+        await redisCache.setSuggestions(videoId, data as any);
+      } else if (key.startsWith('artist_playlists:')) {
+        const artistName = key.replace('artist_playlists:', '');
+        // data is the array of playlists
+        await redisCache.setArtistPlaylists(artistName, data as any);
+      }
+    } catch (e) {
+      console.warn('[YouTubeCache] Error setting in Redis:', e);
     }
   }
 
