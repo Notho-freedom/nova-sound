@@ -238,13 +238,13 @@ class RedisCacheServer {
       const results = await pipeline.exec();
       if (!results) return [];
 
-      // Parse and validate results
+      // Parse and validate results - pipeline.exec() returns array of values
       const tracks: any[] = [];
-      for (const [err, stored] of results) {
-        if (err || !stored) continue;
+      for (const stored of results) {
+        if (!stored) continue;
         
         try {
-          const entry = JSON.parse(stored as string) as CacheEntry;
+          const entry = JSON.parse(String(stored)) as CacheEntry;
           // Check if expired
           if (Date.now() < entry.expiresAt) {
             tracks.push(entry.data);
