@@ -130,7 +130,6 @@ export const DesktopApp = () => {
   }, [libraryTracks, youtubeTracksCache]);
   const { favorites, isFavorite, addFavorite, removeFavorite } = useFavorites();
   const { history, addToHistory, recordPlayback } = usePlayHistory();
-console.log('History Tracks:', history.length, history);
   const { 
     playlists, 
     createPlaylist, 
@@ -1434,8 +1433,50 @@ console.log('History Tracks:', history.length, history);
         input.accept = 'audio/*';
         input.onchange = async (e) => {
           const files = Array.from((e.target as HTMLInputElement).files || []);
-          // Handle file loading
+          if (files.length === 0) return;
+          
           console.log('[DesktopApp] Files selected:', files.length);
+          
+          try {
+            // Convertir les fichiers en Track objects
+            const newTracks: Track[] = files.map((file, index) => {
+              // Extraire le nom du fichier sans extension
+              const fileName = file.name.replace(/\.[^/.]+$/, "");
+              const [title, artist] = fileName.includes('-') 
+                ? fileName.split('-').map(s => s.trim())
+                : [fileName, 'Unknown Artist'];
+              
+              // Créer une URL blob pour le fichier
+              const fileUrl = URL.createObjectURL(file);
+              
+              return {
+                id: `local-${Date.now()}-${index}-${Math.random()}`,
+                title: title || 'Unknown Track',
+                artist: artist || 'Unknown Artist',
+                album: 'Local Files',
+                duration: 0, // Sera défini quand l'audio est chargé
+                coverUrl: '', // Les fichiers locaux n'ont pas de cover par défaut
+                mediaSource: 'local',
+                filePath: fileUrl,
+                addedAt: new Date().toISOString(),
+              };
+            });
+            
+            // Ajouter les tracks à la queue
+            if (newTracks.length > 0) {
+              addToQueue(newTracks);
+              
+              // Jouer le premier fichier ajouté
+              setCurrentIndex(queue.tracks.length);
+              
+              // Toast de succès
+              toast.success(`${newTracks.length} fichier(s) ajouté(s) à la file`);
+              console.log('[DesktopApp] Tracks loaded:', newTracks.length);
+            }
+          } catch (parseErr) {
+            console.error('[DesktopApp] Error processing files:', parseErr);
+            toast.error('Erreur lors du traitement des fichiers');
+          }
         };
         input.click();
       } catch (err) {
@@ -1541,7 +1582,7 @@ console.log('History Tracks:', history.length, history);
       window.removeEventListener('nexus-about', handleAboutEvent);
       window.removeEventListener('nexus-nav', handleNavEvent);
     };
-  }, [handlePlayPause, handlePrevious, handleNext, currentTrack, setShowInlinePlayer, setCurrentView, setIsQueueOpen]);
+  }, [handlePlayPause, handlePrevious, handleNext, currentTrack, setShowInlinePlayer, setCurrentView, setIsQueueOpen, addToQueue, setCurrentIndex, queue]);
 
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
