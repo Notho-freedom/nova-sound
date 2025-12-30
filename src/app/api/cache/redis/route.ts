@@ -56,8 +56,15 @@ export async function GET(req: NextRequest) {
 /**
  * PUT endpoint for cache writes
  * Returns 503 if Redis is not configured
+ * Handles aborted requests gracefully (499)
  */
 export async function PUT(req: NextRequest) {
+  // Check if request was aborted before processing
+  if (req.signal.aborted) {
+    console.debug('[Redis API] Request aborted before processing');
+    return new NextResponse('Client closed request', { status: 499 });
+  }
+
   const hasRedisConfig = !!process.env.REDIS_HOST;
   
   if (!hasRedisConfig) {
@@ -72,8 +79,22 @@ export async function PUT(req: NextRequest) {
   try {
     const { redisCacheServer } = await import('@/services/redis-cache-server');
     await redisCacheServer.connect();
+    
+    // Check abort again before Redis operation
+    if (req.signal.aborted) {
+      console.debug('[Redis API] Request aborted during processing');
+      return new NextResponse('Client closed request', { status: 499 });
+    }
+    
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
+    // Handle specific error cases
+    if (error?.code === 'ECONNRESET' || error?.name === 'AbortError') {
+      console.debug('[Redis API] Connection aborted:', error.code || error.name);
+      return new NextResponse('Client closed request', { status: 499 });
+    }
+    
+    console.error('[Redis API] Write error:', error);
     return NextResponse.json(
       { success: false, error: String(error) },
       { status: 503 }

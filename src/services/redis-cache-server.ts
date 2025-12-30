@@ -222,17 +222,74 @@ class RedisCacheServer {
   }
 
   async getTracks(trackIds: string[]): Promise<any[]> {
-    const results: any[] = [];
-    for (const id of trackIds) {
-      const track = await this.getTrack(id);
-      if (track) results.push(track);
+    if (!this.client || !this.isConnected || trackIds.length === 0) {
+      return [];
     }
-    return results;
+
+    try {
+      // Use pipeline for batch GET operations
+      const pipeline = this.client.multi();
+      const keys = trackIds.map(id => `track:${id}`);
+      
+      keys.forEach(key => {
+        pipeline.get(key);
+      });
+
+      const results = await pipeline.exec();
+      if (!results) return [];
+
+      // Parse and validate results
+      const tracks: any[] = [];
+      for (const [err, stored] of results) {
+        if (err || !stored) continue;
+        
+        try {
+          const entry = JSON.parse(stored as string) as CacheEntry;
+          // Check if expired
+          if (Date.now() < entry.expiresAt) {
+            tracks.push(entry.data);
+          }
+        } catch (e) {
+          // Skip invalid entries
+        }
+      }
+
+      return tracks;
+    } catch (error) {
+      console.error('[RedisCacheServer] Error getting tracks:', error);
+      return [];
+    }
   }
 
   async setTracks(tracks: any[]): Promise<void> {
-    for (const track of tracks) {
-      await this.setTrack(track.id, track);
+    if (!this.client || !this.isConnected || tracks.length === 0) {
+      console.debug('[RedisCacheServer] Skipping setTracks - not connected or empty');
+      return;
+    }
+
+    try {
+      // Use pipeline for batch SET operations
+      const pipeline = this.client.multi();
+      const ttl = this.CONFIG.trackTTL;
+
+      tracks.forEach(track => {
+        if (!track?.id) return; // Skip invalid tracks
+        
+        const key = `track:${track.id}`;
+        const entry: CacheEntry = {
+          data: track,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + ttl * 1000,
+        };
+        
+        pipeline.setEx(key, ttl, JSON.stringify(entry));
+      });
+
+      await pipeline.exec();
+      console.debug(`[RedisCacheServer] Batch set ${tracks.length} tracks via pipeline`);
+    } catch (error) {
+      console.error('[RedisCacheServer] Error setting tracks:', error);
+      // Don't throw - graceful degradation
     }
   }
 

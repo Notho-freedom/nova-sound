@@ -34,6 +34,12 @@ export class RedisCacheService {
   private baseURL = process.env.NEXT_PUBLIC_REDIS_API_URL || '/api/cache/redis';
   private isAvailable = typeof window !== 'undefined';
 
+  // Batch queue for debounced writes
+  private trackBatchQueue: Map<string, Track> = new Map();
+  private batchTimeout: NodeJS.Timeout | null = null;
+  private readonly BATCH_DELAY = 1000; // 1 second debounce
+  private readonly BATCH_SIZE = 50; // Max tracks per batch
+
   // Configuration
   private readonly CONFIG = {
     videoTTL: 7 * 24 * 60 * 60 * 1000,           // 7 days
@@ -320,39 +326,77 @@ export class RedisCacheService {
     }
   }
 
+  /**
+   * Queue a track for batch writing (debounced)
+   * This prevents request storms when adding multiple tracks
+   */
   async setTrack(track: Track): Promise<void> {
     if (!this.isAvailable) return;
+    
+    // Add to batch queue instead of immediate write
+    this.trackBatchQueue.set(track.id, track);
+    
+    // Cancel previous timeout
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+    }
+    
+    // Schedule batch write after debounce delay
+    this.batchTimeout = setTimeout(() => {
+      this.flushTrackBatch();
+    }, this.BATCH_DELAY);
+    
+    // Flush immediately if queue is full
+    if (this.trackBatchQueue.size >= this.BATCH_SIZE) {
+      if (this.batchTimeout) {
+        clearTimeout(this.batchTimeout);
+        this.batchTimeout = null;
+      }
+      this.flushTrackBatch();
+    }
+  }
+
+  /**
+   * Flush the track batch queue to Redis via batch endpoint
+   * Uses Redis pipeline on server side
+   */
+  private async flushTrackBatch(): Promise<void> {
+    if (this.trackBatchQueue.size === 0) return;
+    
+    const tracks = Array.from(this.trackBatchQueue.values());
+    this.trackBatchQueue.clear();
+    
     try {
-      const entry: CacheEntry<Track> = {
-        data: track,
-        timestamp: Date.now(),
-        expiresAt: Date.now() + this.CONFIG.trackTTL,
-      };
-      const response = await fetch(`${this.baseURL}/track/${track.id}`, {
+      const response = await fetch(`${this.baseURL}/batch/tracks`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry),
-        signal: AbortSignal.timeout(3000),
+        body: JSON.stringify(tracks),
+        signal: AbortSignal.timeout(5000), // Longer timeout for batch
       });
-      if (!response.ok) {
-        console.debug(`[RedisCacheService] Track sync failed (${response.status})`);
+      
+      if (response.ok) {
+        console.debug(`[RedisCacheService] Batch flushed ${tracks.length} tracks`);
+      } else {
+        console.debug(`[RedisCacheService] Batch flush failed (${response.status})`);
       }
     } catch (e: any) {
       if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
         return; // Silent return for expected errors
       }
-      console.debug('[RedisCacheService] Track sync offline');
+      console.debug('[RedisCacheService] Batch flush offline');
     }
   }
 
   async getTracks(trackIds: string[]): Promise<Track[]> {
-    if (!this.isAvailable) return [];
+    if (!this.isAvailable || trackIds.length === 0) return [];
     try {
       const keys = trackIds.join(',');
-      const response = await fetch(`${this.baseURL}/tracks?ids=${encodeURIComponent(keys)}`, { signal: AbortSignal.timeout(2000) });
+      const response = await fetch(`${this.baseURL}/batch/tracks?ids=${encodeURIComponent(keys)}`, { 
+        signal: AbortSignal.timeout(3000) // Longer timeout for batch
+      });
       if (!response.ok) return [];
       const data = await response.json();
-      return Array.isArray(data) ? data.map((entry: any) => entry.data).filter(Boolean) : [];
+      return data.tracks || [];
     } catch (e: any) {
       if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
         return [];
@@ -362,28 +406,26 @@ export class RedisCacheService {
   }
 
   async setTracks(tracks: Track[]): Promise<void> {
-    if (!this.isAvailable) return;
+    if (!this.isAvailable || tracks.length === 0) return;
+    
+    // Use batch endpoint directly for explicit batch calls
     try {
-      const entries = tracks.map(track => ({
-        id: track.id,
-        data: track,
-        timestamp: Date.now(),
-        expiresAt: Date.now() + this.CONFIG.trackTTL,
-      }));
-      const response = await fetch(`${this.baseURL}/tracks`, {
+      const response = await fetch(`${this.baseURL}/batch/tracks`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entries),
-        signal: AbortSignal.timeout(3000),
+        body: JSON.stringify(tracks),
+        signal: AbortSignal.timeout(5000), // Longer timeout for batch
       });
-      if (!response.ok) {
-        console.debug(`[RedisCacheService] Tracks sync failed (${response.status})`);
+      if (response.ok) {
+        console.debug(`[RedisCacheService] Batch set ${tracks.length} tracks`);
+      } else {
+        console.debug(`[RedisCacheService] Batch set failed (${response.status})`);
       }
     } catch (e: any) {
       if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
         return; // Silent return for expected errors
       }
-      console.debug('[RedisCacheService] Tracks sync offline');
+      console.debug('[RedisCacheService] Batch set offline');
     }
   }
 
