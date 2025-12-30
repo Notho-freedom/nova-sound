@@ -67,8 +67,12 @@ export class RedisCacheService {
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
-    } catch (e) {
+    } catch (e: any) {
       // Silent fail for GET operations - expected in offline scenarios
+      // Catch AbortError, ECONNRESET, and network errors
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return null;
+      }
       return null;
     }
   }
@@ -85,13 +89,18 @@ export class RedisCacheService {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
+        signal: AbortSignal.timeout(3000),
       });
       // Log non-200 responses but don't throw - offline-first
       if (!response.ok) {
         console.debug(`[RedisCacheService] Video sync failed (${response.status}), continuing with local cache`);
       }
-    } catch (e) {
+    } catch (e: any) {
       // Silent fail - Redis sync is non-critical, continue with local cache
+      // Specifically catch timeout, abort, and connection errors
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return; // Silent return for expected errors
+      }
       console.debug('[RedisCacheService] Video sync offline, using local cache only');
     }
   }
@@ -106,7 +115,10 @@ export class RedisCacheService {
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return null;
+      }
       return null;
     }
   }
@@ -129,7 +141,10 @@ export class RedisCacheService {
       if (!response.ok) {
         console.debug(`[RedisCacheService] Search sync failed (${response.status})`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return; // Silent return for expected errors
+      }
       console.debug('[RedisCacheService] Search sync offline');
     }
   }
@@ -143,7 +158,10 @@ export class RedisCacheService {
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return null;
+      }
       return null;
     }
   }
@@ -165,7 +183,10 @@ export class RedisCacheService {
       if (!response.ok) {
         console.debug(`[RedisCacheService] Playlist sync failed (${response.status})`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return; // Silent return for expected errors
+      }
       console.debug('[RedisCacheService] Playlist sync offline');
     }
   }
@@ -178,7 +199,10 @@ export class RedisCacheService {
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return null;
+      }
       return null;
     }
   }
@@ -201,7 +225,10 @@ export class RedisCacheService {
       if (!response.ok) {
         console.debug(`[RedisCacheService] Playlist videos sync failed (${response.status})`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return; // Silent return for expected errors
+      }
       console.debug('[RedisCacheService] Playlist videos sync offline');
     }
   }
@@ -285,7 +312,10 @@ export class RedisCacheService {
       if (!response.ok) return null;
       const entry = await response.json();
       return entry.data || null;
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return null;
+      }
       return null;
     }
   }
@@ -307,7 +337,10 @@ export class RedisCacheService {
       if (!response.ok) {
         console.debug(`[RedisCacheService] Track sync failed (${response.status})`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return; // Silent return for expected errors
+      }
       console.debug('[RedisCacheService] Track sync offline');
     }
   }
@@ -320,7 +353,10 @@ export class RedisCacheService {
       if (!response.ok) return [];
       const data = await response.json();
       return Array.isArray(data) ? data.map((entry: any) => entry.data).filter(Boolean) : [];
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return [];
+      }
       return [];
     }
   }
@@ -343,7 +379,10 @@ export class RedisCacheService {
       if (!response.ok) {
         console.debug(`[RedisCacheService] Tracks sync failed (${response.status})`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return; // Silent return for expected errors
+      }
       console.debug('[RedisCacheService] Tracks sync offline');
     }
   }
@@ -392,8 +431,12 @@ export class RedisCacheService {
       });
       clearTimeout(timeoutId);
       return response.ok && response.status === 200;
-    } catch (e) {
+    } catch (e: any) {
       // Silently fail - Redis is optional
+      // Handle AbortError, ECONNRESET, and other network errors
+      if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
+        return false;
+      }
       return false;
     }
   }
