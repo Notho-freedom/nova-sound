@@ -111,17 +111,8 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
     setOpenMenu(null);
   };
 
-  const handleSyncNow = async () => {
-    window.dispatchEvent(new CustomEvent("nexus-sync-start"));
-    try {
-      // Sync via global event - le TitleBar ou DesktopApp gérera
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent("nexus-sync-complete"));
-      }, 1000);
-    } catch (error) {
-      console.error("MenuBar: Manual sync failed:", error);
-      window.dispatchEvent(new CustomEvent("nexus-sync-error"));
-    }
+  const handleSyncNow = () => {
+    window.dispatchEvent(new CustomEvent("nexus-sync-now"));
     setOpenMenu(null);
   };
 
@@ -151,7 +142,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
   };
 
   const handleOpenSubscription = () => {
-    window.dispatchEvent(new CustomEvent("nexus-open-subscription"));
+    window.dispatchEvent(new CustomEvent("nexus-nav", { detail: { destination: "settings", section: "subscription" } }));
     setOpenMenu(null);
   };
 
@@ -166,7 +157,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
   };
 
   const handleOpenDocumentation = () => {
-    window.open("https://github.com/Notho-freedom/nova-sound", "_blank");
+    window.dispatchEvent(new CustomEvent("nexus-open-documentation"));
     setOpenMenu(null);
   };
 

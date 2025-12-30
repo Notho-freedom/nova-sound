@@ -1426,11 +1426,11 @@ export const DesktopApp = () => {
     // Open files
     const handleOpenFilesEvent = async () => {
       try {
-        // Browser fallback
         const input = document.createElement('input');
         input.type = 'file';
         input.multiple = true;
         input.accept = 'audio/*';
+        
         input.onchange = async (e) => {
           const files = Array.from((e.target as HTMLInputElement).files || []);
           if (files.length === 0) return;
@@ -1438,46 +1438,86 @@ export const DesktopApp = () => {
           console.log('[DesktopApp] Files selected:', files.length);
           
           try {
-            // Convertir les fichiers en Track objects
-            const newTracks: Track[] = files.map((file, index) => {
-              // Extraire le nom du fichier sans extension
-              const fileName = file.name.replace(/\.[^/.]+$/, "");
-              const [title, artist] = fileName.includes('-') 
-                ? fileName.split('-').map(s => s.trim())
-                : [fileName, 'Unknown Artist'];
-              
-              // Créer une URL blob pour le fichier
-              const fileUrl = URL.createObjectURL(file);
-              
-              return {
-                id: `local-${Date.now()}-${index}-${Math.random()}`,
-                title: title || 'Unknown Track',
-                artist: artist || 'Unknown Artist',
-                album: 'Local Files',
-                duration: 0, // Sera défini quand l'audio est chargé
-                coverUrl: '', // Les fichiers locaux n'ont pas de cover par défaut
-                mediaSource: 'local',
-                filePath: fileUrl,
-                addedAt: new Date().toISOString(),
-              };
-            });
+            // Convertir les fichiers en Track objects avec extraction de métadonnées
+            const newTracks: Track[] = await Promise.all(
+              files.map(async (file, index) => {
+                // Extraire le nom du fichier sans extension
+                const fileName = file.name.replace(/\.[^/.]+$/, "");
+                const [title, artist] = fileName.includes('-') 
+                  ? fileName.split('-').map(s => s.trim())
+                  : [fileName, 'Unknown Artist'];
+                
+                // Créer une URL blob pour le fichier
+                const fileUrl = URL.createObjectURL(file);
+                
+                // Générer un ID stable basé sur le nom et la taille du fichier
+                // (similaire à comment les systèmes gèrent les fichiers locaux)
+                const idBase = `${file.name}-${file.size}-${file.lastModified}`;
+                const id = `local-${btoa(idBase).replace(/[^a-z0-9]/gi, '').substring(0, 20)}`;
+                
+                // Extraire les métadonnées du fichier audio
+                let duration = 0;
+                try {
+                  // Créer un audio element temporaire pour extraire la durée
+                  const audioElement = new Audio();
+                  duration = await new Promise<number>((resolve) => {
+                    const timeout = setTimeout(() => {
+                      audioElement.pause();
+                      resolve(0); // Fallback à 0 si non trouvé
+                    }, 5000); // Max 5 secondes pour extraire la durée
+                    
+                    audioElement.onloadedmetadata = () => {
+                      clearTimeout(timeout);
+                      const dur = audioElement.duration || 0;
+                      audioElement.pause();
+                      resolve(isFinite(dur) ? dur : 0);
+                    };
+                    
+                    audioElement.src = fileUrl;
+                    audioElement.load();
+                  });
+                } catch (err) {
+                  console.warn('[DesktopApp] Could not extract duration:', err);
+                  duration = 0;
+                }
+                
+                // Créer le Track object exactement comme les tracks locaux du système
+                return {
+                  id,
+                  title: title || 'Unknown Track',
+                  artist: artist || 'Unknown Artist',
+                  album: 'Local Files',
+                  duration: Math.round(duration), // Durée en secondes
+                  coverUrl: '', // Les fichiers locaux utilisent la cover par défaut
+                  mediaSource: 'local' as const,
+                  filePath: fileUrl, // Blob URL (géré par getAudioSrc)
+                  addedAt: new Date().toISOString(),
+                  format: file.type || file.name.split('.').pop() || 'unknown',
+                } as Track;
+              })
+            );
             
             // Ajouter les tracks à la queue
             if (newTracks.length > 0) {
+              // Ajouter à la queue existante
               addToQueue(newTracks);
               
               // Jouer le premier fichier ajouté
-              setCurrentIndex(queue.tracks.length);
+              const startIndex = queue.tracks.length - newTracks.length;
+              if (startIndex >= 0) {
+                setCurrentIndex(startIndex);
+              }
               
               // Toast de succès
               toast.success(`${newTracks.length} fichier(s) ajouté(s) à la file`);
-              console.log('[DesktopApp] Tracks loaded:', newTracks.length);
+              console.log('[DesktopApp] Local tracks loaded:', newTracks);
             }
           } catch (parseErr) {
             console.error('[DesktopApp] Error processing files:', parseErr);
             toast.error('Erreur lors du traitement des fichiers');
           }
         };
+        
         input.click();
       } catch (err) {
         console.error('[DesktopApp] Error opening files:', err);
@@ -1556,12 +1596,32 @@ export const DesktopApp = () => {
     const handleNavEvent = (event: Event) => {
       const customEvent = event as CustomEvent;
       const destination = customEvent.detail?.destination;
+      const section = customEvent.detail?.section;
+      
       if (destination) {
         setCurrentView(destination as any);
         setShowInlinePlayer(false);
+        
+        // Si une section est spécifiée et que c'est settings, passer le paramètre
+        if (destination === 'settings' && section) {
+          // Le paramètre section sera utilisé par SettingsView pour scroller/focus
+          // Voir useViewNavigation pour les paramètres
+          console.log('[DesktopApp] Navigate to settings with section:', section);
+        }
       }
     };
     window.addEventListener('nexus-nav', handleNavEvent);
+
+    // Open documentation
+    const handleOpenDocumentationEvent = () => {
+      try {
+        window.open("https://github.com/Notho-freedom/nova-sound", "_blank");
+      } catch (err) {
+        console.error('[DesktopApp] Error opening documentation:', err);
+        toast.error('Impossible d\'ouvrir la documentation');
+      }
+    };
+    window.addEventListener('nexus-open-documentation', handleOpenDocumentationEvent);
 
     // Cleanup
     return () => {
@@ -1581,6 +1641,7 @@ export const DesktopApp = () => {
       window.removeEventListener('nexus-check-updates', handleCheckUpdatesEvent);
       window.removeEventListener('nexus-about', handleAboutEvent);
       window.removeEventListener('nexus-nav', handleNavEvent);
+      window.removeEventListener('nexus-open-documentation', handleOpenDocumentationEvent);
     };
   }, [handlePlayPause, handlePrevious, handleNext, currentTrack, setShowInlinePlayer, setCurrentView, setIsQueueOpen, addToQueue, setCurrentIndex, queue]);
 
