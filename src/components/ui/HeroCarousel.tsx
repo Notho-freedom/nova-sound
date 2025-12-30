@@ -232,7 +232,7 @@ export const HeroCarousel = memo(({
   return (
     <div
       className={cn(
-        "relative w-full h-[400px] md:h-[480px] lg:h-[520px] rounded-3xl overflow-hidden group",
+        "relative w-full h-[500px] md:h-[550px] lg:h-[600px] rounded-3xl overflow-hidden group mt-1",
         className
       )}
       onMouseEnter={() => setIsPaused(true)}
@@ -322,7 +322,7 @@ export const HeroCarousel = memo(({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-foreground"
+              className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-foreground truncate max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg"
               style={{
                 textShadow: "0 4px 30px rgba(0,0,0,0.5)",
               }}
@@ -431,13 +431,13 @@ export const HeroCarousel = memo(({
 
       {/* Progress bar */}
       {autoPlay && !isPaused && enhancedSlides.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/15 z-20">
           <motion.div
             key={currentIndex}
             initial={{ width: "0%" }}
             animate={{ width: "100%" }}
             transition={{ duration: interval / 1000, ease: "linear" }}
-            className="h-full bg-gradient-to-r from-primary to-secondary"
+            className="h-full bg-gradient-to-r from-primary to-secondary shadow-[0_0_12px_rgba(0,0,0,0.25)]"
           />
         </div>
       )}

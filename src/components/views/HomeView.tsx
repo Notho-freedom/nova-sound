@@ -175,12 +175,12 @@ export const HomeView = memo(({
   const displayRecent = useMemo(() => 
     recentTracks.length > 0 
       ? getUniqueTracks(recentTracks).slice(0, 30) // Increased from 20 to 30
-      : getUniqueTracks(tracks).slice(0, 20), // Increased from 10 to 20
+      : getUniqueTracks(tracks).slice(0, 30), // Increased from 10 to 20
     [recentTracks, tracks, getUniqueTracks]
   );
   
   const displayFavorites = useMemo(() => 
-    favoriteTracks.length > 0 ? getUniqueTracks(favoriteTracks).slice(0, 10) : [],
+    favoriteTracks.length > 0 ? getUniqueTracks(favoriteTracks).slice(0, 30) : [],
     [favoriteTracks, getUniqueTracks]
   );
 
@@ -190,7 +190,7 @@ export const HomeView = memo(({
   );
 
   const newTracks = useMemo(() => {
-    return getUniqueTracks(tracks).slice(-20).reverse(); // Increased from 12 to 20
+    return getUniqueTracks(tracks).slice(-30).reverse(); // Increased from 12 to 20
   }, [tracks, getUniqueTracks]);
 
   const topGenres = useMemo(() => genres.slice(0, 16), [genres]); // Increased from 8 to 16
@@ -199,7 +199,7 @@ export const HomeView = memo(({
   // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
   const recentArtists = useMemo(() => {
     if (!stats?.recentArtists) return [];
-    return stats.recentArtists.slice(0, 20); // Increased from 10 to 20
+    return stats.recentArtists.slice(0, 30); // Increased from 10 to 20
   }, [stats]);
 
   // Hero slides
@@ -490,6 +490,7 @@ export const HomeView = memo(({
                     imageUrl={getCoverUrl(track.coverUrl)}
                     isPlaying={isPlaying}
                     isCurrent={isCurrent}
+                    onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                     onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
                     size="md"
                     className="snap-start"

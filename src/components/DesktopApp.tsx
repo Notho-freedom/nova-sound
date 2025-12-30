@@ -2342,6 +2342,7 @@ console.log('History Tracks:', history.length, history);
             }}
           >
             <YouTubePlayer
+              key={currentTrack?.id || 'yt-player'}
               ref={youtubePlayerRef}
               videoId={currentTrack?.youtubeVideoId || ''}
               autoPlay={isPlaying}
