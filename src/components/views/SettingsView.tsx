@@ -55,6 +55,7 @@ import { stripeService, PRICE_IDS } from "@/services/stripe";
 import type { SubscriptionStatus } from "@/services/stripe";
 import { Skeleton } from "@/components/ui/skeleton";
 import { testYouTubeApiKey } from "@/lib/youtube-api-test";
+import { redisCache } from "@/services/redis-cache";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -409,6 +410,8 @@ export const SettingsView = () => {
 
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [redisConnected, setRedisConnected] = useState<boolean | null>(null);
+  const [redisChecking, setRedisChecking] = useState(false);
   // Initialize settings with current theme from useTheme hook
   const [settings, setSettings] = useState<Partial<Settings>>(() => {
     const savedTheme = typeof window !== 'undefined' 
@@ -616,6 +619,15 @@ export const SettingsView = () => {
       setYoutubeApiKey(savedYouTubeKey);
       // Cacher la config si une clé existe déjà
       setShowYouTubeConfig(!savedYouTubeKey);
+      
+      // Check Redis connection status
+      try {
+        const isRedisConnected = await redisCache.isConnected();
+        setRedisConnected(isRedisConnected);
+      } catch (error) {
+        console.error('[Settings] Failed to check Redis status:', error);
+        setRedisConnected(false);
+      }
       
       setLoading(false);
     };
@@ -2665,6 +2677,43 @@ export const SettingsView = () => {
                     <span className={cn("text-sm", stripeInitialized ? "text-green-500" : "text-yellow-500")}>
                       {stripeInitialized ? "Connecté" : "Non configuré"}
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between group">
+                    <span className="text-sm text-muted-foreground">Redis Cache (L3)</span>
+                    <div className="flex items-center gap-2">
+                      {redisChecking ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                      ) : (
+                        <span className={cn(
+                          "text-sm",
+                          redisConnected === null ? "text-muted-foreground" :
+                          redisConnected ? "text-green-500" : "text-yellow-500"
+                        )}>
+                          {redisConnected === null ? "Vérification..." :
+                           redisConnected ? "Connecté" : "Non configuré"}
+                        </span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={async () => {
+                          setRedisChecking(true);
+                          try {
+                            const isConnected = await redisCache.isConnected();
+                            setRedisConnected(isConnected);
+                            toast.success(isConnected ? "Redis connecté" : "Redis non configuré");
+                          } catch (error) {
+                            setRedisConnected(false);
+                            toast.error("Erreur de connexion Redis");
+                          } finally {
+                            setRedisChecking(false);
+                          }
+                        }}
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="pt-3 flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => notifySuccess("Vous êtes à jour !")}>

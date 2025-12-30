@@ -29,8 +29,9 @@ class RedisCacheServer {
     password: process.env.REDIS_PASSWORD || '',
     socket: {
       host: process.env.REDIS_HOST || '',
-      port: parseInt(process.env.REDIS_PORT || ''),
+      port: parseInt(process.env.REDIS_PORT || '6379'),
     },
+    database: parseInt(process.env.REDIS_DB || '0'),
     // TTL configuration
     videoTTL: 7 * 24 * 60 * 60,           // 7 days in seconds
     searchTTL: 7 * 24 * 60 * 60,          // 7 days
@@ -42,12 +43,31 @@ class RedisCacheServer {
   };
 
   async connect(): Promise<void> {
+    // Check if Redis is configured
+    if (!this.CONFIG.socket.host || !this.CONFIG.socket.port) {
+      console.warn('[RedisCacheServer] Redis not configured (REDIS_HOST or REDIS_PORT missing), skipping connection');
+      return;
+    }
+
     try {
-      this.client = createClient({
-        username: this.CONFIG.username,
-        password: this.CONFIG.password,
+      const clientConfig: any = {
         socket: this.CONFIG.socket,
-      });
+      };
+
+      // Add authentication if provided
+      if (this.CONFIG.username) {
+        clientConfig.username = this.CONFIG.username;
+      }
+      if (this.CONFIG.password) {
+        clientConfig.password = this.CONFIG.password;
+      }
+
+      // Add database selection if provided
+      if (this.CONFIG.database) {
+        clientConfig.database = this.CONFIG.database;
+      }
+
+      this.client = createClient(clientConfig);
 
       this.client.on('error', (err) => {
         console.error('[RedisCacheServer] Redis error:', err);
@@ -55,14 +75,15 @@ class RedisCacheServer {
       });
 
       this.client.on('connect', () => {
-        console.log('[RedisCacheServer] Redis connected');
+        console.log('[RedisCacheServer] Redis connected successfully');
         this.isConnected = true;
       });
 
       await this.client.connect();
-      console.log('[RedisCacheServer] Connected to Redis server');
+      console.log(`[RedisCacheServer] Connected to Redis at ${this.CONFIG.socket.host}:${this.CONFIG.socket.port}`);
     } catch (error) {
       console.error('[RedisCacheServer] Connection failed:', error);
+      this.isConnected = false;
       throw error;
     }
   }
