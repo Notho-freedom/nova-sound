@@ -151,49 +151,6 @@ export const FullscreenPlayer = ({
     });
   }, [onSeek]);
 
-  const handleYouTubeReady = useCallback(() => {
-    // Ce callback n'est plus utilisé car on utilise le player persistant de DesktopApp
-    // Mais on le garde pour compatibilité si jamais un player local est créé
-    if (sharedYoutubePlayerRef && sharedYoutubePlayerRef.current) {
-      const player = sharedYoutubePlayerRef.current;
-      
-      // Mettre à jour l'état avec les valeurs du player
-      setYoutubeState(prev => ({
-        ...prev,
-        volume: player.volume,
-        isMuted: player.isMuted,
-        duration: player.duration || currentTrack.duration,
-      }));
-      
-      // Synchroniser le volume et mute avec les valeurs actuelles
-      const currentVol = isMuted ? 0 : volume;
-      if (Math.abs(player.volume - currentVol) > 1) {
-        player.setVolume(currentVol);
-      }
-      if (player.isMuted !== isMuted) {
-        if (isMuted && !player.isMuted) {
-          player.toggleMute();
-        } else if (!isMuted && player.isMuted) {
-          player.toggleMute();
-        }
-      }
-      
-      // Démarrer la lecture si isPlaying est true
-      if (isPlaying && !player.isPlaying) {
-        // Attendre un peu pour s'assurer que tout est initialisé
-        setTimeout(() => {
-          if (player && typeof player.play === 'function' && !player.isPlaying) {
-            try {
-              player.play();
-            } catch (err: unknown) {
-              console.error('[FullscreenPlayer] Erreur lors du play automatique:', err);
-            }
-          }
-        }, 300);
-      }
-    }
-  }, [isPlaying, currentTrack.duration, volume, isMuted]);
-
   // Synchroniser les contrôles avec le player YouTube persistant
   // Utiliser toujours la ref partagée (player persistant de DesktopApp)
   useEffect(() => {
@@ -285,7 +242,7 @@ useEffect(() => {
 
     const barWidth = width / barCount;
 
-    for (let i of bars) {
+    for (const i of bars) {
       const index = Math.floor((i / barCount) * freqData.length);
       const value = freqData[index] || 0;
       const barHeight = (value / 255) * height;
@@ -310,7 +267,7 @@ useEffect(() => {
   rafId = requestAnimationFrame(loop);
 
   return () => cancelAnimationFrame(rafId);
-}, [vibesData?.frequency, bars]);
+}, [vibesData?.frequency, bars, audioElement]);
 
   const VolumeIcon = isMuted || volume === 0 
     ? VolumeX 
@@ -337,7 +294,7 @@ useEffect(() => {
   }, [currentTrack.id, currentTrack.artist, currentTrack.title]);
 
   // Utiliser youtubeDuration pour les tracks YouTube, sinon la durée du track
-  const isYouTubeTrack = currentTrack.mediaSource === 'youtube';
+  const isYouTubeTrack = (currentTrack.mediaSource as string)?.toLowerCase().includes('youtube');
   const effectiveDuration = isYouTubeTrack && youtubeDuration ? youtubeDuration : currentTrack.duration;
   const progress = effectiveDuration > 0 
     ? (currentTime / effectiveDuration) * 100 
@@ -868,10 +825,6 @@ useEffect(() => {
                 <span className="text-white/50 font-mono tabular-nums">
                   {formatTime(currentTime)}
                 </span>
-                <div className="flex items-center gap-2 text-white/30">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="text-xs">{formatDuration(effectiveDuration)}</span>
-                </div>
                 <span className="text-white/50 font-mono tabular-nums">
                   {formatTime(effectiveDuration)}
                 </span>

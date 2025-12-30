@@ -500,6 +500,29 @@ console.log('History Tracks:', history.length, history);
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
+
+    // Sync YouTube player volume/mute as well
+    if ((currentTrack?.mediaSource as string)?.toString().toLowerCase().includes('youtube')) {
+      const applyYouTubeVolume = () => {
+        if (!youtubePlayerRef.current) return;
+        const player = youtubePlayerRef.current;
+        try {
+          player.setVolume(isMuted ? 0 : volume);
+          if (isMuted && !player.isMuted) {
+            player.toggleMute();
+          } else if (!isMuted && player.isMuted) {
+            player.toggleMute();
+          }
+        } catch (err) {
+          console.warn('[DesktopApp] Unable to sync YouTube volume/mute', err);
+        }
+      };
+
+      applyYouTubeVolume();
+      // Retry shortly in case the player wasn't fully ready
+      const retryId = setTimeout(applyYouTubeVolume, 300);
+      return () => clearTimeout(retryId);
+    }
     
     // Save volume to localStorage and sync to Firebase
     localStorage.setItem('nexus-volume', volume.toString());
@@ -899,8 +922,23 @@ console.log('History Tracks:', history.length, history);
   }, [currentTrack?.mediaSource]);
 
   const handleVolumeChange = useCallback((value: number[]) => {
-    setVolume(value[0]);
-    setIsMuted(prev => prev && value[0] > 0 ? false : prev);
+    const nextVol = value[0];
+    setVolume(nextVol);
+    setIsMuted(prev => (prev && nextVol > 0 ? false : prev));
+
+    // Apply immediately to YouTube player to avoid waiting for effect ticks
+    if ((currentTrack?.mediaSource as string)?.toString().toLowerCase().includes('youtube') && youtubePlayerRef.current) {
+      try {
+        youtubePlayerRef.current.setVolume(nextVol);
+        if (nextVol === 0 && !youtubePlayerRef.current.isMuted) {
+          youtubePlayerRef.current.toggleMute();
+        } else if (nextVol > 0 && youtubePlayerRef.current.isMuted) {
+          youtubePlayerRef.current.toggleMute();
+        }
+      } catch (err) {
+        console.warn('[DesktopApp] Immediate YouTube volume sync failed:', err);
+      }
+    }
   }, []);
 
   const handleRepeat = useCallback(() => {
