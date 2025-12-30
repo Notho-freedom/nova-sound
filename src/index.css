@@ -1475,3 +1475,30 @@
 .animate-pulse-slow {
   animation: pulse-slow 3s ease-in-out infinite;
 }
+
+/* YouTube fullscreen - Force cover sans bandes noires */
+#youtube-player-container {
+  overflow: hidden;
+  position: relative;
+}
+
+#youtube-player-container iframe {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  /* Toujours plus grand que le conteneur pour éviter les bandes noires */
+  width: 177.77vh !important; /* 16:9 ratio basé sur la hauteur */
+  height: 100vh !important;
+  min-width: 100vw !important;
+  min-height: 100vh !important;
+}
+
+/* Si la vidéo est plus large que haute */
+@media (min-aspect-ratio: 16/9) {
+  #youtube-player-container iframe {
+    width: 100vw !important;
+    height: 56.25vw !important; /* 16:9 ratio basé sur la largeur */
+  }
+}
+

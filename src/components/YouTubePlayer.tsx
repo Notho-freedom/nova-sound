@@ -199,6 +199,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
 
   return (
     <div
+      id="youtube-player-container"
       className={cn(
         "relative w-full h-full bg-black",
         audioOnly && "overflow-hidden",
@@ -222,7 +223,10 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
           pointerEvents: 'auto',
           transform: 'none',
           width: '100%',
-          height: '100%'
+          height: '100%',
+          minWidth: '100%',
+          minHeight: '100%',
+          objectFit: 'cover'
         }}
       />
       
