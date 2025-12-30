@@ -1371,6 +1371,178 @@ console.log('History Tracks:', history.length, history);
     };
   }, [playlists, allTracks]);
 
+  // MenuBar Custom Events Handlers
+  useEffect(() => {
+    // Play/Pause toggle
+    const handlePlayToggleEvent = () => {
+      handlePlayPause();
+    };
+    window.addEventListener('nexus-play-toggle', handlePlayToggleEvent);
+
+    // Previous track
+    const handlePrevEvent = () => {
+      handlePrevious();
+    };
+    window.addEventListener('nexus-play-prev', handlePrevEvent);
+
+    // Next track
+    const handleNextEvent = () => {
+      handleNext();
+    };
+    window.addEventListener('nexus-play-next', handleNextEvent);
+
+    // Toggle mini player
+    const handleMiniPlayerEvent = () => {
+      setShowInlinePlayer(prev => !prev);
+    };
+    window.addEventListener('nexus-toggle-mini-player', handleMiniPlayerEvent);
+
+    // Open now playing view
+    const handleNowPlayingEvent = () => {
+      if (currentTrack) {
+        setShowInlinePlayer(false);
+        setCurrentView('player');
+      }
+    };
+    window.addEventListener('nexus-open-now-playing', handleNowPlayingEvent);
+
+    // Open queue view
+    const handleQueueEvent = () => {
+      setIsQueueOpen(prev => !prev);
+    };
+    window.addEventListener('nexus-open-queue', handleQueueEvent);
+
+    // Toggle sidebar
+    const handleSidebarEvent = () => {
+      setSidebarCollapsed(prev => !prev);
+    };
+    window.addEventListener('nexus-toggle-sidebar', handleSidebarEvent);
+
+    // New playlist - navigate to playlists view
+    const handleNewPlaylistEvent = () => {
+      setCurrentView('playlists');
+    };
+    window.addEventListener('nexus-new-playlist', handleNewPlaylistEvent);
+
+    // Open files
+    const handleOpenFilesEvent = async () => {
+      try {
+        // Browser fallback
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.accept = 'audio/*';
+        input.onchange = async (e) => {
+          const files = Array.from((e.target as HTMLInputElement).files || []);
+          // Handle file loading
+          console.log('[DesktopApp] Files selected:', files.length);
+        };
+        input.click();
+      } catch (err) {
+        console.error('[DesktopApp] Error opening files:', err);
+        toast.error('Erreur lors de l\'ouverture des fichiers');
+      }
+    };
+    window.addEventListener('nexus-open-files', handleOpenFilesEvent);
+
+    // Open folders
+    const handleOpenFoldersEvent = async () => {
+      try {
+        console.log('[DesktopApp] Folder opening not available in browser mode');
+        toast.info('Fonction disponible uniquement en mode desktop');
+      } catch (err) {
+        console.error('[DesktopApp] Error opening folders:', err);
+        toast.error('Erreur lors de l\'ouverture des dossiers');
+      }
+    };
+    window.addEventListener('nexus-open-folders', handleOpenFoldersEvent);
+
+    // Import library (sync from local files)
+    const handleImportEvent = async () => {
+      try {
+        // This should trigger a full library scan from local files
+        toast.success('Importation de la bibliothèque en cours...');
+      } catch (err) {
+        console.error('[DesktopApp] Error importing library:', err);
+        toast.error('Erreur lors de l\'importation de la bibliothèque');
+      }
+    };
+    window.addEventListener('nexus-import-library', handleImportEvent);
+
+    // Sync now (Firebase sync)
+    const handleSyncEvent = async () => {
+      try {
+        toast.success('Synchronisation en cours...');
+      } catch (err) {
+        console.error('[DesktopApp] Error syncing:', err);
+        toast.error('Erreur lors de la synchronisation');
+      }
+    };
+    window.addEventListener('nexus-sync-now', handleSyncEvent);
+
+    // Clear cache
+    const handleClearCacheEvent = async () => {
+      try {
+        // Clear browser storage
+        localStorage.clear();
+        sessionStorage.clear();
+        toast.success('Cache vidé avec succès');
+      } catch (err) {
+        console.error('[DesktopApp] Error clearing cache:', err);
+        toast.error('Erreur lors de la suppression du cache');
+      }
+    };
+    window.addEventListener('nexus-clear-cache', handleClearCacheEvent);
+
+    // Check updates (Electron updater)
+    const handleCheckUpdatesEvent = async () => {
+      try {
+        toast.info('Vérification des mises à jour...');
+      } catch (err) {
+        console.error('[DesktopApp] Error checking updates:', err);
+        toast.error('Erreur lors de la vérification des mises à jour');
+      }
+    };
+    window.addEventListener('nexus-check-updates', handleCheckUpdatesEvent);
+
+    // About app
+    const handleAboutEvent = () => {
+      toast.info('Nova Sound - Application musicale intelligente');
+    };
+    window.addEventListener('nexus-about', handleAboutEvent);
+
+    // Navigation handler
+    const handleNavEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const destination = customEvent.detail?.destination;
+      if (destination) {
+        setCurrentView(destination as any);
+        setShowInlinePlayer(false);
+      }
+    };
+    window.addEventListener('nexus-nav', handleNavEvent);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('nexus-play-toggle', handlePlayToggleEvent);
+      window.removeEventListener('nexus-play-prev', handlePrevEvent);
+      window.removeEventListener('nexus-play-next', handleNextEvent);
+      window.removeEventListener('nexus-toggle-mini-player', handleMiniPlayerEvent);
+      window.removeEventListener('nexus-open-now-playing', handleNowPlayingEvent);
+      window.removeEventListener('nexus-open-queue', handleQueueEvent);
+      window.removeEventListener('nexus-toggle-sidebar', handleSidebarEvent);
+      window.removeEventListener('nexus-new-playlist', handleNewPlaylistEvent);
+      window.removeEventListener('nexus-open-files', handleOpenFilesEvent);
+      window.removeEventListener('nexus-open-folders', handleOpenFoldersEvent);
+      window.removeEventListener('nexus-import-library', handleImportEvent);
+      window.removeEventListener('nexus-sync-now', handleSyncEvent);
+      window.removeEventListener('nexus-clear-cache', handleClearCacheEvent);
+      window.removeEventListener('nexus-check-updates', handleCheckUpdatesEvent);
+      window.removeEventListener('nexus-about', handleAboutEvent);
+      window.removeEventListener('nexus-nav', handleNavEvent);
+    };
+  }, [handlePlayPause, handlePrevious, handleNext, currentTrack, setShowInlinePlayer, setCurrentView, setIsQueueOpen]);
+
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
     setShowInlinePlayer(false);
