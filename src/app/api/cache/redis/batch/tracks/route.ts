@@ -14,8 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(req: NextRequest) {
   // Check if request was aborted
   if (req.signal.aborted) {
-    console.debug('[Redis Batch] GET request aborted before processing');
-    return new NextResponse('Client closed request', { status: 499 });
+    return new NextResponse(null, { status: 499 });
   }
 
   const hasRedisConfig = !!process.env.REDIS_HOST;
@@ -46,8 +45,7 @@ export async function GET(req: NextRequest) {
 
     // Check abort again before Redis operation
     if (req.signal.aborted) {
-      console.debug('[Redis Batch] GET request aborted during processing');
-      return new NextResponse('Client closed request', { status: 499 });
+      return new NextResponse(null, { status: 499 });
     }
 
     const { redisCacheServer } = await import('@/services/redis-cache-server');
@@ -62,10 +60,9 @@ export async function GET(req: NextRequest) {
       requested: trackIds.length
     });
   } catch (error: any) {
-    // Handle specific error cases
-    if (error?.code === 'ECONNRESET' || error?.name === 'AbortError') {
-      console.debug('[Redis Batch] Connection aborted:', error.code || error.name);
-      return new NextResponse('Client closed request', { status: 499 });
+    // Silently handle connection abort errors
+    if (error?.code === 'ECONNRESET' || error?.name === 'AbortError' || req.signal.aborted) {
+      return new NextResponse(null, { status: 499 });
     }
     
     console.error('[Redis Batch] GET error:', error);
@@ -83,8 +80,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   // Check if request was aborted
   if (req.signal.aborted) {
-    console.debug('[Redis Batch] PUT request aborted before processing');
-    return new NextResponse('Client closed request', { status: 499 });
+    return new NextResponse(null, { status: 499 });
   }
 
   const hasRedisConfig = !!process.env.REDIS_HOST;
@@ -97,7 +93,13 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    // Add timeout to prevent hanging requests
+    const bodyPromise = req.json();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), 5000)
+    );
+    
+    const body = await Promise.race([bodyPromise, timeoutPromise]) as any;
     
     if (!Array.isArray(body) || body.length === 0) {
       return NextResponse.json(
@@ -108,8 +110,7 @@ export async function PUT(req: NextRequest) {
 
     // Check abort again before Redis operation
     if (req.signal.aborted) {
-      console.debug('[Redis Batch] PUT request aborted during processing');
-      return new NextResponse('Client closed request', { status: 499 });
+      return new NextResponse(null, { status: 499 });
     }
 
     const { redisCacheServer } = await import('@/services/redis-cache-server');
@@ -124,10 +125,14 @@ export async function PUT(req: NextRequest) {
       message: `Batch stored ${body.length} tracks via pipeline`
     });
   } catch (error: any) {
-    // Handle specific error cases
-    if (error?.code === 'ECONNRESET' || error?.name === 'AbortError') {
-      console.debug('[Redis Batch] Connection aborted:', error.code || error.name);
-      return new NextResponse('Client closed request', { status: 499 });
+    // Silently handle connection abort errors
+    if (error?.code === 'ECONNRESET' || error?.name === 'AbortError' || req.signal.aborted) {
+      return new NextResponse(null, { status: 499 });
+    }
+    
+    // Handle timeout silently
+    if (error?.message === 'Request timeout') {
+      return new NextResponse(null, { status: 408 });
     }
     
     console.error('[Redis Batch] PUT error:', error);

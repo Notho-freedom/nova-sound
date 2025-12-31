@@ -2,21 +2,20 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Proxy pour optimiser les rechargements et le cache
- * Empêche les recompilations inutiles pour certaines routes
+ * Middleware Next.js pour optimiser le cache et gérer les requêtes
  * 
- * Note: Le proxy fonctionne uniquement dans le runtime Node.js
+ * Note: Ce middleware est exécuté pour chaque requête
  */
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   
-  // Empêcher les rechargements inutiles pour certaines routes
+  // Empêcher le cache pour les routes API et /_next/
   if (request.nextUrl.pathname.startsWith('/api/') || 
       request.nextUrl.pathname.startsWith('/_next/')) {
     response.headers.set('Cache-Control', 'no-store, max-age=0');
   }
   
-  // Ajouter des headers pour optimiser les ressources statiques
+  // Optimiser le cache pour les ressources statiques
   if (request.nextUrl.pathname.startsWith('/_next/static/')) {
     response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   }

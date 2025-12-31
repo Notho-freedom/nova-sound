@@ -25,6 +25,25 @@ import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions, ty
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Global error handlers to prevent ECONNRESET and other connection errors from crashing
+process.on('uncaughtException', (error: any) => {
+  // Silently ignore connection reset errors (client closed connection)
+  if (error?.code === 'ECONNRESET' || error?.code === 'ECONNREFUSED' || error?.code === 'EPIPE') {
+    return;
+  }
+  // Log other uncaught exceptions
+  console.error('[Electron] Uncaught exception:', error);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  // Silently ignore connection reset errors
+  if (reason?.code === 'ECONNRESET' || reason?.code === 'ECONNREFUSED' || reason?.code === 'EPIPE') {
+    return;
+  }
+  // Log other unhandled rejections
+  console.error('[Electron] Unhandled rejection:', reason);
+});
+
 // Parse CLI arguments and normalize (remove duplicates, validate)
 const cliOptions = normalizeOptions(parseArgs());
 
