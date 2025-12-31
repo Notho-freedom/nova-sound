@@ -30,6 +30,7 @@ import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FileTableSkeleton, SettingsViewSkeleton, NotificationListSkeleton } from "@/components/ui/skeletons";
 import { Clock, Music, Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -2253,26 +2254,49 @@ export const DesktopApp = () => {
         );
       case "downloads":
         return (
-          <Suspense fallback={<div className="p-6">Chargement des téléchargements...</div>}>
+          <Suspense fallback={<div className="px-6 py-4"><FileTableSkeleton count={8} /></div>}>
             <DownloadsView />
           </Suspense>
         );
       case "cloud":
         return (
-          <Suspense fallback={<div className="p-6">Chargement du cloud...</div>}>
+          <Suspense fallback={<div className="px-6 py-4"><FileTableSkeleton count={5} /></div>}>
             <CloudView />
           </Suspense>
         );
       case "audio-senses":
         return (
-          <Suspense fallback={<div className="p-6">Chargement des sens audio...</div>}>
+          <Suspense fallback={
+            <div className="p-6 space-y-6">
+              <Skeleton className="h-8 w-48" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-32 rounded-xl" />
+                ))}
+              </div>
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+          }>
             {audioRef.current && <AudioSensesView audioElement={audioRef.current} />}
           </Suspense>
         );
       case "settings":
-        return <SettingsView />;
+        return (
+          <Suspense fallback={<SettingsViewSkeleton />}>
+            <SettingsView />
+          </Suspense>
+        );
       case "notifications":
-        return <NotificationsView />;
+        return (
+          <Suspense fallback={
+            <div className="px-6 py-4 space-y-4">
+              <Skeleton className="h-8 w-48 mb-4" />
+              <NotificationListSkeleton count={6} />
+            </div>
+          }>
+            <NotificationsView />
+          </Suspense>
+        );
       default:
         return (
           <div className="p-6">
@@ -2458,16 +2482,7 @@ export const DesktopApp = () => {
               showInlinePlayer && "flex items-center justify-center",
               currentView === "videos" && "overflow-hidden"
             )}>
-              <Suspense fallback={
-                <div className="h-full w-full p-8 space-y-6">
-                  <Skeleton className="h-8 w-48" />
-                  <div className="space-y-4">
-                    <Skeleton className="h-32 w-full rounded-lg" />
-                    <Skeleton className="h-32 w-full rounded-lg" />
-                    <Skeleton className="h-32 w-full rounded-lg" />
-                  </div>
-                </div>
-              }>
+              <Suspense fallback={null}>
                 {showInlinePlayer ? (
                   <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
                     {currentViewContent}
