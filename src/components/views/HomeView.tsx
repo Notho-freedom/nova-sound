@@ -7,7 +7,7 @@ import { getCoverUrl } from "@/lib/audio";
 import { useState, useMemo, useCallback, memo } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrackCardSkeleton, PlaylistCardSkeleton } from "@/components/ui/skeletons";
+import { TrackCardSkeleton, PlaylistCardSkeleton, HomeViewSkeleton } from "@/components/ui/skeletons";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { UploadIndicator } from "@/components/UploadIndicator";
 import { usePlaylists } from "@/hooks/usePlaylists";
@@ -289,21 +289,7 @@ export const HomeView = memo(({
 
   // Loading skeleton
   if (loading) {
-    return (
-      <div className="px-6 py-4 space-y-8 animate-fade-in">
-        <Skeleton className="w-full h-[480px] rounded-3xl" />
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <HomeViewSkeleton />;
   }
 
   return (

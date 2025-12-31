@@ -1,3 +1,6 @@
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
 /**
  * Skeleton pour une liste de notifications
  */
@@ -25,8 +28,7 @@ export const PlaylistGridSkeleton = ({ count = 12 }: { count?: number }) => (
     ))}
   </div>
 );
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+
 /**
  * Skeleton pour une carte de piste
  */
@@ -311,7 +313,7 @@ export const VideoGridSkeleton = ({ count = 12 }: { count?: number }) => (
 export const VideoCarouselSkeleton = ({ count = 8 }: { count?: number }) => (
   <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-4">
     {Array.from({ length: count }).map((_, i) => (
-      <div key={`carousel-skeleton-${i}`} className="flex-shrink-0" style={{ width: '220px' }}>
+      <div key={`carousel-skeleton-${i}`} className="flex-shrink-0 w-[220px]">
         <VideoCardSkeleton />
       </div>
     ))}
@@ -417,6 +419,243 @@ export const SearchResultsSkeleton = () => (
         ))}
       </div>
     </section>
+  </div>
+);
+
+/**
+ * Skeleton pour HomeView - Hero carousel
+ */
+export const HeroCarouselSkeleton = () => (
+  <Skeleton className="w-full h-[480px] rounded-3xl" />
+);
+
+/**
+ * Skeleton pour HomeView - Quick play grid
+ */
+export const QuickPlayGridSkeleton = ({ count = 6 }: { count?: number }) => (
+  <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
+    {Array.from({ length: count }).map((_, i) => (
+      <Skeleton key={`quickplay-${i}`} className="h-20 rounded-xl" />
+    ))}
+  </div>
+);
+
+/**
+ * Skeleton pour HomeView - Stats cards
+ */
+export const StatsGridSkeleton = () => (
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {Array.from({ length: 4 }).map((_, i) => (
+      <div key={`stat-${i}`} className="bg-card/50 backdrop-blur-sm rounded-xl border border-border/30 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-5 h-5 rounded" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        <Skeleton className="h-8 w-16" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * Skeleton pour HomeView - Content carousel
+ */
+export const ContentCarouselSkeleton = ({ count = 6, itemWidth = "w-48" }: { count?: number; itemWidth?: string }) => (
+  <div className="space-y-4">
+    <div>
+      <Skeleton className="h-6 w-32 mb-2" />
+      <Skeleton className="h-4 w-48" />
+    </div>
+    <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={`carousel-item-${i}`} className={`flex-shrink-0 ${itemWidth}`}>
+          <Skeleton className="aspect-square rounded-xl" />
+          <Skeleton className="h-4 w-3/4 mt-2 rounded" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/**
+ * Skeleton pour HomeView - Section avec header et tableau
+ */
+export const SectionWithTableSkeleton = ({ rows = 5 }: { rows?: number }) => (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <div>
+        <Skeleton className="h-6 w-32 mb-2" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <Skeleton className="h-10 w-24" />
+    </div>
+    <TrackTableSkeleton count={rows} />
+  </div>
+);
+
+/**
+ * Skeleton complet pour HomeView
+ */
+export const HomeViewSkeleton = () => (
+  <div className="px-6 py-4 space-y-10 animate-fade-in">
+    <HeroCarouselSkeleton />
+    <QuickPlayGridSkeleton count={6} />
+    <StatsGridSkeleton />
+    <ContentCarouselSkeleton title="Artistes récents" count={8} />
+    <ContentCarouselSkeleton title="Explorer par genre" count={6} />
+    <ContentCarouselSkeleton title="Écouté récemment" count={8} />
+    <SectionWithTableSkeleton rows={5} />
+  </div>
+);
+
+/**
+ * Skeleton pour PlaylistView
+ */
+export const PlaylistViewSkeleton = () => (
+  <div className="space-y-4 px-6 py-4">
+    <div className="flex items-center justify-between">
+      <div>
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+    </div>
+    <PlaylistGridSkeleton count={12} />
+  </div>
+);
+
+/**
+ * Skeleton pour ArtistView - Header et playlist
+ */
+export const ArtistViewSkeleton = () => (
+  <div className="space-y-6">
+    <div className="relative h-80 bg-gradient-to-b from-primary/30 to-background rounded-2xl overflow-hidden">
+      <Skeleton className="absolute inset-0" />
+      <div className="absolute bottom-6 left-6 right-6">
+        <Skeleton className="h-12 w-48 mb-2 rounded-lg" />
+        <Skeleton className="h-4 w-32 rounded" />
+      </div>
+    </div>
+    <div className="px-6 space-y-4">
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+      <PlaylistTableSkeleton count={8} />
+    </div>
+  </div>
+);
+
+/**
+ * Skeleton pour VideosView
+ */
+export const VideosViewSkeleton = () => (
+  <div className="space-y-6 px-6 py-4">
+    <div className="flex items-center justify-between">
+      <div>
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+    </div>
+    <VideoCarouselSkeleton count={8} />
+    <VideoCarouselSkeleton count={8} />
+    <VideoGridSkeleton count={12} />
+  </div>
+);
+
+/**
+ * Skeleton pour SettingsView - Avec tabs
+ */
+export const SettingsViewSkeleton = () => (
+  <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-200">
+    <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
+      <div className="px-6 py-4">
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+    </div>
+    <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <Skeleton className="w-9 h-9 rounded-lg" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, j) => (
+                  <div key={j} className="flex items-center justify-between py-3 border-b border-border/30">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                    <Skeleton className="h-6 w-12" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+/**
+ * Skeleton pour CloudView & DownloadsView - Table de fichiers
+ */
+export const FileTableSkeleton = ({ count = 10 }: { count?: number }) => (
+  <div className="bg-card/30 backdrop-blur-sm rounded-xl overflow-hidden border border-border/30">
+    <div className="overflow-y-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-border/30">
+            <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Nom</th>
+            <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Type</th>
+            <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">Taille</th>
+            <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Date</th>
+            <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: count }).map((_, i) => (
+            <tr key={`file-skeleton-${i}`} className="border-b border-border/30">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3 hidden md:table-cell">
+                <Skeleton className="h-4 w-16" />
+              </td>
+              <td className="px-4 py-3 hidden lg:table-cell">
+                <Skeleton className="h-4 w-20" />
+              </td>
+              <td className="px-4 py-3 hidden md:table-cell">
+                <Skeleton className="h-4 w-24" />
+              </td>
+              <td className="px-4 py-3 text-right">
+                <Skeleton className="h-8 w-24 ml-auto" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </div>
 );
 

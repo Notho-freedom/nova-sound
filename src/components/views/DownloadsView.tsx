@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { firebaseService } from "@/services/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FileTableSkeleton } from "@/components/ui/skeletons";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { getUploadedFiles, getCachedUploads, invalidateUploadsCache, updateUploadsCache } from "@/data/uploads.session";
 
@@ -658,58 +659,7 @@ export const DownloadsView = () => {
 
           {loadingUploaded ? (
             <div className="flex-1 overflow-y-auto">
-              <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
-                <div className="overflow-y-auto">
-                  <table className="w-full">
-                    <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
-                      <tr className="border-b border-border/30">
-                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
-                          Fichier
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                          Type
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                          Taille
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                          Uploadé
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <tr key={`uploaded-skeleton-${i}`} className="border-b border-border/30">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
-                              <div className="flex-1 space-y-2">
-                                <Skeleton className="h-4 w-48" />
-                                <Skeleton className="h-3 w-24" />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell">
-                            <Skeleton className="h-4 w-16" />
-                          </td>
-                          <td className="px-4 py-3 hidden lg:table-cell">
-                            <Skeleton className="h-4 w-20" />
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell">
-                            <Skeleton className="h-4 w-24" />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <Skeleton className="h-8 w-24 ml-auto" />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <FileTableSkeleton count={8} />
             </div>
           ) : uploadedFiles.length === 0 ? (
             <div className="flex-1 flex items-center justify-center">

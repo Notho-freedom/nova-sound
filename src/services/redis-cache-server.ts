@@ -30,6 +30,8 @@ class RedisCacheServer {
     socket: {
       host: process.env.REDIS_HOST || '',
       port: parseInt(process.env.REDIS_PORT || '6379'),
+      tls: process.env.REDIS_TLS === 'true',
+      connectTimeout: parseInt(process.env.REDIS_TIMEOUT || '5000'),
     },
     database: parseInt(process.env.REDIS_DB || '0'),
     // TTL configuration
@@ -51,8 +53,18 @@ class RedisCacheServer {
 
     try {
       const clientConfig: any = {
-        socket: this.CONFIG.socket,
+        socket: {
+          host: this.CONFIG.socket.host,
+          port: this.CONFIG.socket.port,
+          connectTimeout: this.CONFIG.socket.connectTimeout,
+        },
       };
+
+      // Add TLS if enabled (Redis Labs requires TLS)
+      if (this.CONFIG.socket.tls) {
+        clientConfig.socket.tls = true;
+        clientConfig.socket.rejectUnauthorized = false; // Accept self-signed certificates
+      }
 
       // Add authentication if provided
       if (this.CONFIG.username) {
