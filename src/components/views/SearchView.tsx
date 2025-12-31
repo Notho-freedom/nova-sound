@@ -22,6 +22,7 @@ import type { Track } from "@/types/music"
 import { cn } from "@/lib/utils"
 import { getCoverUrl } from "@/lib/audio"
 import { Input } from "@/components/ui/input"
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { TrackContextMenu } from "@/components/TrackContextMenu"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -607,11 +608,18 @@ export const SearchView = ({
               animate={{ opacity: 1, y: 0 }}
               className="text-center max-w-2xl mx-auto"
             >
-              <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-3">
-                <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                  Recherche
-                </span>
-              </h1>
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
+                  <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                    Recherche
+                  </span>
+                </h1>
+                <HelpButton
+                  title="Recherche"
+                  description="Recherchez des titres, des artistes ou des albums dans votre bibliothèque. Vous pouvez aussi découvrir des pistes sur YouTube. Utilisez votre historique de recherche pour un accès rapide."
+                  size="icon-sm"
+                />
+              </div>
               <p className="text-muted-foreground text-lg">
                 Explorez votre bibliothèque et découvrez de nouvelles pistes
               </p>

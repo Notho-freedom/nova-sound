@@ -36,6 +36,7 @@ import { Youtube } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -68,9 +69,11 @@ interface SettingRowProps {
   description?: string
   children: React.ReactNode
   icon?: React.ElementType
+  helpText?: string
+  helpTitle?: string
 }
 
-const SettingRow = ({ label, description, children, icon: Icon }: SettingRowProps) => (
+const SettingRow = ({ label, description, children, icon: Icon, helpText, helpTitle }: SettingRowProps) => (
   <div className="flex items-center justify-between py-4 group hover:bg-white/[0.02] -mx-4 px-4 rounded-lg transition-colors">
     <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
       {Icon && (
@@ -79,7 +82,10 @@ const SettingRow = ({ label, description, children, icon: Icon }: SettingRowProp
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground">{label}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground">{label}</p>
+          {helpText && <HelpIcon title={helpTitle || label} description={helpText} />}
+        </div>
         {description && <p className="text-xs text-muted-foreground/70 mt-0.5 line-clamp-1">{description}</p>}
       </div>
     </div>
@@ -1215,7 +1221,12 @@ export const SettingsView = () => {
           <TabsContent value="audio" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SettingsCard title="Lecture" icon={Volume2}>
-                <SettingRow label="Crossfade" description="Transition fluide entre les pistes">
+                <SettingRow 
+                  label="Crossfade" 
+                  description="Transition fluide entre les pistes"
+                  helpText="Ajoute une transition en fondu entre les pistes. Réglez la durée en secondes pour que la transition soit plus longue ou plus courte."
+                  helpTitle="Crossfade"
+                >
                   <div className="flex items-center gap-3">
                     <Switch
                       checked={settings.crossfadeEnabled}
@@ -1235,29 +1246,53 @@ export const SettingsView = () => {
                     )}
                   </div>
                 </SettingRow>
-                <SettingRow label="Lecture sans interruption" description="Supprime les silences entre les pistes">
+                <SettingRow 
+                  label="Lecture sans interruption" 
+                  description="Supprime les silences entre les pistes"
+                  helpText="Élimine les petits silences naturels au début et à la fin des pistes pour une lecture fluide et continue."
+                >
                   <Switch checked={settings.gaplessPlayback} onCheckedChange={(v) => updateSetting("gaplessPlayback", v)} />
                 </SettingRow>
-                <SettingRow label="Normalisation" description="Égalise le volume des pistes">
+                <SettingRow 
+                  label="Normalisation" 
+                  description="Égalise le volume des pistes"
+                  helpText="Ajuste automatiquement le volume de chaque piste pour éviter les variations trop importantes. Idéal si vos pistes ont des volumes très différents."
+                >
                   <Switch checked={settings.normalizeVolume} onCheckedChange={(v) => updateSetting("normalizeVolume", v)} />
                 </SettingRow>
-                <SettingRow label="Égaliseur" description="Ajustez les fréquences">
+                <SettingRow 
+                  label="Égaliseur" 
+                  description="Ajustez les fréquences"
+                  helpText="Permet d'ajuster les basses, aigus et autres fréquences pour adapter le son à vos préférences."
+                >
                   <Switch checked={settings.equalizerEnabled} onCheckedChange={(v) => updateSetting("equalizerEnabled", v)} />
                 </SettingRow>
               </SettingsCard>
 
               <SettingsCard title="Paroles" icon={Mic2}>
-                <SettingRow label="Afficher les paroles" description="Récupère depuis LRCLIB">
+                <SettingRow 
+                  label="Afficher les paroles" 
+                  description="Récupère depuis LRCLIB"
+                  helpText="Affiche les paroles synchronisées des chansons. Les paroles sont récupérées automatiquement si disponibles."
+                >
                   <Switch checked={settings.showLyrics} onCheckedChange={(v) => updateSetting("showLyrics", v)} />
                 </SettingRow>
-                <SettingRow label="Paroles synchronisées" description="Défilement automatique">
+                <SettingRow 
+                  label="Paroles synchronisées" 
+                  description="Défilement automatique"
+                  helpText="Les paroles s'affichent et défillent automatiquement en temps réel avec la musique."
+                >
                   <Switch checked={settings.showLyrics} disabled />
                   <span className="text-xs text-muted-foreground ml-2">Toujours activé</span>
                 </SettingRow>
               </SettingsCard>
 
               <SettingsCard title="Scrobbling" icon={Sparkles} className="lg:col-span-2">
-                <SettingRow label="Activer le scrobbling" description="Envoie vos écoutes à Last.fm/Libre.fm">
+                <SettingRow 
+                  label="Activer le scrobbling" 
+                  description="Envoie vos écoutes à Last.fm/Libre.fm"
+                  helpText="Le scrobbling enregistre automatiquement toutes les pistes que vous écoutez sur votre profil Last.fm ou Libre.fm. Cela vous permet de suivre vos statistiques d'écoute."
+                >
                   <Switch checked={settings.scrobblingEnabled} onCheckedChange={(v) => updateSetting("scrobblingEnabled", v)} disabled={!isElectron} />
                 </SettingRow>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">

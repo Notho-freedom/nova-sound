@@ -19,6 +19,7 @@ import { useUploadedStatus } from "@/hooks/useUploadedStatus";
 import { useListeningStats, formatDuration } from "@/hooks/useListeningStats";
 import { useGenres, formatGenreName } from "@/hooks/useGenres";
 import { Button } from "@/components/ui/button";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { motion } from "framer-motion";
 
 // UI Components
@@ -320,9 +321,16 @@ export const HomeView = memo(({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <h2 className="font-display text-2xl md:text-3xl font-bold mb-6">
-            {getGreeting()}{userName ? `, ${userName}` : ""}
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-display text-2xl md:text-3xl font-bold">
+              {getGreeting()}{userName ? `, ${userName}` : ""}
+            </h2>
+            <HelpButton
+              title="Bienvenue"
+              description="Cliquez sur les titres pour les écouter. Utilisez le carrousel du haut pour explorer vos artistes et albums récents. Les recommandations sont basées sur votre historique d'écoute."
+              size="icon-sm"
+            />
+          </div>
           
           <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
             {quickPlayItems.map((track) => {
@@ -352,34 +360,42 @@ export const HomeView = memo(({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
           >
-            <StatCard
-              label="Temps d'écoute"
-              value={formatDuration(stats.weeklyListeningTime)}
-              icon={<Timer className="w-5 h-5" />}
-              subtitle="Cette semaine"
-              trend={stats.weeklyListeningTime > stats.dailyListeningTime * 7 * 0.8 ? "up" : "neutral"}
-            />
-            <StatCard
-              label="Pistes"
-              value={stats.totalTracks.toLocaleString()}
-              icon={<Music className="w-5 h-5" />}
-              subtitle="Dans votre bibliothèque"
-            />
-            <StatCard
-              label="Écoutes"
-              value={stats.totalPlays.toLocaleString()}
-              icon={<Headphones className="w-5 h-5" />}
-              subtitle="Total"
-              trend="up"
-            />
-            <StatCard
-              label="Artistes"
-              value={stats.topArtists.length.toLocaleString()}
-              icon={<Users className="w-5 h-5" />}
-              subtitle="Différents"
-            />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Vos statistiques</h3>
+              <HelpIcon
+                title="Statistiques"
+                description="Suivez vos habitudes d'écoute : temps total écouté, nombre de pistes, écoutes cumulées et diversité artistique."
+              />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard
+                label="Temps d'écoute"
+                value={formatDuration(stats.weeklyListeningTime)}
+                icon={<Timer className="w-5 h-5" />}
+                subtitle="Cette semaine"
+                trend={stats.weeklyListeningTime > stats.dailyListeningTime * 7 * 0.8 ? "up" : "neutral"}
+              />
+              <StatCard
+                label="Pistes"
+                value={stats.totalTracks.toLocaleString()}
+                icon={<Music className="w-5 h-5" />}
+                subtitle="Dans votre bibliothèque"
+              />
+              <StatCard
+                label="Écoutes"
+                value={stats.totalPlays.toLocaleString()}
+                icon={<Headphones className="w-5 h-5" />}
+                subtitle="Total"
+                trend="up"
+              />
+              <StatCard
+                label="Artistes"
+                value={stats.topArtists.length.toLocaleString()}
+                icon={<Users className="w-5 h-5" />}
+                subtitle="Différents"
+              />
+            </div>
           </motion.div>
         </section>
       )}
@@ -387,8 +403,15 @@ export const HomeView = memo(({
       {/* Recently Played Artists - Carousel */}
       {recentArtists.length > 0 && (
         <section className="pl-6 pr-6 overflow-hidden max-w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Artistes récents</h3>
+            <HelpIcon
+              title="Artistes récents"
+              description="Découvrez les artistes que vous écoutez le plus en ce moment. Cliquez sur un artiste pour filtrer vos titres."
+            />
+          </div>
           <ContentCarousel
-            title="Artistes récents"
+            title=""
             subtitle="Vos artistes écoutés récemment"
             icon={<Users className="w-5 h-5 text-primary" />}
           >
@@ -410,6 +433,13 @@ export const HomeView = memo(({
       {/* Explore by Genre - Carousel */}
       {topGenres.length > 0 && (
         <section className="pl-6 pr-6 overflow-hidden max-w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Explorer par genre</h3>
+            <HelpIcon
+              title="Genres"
+              description="Explorez votre musique par genre. Cliquez sur un genre pour voir tous les titres de cette catégorie."
+            />
+          </div>
           <ContentCarousel
             title="Explorer par genre"
             subtitle={`${genres.length} genres disponibles`}

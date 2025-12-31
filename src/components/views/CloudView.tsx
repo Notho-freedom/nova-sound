@@ -23,6 +23,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -519,6 +520,11 @@ export const CloudView = () => {
         subtitle="Gérez vos fichiers uploadés sur tous les serveurs"
         rightContent={
           <div className="flex items-center gap-2">
+            <HelpButton
+              title="Cloud Storage"
+              description="Uploader et gérez vos fichiers audio et vidéo sur plusieurs serveurs cloud. Synchronisez vos fichiers avec le cloud pour y accéder de n'importe où."
+              size="icon-sm"
+            />
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">

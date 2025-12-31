@@ -27,6 +27,7 @@ import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { Button } from "@/components/ui/button";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1915,8 +1916,12 @@ export const LibraryView = memo(({
               <h1 className="font-display text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-foreground via-foreground to-emerald-300 bg-clip-text text-transparent">
                 {title}
               </h1>
-              <p className="text-muted-foreground text-lg mb-6">
+              <p className="text-muted-foreground text-lg mb-6 flex items-center gap-2">
                 Votre collection musicale complète
+                <HelpIcon
+                  title="Bibliothèque"
+                  description="Organisez votre collection avec différents modes de vue. Triez par titre, artiste ou album. Écoutez aléatoirement ou créez des playlists."
+                />
               </p>
               
               {/* Action Buttons */}

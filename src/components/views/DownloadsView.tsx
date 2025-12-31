@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -404,6 +405,11 @@ export const DownloadsView = () => {
           <h1 className="font-display text-3xl font-bold text-foreground">
             Téléchargements
           </h1>
+          <HelpButton
+            title="Téléchargements"
+            description="Téléchargez vos fichiers depuis le cloud ou uploadez-les. Suivez la progression et gérez vos fichiers dans différents onglets."
+            size="icon-sm"
+          />
         </div>
         <p className="text-muted-foreground">
           Gérez vos téléchargements et fichiers uploadés.
