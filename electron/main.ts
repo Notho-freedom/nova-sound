@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, type BrowserWindowConstructorOptions } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, type BrowserWindowConstructorOptions, type BrowserWindow as ElectronBrowserWindow, type Rectangle } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -70,6 +70,7 @@ let mainWindow: BrowserWindow | null = null;
 let oauthWindow: BrowserWindow | null = null;
 let stripeWindow: BrowserWindow | null = null;
 let oauthCallbackServer: Server | null = null;
+const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 
 const isDev = !app.isPackaged;
 
@@ -90,14 +91,63 @@ const VIDEO_EXTENSIONS = [
 
 const MEDIA_EXTENSIONS = [...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS];
 
+type SecondaryWindowKey = 'oauth' | 'stripe';
+
+function loadSecondaryWindowState(key: SecondaryWindowKey, defaults: Partial<BrowserWindowConstructorOptions>): Partial<BrowserWindowConstructorOptions> {
+  try {
+    const raw = fs.readFileSync(secondaryWindowStatePath, 'utf-8');
+    const state = JSON.parse(raw);
+    return state[key] ? { ...defaults, ...state[key] } : defaults;
+  } catch {
+    return defaults;
+  }
+}
+
+function saveSecondaryWindowState(key: SecondaryWindowKey, bounds: Rectangle) {
+  try {
+    let state: Record<string, any> = {};
+    try {
+      state = JSON.parse(fs.readFileSync(secondaryWindowStatePath, 'utf-8'));
+    } catch {
+      state = {};
+    }
+    state[key] = bounds;
+    fs.writeFileSync(secondaryWindowStatePath, JSON.stringify(state, null, 2));
+  } catch (error) {
+    console.warn('[SecondaryWindow] Failed to persist window state', error);
+  }
+}
+
+function fadeInWindow(win: ElectronBrowserWindow, duration = 180) {
+  try {
+    win.setOpacity(0);
+    const steps = 12;
+    const delta = 1 / steps;
+    let current = 0;
+    const interval = setInterval(() => {
+      current += 1;
+      const next = Math.min(1, current * delta);
+      if (!win.isDestroyed()) {
+        win.setOpacity(next);
+      }
+      if (next >= 1 || win.isDestroyed()) {
+        clearInterval(interval);
+      }
+    }, duration / steps);
+  } catch {
+    // Ignore opacity failures on some platforms
+  }
+}
+
 /**
  * Create a branded secondary window (OAuth, Stripe, etc.) with consistent chrome.
  */
 function createSecondaryWindow(
   title: string,
+  key: SecondaryWindowKey,
   overrides: BrowserWindowConstructorOptions = {}
 ): BrowserWindow {
-  const baseOptions: BrowserWindowConstructorOptions = {
+  const baseDefaults: BrowserWindowConstructorOptions = {
     width: 640,
     height: 800,
     minWidth: 480,
@@ -113,18 +163,29 @@ function createSecondaryWindow(
     title,
     icon: path.join(__dirname, '../public/favicon.ico'),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 12, y: 12 } : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      allowRunningInsecureContent: false,
+      scrollBounce: true,
     },
   };
 
-  const window = new BrowserWindow({
-    ...baseOptions,
+  const options = loadSecondaryWindowState(key, {
+    ...baseDefaults,
     ...overrides,
+  });
+
+  if (options.x !== undefined || options.y !== undefined) {
+    options.center = false;
+  }
+
+  const window = new BrowserWindow({
+    ...options,
     webPreferences: {
-      ...baseOptions.webPreferences,
+      ...baseDefaults.webPreferences,
       ...(overrides.webPreferences || {}),
     },
   });
@@ -133,6 +194,28 @@ function createSecondaryWindow(
     if (!window.isDestroyed()) {
       window.show();
       window.focus();
+      fadeInWindow(window);
+    }
+  });
+
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  window.webContents.on('did-start-loading', () => {
+    window.setProgressBar(2);
+  });
+
+  const clearProgress = () => window.setProgressBar(-1);
+  window.webContents.on('did-stop-loading', clearProgress);
+  window.webContents.on('did-fail-load', clearProgress);
+  window.webContents.on('did-finish-load', clearProgress);
+
+  window.on('close', () => {
+    if (!window.isDestroyed() && !window.isMinimized()) {
+      const bounds = window.getBounds();
+      saveSecondaryWindowState(key, bounds);
     }
   });
 
@@ -530,6 +613,12 @@ ipcMain.handle('window:isMaximized', () => {
   return mainWindow?.isMaximized() || false;
 });
 
+ipcMain.handle('window:openExternal', (_event, url: string) => {
+  if (url) {
+    shell.openExternal(url);
+  }
+});
+
 // OAuth handlers for desktop app authentication
 ipcMain.handle('oauth:openWindow', async (_event, url: string) => {
   try {
@@ -539,7 +628,7 @@ ipcMain.handle('oauth:openWindow', async (_event, url: string) => {
     }
 
     // Create OAuth window with shared styling
-    oauthWindow = createSecondaryWindow('Authentification Google', {
+    oauthWindow = createSecondaryWindow('Authentification Google', 'oauth', {
       width: 520,
       height: 760,
       minWidth: 480,
@@ -596,7 +685,7 @@ ipcMain.handle('stripe:openWindow', async (_event, url: string) => {
     }
 
     // Create Stripe window with shared styling
-    stripeWindow = createSecondaryWindow('Stripe Checkout', {
+    stripeWindow = createSecondaryWindow('Stripe Checkout', 'stripe', {
       width: 920,
       height: 980,
       minWidth: 760,

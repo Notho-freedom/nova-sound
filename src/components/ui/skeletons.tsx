@@ -461,7 +461,7 @@ export const StatsGridSkeleton = () => (
 /**
  * Skeleton pour HomeView - Content carousel
  */
-export const ContentCarouselSkeleton = ({ count = 6, itemWidth = "w-48" }: { count?: number; itemWidth?: string }) => (
+export const ContentCarouselSkeleton = ({ title, count = 6, itemWidth = "w-48" }: { title?: string; count?: number; itemWidth?: string }) => (
   <div className="space-y-4">
     <div>
       <Skeleton className="h-6 w-32 mb-2" />

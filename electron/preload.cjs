@@ -10,6 +10,7 @@ try {
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
+  openExternal: (url) => ipcRenderer.invoke('window:openExternal', url),
 
   // OAuth - open window in app
   openOAuthWindow: (url) => ipcRenderer.invoke('oauth:openWindow', url),
