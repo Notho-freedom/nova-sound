@@ -11,6 +11,8 @@
  * 2. Provides fallback when local caches miss
  * 3. Enables offline-first with server-side backup
  * 4. Reduces API calls for popular content
+ * 
+ * @version 2.0 - 2025-12-31 - Rate limiting + Circuit breaker
  */
 
 import type { YouTubeVideo, YouTubePlaylist, YouTubeSearchResult } from '@/services/youtube/types';
@@ -32,13 +34,25 @@ interface CacheEntry<T> {
 export class RedisCacheService {
   private static instance: RedisCacheService;
   private baseURL = process.env.NEXT_PUBLIC_REDIS_API_URL || '/api/cache/redis';
-  private isAvailable = typeof window !== 'undefined';
+  private isAvailable = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_REDIS_ENABLED !== 'false';
 
   // Batch queue for debounced writes
   private trackBatchQueue: Map<string, Track> = new Map();
   private batchTimeout: NodeJS.Timeout | null = null;
-  private readonly BATCH_DELAY = 1000; // 1 second debounce
+  private readonly BATCH_DELAY = 10000; // 10 seconds debounce (rate limiting)
   private readonly BATCH_SIZE = 50; // Max tracks per batch
+  private isFlushing = false; // Lock to prevent concurrent flushes
+  private lastFlushTime = 0; // Track last successful flush
+  private readonly MIN_FLUSH_INTERVAL = 10000; // Minimum 10s between flushes
+  private backoffMultiplier = 1; // Exponential backoff on errors
+  private readonly MAX_BACKOFF = 5; // Max 50s backoff (10s * 5)
+  
+  // Circuit breaker pattern
+  private failureCount = 0;
+  private readonly FAILURE_THRESHOLD = 3; // Open circuit after 3 failures
+  private circuitOpen = false;
+  private circuitOpenTime = 0;
+  private readonly CIRCUIT_RESET_TIMEOUT = 60000; // Try again after 60s
 
   // Configuration
   private readonly CONFIG = {
@@ -53,7 +67,10 @@ export class RedisCacheService {
 
   private constructor() {
     if (!this.isAvailable) {
-      console.warn('[RedisCacheService] Running in non-browser environment, Redis sync disabled');
+      const reason = typeof window === 'undefined' 
+        ? 'non-browser environment'
+        : 'REDIS_ENABLED=false';
+      console.warn(`[RedisCacheService] Redis sync disabled (${reason})`);
     }
   }
 
@@ -341,13 +358,24 @@ export class RedisCacheService {
       clearTimeout(this.batchTimeout);
     }
     
-    // Schedule batch write after debounce delay
+    // Calculate next allowed flush time
+    const now = Date.now();
+    const timeSinceLastFlush = now - this.lastFlushTime;
+    const minInterval = this.MIN_FLUSH_INTERVAL * this.backoffMultiplier;
+    
+    // Determine delay: either full BATCH_DELAY or remaining time until next allowed flush
+    let delay = this.BATCH_DELAY;
+    if (timeSinceLastFlush < minInterval) {
+      delay = Math.max(delay, minInterval - timeSinceLastFlush);
+    }
+    
+    // Schedule batch write after calculated delay
     this.batchTimeout = setTimeout(() => {
       this.flushTrackBatch();
-    }, this.BATCH_DELAY);
+    }, delay);
     
-    // Flush immediately if queue is full
-    if (this.trackBatchQueue.size >= this.BATCH_SIZE) {
+    // Flush if queue is full AND we're outside the cooldown period
+    if (this.trackBatchQueue.size >= this.BATCH_SIZE && timeSinceLastFlush >= minInterval) {
       if (this.batchTimeout) {
         clearTimeout(this.batchTimeout);
         this.batchTimeout = null;
@@ -361,8 +389,38 @@ export class RedisCacheService {
    * Uses Redis pipeline on server side
    */
   private async flushTrackBatch(): Promise<void> {
-    if (this.trackBatchQueue.size === 0) return;
+    // Prevent concurrent flushes (anti-loop protection)
+    if (this.isFlushing || this.trackBatchQueue.size === 0) return;
     
+    // Circuit breaker: if open, check if we can try again
+    if (this.circuitOpen) {
+      const now = Date.now();
+      if (now - this.circuitOpenTime < this.CIRCUIT_RESET_TIMEOUT) {
+        console.debug(`[RedisCacheService] 🚫 Circuit breaker open, skipping flush (${Math.round((this.CIRCUIT_RESET_TIMEOUT - (now - this.circuitOpenTime))/1000)}s remaining)`);
+        return;
+      }
+      // Try to close the circuit
+      console.debug('[RedisCacheService] 🔄 Circuit breaker: attempting reconnection');
+      this.circuitOpen = false;
+      this.failureCount = 0;
+    }
+    
+    // Rate limiting: enforce minimum interval between flushes
+    const now = Date.now();
+    const timeSinceLastFlush = now - this.lastFlushTime;
+    const minInterval = this.MIN_FLUSH_INTERVAL * this.backoffMultiplier;
+    
+    if (timeSinceLastFlush < minInterval) {
+      // Too soon, reschedule
+      const delay = minInterval - timeSinceLastFlush;
+      console.debug(`[RedisCacheService] ⏱️ Rate limit: rescheduling flush in ${Math.round(delay/1000)}s`);
+      
+      if (this.batchTimeout) clearTimeout(this.batchTimeout);
+      this.batchTimeout = setTimeout(() => this.flushTrackBatch(), delay);
+      return;
+    }
+    
+    this.isFlushing = true;
     const tracks = Array.from(this.trackBatchQueue.values());
     this.trackBatchQueue.clear();
     
@@ -371,19 +429,69 @@ export class RedisCacheService {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tracks),
-        signal: AbortSignal.timeout(5000), // Longer timeout for batch
+        signal: AbortSignal.timeout(8000), // 8s timeout for batch
       });
       
       if (response.ok) {
-        console.debug(`[RedisCacheService] Batch flushed ${tracks.length} tracks`);
+        console.debug(`[RedisCacheService] ✓ Batch flushed ${tracks.length} tracks`);
+        this.lastFlushTime = Date.now();
+        this.backoffMultiplier = 1; // Reset backoff on success
+        this.failureCount = 0; // Reset failure count on success
+      } else if (response.status === 307 || response.status === 503) {
+        // Redirect or service unavailable - count as failure
+        this.failureCount++;
+        this.backoffMultiplier = Math.min(this.backoffMultiplier + 1, this.MAX_BACKOFF);
+        
+        console.warn(`[RedisCacheService] ⚠️ Flush failed (${response.status}), failures: ${this.failureCount}/${this.FAILURE_THRESHOLD}, backoff: ${this.backoffMultiplier}x`);
+        
+        // Open circuit breaker if threshold reached
+        if (this.failureCount >= this.FAILURE_THRESHOLD) {
+          this.circuitOpen = true;
+          this.circuitOpenTime = Date.now();
+          console.error(`[RedisCacheService] 🚫 Circuit breaker OPEN - Redis appears unavailable, pausing for ${this.CIRCUIT_RESET_TIMEOUT/1000}s`);
+          // Don't re-queue on circuit open
+          this.trackBatchQueue.clear();
+          this.isFlushing = false;
+          return;
+        }
+        
+        // Re-queue tracks for retry (only if circuit not open)
+        tracks.forEach(track => this.trackBatchQueue.set(track.id, track));
+        
+        // Schedule retry with backoff
+        const retryDelay = this.MIN_FLUSH_INTERVAL * this.backoffMultiplier;
+        if (this.batchTimeout) clearTimeout(this.batchTimeout);
+        this.batchTimeout = setTimeout(() => this.flushTrackBatch(), retryDelay);
       } else {
         console.debug(`[RedisCacheService] Batch flush failed (${response.status})`);
       }
     } catch (e: any) {
       if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
-        return; // Silent return for expected errors
+        // Network error - count as failure
+        this.failureCount++;
+        this.backoffMultiplier = Math.min(this.backoffMultiplier + 1, this.MAX_BACKOFF);
+        
+        console.debug(`[RedisCacheService] Network error, failures: ${this.failureCount}/${this.FAILURE_THRESHOLD}, backoff: ${this.backoffMultiplier}x`);
+        
+        // Open circuit breaker if threshold reached
+        if (this.failureCount >= this.FAILURE_THRESHOLD) {
+          this.circuitOpen = true;
+          this.circuitOpenTime = Date.now();
+          console.error(`[RedisCacheService] 🚫 Circuit breaker OPEN - Network error, pausing for ${this.CIRCUIT_RESET_TIMEOUT/1000}s`);
+          this.trackBatchQueue.clear();
+          this.isFlushing = false;
+          return;
+        }
+        
+        // Re-queue tracks (only if circuit not open)
+        tracks.forEach(track => this.trackBatchQueue.set(track.id, track));
+        
+        this.isFlushing = false;
+        return;
       }
       console.debug('[RedisCacheService] Batch flush offline');
+    } finally {
+      this.isFlushing = false;
     }
   }
 
@@ -408,22 +516,52 @@ export class RedisCacheService {
   async setTracks(tracks: Track[]): Promise<void> {
     if (!this.isAvailable || tracks.length === 0) return;
     
+    // Check circuit breaker
+    if (this.circuitOpen) {
+      const now = Date.now();
+      if (now - this.circuitOpenTime < this.CIRCUIT_RESET_TIMEOUT) {
+        console.debug(`[RedisCacheService] 🚫 Circuit breaker open, skipping setTracks (${Math.round((this.CIRCUIT_RESET_TIMEOUT - (now - this.circuitOpenTime))/1000)}s remaining)`);
+        return;
+      }
+    }
+    
     // Use batch endpoint directly for explicit batch calls
     try {
       const response = await fetch(`${this.baseURL}/batch/tracks`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tracks),
-        signal: AbortSignal.timeout(5000), // Longer timeout for batch
+        signal: AbortSignal.timeout(8000), // 8s timeout for batch
       });
       if (response.ok) {
-        console.debug(`[RedisCacheService] Batch set ${tracks.length} tracks`);
+        console.debug(`[RedisCacheService] ✓ Batch set ${tracks.length} tracks`);
+        this.failureCount = 0; // Reset on success
+        this.backoffMultiplier = 1;
+      } else if (response.status === 307 || response.status === 503) {
+        this.failureCount++;
+        console.warn(`[RedisCacheService] ⚠️ Batch set failed (${response.status}), failures: ${this.failureCount}/${this.FAILURE_THRESHOLD}`);
+        
+        // Open circuit breaker if threshold reached
+        if (this.failureCount >= this.FAILURE_THRESHOLD) {
+          this.circuitOpen = true;
+          this.circuitOpenTime = Date.now();
+          console.error(`[RedisCacheService] 🚫 Circuit breaker OPEN from setTracks`);
+        }
       } else {
         console.debug(`[RedisCacheService] Batch set failed (${response.status})`);
       }
     } catch (e: any) {
       if (e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ECONNREFUSED') {
-        return; // Silent return for expected errors
+        this.failureCount++;
+        console.debug(`[RedisCacheService] Network error in setTracks, failures: ${this.failureCount}/${this.FAILURE_THRESHOLD}`);
+        
+        // Open circuit breaker if threshold reached
+        if (this.failureCount >= this.FAILURE_THRESHOLD) {
+          this.circuitOpen = true;
+          this.circuitOpenTime = Date.now();
+          console.error(`[RedisCacheService] 🚫 Circuit breaker OPEN from setTracks network error`);
+        }
+        return;
       }
       console.debug('[RedisCacheService] Batch set offline');
     }

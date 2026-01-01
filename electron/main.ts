@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, type BrowserWindowConstructorOptions } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -89,6 +89,55 @@ const VIDEO_EXTENSIONS = [
 ];
 
 const MEDIA_EXTENSIONS = [...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS];
+
+/**
+ * Create a branded secondary window (OAuth, Stripe, etc.) with consistent chrome.
+ */
+function createSecondaryWindow(
+  title: string,
+  overrides: BrowserWindowConstructorOptions = {}
+): BrowserWindow {
+  const baseOptions: BrowserWindowConstructorOptions = {
+    width: 640,
+    height: 800,
+    minWidth: 480,
+    minHeight: 640,
+    show: false,
+    frame: true,
+    resizable: true,
+    center: true,
+    backgroundColor: '#0d0c14',
+    autoHideMenuBar: true,
+    skipTaskbar: true,
+    parent: mainWindow ?? undefined,
+    title,
+    icon: path.join(__dirname, '../public/favicon.ico'),
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+  };
+
+  const window = new BrowserWindow({
+    ...baseOptions,
+    ...overrides,
+    webPreferences: {
+      ...baseOptions.webPreferences,
+      ...(overrides.webPreferences || {}),
+    },
+  });
+
+  window.once('ready-to-show', () => {
+    if (!window.isDestroyed()) {
+      window.show();
+      window.focus();
+    }
+  });
+
+  return window;
+}
 
 /**
  * Check if a file path is a media file
@@ -489,26 +538,17 @@ ipcMain.handle('oauth:openWindow', async (_event, url: string) => {
       oauthWindow.close();
     }
 
-    // Create OAuth window
-    oauthWindow = new BrowserWindow({
-      width: 500,
-      height: 700,
-      show: false,
-      frame: true,
-      title: 'Authentification Google',
+    // Create OAuth window with shared styling
+    oauthWindow = createSecondaryWindow('Authentification Google', {
+      width: 520,
+      height: 760,
+      minWidth: 480,
+      minHeight: 680,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
       },
-    });
-
-    // Show window when ready
-    oauthWindow.once('ready-to-show', () => {
-      if (oauthWindow && !oauthWindow.isDestroyed()) {
-        oauthWindow.show();
-        oauthWindow.focus();
-      }
     });
 
     // Handle window closed
@@ -555,26 +595,17 @@ ipcMain.handle('stripe:openWindow', async (_event, url: string) => {
       stripeWindow.close();
     }
 
-    // Create Stripe window
-    stripeWindow = new BrowserWindow({
-      width: 800,
-      height: 900,
-      show: false,
-      frame: true,
-      title: 'Stripe Checkout',
+    // Create Stripe window with shared styling
+    stripeWindow = createSecondaryWindow('Stripe Checkout', {
+      width: 920,
+      height: 980,
+      minWidth: 760,
+      minHeight: 880,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: false,
       },
-    });
-
-    // Show window when ready
-    stripeWindow.once('ready-to-show', () => {
-      if (stripeWindow && !stripeWindow.isDestroyed()) {
-        stripeWindow.show();
-        stripeWindow.focus();
-      }
     });
 
     // Handle window closed

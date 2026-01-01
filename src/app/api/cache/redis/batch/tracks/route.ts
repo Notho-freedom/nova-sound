@@ -17,11 +17,12 @@ export async function GET(req: NextRequest) {
     return new NextResponse(null, { status: 499 });
   }
 
+  const isRedisEnabled = process.env.REDIS_ENABLED !== 'false';
   const hasRedisConfig = !!process.env.REDIS_HOST;
   
-  if (!hasRedisConfig) {
+  if (!isRedisEnabled || !hasRedisConfig) {
     return NextResponse.json(
-      { success: false, tracks: [], reason: 'Redis not configured' },
+      { success: false, tracks: [], reason: isRedisEnabled ? 'Redis not configured' : 'Redis disabled' },
       { status: 503 }
     );
   }
@@ -83,11 +84,12 @@ export async function PUT(req: NextRequest) {
     return new NextResponse(null, { status: 499 });
   }
 
+  const isRedisEnabled = process.env.REDIS_ENABLED !== 'false';
   const hasRedisConfig = !!process.env.REDIS_HOST;
   
-  if (!hasRedisConfig) {
+  if (!isRedisEnabled || !hasRedisConfig) {
     return NextResponse.json(
-      { success: false, reason: 'Redis not configured' },
+      { success: false, reason: isRedisEnabled ? 'Redis not configured' : 'Redis disabled' },
       { status: 503 }
     );
   }
