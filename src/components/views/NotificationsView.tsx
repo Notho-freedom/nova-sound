@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 
 export const NotificationsView = () => {
     const [loading, setLoading] = useState(false); // Remplacer par vrai loading si async
@@ -53,14 +54,21 @@ export const NotificationsView = () => {
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-                <Bell className="w-6 h-6" />
-                Notifications
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {notifications.length} notification{notifications.length > 1 ? "s" : ""}
-              </p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
+                  <Bell className="w-6 h-6" />
+                  Notifications
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {notifications.length} notification{notifications.length > 1 ? "s" : ""}
+                </p>
+              </div>
+              <HelpButton
+                title="Notifications"
+                description="Suivez toutes les mises à jour de votre application : synchronisations réussies, téléchargements, erreurs et messages système importants."
+                size="icon-sm"
+              />
             </div>
             {notifications.length > 0 && (
               <Tooltip>

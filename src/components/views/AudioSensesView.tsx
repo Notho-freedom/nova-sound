@@ -17,6 +17,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HelpButton, HelpIcon } from '@/components/ui/HelpButton';
 
 interface AudioSensesViewProps {
   audioElement: HTMLAudioElement | null;
@@ -288,14 +289,21 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-          <Radio className="w-8 h-8 text-primary" />
-          Sens Audio - Analyse en Temps Réel
-        </h1>
-        <p className="text-muted-foreground">
-          Visualisation complète de tous les paramètres audio détectés
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <Radio className="w-8 h-8 text-primary" />
+            Sens Audio - Analyse en Temps Réel
+          </h1>
+          <p className="text-muted-foreground">
+            Visualisation complète de tous les paramètres audio détectés
+          </p>
+        </div>
+        <HelpButton
+          title="Audio Senses"
+          description="Explorez les différentes dimensions de votre audio en temps réel : forme d'onde, spectre de fréquence, énergie des bandes, pics et analyse ADSR. Comprenez la composition acoustique de votre musique."
+          size="icon-sm"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -305,6 +313,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
               Waveform (Amplitude Temporelle)
+              <HelpIcon description="La forme d'onde montre l'amplitude du signal audio au fil du temps. Les pics rouges indiquent les moments les plus forts." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -335,6 +344,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <RadioIcon className="w-5 h-5" />
               FFT Spectrum (20Hz - 20kHz)
+              <HelpIcon description="Le spectre FFT analyse les fréquences présentes dans l'audio. Rouge=basses, Bleu=mids, Violet=aigus." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -376,6 +386,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <Gauge className="w-5 h-5" />
               Energy Bands (5 Bandes)
+              <HelpIcon description="Analyse d'énergie dans 5 bandes de fréquence : basses, bas-mediums, mediums, haut-mediums et aigus." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -408,6 +419,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <Volume2 className="w-5 h-5" />
               Volume & RMS
+              <HelpIcon description="Volume mesuré (0-100%), RMS (niveau d'énergie effective) et énergie globale du signal." />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -441,6 +453,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5" />
               Peak Detection
+              <HelpIcon description="Détection des pics acoustiques au fil du temps. Montre quand et où les moments forts se produisent." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -479,6 +492,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
               Envelope Following (ADSR)
+              <HelpIcon description="Analyse ADSR : Attack (montée), Decay (descente initiale), Sustain (soutien), Release (libération). Révèle le caractère dynamique du son." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -527,6 +541,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <Music className="w-5 h-5" />
               Pitch Detection / Note Detection
+              <HelpIcon description="Détection automatique de la note musicale fondamentale et de sa fréquence en Hz. La confiance indique la certitude de la détection." />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -568,6 +583,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
               Tempo / BPM Estimation
+              <HelpIcon description="Estimation du tempo en BPM (battements par minute) et de la phase du beat. Synchronisez avec le rythme musical." />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

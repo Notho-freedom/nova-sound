@@ -57,6 +57,7 @@ import { toast } from "sonner";
 import { VideoGridSkeleton, VideoCarouselSkeleton } from "@/components/ui/skeletons";
 import { YouTubeSearchView } from "@/components/YouTubeSearchView";
 import { Youtube } from "lucide-react";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { useYouTubeSuggestions } from "@/hooks/useYouTubeSuggestions";
 import { useLibrary } from "@/hooks/useLibrary";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
@@ -514,71 +515,89 @@ export const VideosView = memo(() => {
       <div className="flex-shrink-0 border-b border-border/30 bg-background/80 backdrop-blur-sm px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <button
-              onClick={() => setViewMode("home")}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                viewMode === "home" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Sparkles className="w-4 h-4 inline mr-2" />
-              Accueil
-            </button>
-            <button
-              onClick={() => setViewMode("browse")}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                viewMode === "browse" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Grid className="w-4 h-4 inline mr-2" />
-              Parcourir
-            </button>
-            <button
-              onClick={() => setViewMode("watchlist")}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                viewMode === "watchlist" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Bookmark className="w-4 h-4 inline mr-2" />
-              Ma liste
-              {watchlistVideos.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {watchlistVideos.length}
-                </Badge>
-              )}
-            </button>
-            <button
-              onClick={() => setViewMode("favorites")}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                viewMode === "favorites" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Heart className="w-4 h-4 inline mr-2" />
-              Favoris
-            </button>
-            <button
-              onClick={() => setViewMode("history")}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                viewMode === "history" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <History className="w-4 h-4 inline mr-2" />
-              Historique
-            </button>
-            <button
-              onClick={() => setViewMode("youtube")}
-              className={cn(
-                "text-sm font-medium transition-colors",
-                viewMode === "youtube" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Youtube className="w-4 h-4 inline mr-2" />
-              YouTube
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("home")}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  viewMode === "home" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Sparkles className="w-4 h-4 inline mr-2" />
+                Accueil
+              </button>
+              <HelpIcon description="Découvrez vos vidéos continuées, récemment ajoutées et tendances populaires." />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("browse")}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  viewMode === "browse" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Grid className="w-4 h-4 inline mr-2" />
+                Parcourir
+              </button>
+              <HelpIcon description="Parcourez toutes vos vidéos locales par catégorie, genre, ou recherche." />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("watchlist")}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  viewMode === "watchlist" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Bookmark className="w-4 h-4 inline mr-2" />
+                Ma liste
+                {watchlistVideos.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {watchlistVideos.length}
+                  </Badge>
+                )}
+              </button>
+              <HelpIcon description="Vos vidéos à regarder plus tard. Organisez vos favoris pour voir plus tard." />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("favorites")}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  viewMode === "favorites" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Heart className="w-4 h-4 inline mr-2" />
+                Favoris
+              </button>
+              <HelpIcon description="Vos vidéos marquées comme préférées pour accès rapide." />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("history")}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  viewMode === "history" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <History className="w-4 h-4 inline mr-2" />
+                Historique
+              </button>
+              <HelpIcon description="Toutes les vidéos que vous avez regardées récemment." />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setViewMode("youtube")}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  viewMode === "youtube" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Youtube className="w-4 h-4 inline mr-2" />
+                YouTube
+              </button>
+              <HelpIcon description="Recherchez et intégrez des vidéos YouTube directement." />
+            </div>
           </div>
 
           {/* Search */}

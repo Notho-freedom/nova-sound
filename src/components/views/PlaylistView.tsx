@@ -47,6 +47,7 @@ import { usePlaylistFavorites } from "@/hooks/usePlaylistFavorites";
 import { PlaylistGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
 import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/PageLayout";
 import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 
 interface PlaylistViewProps {
   tracks: Track[];
@@ -1076,7 +1077,14 @@ export const PlaylistView = memo(({
                 <Sparkles className="w-4 h-4" />
                 Mixs sur-mesure
               </div>
-              <h1 className="text-3xl md:text-4xl font-display font-bold text-white drop-shadow-sm">Playlists</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-white drop-shadow-sm">Playlists</h1>
+                <HelpButton
+                  title="Playlists"
+                  description="Créez et organisez vos playlists personnalisées. Regroupez vos titres favoris par mood, genre, ou occasion. Synchronisez vos playlists sur le cloud pour y accéder partout."
+                  size="icon-sm"
+                />
+              </div>
               <p className="text-sm text-white/70">
                 {`${playlists.length} playlist${playlists.length > 1 ? "s" : ""} • ${totalTracks} titres en rotation`}
               </p>

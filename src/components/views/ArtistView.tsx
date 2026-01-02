@@ -49,6 +49,7 @@ import { useArtistImages } from "@/hooks/useArtistImage";
 import { useArtistPlaylists } from "@/hooks/useArtistPlaylists";
 import { ContentCarousel } from "@/components/ui/ContentCarousel";
 import { FeaturedCard } from "@/components/ui/FeaturedCard";
+import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 
 interface ArtistViewProps {
   artistName: string;
@@ -359,9 +360,12 @@ export const ArtistView = memo(({
               className="text-center md:text-left flex-1"
             >
               <Badge variant="secondary" className="mb-2">Artiste</Badge>
-              <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
-                {artistName}
-              </h1>
+              <div className="flex items-center gap-2 justify-center md:justify-start">
+                <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
+                  {artistName}
+                </h1>
+                <HelpIcon description="Explorez toute la discographie, la biographie, les images et collaborations de cet artiste." />
+              </div>
 
               {/* Quick stats */}
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground mb-4">
