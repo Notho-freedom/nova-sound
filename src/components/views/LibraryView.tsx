@@ -69,6 +69,7 @@ interface LibraryViewProps {
   initialSelectedAlbum?: string | null;
   loading?: boolean;
   onNavigateToArtist?: (artistName: string) => void;
+  onNavigateToAlbum?: (albumName: string, artistName: string) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -400,6 +401,7 @@ export const LibraryView = memo(({
   initialSelectedAlbum,
   loading = false,
   onNavigateToArtist,
+  onNavigateToAlbum,
 }: LibraryViewProps) => {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("list");
   const [sortMode, setSortMode] = useState<SortMode>("title");
@@ -1803,6 +1805,8 @@ export const LibraryView = memo(({
             }}
             onAddToPlaylist={onAddToPlaylist}
             createPlaylist={createPlaylist}
+            onNavigateToArtist={onNavigateToArtist}
+            onNavigateToAlbum={onNavigateToAlbum}
           />
         ) : (
           <TrackListView
@@ -1824,6 +1828,8 @@ export const LibraryView = memo(({
             canUploadToNexus={canUploadToNexus}
             isUploaded={isUploaded}
             getUploadedProvider={getUploadedProvider}
+            onNavigateToArtist={onNavigateToArtist}
+            onNavigateToAlbum={onNavigateToAlbum}
           />
         )}
       </div>
@@ -2118,6 +2124,8 @@ export const LibraryView = memo(({
                 }}
                 onAddToPlaylist={onAddToPlaylist}
                 createPlaylist={createPlaylist}
+                onNavigateToArtist={onNavigateToArtist}
+                onNavigateToAlbum={onNavigateToAlbum}
               />
             ) : (
               <TrackListView
@@ -2139,6 +2147,8 @@ export const LibraryView = memo(({
                 canUploadToNexus={canUploadToNexus}
                 isUploaded={isUploaded}
                 getUploadedProvider={getUploadedProvider}
+                onNavigateToArtist={onNavigateToArtist}
+                onNavigateToAlbum={onNavigateToAlbum}
               />
             )}
           </div>

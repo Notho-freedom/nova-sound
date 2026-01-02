@@ -33,6 +33,8 @@ interface TrackGridViewProps {
   columns?: 2 | 3 | 4 | 5;
   isUploaded?: (trackId: string) => boolean;
   getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
+  onNavigateToArtist?: (artist: string) => void;
+  onNavigateToAlbum?: (album: string, artist: string) => void;
 }
 
 export const TrackGridView = ({
@@ -56,6 +58,8 @@ export const TrackGridView = ({
   columns = 5,
   isUploaded,
   getUploadedProvider,
+  onNavigateToArtist,
+  onNavigateToAlbum,
 }: TrackGridViewProps) => {
   const gridCols = {
     2: "grid-cols-2",
@@ -157,8 +161,28 @@ export const TrackGridView = ({
               </TooltipTrigger>
               <TooltipContent>
                 <div className="text-sm font-medium">{track.title}</div>
-                <div className="text-xs text-muted-foreground">{track.artist}</div>
-                {track.album && <div className="text-xs text-muted-foreground mt-1">{track.album}</div>}
+                <div className="text-xs text-muted-foreground">
+                  {onNavigateToArtist ? (
+                    <button
+                      className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+                      onClick={e => { e.stopPropagation(); onNavigateToArtist(track.artist); }}
+                    >
+                      {track.artist}
+                    </button>
+                  ) : track.artist}
+                </div>
+                {track.album && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {onNavigateToAlbum ? (
+                      <button
+                        className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+                        onClick={e => { e.stopPropagation(); onNavigateToAlbum(track.album, track.artist); }}
+                      >
+                        {track.album}
+                      </button>
+                    ) : track.album}
+                  </div>
+                )}
                 <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
               </TooltipContent>
             </Tooltip>

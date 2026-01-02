@@ -64,6 +64,8 @@ interface PlaylistViewProps {
   onRemoveTracksFromPlaylist: (playlistId: string, trackIds: string[]) => Promise<void>;
   loading?: boolean;
   initialPlaylistId?: string | null; // ID de la playlist à ouvrir au chargement
+  onNavigateToArtist?: (artistName: string) => void;
+  onNavigateToAlbum?: (albumName: string, artistName: string) => void;
 }
 
 type ViewMode = "grid" | "list";
@@ -246,6 +248,8 @@ export const PlaylistView = memo(({
   onRemoveTracksFromPlaylist,
   loading = false,
   initialPlaylistId = null,
+  onNavigateToArtist,
+  onNavigateToAlbum,
 }: PlaylistViewProps) => {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(initialPlaylistId);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -1027,6 +1031,8 @@ export const PlaylistView = memo(({
                       }}
                       onAddToPlaylist={(pId, track) => onAddTracksToPlaylist(pId, [track.id])}
                       createPlaylist={onCreatePlaylist}
+                      onNavigateToArtist={onNavigateToArtist}
+                      onNavigateToAlbum={onNavigateToAlbum}
                     />
                   ) : (
                     <TrackListView
@@ -1050,6 +1056,8 @@ export const PlaylistView = memo(({
                       canUploadToNexus={canUploadToNexus}
                       isUploaded={isUploaded}
                       getUploadedProvider={getUploadedProvider}
+                      onNavigateToArtist={onNavigateToArtist}
+                      onNavigateToAlbum={onNavigateToAlbum}
                     />
                   )}
                 </div>
