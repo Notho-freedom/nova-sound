@@ -3,7 +3,7 @@
 import { memo, useCallback } from "react";
 import { User, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SimpleTooltip } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface ArtistCardProps {
   name: string;
@@ -11,32 +11,18 @@ interface ArtistCardProps {
   trackCount?: number;
   playCount?: number;
   onClick?: () => void;
+  onNavigateToArtist?: (artist: string) => void;
   className?: string;
 }
 
-export const ArtistCard = memo(({ name, imageUrl, trackCount, playCount, onClick, className }: ArtistCardProps) => {
+export const ArtistCard = memo(({ name, imageUrl, trackCount, playCount, onClick, onNavigateToArtist, className }: ArtistCardProps) => {
   const handleClick = useCallback(() => {
     onClick?.();
   }, [onClick]);
 
-  const tooltipContent = (
-    <div>
-      <div className="text-sm font-medium truncate max-w-xs">{name}</div>
-      {trackCount !== undefined && (
-        <div className="text-xs text-muted-foreground">
-          {trackCount} titre{trackCount > 1 ? "s" : ""}
-        </div>
-      )}
-      {playCount !== undefined && playCount > 0 && (
-        <div className="text-xs text-muted-foreground">
-          {playCount} écoute{playCount > 1 ? "s" : ""}
-        </div>
-      )}
-    </div>
-  );
-
   return (
-    <SimpleTooltip content={tooltipContent}>
+    <Tooltip>
+      <TooltipTrigger asChild>
       <button
         onClick={handleClick}
         className={cn(
@@ -97,7 +83,35 @@ export const ArtistCard = memo(({ name, imageUrl, trackCount, playCount, onClick
           )}
         </div>
       </button>
-    </SimpleTooltip>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="text-sm font-medium truncate max-w-xs">
+          {onNavigateToArtist ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigateToArtist(name);
+              }}
+              className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+            >
+              {name}
+            </button>
+          ) : (
+            name
+          )}
+        </div>
+        {trackCount !== undefined && (
+          <div className="text-xs text-muted-foreground">
+            {trackCount} titre{trackCount > 1 ? "s" : ""}
+          </div>
+        )}
+        {playCount !== undefined && playCount > 0 && (
+          <div className="text-xs text-muted-foreground">
+            {playCount} écoute{playCount > 1 ? "s" : ""}
+          </div>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 });
 

@@ -56,6 +56,8 @@ interface HomeViewProps {
   onPlayTrackList?: (tracks: Track[]) => void;
   onFilterByGenre?: (genre: string) => void;
   onFilterByArtist?: (artist: string) => void;
+  onNavigateToArtist?: (artist: string) => void;
+  onNavigateToAlbum?: (album: string, artist: string) => void;
   recentTracks?: Track[];
   favoriteTracks?: Track[];
   history?: HistoryEntry[];
@@ -134,6 +136,8 @@ export const HomeView = memo(({
   onAddToPlaylist,
   onFilterByGenre,
   onFilterByArtist,
+  onNavigateToArtist,
+  onNavigateToAlbum,
   recentTracks = [],
   favoriteTracks = [],
   history = [],
@@ -423,6 +427,7 @@ export const HomeView = memo(({
                 trackCount={artist.trackCount}
                 playCount={artist.playCount}
                 onClick={() => onFilterByArtist?.(artist.name)}
+                onNavigateToArtist={onNavigateToArtist}
                 className="flex-shrink-0 snap-start"
               />
             ))}

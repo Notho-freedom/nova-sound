@@ -4,7 +4,7 @@ import { memo, useState, useCallback } from "react";
 import { Play, Pause, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
-import { SimpleTooltip } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type { Track } from "@/types/music";
 
 interface TrackCardProps {
@@ -16,6 +16,8 @@ interface TrackCardProps {
   uploadProvider?: "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
   onPlay: () => void;
   onContextMenu?: () => void;
+  onNavigateToArtist?: (artist: string) => void;
+  onNavigateToAlbum?: (album: string, artist: string) => void;
   className?: string;
   index?: number;
 }
@@ -73,6 +75,8 @@ const CompactTrackCard = memo(
     uploadProvider,
     onPlay,
     onContextMenu,
+    onNavigateToArtist,
+    onNavigateToAlbum,
     className,
   }: Omit<TrackCardProps, "variant" | "index">) => {
     const sizes = sizeClasses.compact;
@@ -86,17 +90,9 @@ const CompactTrackCard = memo(
       [onContextMenu],
     );
 
-    const tooltipContent = (
-      <div>
-        <div className="text-sm font-medium">{track.title}</div>
-        <div className="text-xs text-muted-foreground">{track.artist}</div>
-        {track.album && <div className="text-xs text-muted-foreground/70 mt-1">{track.album}</div>}
-        <div className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</div>
-      </div>
-    );
-
     return (
-      <SimpleTooltip content={tooltipContent}>
+      <Tooltip>
+        <TooltipTrigger asChild>
         <button
           onClick={onPlay}
           onContextMenu={handleContextMenu}
@@ -142,7 +138,44 @@ const CompactTrackCard = memo(
             </div>
           </div>
         </button>
-      </SimpleTooltip>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="text-sm font-medium">{track.title}</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {onNavigateToArtist ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigateToArtist(track.artist);
+                }}
+                className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+              >
+                {track.artist}
+              </button>
+            ) : (
+              track.artist
+            )}
+          </div>
+          {track.album && (
+            <div className="text-xs text-muted-foreground/70 mt-1">
+              {onNavigateToAlbum ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigateToAlbum(track.album!, track.artist);
+                  }}
+                  className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+                >
+                  {track.album}
+                </button>
+              ) : (
+                track.album
+              )}
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</div>
+        </TooltipContent>
+      </Tooltip>
     );
   },
 );
@@ -159,6 +192,8 @@ const DefaultTrackCard = memo(
     uploadProvider,
     onPlay,
     onContextMenu,
+    onNavigateToArtist,
+    onNavigateToAlbum,
     className,
     index,
   }: TrackCardProps) => {
@@ -174,17 +209,9 @@ const DefaultTrackCard = memo(
       [onContextMenu],
     );
 
-    const tooltipContent = (
-      <div>
-        <div className="text-sm font-medium">{track.title}</div>
-        <div className="text-xs text-muted-foreground">{track.artist}</div>
-        {track.album && <div className="text-xs text-muted-foreground/70 mt-1">{track.album}</div>}
-        <div className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</div>
-      </div>
-    );
-
     return (
-      <SimpleTooltip content={tooltipContent}>
+      <Tooltip>
+        <TooltipTrigger asChild>
         <button
           onClick={onPlay}
           onMouseEnter={() => setIsHovered(true)}
@@ -279,7 +306,44 @@ const DefaultTrackCard = memo(
             )}
           </div>
         </button>
-      </SimpleTooltip>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="text-sm font-medium">{track.title}</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {onNavigateToArtist ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigateToArtist(track.artist);
+                }}
+                className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+              >
+                {track.artist}
+              </button>
+            ) : (
+              track.artist
+            )}
+          </div>
+          {track.album && (
+            <div className="text-xs text-muted-foreground/70 mt-1">
+              {onNavigateToAlbum ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigateToAlbum(track.album!, track.artist);
+                  }}
+                  className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+                >
+                  {track.album}
+                </button>
+              ) : (
+                track.album
+              )}
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</div>
+        </TooltipContent>
+      </Tooltip>
     );
   },
 );

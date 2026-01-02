@@ -1814,6 +1814,15 @@ export const DesktopApp = () => {
             setSelectedArtist(artistName);
             setCurrentView("artist-detail");
           }}
+          onNavigateToArtist={(artistName) => {
+            setSelectedArtist(artistName);
+            setCurrentView("artist-detail");
+          }}
+          onNavigateToAlbum={(albumName, artistName) => {
+            const albumKey = `${albumName}-${artistName}`;
+            setAlbumToOpen(albumKey);
+            setCurrentView("albums");
+          }}
         />
         );
       case "search":

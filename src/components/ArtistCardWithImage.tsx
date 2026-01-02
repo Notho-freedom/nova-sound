@@ -15,6 +15,7 @@ interface ArtistCardWithImageProps {
   trackCount?: number;
   playCount?: number;
   onClick?: () => void;
+  onNavigateToArtist?: (artist: string) => void;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -24,6 +25,7 @@ export const ArtistCardWithImage = ({
   trackCount,
   playCount,
   onClick,
+  onNavigateToArtist,
   className,
   size = 'md',
 }: ArtistCardWithImageProps) => {
@@ -86,7 +88,21 @@ export const ArtistCardWithImage = ({
         </button>
       </TooltipTrigger>
       <TooltipContent>
-        <div className="text-sm font-medium">{name}</div>
+        <div className="text-sm font-medium">
+          {onNavigateToArtist ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigateToArtist(name);
+              }}
+              className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
+            >
+              {name}
+            </button>
+          ) : (
+            name
+          )}
+        </div>
         {trackCount !== undefined && (
           <div className="text-xs text-muted-foreground">{trackCount} titre{trackCount > 1 ? "s" : ""}</div>
         )}
