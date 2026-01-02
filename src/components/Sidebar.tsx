@@ -61,6 +61,14 @@ interface SidebarProps {
   onViewChange: (view: ViewType) => void;
   favoritesCount?: number;
   notificationsCount?: number;
+  recentCount?: number;
+  albumsCount?: number;
+  artistsCount?: number;
+  videosCount?: number;
+  localCount?: number;
+  downloadsCount?: number;
+  cloudCount?: number;
+  playlistsCount?: number;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
   onPlayPlaylist?: (playlistId: string) => void;
@@ -210,6 +218,14 @@ export const Sidebar = ({
   onViewChange, 
   favoritesCount,
   notificationsCount,
+  recentCount,
+  albumsCount,
+  artistsCount,
+  videosCount,
+  localCount,
+  downloadsCount,
+  cloudCount,
+  playlistsCount,
   collapsed: controlledCollapsed,
   onCollapsedChange,
   onPlayPlaylist,
@@ -224,6 +240,34 @@ export const Sidebar = ({
   const { notifySuccess } = useNotifications();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
+  
+  // Fonction helper pour obtenir le badge d'un élément
+  const getBadgeForItem = (itemId: ViewType): number | undefined => {
+    switch (itemId) {
+      case "notifications":
+        return notificationsCount;
+      case "playlists":
+        return playlistsCount;
+      case "favorites":
+        return favoritesCount;
+      case "recent":
+        return recentCount;
+      case "albums":
+        return albumsCount;
+      case "artists":
+        return artistsCount;
+      case "videos":
+        return videosCount;
+      case "local":
+        return localCount;
+      case "downloads":
+        return downloadsCount;
+      case "cloud":
+        return cloudCount;
+      default:
+        return undefined;
+    }
+  };
   
   // Gestion centralisée des playlists favorites
   const { isFavorite: isPlaylistFavorite, toggleFavorite: togglePlaylistFavorite, favoritePlaylistIds } = usePlaylistFavorites();
@@ -359,7 +403,7 @@ export const Sidebar = ({
                   label={item.label}
                   isActive={currentView === item.id}
                   onClick={() => handleViewChangeWithMetrics(item.id, `mainNav-${item.label}`)}
-                  badge={item.id === "notifications" ? notificationsCount : undefined}
+                  badge={getBadgeForItem(item.id)}
                   collapsed={collapsed}
                 />
               ))}
@@ -376,7 +420,7 @@ export const Sidebar = ({
                     label={item.label}
                     isActive={currentView === item.id}
                     onClick={() => handleViewChangeWithMetrics(item.id, `library-${item.label}`)}
-                    badge={item.id === "favorites" ? favoritesCount : undefined}
+                    badge={getBadgeForItem(item.id)}
                     collapsed={collapsed}
                     color={item.color}
                   />
@@ -395,6 +439,7 @@ export const Sidebar = ({
                     label={item.label}
                     isActive={currentView === item.id}
                     onClick={() => handleViewChangeWithMetrics(item.id, `media-${item.label}`)}
+                    badge={getBadgeForItem(item.id)}
                     collapsed={collapsed}
                   />
                 ))}
@@ -412,7 +457,9 @@ export const Sidebar = ({
                     label={item.label}
                     isActive={currentView === item.id}
                     onClick={() => handleViewChangeWithMetrics(item.id, `local-${item.label}`)}
+                    badge={getBadgeForItem(item.id)}
                     collapsed={collapsed}
+                    color={item.color}
                   />
                 ))}
               </div>

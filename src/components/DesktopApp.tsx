@@ -1764,6 +1764,37 @@ export const DesktopApp = () => {
     return shuffled.slice(0, 20);
   }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
+  // Calculer les compteurs pour la sidebar
+  const sidebarCounts = useMemo(() => {
+    // Compter les albums uniques
+    const uniqueAlbums = new Set(allTracks.filter(t => t.album).map(t => `${t.album}-${t.artist}`));
+    
+    // Compter les artistes uniques
+    const uniqueArtists = new Set(allTracks.filter(t => t.artist).map(t => t.artist));
+    
+    // Compter les fichiers locaux
+    const localFiles = allTracks.filter(t => t.filePath || t.mediaSource === 'local');
+    
+    // Compter les fichiers cloud (uploadés via Cloudinary, Nexus, Bunny, etc.)
+    const cloudFiles = allTracks.filter(t => 
+      t.mediaSource === 'cloudinary' || 
+      t.mediaSource === 'nexus' || 
+      t.mediaSource === 'bunny' || 
+      t.mediaSource === 'planethoster'
+    );
+    
+    return {
+      recent: recentTracks.length,
+      albums: uniqueAlbums.size,
+      artists: uniqueArtists.size,
+      videos: 0, // Sera géré par VideosView avec son propre état
+      local: localFiles.length,
+      downloads: 0, // Sera géré par DownloadsView avec son propre état
+      cloud: cloudFiles.length,
+      playlists: playlists.length,
+    };
+  }, [allTracks, recentTracks.length, playlists.length]);
+
   // Calculer la vue actuelle avec useMemo pour éviter les problèmes de hooks
   const currentViewContent = useMemo(() => {
     // Inline player view
@@ -2477,6 +2508,14 @@ export const DesktopApp = () => {
             }}
             favoritesCount={favoriteTracks.length}
             notificationsCount={notifications.length}
+            recentCount={sidebarCounts.recent}
+            albumsCount={sidebarCounts.albums}
+            artistsCount={sidebarCounts.artists}
+            videosCount={sidebarCounts.videos}
+            localCount={sidebarCounts.local}
+            downloadsCount={sidebarCounts.downloads}
+            cloudCount={sidebarCounts.cloud}
+            playlistsCount={sidebarCounts.playlists}
             collapsed={sidebarCollapsed}
             onCollapsedChange={setSidebarCollapsed}
             onPlayPlaylist={handlePlayPlaylist}
