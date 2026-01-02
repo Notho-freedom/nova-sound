@@ -651,6 +651,7 @@ export const SearchView = ({
                     </div>
                   )}
                   <Input
+                    data-coachmark="search-input"
                     ref={inputRef}
                     type="text"
                     placeholder="Artistes, titres ou albums..."

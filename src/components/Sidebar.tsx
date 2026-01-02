@@ -285,6 +285,7 @@ export const Sidebar = ({
   return (
     <TooltipProvider>
       <div
+        data-coachmark="sidebar"
         className={cn(
           "h-full flex flex-col transition-all duration-500 ease-out relative",
           "bg-gradient-to-b from-card/80 via-card/60 to-card/40 backdrop-blur-2xl",
@@ -419,7 +420,10 @@ export const Sidebar = ({
 
             {/* Playlists - Only show when expanded */}
             {!collapsed && (
-              <div className="animate-in fade-in slide-in-from-left-2 duration-500">
+              <div 
+                data-coachmark="sidebar-playlists"
+                className="animate-in fade-in slide-in-from-left-2 duration-500"
+              >
                 <SectionTitle
                   collapsed={collapsed}
                   action={
@@ -618,13 +622,15 @@ export const Sidebar = ({
         >
           {/* Settings & Notifications */}
           <div className="space-y-1">
-            <NavItem
-              icon={Settings}
-              label="Paramètres"
-              isActive={currentView === "settings"}
-              onClick={() => handleViewChangeWithMetrics("settings", "settings")}
-              collapsed={collapsed}
-            />
+            <div data-coachmark="sidebar-settings">
+              <NavItem
+                icon={Settings}
+                label="Paramètres"
+                isActive={currentView === "settings"}
+                onClick={() => handleViewChangeWithMetrics("settings", "settings")}
+                collapsed={collapsed}
+              />
+            </div>
           </div>
         </div>
 

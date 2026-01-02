@@ -169,7 +169,10 @@ export const QueuePanel = ({
   }, [queueTracks, queueFilter]);
 
   return (
-    <div className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl">
+    <div 
+      data-coachmark="queue-panel"
+      className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl"
+    >
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <h2 className="font-display text-sm tracking-wider text-foreground">

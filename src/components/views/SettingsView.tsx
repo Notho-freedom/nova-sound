@@ -58,6 +58,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SettingsViewSkeleton } from "@/components/ui/skeletons";
 import { testYouTubeApiKey } from "@/lib/youtube-api-test";
 import { redisCache } from "@/services/redis-cache";
+import { CoachmarkTrigger } from "@/features/coachmarks";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -2717,7 +2718,7 @@ export const SettingsView = () => {
                       </Button>
                     </div>
                   </div>
-                  <div className="pt-3 flex gap-2">
+                  <div className="pt-3 flex gap-2 flex-wrap">
                     <Button variant="outline" size="sm" onClick={() => notifySuccess("Vous êtes à jour !")}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Mises à jour
@@ -2726,6 +2727,9 @@ export const SettingsView = () => {
                       <ExternalLink className="w-4 h-4 mr-2" />
                       GitHub
                     </Button>
+                    <CoachmarkTrigger variant="ghost" size="sm" showIcon>
+                      Recommencer le coachmark
+                    </CoachmarkTrigger>
                   </div>
                 </div>
               </SettingsCard>

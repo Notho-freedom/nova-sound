@@ -57,6 +57,7 @@ let mainWindow = null;
 let oauthWindow = null;
 let stripeWindow = null;
 let oauthCallbackServer = null;
+const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 const isDev = !app.isPackaged;
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
@@ -72,11 +73,58 @@ const VIDEO_EXTENSIONS = [
     'amv', 'drc', 'gifv', 'mxf', 'roq', 'nsv', 'yuv', 'viv', 'svi', 'mng', 'qt'
 ];
 const MEDIA_EXTENSIONS = [...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS];
+function loadSecondaryWindowState(key, defaults) {
+    try {
+        const raw = fs.readFileSync(secondaryWindowStatePath, 'utf-8');
+        const state = JSON.parse(raw);
+        return state[key] ? { ...defaults, ...state[key] } : defaults;
+    }
+    catch {
+        return defaults;
+    }
+}
+function saveSecondaryWindowState(key, bounds) {
+    try {
+        let state = {};
+        try {
+            state = JSON.parse(fs.readFileSync(secondaryWindowStatePath, 'utf-8'));
+        }
+        catch {
+            state = {};
+        }
+        state[key] = bounds;
+        fs.writeFileSync(secondaryWindowStatePath, JSON.stringify(state, null, 2));
+    }
+    catch (error) {
+        console.warn('[SecondaryWindow] Failed to persist window state', error);
+    }
+}
+function fadeInWindow(win, duration = 180) {
+    try {
+        win.setOpacity(0);
+        const steps = 12;
+        const delta = 1 / steps;
+        let current = 0;
+        const interval = setInterval(() => {
+            current += 1;
+            const next = Math.min(1, current * delta);
+            if (!win.isDestroyed()) {
+                win.setOpacity(next);
+            }
+            if (next >= 1 || win.isDestroyed()) {
+                clearInterval(interval);
+            }
+        }, duration / steps);
+    }
+    catch {
+        // Ignore opacity failures on some platforms
+    }
+}
 /**
  * Create a branded secondary window (OAuth, Stripe, etc.) with consistent chrome.
  */
-function createSecondaryWindow(title, overrides = {}) {
-    const baseOptions = {
+function createSecondaryWindow(title, key, overrides = {}) {
+    const baseDefaults = {
         width: 640,
         height: 800,
         minWidth: 480,
@@ -92,17 +140,26 @@ function createSecondaryWindow(title, overrides = {}) {
         title,
         icon: path.join(__dirname, '../public/favicon.ico'),
         titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+        trafficLightPosition: process.platform === 'darwin' ? { x: 12, y: 12 } : undefined,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: false,
+            allowRunningInsecureContent: false,
+            scrollBounce: true,
         },
     };
-    const window = new BrowserWindow({
-        ...baseOptions,
+    const options = loadSecondaryWindowState(key, {
+        ...baseDefaults,
         ...overrides,
+    });
+    if (options.x !== undefined || options.y !== undefined) {
+        options.center = false;
+    }
+    const window = new BrowserWindow({
+        ...options,
         webPreferences: {
-            ...baseOptions.webPreferences,
+            ...baseDefaults.webPreferences,
             ...(overrides.webPreferences || {}),
         },
     });
@@ -110,6 +167,24 @@ function createSecondaryWindow(title, overrides = {}) {
         if (!window.isDestroyed()) {
             window.show();
             window.focus();
+            fadeInWindow(window);
+        }
+    });
+    window.webContents.setWindowOpenHandler(({ url }) => {
+        shell.openExternal(url);
+        return { action: 'deny' };
+    });
+    window.webContents.on('did-start-loading', () => {
+        window.setProgressBar(2);
+    });
+    const clearProgress = () => window.setProgressBar(-1);
+    window.webContents.on('did-stop-loading', clearProgress);
+    window.webContents.on('did-fail-load', clearProgress);
+    window.webContents.on('did-finish-load', clearProgress);
+    window.on('close', () => {
+        if (!window.isDestroyed() && !window.isMinimized()) {
+            const bounds = window.getBounds();
+            saveSecondaryWindowState(key, bounds);
         }
     });
     return window;
@@ -472,6 +547,11 @@ ipcMain.handle('window:close', () => {
 ipcMain.handle('window:isMaximized', () => {
     return mainWindow?.isMaximized() || false;
 });
+ipcMain.handle('window:openExternal', (_event, url) => {
+    if (url) {
+        shell.openExternal(url);
+    }
+});
 // OAuth handlers for desktop app authentication
 ipcMain.handle('oauth:openWindow', async (_event, url) => {
     try {
@@ -480,7 +560,7 @@ ipcMain.handle('oauth:openWindow', async (_event, url) => {
             oauthWindow.close();
         }
         // Create OAuth window with shared styling
-        oauthWindow = createSecondaryWindow('Authentification Google', {
+        oauthWindow = createSecondaryWindow('Authentification Google', 'oauth', {
             width: 520,
             height: 760,
             minWidth: 480,
@@ -530,7 +610,7 @@ ipcMain.handle('stripe:openWindow', async (_event, url) => {
             stripeWindow.close();
         }
         // Create Stripe window with shared styling
-        stripeWindow = createSecondaryWindow('Stripe Checkout', {
+        stripeWindow = createSecondaryWindow('Stripe Checkout', 'stripe', {
             width: 920,
             height: 980,
             minWidth: 760,

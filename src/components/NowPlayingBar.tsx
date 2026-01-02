@@ -128,6 +128,7 @@ export const NowPlayingBar = ({
   return (
     <TooltipProvider>
       <div
+        data-coachmark="player-bar"
         className={cn(
           "relative flex flex-col",
           "bg-gradient-to-t from-black/90 via-card/80 to-card/60",
@@ -284,7 +285,10 @@ export const NowPlayingBar = ({
             </div>
 
             {/* Center: Playback Controls */}
-            <div className="flex-1 flex flex-col items-center justify-center">
+            <div 
+              data-coachmark="player-controls"
+              className="flex-1 flex flex-col items-center justify-center"
+            >
               <div className="flex items-center gap-2">
                 {/* Shuffle */}
                 <Tooltip delayDuration={0}>
@@ -518,6 +522,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
+                    data-coachmark="player-queue-btn"
                     onClick={onToggleQueue}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",

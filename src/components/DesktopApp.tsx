@@ -47,13 +47,15 @@ import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Track } from "@/types/music";
-//import { VibrantUI, BassPulse } from "@/components/VibrantUI";
-//import { useAudioVibes } from "@/hooks/useAudioVibes";
-//import { useAudioAI } from "@/hooks/useAudioAI";
 import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer";
 import { getCachedYouTubeTrackByVideoId } from "@/lib/youtube-track-cache";
 import { mapHistoryEntriesToTracks } from "@/lib/history-utils";
 import { getTrackFromAllOrCache } from "@/lib/track-resolver";
+import { CoachmarkProvider } from "@/features/coachmarks";
+import "@/features/coachmarks/styles/coachmarks-theme.css";
+//import { VibrantUI, BassPulse } from "@/components/VibrantUI";
+//import { useAudioVibes } from "@/hooks/useAudioVibes";
+//import { useAudioAI } from "@/hooks/useAudioAI";
 //import { extractYouTubeVideoId } from "@/lib/youtube";
 
 export const DesktopApp = () => {
@@ -2383,7 +2385,8 @@ export const DesktopApp = () => {
   );
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <CoachmarkProvider autoStart={true}>
+      <TooltipProvider delayDuration={0}>
       <UpdateNotification />
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
         {/* Fullscreen Player */}
@@ -2793,5 +2796,6 @@ export const DesktopApp = () => {
         )}
       </div>
     </TooltipProvider>
+    </CoachmarkProvider>
   );
 };
