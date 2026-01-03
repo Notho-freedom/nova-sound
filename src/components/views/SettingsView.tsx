@@ -31,6 +31,10 @@ import {
   Wand2,
   CheckCircle2,
   Loader2,
+  Copy,
+  Search,
+  Tag,
+  Clock,
 } from "lucide-react";
 import { Youtube } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -420,6 +424,7 @@ export const SettingsView = () => {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [redisConnected, setRedisConnected] = useState<boolean | null>(null);
   const [redisChecking, setRedisChecking] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
   // Initialize settings with current theme from useTheme hook
   const [settings, setSettings] = useState<Partial<Settings>>(() => {
     const savedTheme = typeof window !== 'undefined' 
@@ -462,6 +467,11 @@ export const SettingsView = () => {
   const [bunnyStatusLoading, setBunnyStatusLoading] = useState(false);
   // Check if running in Electron - use reliable detection
   const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined';
+
+  // Debug: Log scanning state changes
+  useEffect(() => {
+    console.log('🔍 [SettingsView] Scanning state:', { scanning, scanProgress });
+  }, [scanning, scanProgress]);
 
   // Load Bunny status when user is Pro
   useEffect(() => {
@@ -1039,6 +1049,24 @@ export const SettingsView = () => {
     }
   };
 
+  // Handle cleanup of orphaned references
+  const handleCleanupOrphaned = async () => {
+    setCleanupLoading(true);
+    try {
+      // This would ideally call a cleanup function
+      // For now, we'll just log the recommendation
+      toast.success("Nettoyage en attente d'implémentation", {
+        description: "La fonction de nettoyage des références orphelines est prête à être intégrée"
+      });
+      console.log("💡 Cleanup orphaned references functionality ready to be implemented");
+    } catch (error) {
+      console.error("Cleanup error:", error);
+      toast.error("Erreur lors du nettoyage");
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
   // Handle upgrade to pro
   const handleUpgradeToPro = async () => {
     if (!stripeInitialized) {
@@ -1400,44 +1428,241 @@ export const SettingsView = () => {
 
                 {/* Scan progress */}
                 {scanning && scanProgress && (
-                  <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">
-                        {scanProgress.phase === "scanning" ? "Recherche..." : scanProgress.phase === "extracting" ? "Extraction..." : "Terminé"}
-                      </span>
-                      <span className="text-primary font-mono">{scanProgress.current} / {scanProgress.total}</span>
+                  <div className="mt-4 space-y-3">
+                    <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                      <div className="flex items-center justify-between text-sm mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex items-center justify-center">
+                            <RefreshCw className="w-4 h-4 text-primary animate-spin" />
+                          </div>
+                          <span className="font-medium text-foreground">
+                            {scanProgress.phase === "scanning" ? "🔍 Recherche des fichiers..." : 
+                             scanProgress.phase === "extracting" ? "🎵 Extraction des métadonnées..." : 
+                             scanProgress.phase === "indexing" ? "📊 Indexation..." : "✅ Terminé"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-primary font-mono font-semibold">{scanProgress.current} / {scanProgress.total}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {scanProgress.total > 0 ? `${Math.round((scanProgress.current / scanProgress.total) * 100)}%` : '0%'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <Progress 
+                        value={scanProgress.total > 0 ? (scanProgress.current / scanProgress.total) * 100 : 0} 
+                        className="h-2 mb-3" 
+                      />
+                      
+                      {scanProgress.file && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Music className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <p className="text-muted-foreground truncate">{scanProgress.file}</p>
+                        </div>
+                      )}
                     </div>
-                    <Progress value={scanProgress.total > 0 ? (scanProgress.current / scanProgress.total) * 100 : 0} className="h-1.5" />
-                    {scanProgress.file && <p className="text-xs text-muted-foreground truncate mt-2">{scanProgress.file}</p>}
+                    
+                    {/* Statistiques temps réel */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <div className="p-3 rounded-lg bg-card border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-1">Fichiers trouvés</p>
+                        <p className="text-lg font-bold text-foreground">{scanProgress.total}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-1">Traités</p>
+                        <p className="text-lg font-bold text-primary">{scanProgress.current}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-1">Restants</p>
+                        <p className="text-lg font-bold text-orange-500">{Math.max(0, scanProgress.total - scanProgress.current)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-card border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-1">Phase</p>
+                        <p className="text-sm font-semibold text-foreground capitalize">
+                          {scanProgress.phase === "scanning" ? "Recherche" : 
+                           scanProgress.phase === "extracting" ? "Extraction" : 
+                           scanProgress.phase === "indexing" ? "Indexation" : "Terminé"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </SettingsCard>
 
-              <SettingsCard title="Statistiques" icon={HardDrive}>
+              <SettingsCard title="Statistiques de la bibliothèque" icon={HardDrive}>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Pistes</span>
-                    <span className="text-sm font-mono text-foreground">{tracks.length}</span>
+                    <span className="text-sm font-mono text-foreground font-semibold">{tracks.length.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Albums</span>
-                    <span className="text-sm font-mono text-foreground">{new Set(tracks.map(t => t.album)).size}</span>
+                    <span className="text-sm font-mono text-foreground">{new Set(tracks.map(t => t.album)).size.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Artistes</span>
-                    <span className="text-sm font-mono text-foreground">{new Set(tracks.map(t => t.artist)).size}</span>
+                    <span className="text-sm font-mono text-foreground">{new Set(tracks.map(t => t.artist)).size.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                    <span className="text-sm text-muted-foreground">Genres</span>
+                    <span className="text-sm font-mono text-foreground">{new Set(tracks.filter(t => t.genre).map(t => t.genre)).size.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Taille totale</span>
+                    <span className="text-sm font-mono text-foreground">
+                      {(() => {
+                        const totalBytes = tracks.reduce((sum, t) => sum + (t.fileSize || 0), 0);
+                        const gb = totalBytes / (1024 * 1024 * 1024);
+                        return gb >= 1 ? `${gb.toFixed(2)} Go` : `${(totalBytes / (1024 * 1024)).toFixed(0)} Mo`;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Durée totale</span>
+                    <span className="text-sm font-mono text-foreground">
+                      {(() => {
+                        const totalSeconds = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
+                        const hours = Math.floor(totalSeconds / 3600);
+                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                      })()}
+                    </span>
                   </div>
                 </div>
               </SettingsCard>
 
-              <SettingsCard title="Options" icon={Music}>
+              <SettingsCard title="Options de scan" icon={Music}>
                 <SettingRow label="Scanner au démarrage" description="Recherche automatique des nouveaux fichiers">
                   <Switch checked={settings.autoScanOnStartup} onCheckedChange={(v) => updateSetting("autoScanOnStartup", v)} />
                 </SettingRow>
-                <SettingRow label="Surveiller les dossiers" description="Détection en temps réel">
+                <SettingRow label="Surveiller les dossiers" description="Détection en temps réel des changements">
                   <Switch checked={false} disabled />
                   <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
                 </SettingRow>
+              </SettingsCard>
+
+              <SettingsCard title="Outils avancés" icon={Sparkles} className="lg:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Analyse de qualité */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">Analyse de qualité</h4>
+                        <p className="text-xs text-muted-foreground">Bitrate, format, intégrité</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-xs text-muted-foreground mb-3">
+                      <div className="flex items-center justify-between">
+                        <span>Haute qualité (≥320kbps)</span>
+                        <span className="font-mono text-foreground">
+                          {tracks.filter(t => (t.bitrate || 0) >= 320).length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Qualité moyenne (128-320kbps)</span>
+                        <span className="font-mono text-foreground">
+                          {tracks.filter(t => (t.bitrate || 0) >= 128 && (t.bitrate || 0) < 320).length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Basse qualité (&lt;128kbps)</span>
+                        <span className="font-mono text-orange-500">
+                          {tracks.filter(t => (t.bitrate || 0) > 0 && (t.bitrate || 0) < 128).length}
+                        </span>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      <Check className="w-4 h-4 mr-2" />
+                      Analyser la qualité
+                    </Button>
+                  </div>
+
+                  {/* Détection de doublons */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <Copy className="w-5 h-5 text-purple-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">Doublons</h4>
+                        <p className="text-xs text-muted-foreground">Détection intelligente</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      <p>Recherche des fichiers en double basée sur:</p>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li>Titre + Artiste identiques</li>
+                        <li>Durée similaire (±3s)</li>
+                        <li>Empreinte audio</li>
+                      </ul>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      <Search className="w-4 h-4 mr-2" />
+                      Rechercher les doublons
+                    </Button>
+                  </div>
+
+                  {/* Fichiers manquants */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <AlertCircle className="w-5 h-5 text-orange-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">Fichiers manquants</h4>
+                        <p className="text-xs text-muted-foreground">Vérification d'intégrité</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      <p>Vérifie si tous les fichiers référencés existent encore sur le disque.</p>
+                      <p className="mt-1 text-orange-500">Nettoie les références obsolètes.</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Vérifier l'intégrité
+                    </Button>
+                  </div>
+
+                  {/* Métadonnées manquantes */}
+                  <div className="p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                        <Tag className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">Métadonnées</h4>
+                        <p className="text-xs text-muted-foreground">Complétion automatique</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-xs text-muted-foreground mb-3">
+                      <div className="flex items-center justify-between">
+                        <span>Sans pochette</span>
+                        <span className="font-mono text-foreground">
+                          {tracks.filter(t => !t.coverUrl).length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Sans genre</span>
+                        <span className="font-mono text-foreground">
+                          {tracks.filter(t => !t.genre).length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Sans année</span>
+                        <span className="font-mono text-foreground">
+                          {tracks.filter(t => !t.year).length}
+                        </span>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      <Download className="w-4 h-4 mr-2" />
+                      Compléter les infos
+                    </Button>
+                  </div>
+                </div>
               </SettingsCard>
 
               <RecognitionCard tracks={tracks} refreshLibrary={refreshLibrary} />
@@ -2722,6 +2947,20 @@ export const SettingsView = () => {
                     <Button variant="outline" size="sm" onClick={() => notifySuccess("Vous êtes à jour !")}>
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Mises à jour
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={handleCleanupOrphaned}
+                      disabled={cleanupLoading}
+                      className="flex items-center gap-2"
+                    >
+                      {cleanupLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                      Nettoyer les orphelins
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => window.open("https://github.com/nexus-audio", "_blank")}>
                       <ExternalLink className="w-4 h-4 mr-2" />

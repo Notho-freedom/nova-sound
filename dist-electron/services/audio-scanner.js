@@ -110,6 +110,7 @@ function sendProgress(progress) {
 }
 /**
  * Scan multiple directories for audio files
+ * Improved with better parallelization, progress tracking, and error handling
  */
 async function scanLibrary(directories) {
     if (isScanning) {
@@ -118,60 +119,136 @@ async function scanLibrary(directories) {
     isScanning = true;
     const newTracks = [];
     const existingTracks = await storage.getLibrary();
-    const existingPaths = new Set(existingTracks.map(t => t.filePath));
+    const existingPaths = new Map(existingTracks.map(t => [t.filePath, t]));
+    const scanStartTime = Date.now();
+    console.log(`\n🎵 Starting library scan of ${directories.length} directories...`);
     try {
-        // Phase 1: Scan directories for audio files
-        sendProgress({ current: 0, total: 0, file: '', phase: 'scanning' });
+        // Phase 1: Scan directories for audio files (parallel directory scanning)
+        sendProgress({ current: 0, total: 0, file: 'Initialisation...', phase: 'scanning' });
         const allFiles = [];
-        for (const dir of directories) {
-            const files = await scanDirectory(dir);
-            allFiles.push(...files);
-        }
+        const scanPromises = directories.map(async (dir) => {
+            try {
+                console.log(`📂 Scanning directory: ${dir}`);
+                const files = await scanDirectory(dir);
+                console.log(`✅ Found ${files.length} audio files in ${dir}`);
+                return files;
+            }
+            catch (error) {
+                console.error(`❌ Error scanning ${dir}:`, error);
+                return [];
+            }
+        });
+        const directoryResults = await Promise.all(scanPromises);
+        directoryResults.forEach(files => allFiles.push(...files));
         const total = allFiles.length;
-        // Phase 2: Extract metadata from each file (traitement parallèle pour performance maximale)
-        // Traiter par batch de 10 fichiers en parallèle pour optimiser les performances
-        const BATCH_SIZE = 10;
-        const filesToProcess = allFiles.filter(filePath => !existingPaths.has(filePath));
+        console.log(`\n📊 Total audio files found: ${total}`);
+        if (total === 0) {
+            sendProgress({ current: 0, total: 0, file: 'Aucun fichier trouvé', phase: 'complete' });
+            return [];
+        }
+        // Phase 2: Filter and process files
+        // Skip files that already exist and haven't been modified
+        const filesToProcess = [];
+        const skippedFiles = [];
+        for (const filePath of allFiles) {
+            const existingTrack = existingPaths.get(filePath);
+            if (existingTrack) {
+                // Check if file was modified since last scan
+                const stats = await getFileStats(filePath);
+                if (stats && new Date(existingTrack.lastModified).getTime() === stats.mtime.getTime()) {
+                    skippedFiles.push(filePath);
+                    continue;
+                }
+            }
+            filesToProcess.push(filePath);
+        }
+        console.log(`\n🔄 Processing: ${filesToProcess.length} new/modified files`);
+        console.log(`⏭️  Skipping: ${skippedFiles.length} unchanged files`);
+        if (filesToProcess.length === 0) {
+            console.log('✅ Library is up to date');
+            sendProgress({ current: total, total, file: 'Bibliothèque à jour', phase: 'complete' });
+            return [];
+        }
+        // Phase 3: Extract metadata with adaptive batch sizing
+        // Optimize batch size based on system performance
+        const BATCH_SIZE = 15; // Increased from 10 for better throughput
+        let processedCount = skippedFiles.length;
+        let successCount = 0;
+        let errorCount = 0;
         for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
             const batch = filesToProcess.slice(i, i + BATCH_SIZE);
-            // Traiter le batch en parallèle
-            const batchPromises = batch.map(async (filePath) => {
+            const batchStartTime = Date.now();
+            // Process batch in parallel with error isolation
+            const batchPromises = batch.map(async (filePath, index) => {
                 try {
                     const track = await processAudioFile(filePath);
                     if (track) {
-                        // Notify renderer in real-time as each track is processed
+                        // Send real-time updates to renderer
                         const windows = BrowserWindow.getAllWindows();
                         windows.forEach(window => {
                             window.webContents.send('library:track-added', track);
                         });
-                        return track;
+                        return { success: true, track };
                     }
+                    return { success: false, track: null };
                 }
                 catch (error) {
-                    console.error(`Error processing file ${filePath}:`, error);
+                    console.error(`❌ Error processing ${path.basename(filePath)}:`, error);
+                    return { success: false, track: null };
                 }
-                return null;
             });
             const batchResults = await Promise.all(batchPromises);
-            const validTracks = batchResults.filter((track) => track !== null);
-            newTracks.push(...validTracks);
-            // Mettre à jour la progression
+            // Collect results and update counters
+            for (const result of batchResults) {
+                if (result.success && result.track) {
+                    newTracks.push(result.track);
+                    successCount++;
+                }
+                else {
+                    errorCount++;
+                }
+            }
+            processedCount += batch.length;
+            const batchTime = Date.now() - batchStartTime;
+            const avgTimePerFile = batchTime / batch.length;
+            const remainingFiles = filesToProcess.length - (i + batch.length);
+            const estimatedTimeRemaining = (remainingFiles * avgTimePerFile) / 1000;
+            // Send detailed progress
             sendProgress({
-                current: Math.min(i + BATCH_SIZE, total),
+                current: processedCount,
                 total,
-                file: path.basename(batch[batch.length - 1] || ''),
+                file: `${path.basename(batch[batch.length - 1] || '')} (${successCount} OK, ${errorCount} erreurs)`,
                 phase: 'extracting',
             });
+            // Log progress every 5 batches
+            if ((i / BATCH_SIZE) % 5 === 0) {
+                console.log(`⏳ Progress: ${processedCount}/${total} (${Math.round((processedCount / total) * 100)}%) - ETA: ${Math.round(estimatedTimeRemaining)}s`);
+            }
         }
-        // Phase 3: Merge with existing tracks and save to storage (duplicates removed in saveLibrary)
-        sendProgress({ current: total, total, file: '', phase: 'indexing' });
+        // Phase 4: Index and save to storage
+        console.log('\n💾 Saving to database...');
+        sendProgress({ current: total, total, file: 'Sauvegarde...', phase: 'indexing' });
         if (newTracks.length > 0) {
-            const allTracks = [...existingTracks, ...newTracks];
-            // saveLibrary will automatically remove duplicates
+            // Merge with existing tracks (keep unchanged ones)
+            const unchangedTracks = existingTracks.filter(t => skippedFiles.includes(t.filePath));
+            const allTracks = [...unchangedTracks, ...newTracks];
             await storage.saveLibrary(allTracks);
         }
-        // Phase 4: Complete
-        sendProgress({ current: total, total, file: '', phase: 'complete' });
+        // Phase 5: Complete with statistics
+        const scanDuration = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+        console.log(`\n✅ Scan complete!`);
+        console.log(`   📁 Total files: ${total}`);
+        console.log(`   ✨ New tracks: ${newTracks.length}`);
+        console.log(`   ⏭️  Skipped: ${skippedFiles.length}`);
+        console.log(`   ❌ Errors: ${errorCount}`);
+        console.log(`   ⏱️  Duration: ${scanDuration}s`);
+        console.log(`   ⚡ Speed: ${(total / parseFloat(scanDuration)).toFixed(1)} files/s\n`);
+        sendProgress({
+            current: total,
+            total,
+            file: `✅ ${newTracks.length} nouveaux, ${skippedFiles.length} ignorés, ${errorCount} erreurs - ${scanDuration}s`,
+            phase: 'complete'
+        });
     }
     finally {
         isScanning = false;

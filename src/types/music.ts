@@ -17,6 +17,8 @@ export interface Track {
   addedAt?: string;
   lastPlayedAt?: string;
   playCount?: number;
+  fileSize?: number; // Taille du fichier en octets
+  lastModified?: string; // Date de dernière modification du fichier
   
   // Media source (YouTube, local, cloud, etc.)
   mediaSource?: 'local' | 'youtube' | 'cloudinary' | 'nexus' | 'bunny' | 'planethoster' | 'soundcloud' | 'vimeo' | 'unknown';

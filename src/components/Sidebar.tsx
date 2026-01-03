@@ -161,14 +161,17 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           >
             {label}
           </span>
-          {badge !== undefined && badge > 0 && (
+          {badge !== undefined && (
             <span
               className={cn(
                 "min-w-[20px] h-5 px-1.5 text-xs font-bold rounded-full flex items-center justify-center transition-all duration-300",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-white/10 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary",
+                badge > 0 ? (
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-white/10 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
+                ) : "bg-red-500/20 text-red-400 opacity-50"
               )}
+              title={badge === 0 ? "Aucun élément trouvé" : undefined}
             >
               {badge > 99 ? "99+" : badge}
             </span>
@@ -184,8 +187,14 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent side="right" className="flex items-center gap-2 bg-card/95 backdrop-blur-xl border-border/50">
           <span className="font-medium">{label}</span>
-          {badge !== undefined && badge > 0 && (
-            <span className="px-1.5 py-0.5 text-xs font-bold rounded-full bg-primary/20 text-primary flex items-center justify-center">
+          {badge !== undefined && (
+            <span 
+              className={cn(
+                "px-1.5 py-0.5 text-xs font-bold rounded-full flex items-center justify-center",
+                badge > 0 ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-400"
+              )}
+              title={badge === 0 ? "Aucun élément trouvé" : undefined}
+            >
               {badge}
             </span>
           )}
@@ -283,6 +292,63 @@ export const Sidebar = ({
   
   // Enrich playlists with metadata (covers, duration, artists)
   const playlistMetadata = usePlaylistMetadata(playlists, tracks);
+
+  // Debug: Afficher tous les compteurs reçus et leur état d'affichage
+  useEffect(() => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🎨 [SIDEBAR UI] Compteurs reçus et état d\'affichage');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    const allItems = [
+      ...mainNavItems.map(i => ({ ...i, section: 'Navigation' })),
+      ...libraryItems.map(i => ({ ...i, section: 'Ma Musique' })),
+      ...mediaItems.map(i => ({ ...i, section: 'Médias' })),
+      ...localItems.map(i => ({ ...i, section: 'Local' })),
+    ];
+    
+    let displayedCount = 0;
+    let hiddenCount = 0;
+    
+    allItems.forEach(item => {
+      const badge = getBadgeForItem(item.id);
+      const willDisplay = badge !== undefined && badge > 0;
+      
+      if (willDisplay) displayedCount++;
+      else hiddenCount++;
+      
+      const status = willDisplay ? '✅ AFFICHÉ' : '❌ MASQUÉ';
+      const reason = badge === undefined ? '(undefined)' : badge === 0 ? '(= 0)' : '';
+      
+      console.log(`${status} ${item.section} > ${item.label}: ${badge} ${reason}`);
+    });
+    
+    console.log('\n📊 RÉSUMÉ AFFICHAGE:');
+    console.log(`   - Items avec badge affiché: ${displayedCount}/${allItems.length} (${Math.round(displayedCount/allItems.length*100)}%)`);
+    console.log(`   - Items sans badge: ${hiddenCount}/${allItems.length} (${Math.round(hiddenCount/allItems.length*100)}%)`);
+    
+    console.log('\n📋 COMPTEURS REÇUS (props):');
+    console.log(`   - favoritesCount: ${favoritesCount}`);
+    console.log(`   - notificationsCount: ${notificationsCount}`);
+    console.log(`   - recentCount: ${recentCount}`);
+    console.log(`   - albumsCount: ${albumsCount}`);
+    console.log(`   - artistsCount: ${artistsCount}`);
+    console.log(`   - videosCount: ${videosCount}`);
+    console.log(`   - localCount: ${localCount}`);
+    console.log(`   - downloadsCount: ${downloadsCount}`);
+    console.log(`   - cloudCount: ${cloudCount}`);
+    console.log(`   - playlistsCount: ${playlistsCount}`);
+    
+    console.log('\n🔍 DONNÉES LOCALES:');
+    console.log(`   - Tracks disponibles: ${tracks.length}`);
+    console.log(`   - Playlists visibles (favorites): ${playlists.length}`);
+    console.log(`   - Toutes playlists (props): ${propPlaylists?.length || 'non fourni'}`);
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  }, [
+    favoritesCount, notificationsCount, recentCount, albumsCount, artistsCount, 
+    videosCount, localCount, downloadsCount, cloudCount, playlistsCount,
+    tracks.length, playlists.length, propPlaylists?.length
+  ]);
 
   // Optimized view change with startTransition for non-blocking updates
   const handleViewChangeWithMetrics = useCallback((newView: ViewType, source: string) => {

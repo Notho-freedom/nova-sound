@@ -1115,8 +1115,34 @@ ipcMain.handle('fs:openPath', async (_event, filePath: string) => {
 // Register custom protocol for local audio files
 function registerLocalAudioProtocol() {
   protocol.handle('local-audio', async (request) => {
-    const filePath = decodeURIComponent(request.url.replace('local-audio://', ''));
+    let filePath = request.url.replace('local-audio://', '');
+    
+    // Decode URI component - handle both encoded and unencoded paths
     try {
+      // Remove any leading slashes
+      filePath = filePath.replace(/^\/+/, '');
+      // Decode URI component (handles %20, %2B, etc.)
+      filePath = decodeURIComponent(filePath);
+    } catch (e) {
+      console.error('Failed to decode audio path:', filePath, e);
+    }
+    
+    try {
+      // Normalize path for Windows
+      if (process.platform === 'win32') {
+        // Handle Windows paths that might have forward slashes
+        filePath = filePath.replace(/\//g, '\\');
+      }
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        console.error('Audio file not found:', filePath);
+        return new Response('File not found', { 
+          status: 404,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+      
       const data = fs.readFileSync(filePath);
       const ext = path.extname(filePath).toLowerCase();
       

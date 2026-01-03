@@ -114,21 +114,37 @@ export function useLibrary(): UseLibraryReturn {
   useEffect(() => {
     if (!isElectron || !window.electronAPI) return;
 
+    console.log('🎧 [useLibrary] Registering scan progress listener');
     const unsubscribe = window.electronAPI.onScanProgress((progress) => {
+      console.log('📊 [useLibrary] Received scan progress:', progress);
       setScanProgress(progress);
+      setScanning(true); // Ensure scanning is set to true when we receive progress
       if (progress.phase === "complete") {
+        console.log('✅ [useLibrary] Scan complete, updating state');
         setScanning(false);
         setScanProgress(null);
+        // Reload library when scan is complete
         window.electronAPI?.getLibrary().then((library) => {
-          const uniqueTracks = deduplicateTracks(library);
-          indexTracks(uniqueTracks);
-          setTracks(uniqueTracks);
+          setTracks(prev => {
+            // Use a functional update to avoid depending on deduplicateTracks/indexTracks
+            const seen = new Set<string>();
+            const unique = library.filter(t => {
+              if (seen.has(t.id)) return false;
+              seen.add(t.id);
+              return true;
+            });
+            return unique;
+          });
         });
       }
     });
 
-    return unsubscribe;
-  }, [isElectron, deduplicateTracks, indexTracks]);
+    console.log('✅ [useLibrary] Scan progress listener registered');
+    return () => {
+      console.log('🔌 [useLibrary] Unregistering scan progress listener');
+      unsubscribe();
+    };
+  }, [isElectron]); // Only depend on isElectron, not on functions that change
 
   // Listen for real-time track updates
   useEffect(() => {
@@ -182,6 +198,7 @@ export function useLibrary(): UseLibraryReturn {
   const scanLibrary = useCallback(async (directories?: string[]) => {
     if (!isElectron || !window.electronAPI) return;
 
+    console.log('🚀 [useLibrary] Starting scan...', { directories });
     setScanning(true);
     setError(null);
     setScanProgress({ current: 0, total: 0, file: "", phase: "scanning" });
@@ -202,8 +219,10 @@ export function useLibrary(): UseLibraryReturn {
       }
 
       if (foldersToScan.length > 0) {
+        console.log('📂 [useLibrary] Scanning folders:', foldersToScan);
         await window.electronAPI.scanLibrary(foldersToScan);
       } else {
+        console.log('⚠️ [useLibrary] No folders to scan');
         setScanning(false);
         setScanProgress(null);
       }
