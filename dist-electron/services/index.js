@@ -6,4 +6,5 @@ export { initPlaylistManager } from './playlist-manager.js';
 export { initEqualizer, EQUALIZER_FREQUENCIES, DEFAULT_PRESETS, interpolateEQCurve } from './equalizer.js';
 export { initLyricsProvider, findCurrentLyricsLine } from './lyrics-provider.js';
 export { initScrobbler, shouldScrobble } from './scrobbler.js';
+export { analyzeQuality, detectDuplicates, checkIntegrity, cleanupMissingFiles, analyzeMetadata } from './library-tools.js';
 //# sourceMappingURL=index.js.map

@@ -1714,7 +1714,7 @@ export const DesktopApp = () => {
   // BUGFIX: Utiliser allTracks comme source principale pour les lookups
   const historyTracks = useMemo(() => {
     const mapped = mapHistoryEntriesToTracks(history, allTracks, tracks, libraryTracks);
-    return getUniqueTracks(mapped).slice(0, 50);
+    return getUniqueTracks(mapped); // No limit - show all history
   }, [history, allTracks, tracks, libraryTracks, getUniqueTracks]);
 
   // Get recently played tracks from history (for HomeView) - without duplicates
@@ -1724,7 +1724,7 @@ export const DesktopApp = () => {
   // quand une playlist est jouée (car tracks devient queue.tracks qui ne contient que la playlist)
   const recentTracks = useMemo(() => {
     const mapped = mapHistoryEntriesToTracks(history, allTracks, tracks, libraryTracks);
-    return getUniqueTracks(mapped).slice(0, 20);
+    return getUniqueTracks(mapped); // No limit - show all recent tracks
   }, [history, allTracks, tracks, libraryTracks, getUniqueTracks]);
 
   // Get recently added tracks (sorted by addedAt date) - without duplicates
@@ -1736,8 +1736,7 @@ export const DesktopApp = () => {
         const dateA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
         const dateB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
         return dateB - dateA; // Most recent first
-      })
-      .slice(0, 50);
+      }); // No limit - show all recently added tracks
   }, [libraryTracks, getUniqueTracks]);
 
   // Get similar tracks (same artist or genre, random selection) - without duplicates
@@ -1761,7 +1760,7 @@ export const DesktopApp = () => {
     // Remove duplicates and shuffle
     const unique = getUniqueTracks(candidates);
     const shuffled = [...unique].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 20);
+    return shuffled; // No limit - show all similar tracks
   }, [currentTrack?.id, currentTrack?.artist, currentTrack?.genre, currentTrack?.mediaSource, libraryTracks, getUniqueTracks]);
 
   // Calculer les compteurs pour la sidebar

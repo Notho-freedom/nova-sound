@@ -18,6 +18,7 @@ import { initLyricsProvider } from './services/lyrics-provider.js';
 import { initScrobbler } from './services/scrobbler.js';
 import { initMusicRecognizer } from './services/music-recognizer.js';
 import { initUpdater } from './updater/updater.js';
+import { analyzeQuality, detectDuplicates, checkIntegrity, cleanupMissingFiles, analyzeMetadata } from './services/library-tools.js';
 
 // Import CLI parser
 import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions, type CLIOptions } from './cli.js';
@@ -1108,6 +1109,63 @@ ipcMain.handle('fs:openPath', async (_event, filePath: string) => {
     shell.showItemInFolder(filePath);
   } catch (error) {
     console.error('Failed to open path:', filePath, error);
+    throw error;
+  }
+});
+
+// ============== Library Tools Handlers ==============
+
+// Analyze library quality
+ipcMain.handle('library:analyze-quality', async () => {
+  try {
+    const analysis = await analyzeQuality();
+    return analysis;
+  } catch (error) {
+    console.error('Failed to analyze quality:', error);
+    throw error;
+  }
+});
+
+// Detect duplicates
+ipcMain.handle('library:detect-duplicates', async () => {
+  try {
+    const duplicates = await detectDuplicates();
+    return duplicates;
+  } catch (error) {
+    console.error('Failed to detect duplicates:', error);
+    throw error;
+  }
+});
+
+// Check library integrity
+ipcMain.handle('library:check-integrity', async () => {
+  try {
+    const result = await checkIntegrity();
+    return result;
+  } catch (error) {
+    console.error('Failed to check integrity:', error);
+    throw error;
+  }
+});
+
+// Cleanup missing files
+ipcMain.handle('library:cleanup-missing', async () => {
+  try {
+    const result = await cleanupMissingFiles();
+    return result;
+  } catch (error) {
+    console.error('Failed to cleanup missing files:', error);
+    throw error;
+  }
+});
+
+// Analyze metadata completion
+ipcMain.handle('library:analyze-metadata', async () => {
+  try {
+    const report = await analyzeMetadata();
+    return report;
+  } catch (error) {
+    console.error('Failed to analyze metadata:', error);
     throw error;
   }
 });

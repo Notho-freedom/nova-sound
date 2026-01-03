@@ -47,6 +47,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLibrary } from "@/hooks/useLibrary";
+import { useLibraryTools } from "@/hooks/useLibraryTools";
 import { useVideos } from "@/hooks/useVideos";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
@@ -396,6 +397,22 @@ const ConfigAlert = ({ configured, service }: { configured: boolean; service: st
 
 export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders, refreshLibrary } = useLibrary();
+  const {
+    qualityAnalysis,
+    qualityLoading,
+    analyzeQuality,
+    duplicates,
+    duplicatesLoading,
+    detectDuplicates,
+    integrityResult,
+    integrityLoading,
+    checkIntegrity,
+    cleanupMissing,
+    cleanupLoading,
+    metadataReport,
+    metadataLoading,
+    analyzeMetadata,
+  } = useLibraryTools();
   const { videos, scanning: scanningVideos, scanProgress: videoScanProgress, scanVideos, selectVideoFolders } = useVideos();
   const { theme, setTheme } = useTheme();
   const { enabled: notificationsEnabled, setEnabled: setNotificationsEnabled, notifySuccess, notifyError } = useNotifications();
@@ -424,7 +441,6 @@ export const SettingsView = () => {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [redisConnected, setRedisConnected] = useState<boolean | null>(null);
   const [redisChecking, setRedisChecking] = useState(false);
-  const [cleanupLoading, setCleanupLoading] = useState(false);
   // Initialize settings with current theme from useTheme hook
   const [settings, setSettings] = useState<Partial<Settings>>(() => {
     const savedTheme = typeof window !== 'undefined' 
@@ -1051,19 +1067,16 @@ export const SettingsView = () => {
 
   // Handle cleanup of orphaned references
   const handleCleanupOrphaned = async () => {
-    setCleanupLoading(true);
     try {
-      // This would ideally call a cleanup function
-      // For now, we'll just log the recommendation
-      toast.success("Nettoyage en attente d'implémentation", {
-        description: "La fonction de nettoyage des références orphelines est prête à être intégrée"
-      });
-      console.log("💡 Cleanup orphaned references functionality ready to be implemented");
+      const result = await cleanupMissing();
+      if (result) {
+        toast.success(`✅ Nettoyage terminé`, {
+          description: `${result.removed} fichier(s) manquant(s) supprimé(s), ${result.remaining} référence(s) valide(s) restante(s)`
+        });
+      }
     } catch (error) {
       console.error("Cleanup error:", error);
       toast.error("Erreur lors du nettoyage");
-    } finally {
-      setCleanupLoading(false);
     }
   };
 
@@ -1574,9 +1587,24 @@ export const SettingsView = () => {
                         </span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      <Check className="w-4 h-4 mr-2" />
-                      Analyser la qualité
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full" 
+                      onClick={analyzeQuality}
+                      disabled={qualityLoading}
+                    >
+                      {qualityLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Analyse...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Analyser la qualité
+                        </>
+                      )}
                     </Button>
                   </div>
 
@@ -1599,9 +1627,24 @@ export const SettingsView = () => {
                         <li>Empreinte audio</li>
                       </ul>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      <Search className="w-4 h-4 mr-2" />
-                      Rechercher les doublons
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full" 
+                      onClick={detectDuplicates}
+                      disabled={duplicatesLoading}
+                    >
+                      {duplicatesLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Recherche...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 mr-2" />
+                          Rechercher les doublons
+                        </>
+                      )}
                     </Button>
                   </div>
 
@@ -1620,10 +1663,48 @@ export const SettingsView = () => {
                       <p>Vérifie si tous les fichiers référencés existent encore sur le disque.</p>
                       <p className="mt-1 text-orange-500">Nettoie les références obsolètes.</p>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Vérifier l'intégrité
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1" 
+                        onClick={checkIntegrity}
+                        disabled={integrityLoading}
+                      >
+                        {integrityLoading ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Vérification...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Vérifier
+                          </>
+                        )}
+                      </Button>
+                      {integrityResult && integrityResult.stats.missing > 0 && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={cleanupMissing}
+                          disabled={cleanupLoading}
+                        >
+                          {cleanupLoading ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                              Nettoyage...
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-4 h-4 mr-2" />
+                              Nettoyer ({integrityResult.stats.missing})
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Métadonnées manquantes */}
@@ -1657,15 +1738,182 @@ export const SettingsView = () => {
                         </span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      <Download className="w-4 h-4 mr-2" />
-                      Compléter les infos
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full" 
+                      onClick={analyzeMetadata}
+                      disabled={metadataLoading}
+                    >
+                      {metadataLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Analyse...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4 mr-2" />
+                          Analyser les métadonnées
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
               </SettingsCard>
 
               <RecognitionCard tracks={tracks} refreshLibrary={refreshLibrary} />
+
+              {/* Quality Analysis Results */}
+              {qualityAnalysis && (
+                <SettingsCard title="Résultats d'analyse de qualité" icon={Sparkles} className="lg:col-span-2">
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <p className="text-xs text-muted-foreground">Haute qualité</p>
+                        <p className="text-lg font-bold text-green-500">{qualityAnalysis.stats.highQualityCount}</p>
+                        <p className="text-xs text-muted-foreground">≥ 320 kbps</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <p className="text-xs text-muted-foreground">Qualité moyenne</p>
+                        <p className="text-lg font-bold text-blue-500">{qualityAnalysis.stats.mediumQualityCount}</p>
+                        <p className="text-xs text-muted-foreground">128-320 kbps</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                        <p className="text-xs text-muted-foreground">Basse qualité</p>
+                        <p className="text-lg font-bold text-orange-500">{qualityAnalysis.stats.lowQualityCount}</p>
+                        <p className="text-xs text-muted-foreground">&lt; 128 kbps</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                        <p className="text-xs text-muted-foreground">Inconnu</p>
+                        <p className="text-lg font-bold text-foreground">{qualityAnalysis.stats.unknownCount}</p>
+                        <p className="text-xs text-muted-foreground">Bitrate missing</p>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <p className="text-sm font-semibold mb-2">Bitrate moyen: <span className="text-primary">{qualityAnalysis.stats.averageBitrate} kbps</span></p>
+                      <p className="text-xs text-muted-foreground">Formats détectés:</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {Object.entries(qualityAnalysis.stats.formats).map(([format, count]) => (
+                          <span key={format} className="text-xs bg-primary/10 px-2 py-1 rounded">
+                            {format}: {count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </SettingsCard>
+              )}
+
+              {/* Integrity Check Results */}
+              {integrityResult && (
+                <SettingsCard title="Résultats de vérification d'intégrité" icon={Check} className="lg:col-span-2">
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <p className="text-xs text-muted-foreground">Fichiers valides</p>
+                        <p className="text-lg font-bold text-green-500">{integrityResult.stats.valid}</p>
+                        <p className="text-xs text-muted-foreground">{integrityResult.stats.percentage}%</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <p className="text-xs text-muted-foreground">Fichiers manquants</p>
+                        <p className="text-lg font-bold text-red-500">{integrityResult.stats.missing}</p>
+                        <p className="text-xs text-muted-foreground">{100 - integrityResult.stats.percentage}%</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="text-lg font-bold text-blue-500">{integrityResult.totalTracks}</p>
+                        <p className="text-xs text-muted-foreground">pistes</p>
+                      </div>
+                    </div>
+                    {integrityResult.missingFiles.length > 0 && (
+                      <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <p className="text-sm font-semibold text-red-500 mb-2">Fichiers manquants ({integrityResult.missingFiles.length}):</p>
+                        <div className="max-h-32 overflow-y-auto">
+                          <ul className="text-xs space-y-1">
+                            {integrityResult.missingFiles.slice(0, 5).map((track) => (
+                              <li key={track.id} className="text-muted-foreground truncate">
+                                • {track.title} - {track.artist}
+                              </li>
+                            ))}
+                            {integrityResult.missingFiles.length > 5 && (
+                              <li className="text-muted-foreground italic">
+                                + {integrityResult.missingFiles.length - 5} autres...
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </SettingsCard>
+              )}
+
+              {/* Metadata Analysis Results */}
+              {metadataReport && (
+                <SettingsCard title="Analyse de complétude des métadonnées" icon={Tag} className="lg:col-span-2">
+                  <div className="space-y-3">
+                    <div className="relative h-2 rounded-full bg-muted/30 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
+                        style={{ width: `${metadataReport.stats.completionPercentage}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-center font-semibold text-foreground">
+                      {metadataReport.stats.completionPercentage}% de complétude
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                        <p className="text-xs text-muted-foreground">Sans pochette</p>
+                        <p className="text-lg font-bold text-yellow-500">{metadataReport.stats.missingCover}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                        <p className="text-xs text-muted-foreground">Sans genre</p>
+                        <p className="text-lg font-bold text-purple-500">{metadataReport.stats.missingGenre}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                        <p className="text-xs text-muted-foreground">Sans année</p>
+                        <p className="text-lg font-bold text-pink-500">{metadataReport.stats.missingYear}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                        <p className="text-xs text-muted-foreground">Sans artiste</p>
+                        <p className="text-lg font-bold text-indigo-500">{metadataReport.stats.missingArtist}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <p className="text-sm font-semibold text-green-500">
+                        {metadataReport.stats.complete} pistes avec métadonnées complètes
+                      </p>
+                    </div>
+                  </div>
+                </SettingsCard>
+              )}
+
+              {/* Duplicate Results */}
+              {duplicates && duplicates.length > 0 && (
+                <SettingsCard title="Doublons détectés" icon={Copy} className="lg:col-span-2">
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {duplicates.length} groupe{duplicates.length > 1 ? 's' : ''} de doublons détecté{duplicates.length > 1 ? 's' : ''}
+                    </p>
+                    {duplicates.map((group, idx) => (
+                      <div key={idx} className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">
+                          {group.reason === 'exact-match' ? '🎯 Correspondance exacte' : group.reason === 'similar-duration' ? '⏱️ Durée similaire' : '📝 Titre/Artiste similaires'} ({group.confidence}% confiance)
+                        </p>
+                        <ul className="space-y-1">
+                          {group.tracks.map((track) => (
+                            <li key={track.id} className="text-xs text-foreground">
+                              {track.title} - {track.artist}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </SettingsCard>
+              )}
             </div>
           </TabsContent>
 

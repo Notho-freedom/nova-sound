@@ -141,6 +141,13 @@ try {
   getFileInfo: (filePath) => ipcRenderer.invoke('file:getInfo', filePath),
   uploadToCloud: (options) => ipcRenderer.invoke('file:uploadToCloud', options),
   
+  // Library tools
+  analyzeQuality: () => ipcRenderer.invoke('library:analyze-quality'),
+  detectDuplicates: () => ipcRenderer.invoke('library:detect-duplicates'),
+  checkIntegrity: () => ipcRenderer.invoke('library:check-integrity'),
+  cleanupMissing: () => ipcRenderer.invoke('library:cleanup-missing'),
+  analyzeMetadata: () => ipcRenderer.invoke('library:analyze-metadata'),
+  
   // File open event (from "Open with..." or command line)
   onFileOpen: (callback) => {
     const listener = (_event, filePath) => callback(filePath);

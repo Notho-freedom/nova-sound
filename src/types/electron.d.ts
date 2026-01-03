@@ -14,6 +14,12 @@ import type {
   RecognitionResult,
   DetectedGroup,
 } from './music';
+import type {
+  QualityAnalysis,
+  DuplicateGroup,
+  IntegrityCheckResult,
+  MetadataCompletionReport,
+} from './library-tools';
 
 export interface ElectronAPI {
   // Window controls
@@ -164,6 +170,13 @@ export interface ElectronAPI {
   openStripeWindow: (url: string) => Promise<void>;
   onStripeCheckoutSuccess?: (callback: (data: { sessionId: string; url?: string }) => void) => () => void;
   onStripeCheckoutCanceled?: (callback: () => void) => () => void;
+
+  // Library tools
+  analyzeQuality: () => Promise<QualityAnalysis>;
+  detectDuplicates: () => Promise<DuplicateGroup[]>;
+  checkIntegrity: () => Promise<IntegrityCheckResult>;
+  cleanupMissing: () => Promise<{ removed: number; remaining: number }>;
+  analyzeMetadata: () => Promise<MetadataCompletionReport>;
 }
 
 declare global {
