@@ -561,8 +561,8 @@ export const LibraryView = memo(({
 
   // Get random cover images for visual display
   const randomCovers = useMemo(() => {
-    const coversWithImages = tracks.filter(t => t.coverUrl).slice(0, 12);
-    return coversWithImages.sort(() => Math.random() - 0.5).slice(0, 6);
+    const coversWithImages = tracks.filter(t => t.coverUrl);
+    return coversWithImages.sort(() => Math.random() - 0.5);
   }, [tracks]);
 
   // Handle initial album selection
@@ -986,8 +986,7 @@ export const LibraryView = memo(({
   if (viewMode === "albums") {
     // Get featured albums (most tracks)
     const featuredAlbums = [...filteredAndSortedAlbums]
-      .sort((a, b) => b.tracks.length - a.tracks.length)
-      .slice(0, 6);
+      .sort((a, b) => b.tracks.length - a.tracks.length);
     const remainingAlbums = filteredAndSortedAlbums.filter(
       a => !featuredAlbums.find(f => f.name === a.name && f.artist === a.artist)
     );
@@ -1269,8 +1268,7 @@ export const LibraryView = memo(({
   if (viewMode === "artists") {
     // Get top artists (most tracks)
     const topArtists = [...filteredAndSortedArtists]
-      .sort((a, b) => b.tracks.length - a.tracks.length)
-      .slice(0, 4);
+      .sort((a, b) => b.tracks.length - a.tracks.length);
     const remainingArtists = filteredAndSortedArtists.filter(
       a => !topArtists.find(t => t.name === a.name)
     );

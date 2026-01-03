@@ -424,12 +424,11 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
     // Top 5 artistes (augmenté pour avoir plus de résultats)
     const topArtists = Array.from(artistCounts.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
       .map(([artist]) => artist);
     
     // Si pas d'artistes mais des recherches, utiliser les recherches comme "artistes"
     const searchTerms = topArtists.length === 0 && searchHistory.length > 0
-      ? searchHistory.slice(0, 3)
+      ? searchHistory
       : topArtists;
     
     if (searchTerms.length === 0) {
@@ -508,7 +507,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
         new Map(allSuggestions.map(r => [r.videoId, r])).values()
       );
 
-      const finalSuggestions = unique.slice(0, 15); // Max 15 suggestions
+      const finalSuggestions = unique; // Show all suggestions
       console.log(`[YouTubeSearchView] Suggestions artistes chargées: ${finalSuggestions.length} vidéos`, {
         searchTerms,
         allSuggestionsCount: allSuggestions.length,
@@ -522,7 +521,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
       // En cas d'erreur totale, essayer quand même le fallback historique
       try {
         const historySuggestions = findSuggestionsFromHistory(searchTerms);
-        setArtistSuggestions(historySuggestions.slice(0, 15));
+        setArtistSuggestions(historySuggestions);
       } catch (fallbackError) {
         console.error('[YouTubeSearchView] Erreur fallback historique:', fallbackError);
         setArtistSuggestions([]);

@@ -563,7 +563,7 @@ export const Sidebar = ({
                 </SectionTitle>
 
                 <div className="space-y-1">
-                  {playlists.slice(0, 5).map((playlist) => {
+                  {playlists.map((playlist) => {
                     const metadata = playlistMetadata.find(m => m.playlist.id === playlist.id);
                     return (
                     <PlaylistContextMenu

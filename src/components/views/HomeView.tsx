@@ -100,16 +100,16 @@ const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = [
   }
   
   tracksWithCounts.sort((a, b) => b.playCount - a.playCount);
-  const topTracks = tracksWithCounts.slice(0, 50);
+  const topTracks = tracksWithCounts;
   
   const shuffled1 = fisherYatesShuffle(topTracks, Date.now() % 1000);
   const shuffled2 = fisherYatesShuffle(topTracks, (Date.now() + 1) % 1000);
   const shuffled3 = fisherYatesShuffle(topTracks, (Date.now() + 2) % 1000);
 
   return {
-    discoveries: shuffled1.slice(0, 10).map(item => item.track),
-    similar: shuffled2.slice(0, 10).map(item => item.track),
-    mix: shuffled3.slice(0, 10).map(item => item.track),
+    discoveries: shuffled1.map(item => item.track),
+    similar: shuffled2.map(item => item.track),
+    mix: shuffled3.map(item => item.track),
   };
 };
 
@@ -179,13 +179,13 @@ export const HomeView = memo(({
   // Ces données ne sont JAMAIS supprimées par les fonctions de lecture
   const displayRecent = useMemo(() => 
     recentTracks.length > 0 
-      ? getUniqueTracks(recentTracks).slice(0, 30) // Increased from 20 to 30
-      : getUniqueTracks(tracks).slice(0, 30), // Increased from 10 to 20
+      ? getUniqueTracks(recentTracks)
+      : getUniqueTracks(tracks),
     [recentTracks, tracks, getUniqueTracks]
   );
   
   const displayFavorites = useMemo(() => 
-    favoriteTracks.length > 0 ? getUniqueTracks(favoriteTracks).slice(0, 30) : [],
+    favoriteTracks.length > 0 ? getUniqueTracks(favoriteTracks) : [],
     [favoriteTracks, getUniqueTracks]
   );
 
@@ -195,16 +195,16 @@ export const HomeView = memo(({
   );
 
   const newTracks = useMemo(() => {
-    return getUniqueTracks(tracks).slice(-30).reverse(); // Increased from 12 to 20
+    return getUniqueTracks(tracks).reverse();
   }, [tracks, getUniqueTracks]);
 
-  const topGenres = useMemo(() => genres.slice(0, 16), [genres]); // Increased from 8 to 16
+  const topGenres = useMemo(() => genres, [genres]);
 
   // IMPORTANT: Ces données sont calculées à partir de l'historique et ne sont JAMAIS supprimées
   // Les fonctions de lecture (handlePlayPlaylist, handlePlayTracks, etc.) ne touchent pas à ces données
   const recentArtists = useMemo(() => {
     if (!stats?.recentArtists) return [];
-    return stats.recentArtists.slice(0, 30); // Increased from 10 to 20
+    return stats.recentArtists;
   }, [stats]);
 
   // Hero slides

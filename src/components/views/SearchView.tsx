@@ -475,8 +475,8 @@ export const SearchView = ({
 
     return {
       tracks: uniqueMatchedTracks,
-      albums: Array.from(albumsMap.values()).slice(0, 6),
-      artists: Array.from(artistsMap.values()).slice(0, 6),
+      albums: Array.from(albumsMap.values()),
+      artists: Array.from(artistsMap.values()),
     }
   }, [query, tracks, youtubeTracks, getUniqueTracks])
 
@@ -493,7 +493,6 @@ export const SearchView = ({
     })
     const topArtists = Array.from(artistPlayCounts.entries())
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 8)
       .map(([name, data]) => ({ name, playCount: data.count, coverUrl: data.track.coverUrl }))
 
     // Recently added tracks (last 12) - using reverse order as proxy for recently added
@@ -509,7 +508,6 @@ export const SearchView = ({
     })
     const genres = Array.from(genreMap.entries())
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 8)
       .map(([name, data]) => ({ name, count: data.count, coverUrl: data.coverUrl }))
 
     // Recommended based on favorites
@@ -519,7 +517,6 @@ export const SearchView = ({
     )
     const recommended = tracks
       .filter((t) => !favoriteTrackIds.includes(t.id) && favoriteArtists.has(t.artist))
-      .slice(0, 8)
 
     return {
       topArtists,
@@ -574,7 +571,7 @@ export const SearchView = ({
   }, [query, suggestionPool])
 
   const inlineSuggestions = useMemo(() => {
-    if (!query.trim()) return searchHistory.slice(0, 4)
+    if (!query.trim()) return searchHistory
     const base = query.trim().toLowerCase()
     const relatedArtists = searchResults.tracks
       .map((t) => t.artist)
@@ -587,7 +584,7 @@ export const SearchView = ({
     merged.forEach((m) => {
       if (m && !unique.some((u) => u.toLowerCase() === m.toLowerCase())) unique.push(m)
     })
-    return unique.slice(0, 4)
+    return unique
   }, [query, searchHistory, searchResults.tracks])
 
   const hasResults =
@@ -891,7 +888,7 @@ export const SearchView = ({
                           </div>
                         </div>
                       )}
-                      {searchResults.tracks.slice(0, 50).map((track) => {
+                      {searchResults.tracks.map((track) => {
                         const isYouTubeTrack = track.mediaSource === "youtube"
                         let actualIndex: number
 

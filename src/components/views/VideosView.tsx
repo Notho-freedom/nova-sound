@@ -265,9 +265,9 @@ export const VideosView = memo(() => {
   const featuredVideos = useMemo(() => {
     const videos: Video[] = [];
     // Priority: continue watching > recently added > recently watched > top rated
-    videos.push(...continueWatching.slice(0, 5));
-    videos.push(...recentlyAdded.slice(0, 5));
-    videos.push(...recentlyWatched.slice(0, 5));
+    videos.push(...continueWatching);
+    videos.push(...recentlyAdded);
+    videos.push(...recentlyWatched);
     
     // Add top rated videos
     const topRated = [...enhancedVideos]
@@ -276,13 +276,12 @@ export const VideosView = memo(() => {
         const aRating = a.ratings?.[0]?.value || 0;
         const bRating = b.ratings?.[0]?.value || 0;
         return bRating - aRating;
-      })
-      .slice(0, 5);
+      });
     videos.push(...topRated);
     
-    // Remove duplicates and limit to 10
+    // Remove duplicates
     const unique = videos.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
-    return unique.slice(0, 10);
+    return unique;
   }, [continueWatching, recentlyAdded, recentlyWatched, enhancedVideos]);
 
   // Auto-rotate hero video every 10 seconds
@@ -485,7 +484,7 @@ export const VideosView = memo(() => {
     return (
       <VideoDetailView
         video={detailVideo}
-        relatedVideos={enhancedVideos.filter((v) => v.id !== detailVideo.id).slice(0, 12)}
+        relatedVideos={enhancedVideos.filter((v) => v.id !== detailVideo.id)}
         onPlay={() => {
           setDetailVideo(null);
           handlePlayVideo(detailVideo);
@@ -784,8 +783,7 @@ export const VideosView = memo(() => {
                 <VideoCarousel
                   title="Les plus regardés"
                   videos={enhancedVideos
-                    .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
-                    .slice(0, 10)}
+                    .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))}
                   onVideoSelect={handlePlayVideo}
                   onViewDetails={handleViewDetails}
                   onToggleWatchlist={handleToggleWatchlist}
@@ -816,7 +814,7 @@ export const VideosView = memo(() => {
               })()}
 
               {/* By Genre */}
-              {availableGenres.slice(0, 5).map((genre) => {
+              {availableGenres.map((genre) => {
                 const genreVideos = getVideosByGenre(genre);
                 if (genreVideos.length < 3) return null;
                 return (

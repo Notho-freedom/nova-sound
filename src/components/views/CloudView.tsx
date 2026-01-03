@@ -574,7 +574,7 @@ export const CloudView = () => {
                     <ScrollArea className="h-64 border rounded-lg p-2">
                       {uploadType === "audio" ? (
                         <div className="space-y-2">
-                          {tracks.slice(0, 50).map((track) => (
+                          {tracks.map((track) => (
                             <div
                               key={track.id}
                               className={cn(
@@ -602,7 +602,7 @@ export const CloudView = () => {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          {videos.slice(0, 50).map((video) => (
+                          {videos.map((video) => (
                             <div
                               key={video.id}
                               className={cn(

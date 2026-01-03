@@ -211,7 +211,7 @@ export const ArtistView = memo(({
 
   // Get popular tracks (sort by some metric - here we just take first 5)
   const popularTracks = useMemo(() => {
-    return artistTracks.slice(0, 5);
+    return artistTracks;
   }, [artistTracks]);
 
   // Get total stats
@@ -225,7 +225,7 @@ export const ArtistView = memo(({
   // Get similar artists from metadata
   const similarArtists = useMemo(() => {
     if (!metadata?.similarArtists) return [];
-    return metadata.similarArtists.slice(0, 6);
+    return metadata.similarArtists;
   }, [metadata]);
 
   // Handlers
@@ -392,7 +392,7 @@ export const ArtistView = memo(({
               {/* Genres */}
               {(metadata?.genres || stats.genres).length > 0 && (
                 <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-4">
-                  {(metadata?.genres || stats.genres).slice(0, 5).map(genre => (
+                  {(metadata?.genres || stats.genres).map(genre => (
                     <Badge key={genre} variant="outline" className="text-xs">
                       {genre}
                     </Badge>

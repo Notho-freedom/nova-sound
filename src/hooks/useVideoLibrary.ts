@@ -159,8 +159,7 @@ export function useVideoLibrary(): UseVideoLibraryReturn {
         const aTime = new Date(a.watchProgress!.lastWatchedAt).getTime();
         const bTime = new Date(b.watchProgress!.lastWatchedAt).getTime();
         return bTime - aTime;
-      })
-      .slice(0, 20);
+      });
   }, [enhancedVideos]);
 
   // Recently added (last 30 days)
@@ -168,13 +167,12 @@ export function useVideoLibrary(): UseVideoLibraryReturn {
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     return enhancedVideos
       .filter((v) => new Date(v.addedAt).getTime() > thirtyDaysAgo)
-      .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
-      .slice(0, 20);
+      .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
   }, [enhancedVideos]);
 
   // Recently watched
   const recentlyWatched = useMemo(() => {
-    const watchedIds = state.watchHistory.slice(0, 20).map((h) => h.videoId);
+    const watchedIds = state.watchHistory.map((h) => h.videoId);
     return watchedIds
       .map((id) => enhancedVideos.find((v) => v.id === id))
       .filter((v) => v !== undefined) as Video[];

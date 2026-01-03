@@ -275,7 +275,6 @@ export const ArtistInfoPanel = memo(({
         playCount: trackPlayCounts.get(track.id) || 0
       }))
       .sort((a, b) => b.playCount - a.playCount)
-      .slice(0, 10)
       .map(item => item.track)
 
     // Grouper par album
@@ -569,7 +568,7 @@ export const ArtistInfoPanel = memo(({
                 {/* Genres */}
                 {artistMetadata.genres && artistMetadata.genres.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {artistMetadata.genres.slice(0, 6).map((genre, idx) => (
+                    {artistMetadata.genres.map((genre, idx) => (
                       <Badge
                         key={idx}
                         variant="secondary"
@@ -710,7 +709,7 @@ export const ArtistInfoPanel = memo(({
             {artistStats && artistStats.albums.length > 0 && (
               <InfoSection title="Albums dans votre bibliothèque" icon={Disc3} delay={0.2}>
                 <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                  {artistStats.albums.slice(0, 8).map((album: { name: string; coverUrl: string; tracks: Track[]; year?: number; playCount: number }, idx: number) => (
+                  {artistStats.albums.map((album: { name: string; coverUrl: string; tracks: Track[]; year?: number; playCount: number }, idx: number) => (
                     <motion.div
                       key={idx}
                       initial={{ opacity: 0, x: -10 }}
@@ -857,7 +856,7 @@ export const ArtistInfoPanel = memo(({
 
                   {albumMetadata.genres && albumMetadata.genres.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/20">
-                      {albumMetadata.genres.slice(0, 4).map((genre, idx) => (
+                      {albumMetadata.genres.map((genre, idx) => (
                         <Badge
                           key={idx}
                           variant="outline"
@@ -927,7 +926,7 @@ export const ArtistInfoPanel = memo(({
             {artistMetadata?.similarArtists && artistMetadata.similarArtists.length > 0 && (
               <InfoSection title="Artistes similaires" icon={Users} delay={0.4}>
                 <div className="flex flex-wrap gap-2">
-                  {artistMetadata.similarArtists.slice(0, 12).map((name, idx) => (
+                  {artistMetadata.similarArtists.map((name, idx) => (
                     <motion.div
                       key={idx}
                       initial={{ opacity: 0, scale: 0.8 }}
