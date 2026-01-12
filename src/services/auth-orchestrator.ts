@@ -322,3 +322,54 @@ export async function forceStripeCheck(): Promise<void> {
   }
 }
 
+// Initialiser l'écoute des changements d'état Firebase
+let authListenerInitialized = false;
+
+export function initializeAuthListener(): void {
+  if (authListenerInitialized) return;
+  authListenerInitialized = true;
+
+  // S'abonner aux changements d'état Firebase
+  firebaseService.onAuthStateChanged((user) => {
+    const currentPhase = currentState.phase;
+    const currentUid = currentState.uid;
+    
+    // Ne pas ré-orchestrer si même utilisateur et déjà en état stable
+    if (user && user.uid === currentUid && (currentPhase === 'ready' || currentPhase === 'authenticated')) {
+      console.log('[AuthOrchestrator] Same user, skipping re-orchestration');
+      return;
+    }
+    
+    // Ne pas ré-orchestrer si pas d'utilisateur et déjà anonymous
+    if (!user && currentPhase === 'anonymous') {
+      console.log('[AuthOrchestrator] Already anonymous, skipping');
+      return;
+    }
+    
+    console.log('[AuthOrchestrator] Firebase auth state changed:', user ? `${user.email || 'anonymous'} (${user.uid})` : 'signed out');
+    
+    // Réinitialiser les caches si l'utilisateur a changé
+    if (user && user.uid !== currentUid) {
+      orchestrationInProgress = false;
+      lastOrchestrationUid = null;
+    }
+    
+    // Ré-orchestrer l'authentification quand l'état change
+    orchestrateAuth().catch((error) => {
+      console.error('[AuthOrchestrator] Error re-orchestrating after auth change:', error);
+    });
+  });
+  
+  console.log('✅ AuthOrchestrator: Firebase listener initialisé');
+}
+
+// Auto-initialiser le listener au chargement du module
+// Note: Ceci s'exécute dès que le module est importé
+if (typeof window !== 'undefined') {
+  // Attendre que Firebase soit prêt avant d'initialiser
+  firebaseService.ensureInitialized().then(() => {
+    initializeAuthListener();
+  }).catch((error) => {
+    console.error('[AuthOrchestrator] Failed to initialize auth listener:', error);
+  });
+}
