@@ -1,6 +1,7 @@
 import { ipcMain, BrowserWindow, app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import { watch, FSWatcher } from 'chokidar';
 import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
@@ -29,7 +30,6 @@ function getDefaultThumbnailPath(): string | null {
       path.join(__dirname, '../src/assets/album-cover-1.jpg'),
     ];
 
-    const fsSync = require('fs');
     for (const possiblePath of possiblePaths) {
       try {
         if (fsSync.existsSync(possiblePath)) {

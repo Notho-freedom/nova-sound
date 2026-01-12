@@ -35,12 +35,15 @@ export function CoachmarkProvider({
 
   return (
     <CoachmarksContext.Provider value={{ isOpen, start, reset: resetCoachmarks, skip }}>
-      <CoachmarksDisplay 
-        isOpen={isOpen} 
-        onCallback={handleCallback} 
-        steps={coachmarks}
-        stepIndex={stepIndex}
-      />
+      {/* Les coachmarks sont rendus en position fixed/absolute, ne créent pas de décalage */}
+      {isOpen && (
+        <CoachmarksDisplay 
+          isOpen={isOpen} 
+          onCallback={handleCallback} 
+          steps={coachmarks}
+          stepIndex={stepIndex}
+        />
+      )}
       {children}
     </CoachmarksContext.Provider>
   );

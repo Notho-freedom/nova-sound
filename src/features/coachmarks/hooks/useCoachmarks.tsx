@@ -19,6 +19,7 @@ export function useCoachmarks(options: UseCoachmarksOptions = {}) {
   const [isOpen, setIsOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const runRef = useRef(false);
+  const hasAutoStartedRef = useRef(false);
 
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
@@ -35,11 +36,13 @@ export function useCoachmarks(options: UseCoachmarksOptions = {}) {
         console.log('[Coachmarks] Finished!');
         markCompleted();
         setIsOpen(false);
+        runRef.current = false;
         onComplete?.();
       } else if (status === STATUS.SKIPPED) {
         console.log('[Coachmarks] Skipped!');
         markSkipped();
         setIsOpen(false);
+        runRef.current = false;
         onSkip?.();
       }
     },
@@ -47,8 +50,11 @@ export function useCoachmarks(options: UseCoachmarksOptions = {}) {
   );
 
   useEffect(() => {
-    if (autoStart && shouldShowCoachmarks() && !runRef.current) {
+    // Ne démarrer qu'une seule fois, seulement si autoStart est activé et que le tour n'a jamais été montré
+    if (autoStart && shouldShowCoachmarks() && !runRef.current && !hasAutoStartedRef.current) {
+      console.log('[Coachmarks] Auto-starting tour (first time only)');
       runRef.current = true;
+      hasAutoStartedRef.current = true;
       setIsOpen(true);
       setStepIndex(0);
       onStart?.();
@@ -111,6 +117,16 @@ export function CoachmarksDisplay({
       scrollToFirstStep={true}
       spotlightClicks={true}
       debug={true}
+      floaterProps={{
+        disableAnimation: false,
+        styles: {
+          floater: {
+            // Position fixed pour ne pas affecter le layout
+            position: 'fixed',
+            zIndex: 10000,
+          },
+        },
+      }}
       styles={{
         options: {
           arrowColor: 'hsl(var(--card))',
@@ -125,6 +141,12 @@ export function CoachmarksDisplay({
           backgroundColor: 'transparent',
           border: '3px solid hsl(var(--primary))',
           borderRadius: '12px',
+        },
+        overlay: {
+          position: 'fixed',
+        },
+        tooltipContainer: {
+          textAlign: 'left',
         },
       }}
       locale={{

@@ -422,7 +422,7 @@ function createWindow() {
         const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
         console.log('🌐 Loading production URL:', vercelUrl);
         mainWindow.loadURL(vercelUrl);
-        mainWindow.webContents.openDevTools();
+        // DevTools désactivés en production
     }
     else {
         // Development: Load from localhost (only if --dev flag is explicitly set)

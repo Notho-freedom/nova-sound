@@ -13,6 +13,29 @@
  * On fournit ici une surcouche premium pour la personnalisation
  */
 
+/* ===== CONTAINER - POSITION ABSOLUTE POUR ÉVITER LES DÉCALAGES ===== */
+
+.__floater {
+  position: fixed !important;
+  z-index: 10000 !important;
+  pointer-events: none !important;
+}
+
+.__floater > * {
+  pointer-events: auto !important;
+}
+
+.react-joyride {
+  position: fixed !important;
+  z-index: 10000 !important;
+  pointer-events: none !important;
+}
+
+/* Assure que le composant n'affecte pas le layout */
+.react-joyride > div {
+  pointer-events: auto !important;
+}
+
 /* ===== TOOLTIP / POPOVER ===== */
 
 .react-joyride__tooltip {
@@ -27,6 +50,7 @@
   font-family: var(--font-body, inherit) !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
+  position: relative !important;
 }
 
 .react-joyride__tooltip__header {
@@ -177,6 +201,8 @@
     0 0 25px hsl(var(--primary) / 0.25),
     0 0 50px hsl(var(--primary) / 0.15) !important;
   background: hsl(var(--primary) / 0.02) !important;
+  position: absolute !important;
+  pointer-events: none !important;
 }
 
 /* Animation du spotlight */
@@ -225,6 +251,12 @@
   background: rgba(0, 0, 0, 0.3) !important;
   backdrop-filter: blur(2px) !important;
   -webkit-backdrop-filter: blur(2px) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
 }
 
 .react-joyride__overlay--transparent {
