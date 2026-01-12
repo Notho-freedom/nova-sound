@@ -984,9 +984,10 @@ export const LibraryView = memo(({
 
   // Albums View
   if (viewMode === "albums") {
-    // Get featured albums (most tracks)
+    // Get featured albums (most tracks) - only take top 6
     const featuredAlbums = [...filteredAndSortedAlbums]
-      .sort((a, b) => b.tracks.length - a.tracks.length);
+      .sort((a, b) => b.tracks.length - a.tracks.length)
+      .slice(0, 6);
     const remainingAlbums = filteredAndSortedAlbums.filter(
       a => !featuredAlbums.find(f => f.name === a.name && f.artist === a.artist)
     );
@@ -1266,9 +1267,10 @@ export const LibraryView = memo(({
 
   // Artists View
   if (viewMode === "artists") {
-    // Get top artists (most tracks)
+    // Get top artists (most tracks) - only take top 4
     const topArtists = [...filteredAndSortedArtists]
-      .sort((a, b) => b.tracks.length - a.tracks.length);
+      .sort((a, b) => b.tracks.length - a.tracks.length)
+      .slice(0, 4);
     const remainingArtists = filteredAndSortedArtists.filter(
       a => !topArtists.find(t => t.name === a.name)
     );
