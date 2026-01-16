@@ -58,6 +58,8 @@ import "@/features/coachmarks/styles/coachmarks-theme.css";
 //import { useAudioAI } from "@/hooks/useAudioAI";
 //import { extractYouTubeVideoId } from "@/lib/youtube";
 
+const DEBUG_SIDEBAR_COUNTS = process.env.NEXT_PUBLIC_DEBUG_SIDEBAR === 'true';
+
 export const DesktopApp = () => {
   // Initialize theme hook to ensure theme is loaded and applied on mount
   useTheme();
@@ -1802,185 +1804,51 @@ export const DesktopApp = () => {
   }, [allTracks, favorites, history, playlists]);
 
   const sidebarCounts = useMemo(() => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📊 [SIDEBAR COUNTS] Calcul des compteurs de la sidebar');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    // === VÉRIFICATION D'INTÉGRITÉ DES IDs ===
-    console.log('\n🔍 [INTÉGRITÉ] Vérification des IDs orphelins...');
-    
-    // Créer un Set de tous les IDs de tracks disponibles
     const availableTrackIds = new Set(allTracks.map(t => t.id));
-    console.log(`   ✓ Tracks disponibles: ${availableTrackIds.size} IDs uniques`);
-    
-    // Vérifier les favoris
-    const orphanedFavorites = favorites.filter(id => !availableTrackIds.has(id));
-    if (orphanedFavorites.length > 0) {
-      console.warn(`   ⚠️  FAVORIS ORPHELINS: ${orphanedFavorites.length}/${favorites.length} (${Math.round(orphanedFavorites.length/favorites.length*100)}%)`);
-      console.log(`      IDs fantômes:`, orphanedFavorites.slice(0, 5));
-    } else {
-      console.log(`   ✓ Favoris: ${favorites.length} - Tous valides`);
-    }
-    
-    // Vérifier l'historique
-    const orphanedHistory = history.filter(h => !availableTrackIds.has(h.trackId));
-    if (orphanedHistory.length > 0) {
-      console.warn(`   ⚠️  HISTORIQUE ORPHELIN: ${orphanedHistory.length}/${history.length} entrées (${Math.round(orphanedHistory.length/history.length*100)}%)`);
-      console.log(`      Exemples:`, orphanedHistory.slice(0, 3).map(h => ({ id: h.trackId, playedAt: h.playedAt })));
-    } else {
-      console.log(`   ✓ Historique: ${history.length} entrées - Toutes valides`);
-    }
-    
-    // Vérifier les playlists
-    let totalPlaylistTracks = 0;
-    let orphanedPlaylistTracks = 0;
-    const playlistsWithOrphans: any[] = [];
-    
-    playlists.forEach(playlist => {
-      const orphans = playlist.trackIds.filter(id => !availableTrackIds.has(id));
-      totalPlaylistTracks += playlist.trackIds.length;
-      orphanedPlaylistTracks += orphans.length;
-      
-      if (orphans.length > 0) {
-        playlistsWithOrphans.push({
-          name: playlist.name,
-          total: playlist.trackIds.length,
-          orphans: orphans.length,
-          percentage: Math.round(orphans.length / playlist.trackIds.length * 100)
-        });
-      }
-    });
-    
-    if (orphanedPlaylistTracks > 0) {
-      console.warn(`   ⚠️  PLAYLISTS ORPHELINES: ${orphanedPlaylistTracks}/${totalPlaylistTracks} tracks (${Math.round(orphanedPlaylistTracks/totalPlaylistTracks*100)}%)`);
-      console.log(`      Playlists affectées (${playlistsWithOrphans.length}):`, playlistsWithOrphans);
-    } else {
-      console.log(`   ✓ Playlists: ${totalPlaylistTracks} tracks - Toutes valides`);
-    }
-    
-    // Vérifier les sources de tracks
-    console.log('\n📦 [SOURCES] Analyse des sources de tracks...');
-    const tracksBySources = {
-      library: libraryTracks.length,
-      youtubeCache: Array.from(youtubeTracksCache.values()).flat().length,
-      queue: queue.tracks.length,
-    };
-    console.log(`   - LibraryTracks (source primaire): ${tracksBySources.library}`);
-    console.log(`   - YouTube Cache: ${tracksBySources.youtubeCache}`);
-    console.log(`   - Queue actuelle: ${tracksBySources.queue}`);
-    console.log(`   - AllTracks (combiné): ${allTracks.length}`);
-    
-    const duplicatesInAllTracks = allTracks.length - availableTrackIds.size;
-    if (duplicatesInAllTracks > 0) {
-      console.warn(`   ⚠️  DOUBLONS dans allTracks: ${duplicatesInAllTracks} tracks dupliqués`);
-    }
-    
-    // === CALCUL DES COMPTEURS ===
-    console.log('\n📊 [COMPTEURS] Calcul des statistiques...');
-    
-    // Compter les albums uniques
+    const validRecentTracks = recentTracks.filter(t => availableTrackIds.has(t.id));
+
     const albumsWithInfo = allTracks.filter(t => t.album);
     const uniqueAlbums = new Set(albumsWithInfo.map(t => `${t.album}-${t.artist}`));
-    console.log(`📀 ALBUMS: ${uniqueAlbums.size} albums uniques trouvés`);
-    console.log(`   - Total tracks avec album: ${albumsWithInfo.length}`);
-    console.log(`   - Tracks sans album: ${allTracks.length - albumsWithInfo.length}`);
-    if (uniqueAlbums.size <= 10) {
-      console.log(`   - Liste:`, Array.from(uniqueAlbums));
-    }
-    
-    // Compter les artistes uniques
+
     const artistsWithInfo = allTracks.filter(t => t.artist);
     const uniqueArtists = new Set(artistsWithInfo.map(t => t.artist));
-    console.log(`🎤 ARTISTES: ${uniqueArtists.size} artistes uniques trouvés`);
-    console.log(`   - Total tracks avec artiste: ${artistsWithInfo.length}`);
-    console.log(`   - Tracks sans artiste: ${allTracks.length - artistsWithInfo.length}`);
-    if (uniqueArtists.size <= 10) {
-      console.log(`   - Liste:`, Array.from(uniqueArtists));
-    }
-    
-    // Compter les fichiers locaux
+
     const localFiles = allTracks.filter(t => t.filePath || t.mediaSource === 'local');
-    console.log(`📁 FICHIERS LOCAUX: ${localFiles.length} fichiers trouvés`);
-    console.log(`   - Avec filePath: ${allTracks.filter(t => t.filePath).length}`);
-    console.log(`   - Avec mediaSource='local': ${allTracks.filter(t => t.mediaSource === 'local').length}`);
-    
-    // Compter les fichiers cloud (uploadés via Cloudinary, Nexus, Bunny, etc.)
-    const cloudFiles = allTracks.filter(t => 
-      t.mediaSource === 'cloudinary' || 
-      t.mediaSource === 'nexus' || 
-      t.mediaSource === 'bunny' || 
+    const cloudFiles = allTracks.filter(t =>
+      t.mediaSource === 'cloudinary' ||
+      t.mediaSource === 'nexus' ||
+      t.mediaSource === 'bunny' ||
       t.mediaSource === 'planethoster'
     );
-    const cloudBySource = {
-      cloudinary: allTracks.filter(t => t.mediaSource === 'cloudinary').length,
-      nexus: allTracks.filter(t => t.mediaSource === 'nexus').length,
-      bunny: allTracks.filter(t => t.mediaSource === 'bunny').length,
-      planethoster: allTracks.filter(t => t.mediaSource === 'planethoster').length,
-    };
-    console.log(`☁️  CLOUD: ${cloudFiles.length} fichiers uploadés`);
-    console.log(`   - Cloudinary: ${cloudBySource.cloudinary}`);
-    console.log(`   - Nexus: ${cloudBySource.nexus}`);
-    console.log(`   - Bunny: ${cloudBySource.bunny}`);
-    console.log(`   - PlanetHoster: ${cloudBySource.planethoster}`);
-    
-    // Analyser toutes les sources média
-    const allMediaSources = new Map<string, number>();
-    allTracks.forEach(t => {
-      const source = t.mediaSource || 'undefined';
-      allMediaSources.set(source, (allMediaSources.get(source) || 0) + 1);
-    });
-    console.log(`🎵 SOURCES MÉDIA (toutes):`, Object.fromEntries(allMediaSources));
-    
-    // Compter les playlists
-    console.log(`📋 PLAYLISTS: ${playlists.length} playlists au total`);
-    console.log(`   - Favorites: ${playlists.filter(p => p.isFavorite).length}`);
-    console.log(`   - Smart playlists: ${playlists.filter(p => p.isSmartPlaylist).length}`);
-    
-    // Tracks récents (après nettoyage des orphelins)
-    const validRecentTracks = recentTracks.filter(t => availableTrackIds.has(t.id));
-    const invalidRecentTracks = recentTracks.length - validRecentTracks.length;
-    console.log(`⏱️  RÉCENTS: ${validRecentTracks.length} tracks récemment écoutées`);
-    if (invalidRecentTracks > 0) {
-      console.warn(`   ⚠️  ${invalidRecentTracks} tracks récentes sont orphelines`);
+
+    if (DEBUG_SIDEBAR_COUNTS) {
+      const orphanedFavorites = favorites.filter(id => !availableTrackIds.has(id));
+      const orphanedHistory = history.filter(h => !availableTrackIds.has(h.trackId));
+      const orphanedPlaylistTracks = playlists.reduce((count, playlist) => {
+        const trackIds = playlist.trackIds || [];
+        return count + trackIds.filter(id => !availableTrackIds.has(id)).length;
+      }, 0);
+      const totalPlaylistTracks = playlists.reduce((count, playlist) => count + (playlist.trackIds?.length || 0), 0);
+
+      console.info('[SidebarCounts]', {
+        totals: {
+          allTracks: allTracks.length,
+          recent: validRecentTracks.length,
+          albums: uniqueAlbums.size,
+          artists: uniqueArtists.size,
+          local: localFiles.length,
+          cloud: cloudFiles.length,
+          playlists: playlists.length,
+        },
+        orphans: {
+          favorites: orphanedFavorites.length,
+          history: orphanedHistory.length,
+          playlists: orphanedPlaylistTracks,
+          playlistTotal: totalPlaylistTracks,
+        },
+      });
     }
-    
-    // Résumé total
-    console.log(`\n📊 RÉSUMÉ GLOBAL:`);
-    console.log(`   - Total tracks dans allTracks: ${allTracks.length}`);
-    console.log(`   - Total IDs uniques: ${availableTrackIds.size}`);
-    console.log(`   - Total tracks dans libraryTracks: ${libraryTracks.length}`);
-    console.log(`   - Total tracks dans queue: ${queue.tracks.length}`);
-    console.log(`   - Total favoris: ${favorites.length} (${orphanedFavorites.length} orphelins)`);
-    console.log(`   - Total historique: ${history.length} (${orphanedHistory.length} orphelins)`);
-    
-    // Taux d'intégrité global
-    const totalReferences = favorites.length + history.length + totalPlaylistTracks;
-    const totalOrphans = orphanedFavorites.length + orphanedHistory.length + orphanedPlaylistTracks;
-    const integrityRate = totalReferences > 0 ? Math.round((1 - totalOrphans / totalReferences) * 100) : 100;
-    
-    console.log(`\n🎯 TAUX D'INTÉGRITÉ: ${integrityRate}%`);
-    if (integrityRate < 100) {
-      console.warn(`   ⚠️  ${totalOrphans}/${totalReferences} références sont orphelines (${100-integrityRate}%)`);
-      console.warn(`   💡 RECOMMANDATION: Nettoyer les références orphelines`);
-    }
-    
-    // Identifier les tracks non catégorisées
-    const uncategorized = allTracks.filter(t => 
-      !t.filePath && 
-      !t.mediaSource && 
-      !t.youtubeVideoId
-    );
-    if (uncategorized.length > 0) {
-      console.warn(`⚠️  TRACKS NON CATÉGORISÉES: ${uncategorized.length} tracks sans source claire`);
-      console.log(`   - Exemple:`, uncategorized.slice(0, 3).map(t => ({ id: t.id, title: t.title, artist: t.artist })));
-    }
-    
-    // Identifier les tracks YouTube
-    const youtubeFiles = allTracks.filter(t => t.mediaSource === 'youtube' || t.youtubeVideoId);
-    console.log(`🎥 YOUTUBE: ${youtubeFiles.length} tracks YouTube`);
-    
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    
+
     return {
       recent: validRecentTracks.length,
       albums: uniqueAlbums.size,
@@ -1991,7 +1859,7 @@ export const DesktopApp = () => {
       cloud: cloudFiles.length,
       playlists: playlists.length,
     };
-  }, [allTracks, recentTracks, playlists, libraryTracks.length, queue.tracks.length, favorites, history, youtubeTracksCache]);
+  }, [allTracks, recentTracks, playlists, favorites, history]);
 
   // Calculer la vue actuelle avec useMemo pour éviter les problèmes de hooks
   const currentViewContent = useMemo(() => {

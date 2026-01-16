@@ -4,6 +4,8 @@ import { COACHMARKS } from '../config/coachmarks';
 import { useCoachmarkProgress } from './useCoachmarkProgress';
 import '../styles/coachmarks-theme.css';
 
+const DEBUG_COACHMARKS = process.env.NEXT_PUBLIC_DEBUG_COACHMARKS === 'true';
+
 interface UseCoachmarksOptions {
   autoStart?: boolean;
   onStart?: () => void;
@@ -25,21 +27,23 @@ export function useCoachmarks(options: UseCoachmarksOptions = {}) {
     (data: CallBackProps) => {
       const { status, index, type, action } = data;
 
-      console.log('[Coachmarks] Callback:', { status, index, type, action });
-
       // Mettre à jour l'index du step actuel
       if (typeof index === 'number') {
         setStepIndex(index);
       }
 
       if (status === STATUS.FINISHED) {
-        console.log('[Coachmarks] Finished!');
+        if (DEBUG_COACHMARKS) {
+          console.log('[Coachmarks] Finished', { index, type, action });
+        }
         markCompleted();
         setIsOpen(false);
         runRef.current = false;
         onComplete?.();
       } else if (status === STATUS.SKIPPED) {
-        console.log('[Coachmarks] Skipped!');
+        if (DEBUG_COACHMARKS) {
+          console.log('[Coachmarks] Skipped', { index, type, action });
+        }
         markSkipped();
         setIsOpen(false);
         runRef.current = false;
@@ -52,7 +56,9 @@ export function useCoachmarks(options: UseCoachmarksOptions = {}) {
   useEffect(() => {
     // Ne démarrer qu'une seule fois, seulement si autoStart est activé et que le tour n'a jamais été montré
     if (autoStart && shouldShowCoachmarks() && !runRef.current && !hasAutoStartedRef.current) {
-      console.log('[Coachmarks] Auto-starting tour (first time only)');
+      if (DEBUG_COACHMARKS) {
+        console.log('[Coachmarks] Auto-starting tour (first time only)');
+      }
       runRef.current = true;
       hasAutoStartedRef.current = true;
       setIsOpen(true);
@@ -116,7 +122,7 @@ export function CoachmarksDisplay({
       disableScrolling={false}
       scrollToFirstStep={true}
       spotlightClicks={true}
-      debug={true}
+      debug={DEBUG_COACHMARKS}
       floaterProps={{
         disableAnimation: false,
         styles: {
