@@ -347,7 +347,7 @@ export const PlaylistView = memo(({
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   const { isFavorite: isPlaylistFavorite, toggleFavorite: togglePlaylistFavorite } = usePlaylistFavorites();
   
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+  const canUploadToCloudinary = cloudinaryConfigured;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   

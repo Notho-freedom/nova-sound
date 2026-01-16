@@ -379,7 +379,7 @@ export const LibraryView = memo(({
   const playlists = playlistsResult?.playlists ?? [];
   const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
   
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+  const canUploadToCloudinary = cloudinaryConfigured;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
 

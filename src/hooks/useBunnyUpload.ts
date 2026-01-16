@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { notificationService } from '@/services/notification-service';
+import { authService } from '@/services/auth';
 import { toast } from 'sonner';
 import type { Track } from '@/types/music';
 
@@ -51,6 +52,11 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       }
     } catch (error) {
       // Firebase not available
+    }
+
+    if (!isAuthenticated) {
+      isAuthenticated = authService.isAuthenticated();
+      isPro = authService.isPro();
     }
     
     if (!isAuthenticated) {
@@ -112,6 +118,14 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
         }
       } catch (error) {
         console.error('Failed to get Firebase token:', error);
+      }
+
+      if (!accessToken) {
+        try {
+          accessToken = await authService.getAccessToken();
+        } catch (error) {
+          console.error('Failed to get authService token:', error);
+        }
       }
 
       if (!accessToken) {
@@ -435,6 +449,11 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
     } catch (error) {
       // Firebase not available
     }
+
+    if (!isAuthenticated) {
+      isAuthenticated = authService.isAuthenticated();
+      isPro = authService.isPro();
+    }
     
     if (!isAuthenticated || !isPro) {
       toast.error('Plan Pro requis', {
@@ -486,6 +505,11 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
       }
     } catch (error) {
       // Firebase not available
+    }
+
+    if (!isAuthenticated) {
+      isAuthenticated = authService.isAuthenticated();
+      isPro = authService.isPro();
     }
     
     if (!isAuthenticated || !isPro) {

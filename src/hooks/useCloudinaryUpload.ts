@@ -15,7 +15,7 @@ interface UseCloudinaryUploadReturn {
 }
 
 export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
-  const { cloudinaryConfigured, nexusIsPro } = useCloudSync();
+  const { cloudinaryConfigured } = useCloudSync();
   const [uploadProgress, setUploadProgress] = useState<Map<string, UploadProgress>>(new Map());
   const [isUploading, setIsUploading] = useState(false);
 
@@ -39,15 +39,6 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
 
   // Upload a track to Cloudinary
   const uploadTrack = useCallback(async (track: Track) => {
-    // Cloudinary is only for Free users (serveur 0)
-    // Pro users should use Bunny (serveur 1) or PlanetHoster/Nexus (serveur 2)
-    if (nexusIsPro) {
-      toast.error('Plan Pro détecté', {
-        description: 'Les utilisateurs Pro doivent utiliser Bunny ou PlanetHoster. Cloudinary est réservé aux utilisateurs Free.',
-      });
-      return;
-    }
-    
     if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
         description: 'Configurez Cloudinary dans les paramètres pour uploader vos fichiers.',
@@ -137,18 +128,10 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
         duration: 5000, // Show longer for important errors
       });
     }
-  }, [cloudinaryConfigured, nexusIsPro, uploadProgress]);
+  }, [cloudinaryConfigured, uploadProgress]);
 
   // Upload an entire album (all tracks without duplicates)
   const uploadAlbum = useCallback(async (tracks: Track[]) => {
-    // Cloudinary is only for Free users (serveur 0)
-    if (nexusIsPro) {
-      toast.error('Plan Pro détecté', {
-        description: 'Les utilisateurs Pro doivent utiliser Bunny ou PlanetHoster. Cloudinary est réservé aux utilisateurs Free.',
-      });
-      return;
-    }
-    
     if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
         description: 'Configurez Cloudinary dans les paramètres pour uploader vos fichiers.',
@@ -188,18 +171,10 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
     toast.success('Upload de l\'album terminé', {
       description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} uploadée${uniqueTracks.length > 1 ? 's' : ''}.`,
     });
-  }, [cloudinaryConfigured, nexusIsPro, uploadTrack]);
+  }, [cloudinaryConfigured, uploadTrack]);
 
   // Upload an entire playlist (all tracks without duplicates)
   const uploadPlaylist = useCallback(async (tracks: Track[]) => {
-    // Cloudinary is only for Free users (serveur 0)
-    if (nexusIsPro) {
-      toast.error('Plan Pro détecté', {
-        description: 'Les utilisateurs Pro doivent utiliser Bunny ou PlanetHoster. Cloudinary est réservé aux utilisateurs Free.',
-      });
-      return;
-    }
-    
     if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
         description: 'Configurez Cloudinary dans les paramètres pour uploader vos fichiers.',
@@ -239,7 +214,7 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
     toast.success('Upload de la playlist terminé', {
       description: `${uniqueTracks.length} piste${uniqueTracks.length > 1 ? 's' : ''} uploadée${uniqueTracks.length > 1 ? 's' : ''}.`,
     });
-  }, [cloudinaryConfigured, nexusIsPro, uploadTrack]);
+  }, [cloudinaryConfigured, uploadTrack]);
 
   return {
     uploadTrack,

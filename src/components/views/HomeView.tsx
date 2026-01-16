@@ -119,7 +119,7 @@ export const HomeView = memo(({
   const { genres, getTracksByGenre } = useGenres(tracks);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+  const canUploadToCloudinary = cloudinaryConfigured;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   

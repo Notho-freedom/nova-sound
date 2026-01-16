@@ -178,7 +178,7 @@ export const TrackContextMenu = ({
           </ContextMenuItem>
         )}
 
-        {(onUploadToCloudinary && canUploadToCloudinary) || (onUploadToBunny && canUploadToBunny) || (onUploadToNexus && canUploadToNexus) ? (
+        {(onUploadToCloudinary || onUploadToBunny || onUploadToNexus) ? (
           <>
             <ContextMenuSeparator />
             <ContextMenuSub>
@@ -187,10 +187,10 @@ export const TrackContextMenu = ({
                 Uploader
               </ContextMenuSubTrigger>
               <ContextMenuSubContent className="w-56">
-                {onUploadToCloudinary && canUploadToCloudinary && (
+                {onUploadToCloudinary && (
                   <ContextMenuItem 
                     onClick={onUploadToCloudinary}
-                    disabled={isUploading}
+                    disabled={isUploading || !canUploadToCloudinary}
                   >
                     {isUploading ? (
                       <>
@@ -200,15 +200,15 @@ export const TrackContextMenu = ({
                     ) : (
                       <>
                         <Cloud className="w-4 h-4 mr-2" />
-                        Cloudinary (Free - Serveur 0)
+                        Cloudinary (Serveur 0) — cloud public
                       </>
                     )}
                   </ContextMenuItem>
                 )}
-                {onUploadToBunny && canUploadToBunny && (
+                {onUploadToBunny && (
                   <ContextMenuItem 
                     onClick={onUploadToBunny}
-                    disabled={isUploadingToBunny}
+                    disabled={isUploadingToBunny || !canUploadToBunny}
                   >
                     {isUploadingToBunny ? (
                       <>
@@ -218,28 +218,46 @@ export const TrackContextMenu = ({
                     ) : (
                       <>
                         <Zap className="w-4 h-4 mr-2" />
-                        Bunny (Pro - Serveur 1)
+                        Bunny (Serveur 1) — CDN rapide
                       </>
                     )}
                   </ContextMenuItem>
                 )}
-                {onUploadToNexus && canUploadToNexus && (
-                  <ContextMenuItem 
-                    onClick={onUploadToNexus}
-                    disabled={isUploadingToNexus}
-                  >
-                    {isUploadingToNexus ? (
-                      <>
-                        <Server className="w-4 h-4 mr-2 animate-pulse" />
-                        Upload vers Nexus...
-                      </>
-                    ) : (
-                      <>
-                        <Server className="w-4 h-4 mr-2" />
-                        PlanetHoster (Pro - Serveur 2)
-                      </>
-                    )}
-                  </ContextMenuItem>
+                {onUploadToNexus && (
+                  <>
+                    <ContextMenuItem 
+                      onClick={onUploadToNexus}
+                      disabled={isUploadingToNexus || !canUploadToNexus}
+                    >
+                      {isUploadingToNexus ? (
+                        <>
+                          <Server className="w-4 h-4 mr-2 animate-pulse" />
+                          Upload vers PlanetHoster...
+                        </>
+                      ) : (
+                        <>
+                          <Server className="w-4 h-4 mr-2" />
+                          PlanetHoster (Serveur 2) — SFTP privé
+                        </>
+                      )}
+                    </ContextMenuItem>
+                    <ContextMenuItem 
+                      onClick={onUploadToNexus}
+                      disabled={isUploadingToNexus || !canUploadToNexus}
+                    >
+                      {isUploadingToNexus ? (
+                        <>
+                          <Server className="w-4 h-4 mr-2 animate-pulse" />
+                          Upload vers Nexus...
+                        </>
+                      ) : (
+                        <>
+                          <Server className="w-4 h-4 mr-2" />
+                          Nexus Local (Serveur 3) — stockage local
+                        </>
+                      )}
+                    </ContextMenuItem>
+                  </>
                 )}
               </ContextMenuSubContent>
             </ContextMenuSub>

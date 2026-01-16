@@ -273,7 +273,7 @@ export const SearchView = ({
   const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload()
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync()
   const { isUploaded, getUploadedProvider } = useUploadedStatus()
-  const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro
+  const canUploadToCloudinary = cloudinaryConfigured
   const canUploadToBunny = nexusIsPro && nexusAuthenticated
   const canUploadToNexus = nexusIsPro && nexusAuthenticated
 

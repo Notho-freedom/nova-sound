@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { nexusServerService } from '@/services/nexus-server';
+import { authService } from '@/services/auth';
 import { notificationService } from '@/services/notification-service';
 import { toast } from 'sonner';
 import type { Track } from '@/types/music';
@@ -110,6 +111,11 @@ export function useNexusUpload(): UseNexusUploadReturn {
       isAuthenticated = nexusServerService.isAuthenticated();
       isPro = nexusServerService.isPro();
     }
+
+    if (!isAuthenticated) {
+      isAuthenticated = nexusServerService.isAuthenticated();
+      isPro = nexusServerService.isPro();
+    }
     
     if (!isAuthenticated) {
       toast.error('Authentification requise', {
@@ -170,6 +176,14 @@ export function useNexusUpload(): UseNexusUploadReturn {
         }
       } catch (error) {
         console.error('Failed to get Firebase token:', error);
+      }
+
+      if (!accessToken) {
+        try {
+          accessToken = await authService.getAccessToken();
+        } catch (error) {
+          console.error('Failed to get authService token:', error);
+        }
       }
 
       if (!accessToken) {
@@ -426,6 +440,11 @@ export function useNexusUpload(): UseNexusUploadReturn {
       isAuthenticated = nexusServerService.isAuthenticated();
       isPro = nexusServerService.isPro();
     }
+
+    if (!isAuthenticated) {
+      isAuthenticated = nexusServerService.isAuthenticated();
+      isPro = nexusServerService.isPro();
+    }
     
     if (!isAuthenticated || !isPro) {
       toast.error('Plan Pro requis', {
@@ -481,6 +500,11 @@ export function useNexusUpload(): UseNexusUploadReturn {
         isPro = firebaseService.isPro();
       }
     } catch (error) {
+      isAuthenticated = nexusServerService.isAuthenticated();
+      isPro = nexusServerService.isPro();
+    }
+
+    if (!isAuthenticated) {
       isAuthenticated = nexusServerService.isAuthenticated();
       isPro = nexusServerService.isPro();
     }

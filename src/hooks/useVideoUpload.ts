@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { cloudinaryService, UploadProgress } from '@/services/cloudinary';
+import { authService } from '@/services/auth';
 import { useCloudSync } from './useCloudSync';
 import type { Video } from '@/types/music';
 import { toast } from 'sonner';
@@ -352,6 +353,14 @@ export function useVideoUpload(): UseVideoUploadReturn {
       }
 
       if (!accessToken) {
+        try {
+          accessToken = await authService.getAccessToken();
+        } catch (error) {
+          console.error('Failed to get authService token:', error);
+        }
+      }
+
+      if (!accessToken) {
         throw new Error('Not authenticated - no token available');
       }
 
@@ -583,6 +592,14 @@ export function useVideoUpload(): UseVideoUploadReturn {
         }
       } catch (error) {
         console.error('Failed to get Firebase token:', error);
+      }
+
+      if (!accessToken) {
+        try {
+          accessToken = await authService.getAccessToken();
+        } catch (error) {
+          console.error('Failed to get authService token:', error);
+        }
       }
 
       if (!accessToken) {
