@@ -26,6 +26,7 @@ import { Track, Playlist } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl, formatDuration } from "@/lib/audio";
 import { getTrackFromAllOrCache } from "@/lib/track-resolver";
+import { recoverMissingYouTubeTracks } from "@/lib/youtube-track-recovery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -265,6 +266,47 @@ export const PlaylistView = memo(({
       setPageMode("detail");
     }
   }, [initialPlaylistId]);
+  
+  // Récupération automatique des tracks YouTube manquants pour toutes les playlists
+  useEffect(() => {
+    const recoverPlaylistTracks = async () => {
+      if (!playlists || playlists.length === 0) return;
+      
+      // Collecter tous les trackIds de toutes les playlists
+      const allTrackIds = new Set<string>();
+      playlists.forEach(playlist => {
+        if (playlist.trackIds && playlist.trackIds.length > 0) {
+          playlist.trackIds.forEach(id => allTrackIds.add(id));
+        }
+      });
+      
+      if (allTrackIds.size === 0) return;
+      
+      // Identifier les tracks manquants (IDs présents mais tracks non trouvés)
+      const missingIds: string[] = [];
+      allTrackIds.forEach(trackId => {
+        const track = getTrackFromAllOrCache(tracks, trackId);
+        if (!track) {
+          missingIds.push(trackId);
+        }
+      });
+      
+      if (missingIds.length > 0) {
+        console.log(`[PlaylistView] 🔄 Récupération de ${missingIds.length} tracks YouTube manquants pour les playlists...`);
+        try {
+          await recoverMissingYouTubeTracks(missingIds);
+          console.log(`[PlaylistView] ✅ Tracks récupérés avec succès`);
+        } catch (error) {
+          console.warn('[PlaylistView] Erreur lors de la récupération des tracks:', error);
+        }
+      }
+    };
+    
+    // Différer la récupération pour ne pas bloquer le rendu initial
+    const timer = setTimeout(recoverPlaylistTracks, 1000);
+    return () => clearTimeout(timer);
+  }, [playlists, tracks]);
+  
   const [selectedTracksForPlaylist, setSelectedTracksForPlaylist] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
