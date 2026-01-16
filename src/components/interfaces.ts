@@ -164,6 +164,7 @@ export interface TrackListProps {
   showDuration?: boolean;
   showFavorite?: boolean;
   canUploadToCloudinary?: boolean;
+  canUploadToBunny?: boolean;
   canUploadToNexus?: boolean;
 }
 

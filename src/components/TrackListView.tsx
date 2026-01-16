@@ -31,6 +31,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     uploadTrack?: (track: Track) => void;
     getTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
     canUploadToCloudinary?: boolean;
+    uploadTrackToBunny?: (track: Track) => void;
+    getBunnyTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+    canUploadToBunny?: boolean;
     uploadTrackToNexus?: (track: Track) => void;
     getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
     canUploadToNexus?: boolean;
@@ -61,6 +64,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     uploadTrack,
     getTrackProgress,
     canUploadToCloudinary = false,
+    uploadTrackToBunny,
+    getBunnyTrackProgress,
+    canUploadToBunny = false,
     uploadTrackToNexus,
     getNexusTrackProgress,
     canUploadToNexus = false,
@@ -110,6 +116,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       uploadTrack,
       getTrackProgress,
       canUploadToCloudinary,
+      uploadTrackToBunny,
+      getBunnyTrackProgress,
+      canUploadToBunny,
       uploadTrackToNexus,
       getNexusTrackProgress,
       canUploadToNexus,
@@ -139,6 +148,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       uploadTrack,
       getTrackProgress,
       canUploadToCloudinary,
+      uploadTrackToBunny,
+      getBunnyTrackProgress,
+      canUploadToBunny,
       uploadTrackToNexus,
       getNexusTrackProgress,
       canUploadToNexus,
@@ -176,6 +188,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
           onUploadToCloudinary={() => data.uploadTrack?.(track)}
           canUploadToCloudinary={data.canUploadToCloudinary && !!track.filePath}
           isUploading={data.getTrackProgress?.(track.id)?.status === 'uploading'}
+          onUploadToBunny={() => data.uploadTrackToBunny?.(track)}
+          canUploadToBunny={data.canUploadToBunny && !!track.filePath}
+          isUploadingToBunny={data.getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
           onUploadToNexus={() => data.uploadTrackToNexus?.(track)}
           canUploadToNexus={data.canUploadToNexus && !!track.filePath}
           isUploadingToNexus={data.getNexusTrackProgress?.(track.id)?.status === 'uploading'}

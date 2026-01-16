@@ -341,13 +341,14 @@ export const PlaylistView = memo(({
   
   // Upload hooks
   const { uploadPlaylist, uploadTrack, getTrackProgress } = useCloudinaryUpload();
-  const { uploadPlaylist: uploadPlaylistToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
+  const { uploadPlaylist: uploadPlaylistToBunny, uploadTrack: uploadTrackToBunny, getTrackProgress: getBunnyTrackProgress } = useBunnyUpload();
   const { uploadPlaylist: uploadPlaylistToNexus, uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   const { isFavorite: isPlaylistFavorite, toggleFavorite: togglePlaylistFavorite } = usePlaylistFavorites();
   
   const canUploadToCloudinary = cloudinaryConfigured && !nexusIsPro;
+  const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
   
   // Table state
@@ -1046,6 +1047,17 @@ export const PlaylistView = memo(({
                       createPlaylist={onCreatePlaylist}
                       onNavigateToArtist={onNavigateToArtist}
                       onNavigateToAlbum={onNavigateToAlbum}
+                      uploadTrack={uploadTrack}
+                      getTrackProgress={(id) => getTrackProgress(id) ?? null}
+                      canUploadToCloudinary={canUploadToCloudinary}
+                      uploadTrackToBunny={uploadTrackToBunny}
+                      getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+                      canUploadToBunny={canUploadToBunny}
+                      uploadTrackToNexus={uploadTrackToNexus}
+                      getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
+                      canUploadToNexus={canUploadToNexus}
+                      isUploaded={isUploaded}
+                      getUploadedProvider={getUploadedProvider}
                     />
                   ) : (
                     <TrackListView
@@ -1065,6 +1077,9 @@ export const PlaylistView = memo(({
                       uploadTrack={uploadTrack}
                       getTrackProgress={(id) => getTrackProgress(id) ?? null}
                       canUploadToCloudinary={canUploadToCloudinary}
+                      uploadTrackToBunny={uploadTrackToBunny}
+                      getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+                      canUploadToBunny={canUploadToBunny}
                       uploadTrackToNexus={uploadTrackToNexus}
                       getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                       canUploadToNexus={canUploadToNexus}

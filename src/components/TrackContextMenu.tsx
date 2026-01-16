@@ -181,60 +181,68 @@ export const TrackContextMenu = ({
         {(onUploadToCloudinary && canUploadToCloudinary) || (onUploadToBunny && canUploadToBunny) || (onUploadToNexus && canUploadToNexus) ? (
           <>
             <ContextMenuSeparator />
-            {onUploadToCloudinary && canUploadToCloudinary && (
-              <ContextMenuItem 
-                onClick={onUploadToCloudinary}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <>
-                    <Cloud className="w-4 h-4 mr-2 animate-pulse" />
-                    Upload en cours...
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="w-4 h-4 mr-2" />
-                    Uploader vers Cloudinary (Free - Serveur 0)
-                  </>
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <Cloud className="w-4 h-4 mr-2" />
+                Uploader
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-56">
+                {onUploadToCloudinary && canUploadToCloudinary && (
+                  <ContextMenuItem 
+                    onClick={onUploadToCloudinary}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Cloud className="w-4 h-4 mr-2 animate-pulse" />
+                        Upload en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Cloud className="w-4 h-4 mr-2" />
+                        Cloudinary (Free - Serveur 0)
+                      </>
+                    )}
+                  </ContextMenuItem>
                 )}
-              </ContextMenuItem>
-            )}
-            {onUploadToBunny && canUploadToBunny && (
-              <ContextMenuItem 
-                onClick={onUploadToBunny}
-                disabled={isUploadingToBunny}
-              >
-                {isUploadingToBunny ? (
-                  <>
-                    <Zap className="w-4 h-4 mr-2 animate-pulse" />
-                    Upload vers Bunny...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Uploader vers Bunny (Pro - Serveur 1)
-                  </>
+                {onUploadToBunny && canUploadToBunny && (
+                  <ContextMenuItem 
+                    onClick={onUploadToBunny}
+                    disabled={isUploadingToBunny}
+                  >
+                    {isUploadingToBunny ? (
+                      <>
+                        <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                        Upload vers Bunny...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Bunny (Pro - Serveur 1)
+                      </>
+                    )}
+                  </ContextMenuItem>
                 )}
-              </ContextMenuItem>
-            )}
-            {onUploadToNexus && canUploadToNexus && (
-              <ContextMenuItem 
-                onClick={onUploadToNexus}
-                disabled={isUploadingToNexus}
-              >
-                {isUploadingToNexus ? (
-                  <>
-                    <Server className="w-4 h-4 mr-2 animate-pulse" />
-                    Upload vers Nexus...
-                  </>
-                ) : (
-                  <>
-                    <Server className="w-4 h-4 mr-2" />
-                    Uploader vers PlanetHoster (Pro - Serveur 2)
-                  </>
+                {onUploadToNexus && canUploadToNexus && (
+                  <ContextMenuItem 
+                    onClick={onUploadToNexus}
+                    disabled={isUploadingToNexus}
+                  >
+                    {isUploadingToNexus ? (
+                      <>
+                        <Server className="w-4 h-4 mr-2 animate-pulse" />
+                        Upload vers Nexus...
+                      </>
+                    ) : (
+                      <>
+                        <Server className="w-4 h-4 mr-2" />
+                        PlanetHoster (Pro - Serveur 2)
+                      </>
+                    )}
+                  </ContextMenuItem>
                 )}
-              </ContextMenuItem>
-            )}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
           </>
         ) : null}
 

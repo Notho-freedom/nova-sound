@@ -711,6 +711,9 @@ export const LibraryView = memo(({
                               onUploadToCloudinary={() => uploadTrack?.(track)}
                               canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                               isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                              onUploadToBunny={() => uploadTrackToBunny?.(track)}
+                              canUploadToBunny={canUploadToBunny && !!track.filePath}
+                              isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
                               onUploadToNexus={() => uploadTrackToNexus?.(track)}
                               canUploadToNexus={canUploadToNexus && !!track.filePath}
                               isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
@@ -886,6 +889,9 @@ export const LibraryView = memo(({
                 uploadTrack={uploadTrack}
                 getTrackProgress={(id) => getTrackProgress(id) ?? null}
                 canUploadToCloudinary={canUploadToCloudinary}
+                uploadTrackToBunny={uploadTrackToBunny}
+                getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+                canUploadToBunny={canUploadToBunny}
                 uploadTrackToNexus={uploadTrackToNexus}
                 getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                 canUploadToNexus={canUploadToNexus}
@@ -1669,6 +1675,17 @@ export const LibraryView = memo(({
                             onPlayTrack={onPlayTrack}
                             onAddToPlaylist={onAddToPlaylist}
                             createPlaylist={createPlaylist}
+                            uploadTrack={uploadTrack}
+                            getTrackProgress={(id) => getTrackProgress(id) ?? null}
+                            canUploadToCloudinary={canUploadToCloudinary}
+                            uploadTrackToBunny={uploadTrackToBunny}
+                            getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+                            canUploadToBunny={canUploadToBunny}
+                            uploadTrackToNexus={uploadTrackToNexus}
+                            getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
+                            canUploadToNexus={canUploadToNexus}
+                            isUploaded={isUploaded}
+                            getUploadedProvider={getUploadedProvider}
                           />
                         </div>
                       </motion.div>
@@ -2047,6 +2064,17 @@ export const LibraryView = memo(({
                 createPlaylist={createPlaylist}
                 onNavigateToArtist={onNavigateToArtist}
                 onNavigateToAlbum={onNavigateToAlbum}
+                uploadTrack={uploadTrack}
+                getTrackProgress={(id) => getTrackProgress(id) ?? null}
+                canUploadToCloudinary={canUploadToCloudinary}
+                uploadTrackToBunny={uploadTrackToBunny}
+                getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+                canUploadToBunny={canUploadToBunny}
+                uploadTrackToNexus={uploadTrackToNexus}
+                getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
+                canUploadToNexus={canUploadToNexus}
+                isUploaded={isUploaded}
+                getUploadedProvider={getUploadedProvider}
               />
             ) : (
               <TrackListView
@@ -2064,6 +2092,9 @@ export const LibraryView = memo(({
                 uploadTrack={uploadTrack}
                 getTrackProgress={(id) => getTrackProgress(id) ?? null}
                 canUploadToCloudinary={canUploadToCloudinary}
+                uploadTrackToBunny={uploadTrackToBunny}
+                getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+                canUploadToBunny={canUploadToBunny}
                 uploadTrackToNexus={uploadTrackToNexus}
                 getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                 canUploadToNexus={canUploadToNexus}
