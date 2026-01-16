@@ -116,6 +116,13 @@ export const YouTubePlayer = forwardRef<YouTubePlayerRef | null, YouTubePlayerPr
     }
   }, [isReady, autoPlay, isPlaying, play]);
 
+  // En mode audio-only, forcer une qualité plus basse pour réduire le buffering
+  useEffect(() => {
+    if (isReady && audioOnly) {
+      setQuality("small");
+    }
+  }, [isReady, audioOnly, setQuality]);
+
   // Callbacks - utiliser useRef pour éviter les boucles infinies
   const onReadyRef = useRef(onReady);
   const onStateChangeRef = useRef(onStateChange);

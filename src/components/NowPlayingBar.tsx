@@ -39,7 +39,7 @@ import { getCoverUrl } from "@/lib/audio"
 import type { Track } from "@/types/music"
 import { toast } from "sonner"
 import { useNotifications } from "@/hooks/useNotifications"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { AIAnalysisResult } from "@/hooks/useAudioAI"
 
 interface NowPlayingBarProps {
@@ -116,6 +116,16 @@ export const NowPlayingBar = ({
 }: NowPlayingBarProps) => {
   const [isHoveringProgress, setIsHoveringProgress] = useState(false)
   const [isHoveringVolume, setIsHoveringVolume] = useState(false)
+  const lastVolumeMetricRef = useRef(0)
+  const lastSeekMetricRef = useRef(0)
+  const pendingMetricsRef = useRef(new Map<string, number>())
+  const prevCurrentTimeRef = useRef(currentTime)
+  const prevVolumeRef = useRef(volume)
+  const prevIsPlayingRef = useRef(isPlaying)
+  const prevIsQueueOpenRef = useRef(isQueueOpen)
+  const prevIsShuffleRef = useRef(isShuffle)
+  const prevRepeatModeRef = useRef(repeatMode)
+  const prevIsMutedRef = useRef(isMuted)
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2
 
@@ -124,6 +134,175 @@ export const NowPlayingBar = ({
   const progress = effectiveDuration > 0 ? (currentTime / effectiveDuration) * 100 : 0
 
   const { notifySuccess, notify } = useNotifications()
+
+  const logMetric = (action: string, data: Record<string, unknown> = {}) => {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now()
+    console.log("[metrics][now-playing]", {
+      action,
+      ts: now,
+      trackId: currentTrack?.id,
+      trackTitle: currentTrack?.title,
+      isPlaying,
+      currentTime,
+      duration: effectiveDuration,
+      volume,
+      isMuted,
+      isShuffle,
+      repeatMode,
+      ...data,
+    })
+  }
+
+  const markActionStart = (action: string, data: Record<string, unknown> = {}) => {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now()
+    pendingMetricsRef.current.set(action, now)
+    logMetric(`${action}_start`, data)
+  }
+
+  const markActionComplete = (action: string, data: Record<string, unknown> = {}) => {
+    const startedAt = pendingMetricsRef.current.get(action)
+    if (startedAt == null) return
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now()
+    pendingMetricsRef.current.delete(action)
+    logMetric(`${action}_complete`, { durationMs: Math.round(now - startedAt), ...data })
+  }
+
+  const handlePlayPause = () => {
+    markActionStart("play_pause")
+    onPlayPause()
+  }
+
+  const handlePrevious = () => {
+    markActionStart("previous")
+    onPrevious()
+  }
+
+  const handleNext = () => {
+    markActionStart("next")
+    onNext()
+  }
+
+  const handleShuffle = () => {
+    markActionStart("shuffle_toggle", { nextState: !isShuffle })
+    onShuffle()
+  }
+
+  const handleRepeat = () => {
+    markActionStart("repeat_toggle", { currentMode: repeatMode })
+    onRepeat()
+  }
+
+  const handleMuteToggle = () => {
+    markActionStart("mute_toggle", { nextState: !isMuted })
+    onMuteToggle()
+  }
+
+  const handleToggleQueue = () => {
+    markActionStart("queue_toggle", { nextState: !isQueueOpen })
+    onToggleQueue()
+  }
+
+  const handleFullscreen = () => {
+    markActionStart("fullscreen")
+    onFullscreen()
+  }
+
+  const handleToggleFavorite = () => {
+    markActionStart("favorite_toggle", { nextState: !isFavorite })
+    onToggleFavorite?.()
+  }
+
+  const handleShowPlayer = (source: "artwork" | "title") => {
+    markActionStart("open_player", { source })
+    onShowPlayer?.()
+  }
+
+  const handleShowLyrics = () => {
+    markActionStart("show_lyrics")
+    onShowLyrics?.()
+  }
+
+  const handleShowArtistInfo = () => {
+    markActionStart("show_artist_info")
+    onShowArtistInfo?.()
+  }
+
+  const handleNavigateToAlbum = () => {
+    markActionStart("navigate_album")
+    onNavigateToAlbum?.()
+  }
+
+  const handleNavigateToArtist = () => {
+    markActionStart("navigate_artist")
+    onNavigateToArtist?.()
+  }
+
+  const handleSeekClick = (value: number[]) => {
+    const now = Date.now()
+    if (now - lastSeekMetricRef.current >= 250) {
+      lastSeekMetricRef.current = now
+      markActionStart("seek", { value: value[0] })
+    }
+    onSeek(value)
+  }
+
+  const handleVolumeChange = (value: number[]) => {
+    const now = Date.now()
+    if (now - lastVolumeMetricRef.current >= 250) {
+      lastVolumeMetricRef.current = now
+      markActionStart("volume_change", { value: value[0] })
+    }
+    onVolumeChange(value)
+  }
+
+  useEffect(() => {
+    if (prevIsPlayingRef.current !== isPlaying) {
+      markActionComplete("play_pause", { to: isPlaying })
+      prevIsPlayingRef.current = isPlaying
+    }
+  }, [isPlaying])
+
+  useEffect(() => {
+    if (prevIsQueueOpenRef.current !== isQueueOpen) {
+      markActionComplete("queue_toggle", { to: isQueueOpen })
+      prevIsQueueOpenRef.current = isQueueOpen
+    }
+  }, [isQueueOpen])
+
+  useEffect(() => {
+    if (prevIsShuffleRef.current !== isShuffle) {
+      markActionComplete("shuffle_toggle", { to: isShuffle })
+      prevIsShuffleRef.current = isShuffle
+    }
+  }, [isShuffle])
+
+  useEffect(() => {
+    if (prevRepeatModeRef.current !== repeatMode) {
+      markActionComplete("repeat_toggle", { to: repeatMode })
+      prevRepeatModeRef.current = repeatMode
+    }
+  }, [repeatMode])
+
+  useEffect(() => {
+    if (prevIsMutedRef.current !== isMuted) {
+      markActionComplete("mute_toggle", { to: isMuted })
+      prevIsMutedRef.current = isMuted
+    }
+  }, [isMuted])
+
+  useEffect(() => {
+    if (prevVolumeRef.current !== volume) {
+      markActionComplete("volume_change", { to: volume })
+      prevVolumeRef.current = volume
+    }
+  }, [volume])
+
+  useEffect(() => {
+    if (Math.abs(prevCurrentTimeRef.current - currentTime) >= 0.5) {
+      markActionComplete("seek", { to: currentTime })
+      prevCurrentTimeRef.current = currentTime
+    }
+  }, [currentTime])
 
   return (
     <TooltipProvider>
@@ -151,7 +330,7 @@ export const NowPlayingBar = ({
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect()
             const percent = (e.clientX - rect.left) / rect.width
-            onSeek([percent * effectiveDuration])
+            handleSeekClick([percent * effectiveDuration])
           }}
         >
           {/* Background track */}
@@ -191,7 +370,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={onShowPlayer}
+                    onClick={() => handleShowPlayer("artwork")}
                     className={cn(
                       "relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 group",
                       "ring-2 ring-white/10 hover:ring-primary/50",
@@ -238,21 +417,21 @@ export const NowPlayingBar = ({
               {/* Track details */}
               <div className="flex-1 min-w-0">
                 <button
-                  onClick={onShowPlayer}
+                  onClick={() => handleShowPlayer("title")}
                   className="text-sm font-semibold truncate text-foreground hover:text-primary transition-colors duration-200 block w-full text-left"
                 >
                   {currentTrack.title}
                 </button>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                   <button
-                    onClick={onNavigateToArtist}
+                    onClick={handleNavigateToArtist}
                     className="hover:text-foreground hover:underline transition-colors truncate"
                   >
                     {currentTrack.artist}
                   </button>
                   <span className="text-muted-foreground/40">•</span>
                   <button
-                    onClick={onNavigateToAlbum}
+                    onClick={handleNavigateToAlbum}
                     className="hover:text-foreground hover:underline transition-colors truncate"
                   >
                     {currentTrack.album}
@@ -264,7 +443,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={onToggleFavorite}
+                    onClick={handleToggleFavorite}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       isFavorite ? "text-rose-500 hover:text-rose-400" : "text-muted-foreground/50 hover:text-rose-500",
@@ -294,7 +473,7 @@ export const NowPlayingBar = ({
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={onShuffle}
+                      onClick={handleShuffle}
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
                         isShuffle ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
@@ -310,7 +489,7 @@ export const NowPlayingBar = ({
 
                 {/* Previous */}
                 <button
-                  onClick={onPrevious}
+                  onClick={handlePrevious}
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-foreground/80 hover:text-foreground",
@@ -323,7 +502,7 @@ export const NowPlayingBar = ({
 
                 {/* Play/Pause - Main button */}
                 <button
-                  onClick={onPlayPause}
+                  onClick={handlePlayPause}
                   className={cn(
                     "w-12 h-12 rounded-full flex items-center justify-center",
                     "bg-white text-black",
@@ -342,7 +521,7 @@ export const NowPlayingBar = ({
 
                 {/* Next */}
                 <button
-                  onClick={onNext}
+                  onClick={handleNext}
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-foreground/80 hover:text-foreground",
@@ -357,7 +536,7 @@ export const NowPlayingBar = ({
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={onRepeat}
+                      onClick={handleRepeat}
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
                         repeatMode !== "off"
@@ -396,6 +575,10 @@ export const NowPlayingBar = ({
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => {
+                        logMetric("audio_analysis_click", {
+                          isPro: audioAnalysis.isPro,
+                          hasTranscription: Boolean(audioAnalysis.transcription),
+                        })
                         if (audioAnalysis.isPro && !audioAnalysis.transcription && onStartAIAnalysis) {
                           onStartAIAnalysis();
                           toast.info("Analyse IA en cours...", { duration: 3000 });
@@ -465,7 +648,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => onShowArtistInfo?.()}
+                    onClick={handleShowArtistInfo}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-primary",
@@ -504,7 +687,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={onShowLyrics}
+                    onClick={handleShowLyrics}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
@@ -523,7 +706,7 @@ export const NowPlayingBar = ({
                 <TooltipTrigger asChild>
                   <button
                     data-coachmark="player-queue-btn"
-                    onClick={onToggleQueue}
+                    onClick={handleToggleQueue}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       isQueueOpen ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
@@ -561,7 +744,7 @@ export const NowPlayingBar = ({
                 onMouseLeave={() => setIsHoveringVolume(false)}
               >
                 <button
-                  onClick={onMuteToggle}
+                  onClick={handleMuteToggle}
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-muted-foreground/50 hover:text-foreground",
@@ -581,7 +764,7 @@ export const NowPlayingBar = ({
                     value={[isMuted ? 0 : volume]}
                     max={100}
                     step={1}
-                    onValueChange={onVolumeChange}
+                    onValueChange={handleVolumeChange}
                     className="w-24"
                   />
                 </div>
@@ -591,7 +774,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={onFullscreen}
+                    onClick={handleFullscreen}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
@@ -622,6 +805,7 @@ export const NowPlayingBar = ({
                 <DropdownMenuContent align="end" className="w-52 bg-card/95 backdrop-blur-xl border-white/10">
                   <DropdownMenuItem
                     onClick={() => {
+                      logMetric("share")
                       if (navigator.share) {
                         navigator
                           .share({
@@ -641,6 +825,7 @@ export const NowPlayingBar = ({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
+                      logMetric("track_info")
                       const info = `Titre: ${currentTrack.title}\nArtiste: ${currentTrack.artist}\nAlbum: ${currentTrack.album}\nDurée: ${formatTime(currentTrack.duration)}`
                       toast.info(info, { duration: 5000 })
                     }}
@@ -649,11 +834,11 @@ export const NowPlayingBar = ({
                     Infos de la piste
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/5" />
-                  <DropdownMenuItem onClick={onNavigateToAlbum}>
+                  <DropdownMenuItem onClick={handleNavigateToAlbum}>
                     <Disc3 className="w-4 h-4 mr-3" />
                     Aller à l'album
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onNavigateToArtist}>
+                  <DropdownMenuItem onClick={handleNavigateToArtist}>
                     <Users className="w-4 h-4 mr-3" />
                     Aller à l'artiste
                   </DropdownMenuItem>

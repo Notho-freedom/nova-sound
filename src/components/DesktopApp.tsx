@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
+import { flushSync } from "react-dom";
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { useViewNavigation } from "@/hooks/useViewNavigation";
@@ -343,6 +344,9 @@ export const DesktopApp = () => {
   
   // YouTube Player ref pour lecture persistante en arrière-plan
   const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
+  const youtubeActionRef = useRef<{ action: "play" | "pause"; ts: number } | null>(null);
+  const youtubePausedMuteRef = useRef(false);
+  const youtubePrevVolumeRef = useRef(volume);
 
   // Audio AI Analysis - DÉSACTIVÉ TEMPORAIREMENT
   // TODO: Réactiver le système d'analyse audio plus tard
@@ -641,26 +645,52 @@ export const DesktopApp = () => {
       if (isPlaying) {
         try {
           console.log('[DesktopApp] Appel de pause() sur le player YouTube');
+          youtubePrevVolumeRef.current = volume;
+          try {
+            player.setVolume(0);
+          } catch {
+            // Ignore volume errors
+          }
+          if (!player.isMuted && typeof player.toggleMute === 'function') {
+            player.toggleMute();
+            youtubePausedMuteRef.current = true;
+          }
+          youtubeActionRef.current = { action: "pause", ts: performance.now() };
           player.pause();
           // Mettre à jour l'état immédiatement (optimistic update)
           // Le callback onStateChange confirmera la mise à jour
-          setIsPlaying(false);
+          flushSync(() => setIsPlaying(false));
         } catch (err) {
           console.error('[DesktopApp] Erreur lors de la pause YouTube:', err);
         }
       } else {
         try {
           console.log('[DesktopApp] Appel de play() sur le player YouTube');
+          if (!isMuted) {
+            try {
+              const restoreVolume = volume > 0 ? volume : youtubePrevVolumeRef.current || 100;
+              player.setVolume(restoreVolume);
+            } catch {
+              // Ignore volume sync failures
+            }
+          }
+          if (youtubePausedMuteRef.current && player.isMuted && typeof player.toggleMute === 'function') {
+            if (!isMuted && volume > 0) {
+              player.toggleMute();
+            }
+            youtubePausedMuteRef.current = false;
+          }
+          youtubeActionRef.current = { action: "play", ts: performance.now() };
           player.play();
           // Mettre à jour l'état immédiatement (optimistic update)
-          setIsPlaying(true);
+          flushSync(() => setIsPlaying(true));
         } catch (err) {
           console.error('[DesktopApp] Erreur lors de la lecture YouTube:', err);
         }
       }
     } else {
       // Pour les tracks locaux, basculer l'état
-      setIsPlaying(prev => !prev);
+      flushSync(() => setIsPlaying(prev => !prev));
     }
   }, [currentTrack?.mediaSource, isPlaying]);
 
@@ -2901,6 +2931,17 @@ export const DesktopApp = () => {
               }}
               onStateChange={(playing) => {
                 console.log('[DesktopApp] YouTube onStateChange:', { playing, currentIsPlaying: isPlaying });
+                const pending = youtubeActionRef.current;
+                if (pending && ((pending.action === "play" && playing) || (pending.action === "pause" && !playing))) {
+                  const durationMs = Math.round(performance.now() - pending.ts);
+                  console.log('[metrics][youtube-player]', {
+                    action: pending.action,
+                    durationMs,
+                    trackId: currentTrack?.id,
+                    trackTitle: currentTrack?.title,
+                  });
+                  youtubeActionRef.current = null;
+                }
                 if (playing !== isPlaying) {
                   setIsPlaying(playing);
                 }
