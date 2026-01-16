@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
-import * as musicMetadata from 'music-metadata';
-import * as path from 'path';
+import { WorkerPool } from './worker-pool.js';
+import * as os from 'os';
 
 export interface ExtractedMetadata {
   title?: string;
@@ -29,46 +29,33 @@ export interface ArtworkData {
   description?: string;
 }
 
+const metadataWorkerPool = new WorkerPool<
+  { filePath: string },
+  { metadata: ExtractedMetadata | null; artwork?: { dataBase64: string; format: string; type?: string; description?: string } | null }
+>(
+  new URL('../workers/audio-metadata-worker.js', import.meta.url),
+  Math.max(2, Math.min(4, Math.max(1, os.cpus().length - 1)))
+);
+
 /**
  * Extract metadata from an audio file
  */
 export async function extractMetadata(filePath: string): Promise<ExtractedMetadata | null> {
   try {
-    const metadata = await musicMetadata.parseFile(filePath, { duration: true });
-    const { common, format } = metadata;
+    const workerResult = await metadataWorkerPool.runTask({ filePath });
+    if (!workerResult?.metadata) return null;
 
-    // Extract artwork
-    let artwork: ArtworkData | undefined;
-    if (common.picture && common.picture.length > 0) {
-      const pic = common.picture[0];
-      artwork = {
-        data: Buffer.from(pic.data),
-        format: pic.format,
-        type: pic.type,
-        description: pic.description,
-      };
-    }
-
-    // Get file extension as format fallback
-    const ext = path.extname(filePath).slice(1).toUpperCase();
+    const artwork = workerResult.artwork
+      ? {
+          data: Buffer.from(workerResult.artwork.dataBase64, 'base64'),
+          format: workerResult.artwork.format,
+          type: workerResult.artwork.type,
+          description: workerResult.artwork.description,
+        }
+      : undefined;
 
     return {
-      title: common.title,
-      artist: common.artist || common.artists?.join(', '),
-      album: common.album,
-      year: common.year,
-      genre: common.genre?.join(', '),
-      duration: Math.round(format.duration || 0),
-      bitrate: format.bitrate ? Math.round(format.bitrate / 1000) : undefined,
-      sampleRate: format.sampleRate,
-      channels: format.numberOfChannels,
-      format: format.container || format.codec || ext,
-      trackNumber: common.track?.no || undefined,
-      discNumber: common.disk?.no || undefined,
-      albumArtist: common.albumartist,
-      composer: common.composer?.join(', '),
-      comment: common.comment?.join(', '),
-      lyrics: common.lyrics?.join('\n'),
+      ...workerResult.metadata,
       artwork,
     };
   } catch (error) {
@@ -82,22 +69,15 @@ export async function extractMetadata(filePath: string): Promise<ExtractedMetada
  */
 export async function extractArtwork(filePath: string): Promise<ArtworkData | null> {
   try {
-    const metadata = await musicMetadata.parseFile(filePath, { 
-      duration: false,
-      skipCovers: false,
-    });
+    const workerResult = await metadataWorkerPool.runTask({ filePath });
+    if (!workerResult?.artwork) return null;
 
-    if (metadata.common.picture && metadata.common.picture.length > 0) {
-      const pic = metadata.common.picture[0];
-      return {
-        data: Buffer.from(pic.data),
-        format: pic.format,
-        type: pic.type,
-        description: pic.description,
-      };
-    }
-
-    return null;
+    return {
+      data: Buffer.from(workerResult.artwork.dataBase64, 'base64'),
+      format: workerResult.artwork.format,
+      type: workerResult.artwork.type,
+      description: workerResult.artwork.description,
+    };
   } catch (error) {
     console.error(`Failed to extract artwork from ${filePath}:`, error);
     return null;
@@ -109,11 +89,8 @@ export async function extractArtwork(filePath: string): Promise<ArtworkData | nu
  */
 export async function getAudioDuration(filePath: string): Promise<number> {
   try {
-    const metadata = await musicMetadata.parseFile(filePath, { 
-      duration: true,
-      skipCovers: true,
-    });
-    return Math.round(metadata.format.duration || 0);
+    const workerResult = await metadataWorkerPool.runTask({ filePath });
+    return workerResult?.metadata?.duration ?? 0;
   } catch (error) {
     console.error(`Failed to get duration from ${filePath}:`, error);
     return 0;

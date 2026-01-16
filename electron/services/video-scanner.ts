@@ -4,13 +4,10 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { watch, FSWatcher } from 'chokidar';
 import { v4 as uuidv4 } from 'uuid';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { storage } from './storage.js';
-import ffmpegStatic from 'ffmpeg-static';
 import { fileURLToPath } from 'url';
-
-const execAsync = promisify(exec);
+import { WorkerPool } from './worker-pool.js';
+import * as os from 'os';
 
 // Get default thumbnail path (album-cover-1.jpg)
 function getDefaultThumbnailPath(): string | null {
@@ -90,6 +87,14 @@ const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm
 let watcher: FSWatcher | null = null;
 let isScanning = false;
 
+const thumbnailWorkerPool = new WorkerPool<
+  { filePath: string; useFirstFrame?: boolean },
+  { thumbnailDataBase64?: string } | null
+>(
+  new URL('../workers/video-thumbnail-worker.js', import.meta.url),
+  Math.max(2, Math.min(4, Math.max(1, os.cpus().length - 1)))
+);
+
 /**
  * Check if a file is a supported video file
  */
@@ -140,43 +145,6 @@ async function getFileStats(filePath: string): Promise<{ size: number; mtime: Da
   }
 }
 
-// Check if ffmpeg is available (static or system)
-let ffmpegAvailable: boolean | null = null;
-let ffmpegPath: string | null = null;
-
-async function checkFfmpegAvailable(): Promise<boolean> {
-  if (ffmpegAvailable !== null) return ffmpegAvailable;
-  
-  // First, try to use bundled ffmpeg-static
-  if (ffmpegStatic) {
-    try {
-      // Check if the static binary exists
-      const fsSync = await import('fs');
-      if (fsSync.existsSync(ffmpegStatic)) {
-        ffmpegPath = ffmpegStatic;
-        ffmpegAvailable = true;
-        console.log('Using bundled ffmpeg-static for thumbnail generation:', ffmpegStatic);
-        return true;
-      }
-    } catch (error) {
-      console.log('Bundled ffmpeg-static not found, trying system ffmpeg...');
-    }
-  }
-  
-  // Fallback to system ffmpeg if available
-  try {
-    await execAsync('ffmpeg -version');
-    ffmpegPath = 'ffmpeg';
-    ffmpegAvailable = true;
-    console.log('Using system ffmpeg for thumbnail generation');
-  } catch {
-    ffmpegAvailable = false;
-    ffmpegPath = null;
-    console.log('ffmpeg is not available (neither bundled nor system) - thumbnails will not be generated');
-  }
-  return ffmpegAvailable;
-}
-
 /**
  * Generate thumbnail for video using ffmpeg
  * Tries to capture at second 2 first, falls back to first frame (second 0) if that fails
@@ -191,78 +159,19 @@ async function generateThumbnail(filePath: string, forceRegenerate = false, useF
       }
     }
 
-    // Check if ffmpeg is available and get path (static or system)
-    const hasFfmpeg = await checkFfmpegAvailable();
-    if (!hasFfmpeg || !ffmpegPath) {
+    const workerResult = await thumbnailWorkerPool.runTask({ filePath, useFirstFrame });
+    if (!workerResult?.thumbnailDataBase64) {
+      console.log(`Failed to generate thumbnail for ${path.basename(filePath)} in worker`);
       return null;
     }
 
-    // Create temp directory in user data folder
-    const os = await import('os');
-    const tempDir = os.tmpdir();
-    const thumbnailPath = path.join(tempDir, `nexus_thumb_${Date.now()}.jpg`);
-    
-    // Try to generate thumbnail - first try at second 2, then fallback to first frame
-    const timeOffsets = useFirstFrame ? ['00:00:00'] : ['00:00:02', '00:00:00'];
-
-    for (const timeOffset of timeOffsets) {
-    try {
-      // Use -y to overwrite, -hide_banner for less output
-        // -ss before -i is faster (seeks before decoding)
-        // Use the ffmpeg path (static or system)
-        await execAsync(`"${ffmpegPath}" -y -hide_banner -loglevel error -ss ${timeOffset} -i "${filePath}" -vframes 1 -vf "scale=320:-1" "${thumbnailPath}"`, {
-        timeout: 30000, // 30 second timeout
-      });
-      
-      // Check if thumbnail was created
-      try {
-        await fs.access(thumbnailPath);
-      } catch {
-          console.log(`Thumbnail not created for ${filePath} at ${timeOffset}`);
-          continue; // Try next time offset
-      }
-      
-      // Read the generated thumbnail
-      const thumbnailData = await fs.readFile(thumbnailPath);
-        
-        // Verify it's not empty
-        if (thumbnailData.length === 0) {
-          console.log(`Empty thumbnail generated for ${filePath} at ${timeOffset}`);
-          continue; // Try next time offset
-        }
-      
-      // Save to storage
-      const savedUrl = await storage.saveThumbnail(thumbnailData, filePath);
-      
-      // Clean up temp file
-      try {
-        await fs.unlink(thumbnailPath);
-      } catch {
-        // Ignore cleanup errors
-      }
-      
-        const frameType = timeOffset === '00:00:00' ? 'first frame' : 'frame at 2s';
-        console.log(`Generated thumbnail (${frameType}) for: ${path.basename(filePath)}`);
-      return savedUrl;
-    } catch (ffmpegError: any) {
-        // ffmpeg failed for this time offset, try next one
-        console.log(`ffmpeg failed for ${path.basename(filePath)} at ${timeOffset}:`, ffmpegError.message);
-      
-      // Clean up temp file if it exists
-      try {
-        await fs.unlink(thumbnailPath);
-      } catch {
-        // Ignore cleanup errors
-      }
-      
-        // Continue to next time offset
-        continue;
-      }
-    }
-    
-    // All attempts failed
-    console.log(`Failed to generate thumbnail for ${path.basename(filePath)} after trying all time offsets`);
+    const thumbnailData = Buffer.from(workerResult.thumbnailDataBase64, 'base64');
+    if (thumbnailData.length === 0) {
+      console.log(`Empty thumbnail generated for ${path.basename(filePath)} in worker`);
       return null;
+    }
+
+    return await storage.saveThumbnail(thumbnailData, filePath);
   } catch (error) {
     console.error(`Error generating thumbnail for ${filePath}:`, error);
     return null;

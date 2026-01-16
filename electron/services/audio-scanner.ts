@@ -3,8 +3,10 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { watch, FSWatcher } from 'chokidar';
 import { v4 as uuidv4 } from 'uuid';
-import { extractMetadata, type ExtractedMetadata } from './metadata-extractor.js';
+import type { ExtractedMetadata } from './metadata-extractor.js';
 import { storage } from './storage.js';
+import { WorkerPool } from './worker-pool.js';
+import * as os from 'os';
 
 export interface ScannedTrack {
   id: string;
@@ -39,6 +41,14 @@ const AUDIO_EXTENSIONS = ['.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus', '.aa
 
 let watcher: FSWatcher | null = null;
 let isScanning = false;
+
+const metadataWorkerPool = new WorkerPool<
+  { filePath: string },
+  { metadata: ExtractedMetadata | null; artwork?: { dataBase64: string; format: string } | null }
+>(
+  new URL('../workers/audio-metadata-worker.js', import.meta.url),
+  Math.max(2, Math.min(4, Math.max(1, os.cpus().length - 1)))
+);
 
 /**
  * Check if a file is a supported audio file
@@ -98,14 +108,17 @@ async function processAudioFile(filePath: string): Promise<ScannedTrack | null> 
     const stats = await getFileStats(filePath);
     if (!stats) return null;
 
-    const metadata = await extractMetadata(filePath);
+    const workerResult = await metadataWorkerPool.runTask({ filePath });
+    const metadata = workerResult?.metadata;
     if (!metadata) return null;
 
     // Generate cover URL from embedded artwork or use placeholder
     let coverUrl = '';
-    if (metadata.artwork) {
-      // Store artwork and get path
-      coverUrl = await storage.saveArtwork(metadata.artwork, filePath);
+    if (workerResult?.artwork?.dataBase64 && workerResult?.artwork?.format) {
+      coverUrl = await storage.saveArtwork({
+        data: Buffer.from(workerResult.artwork.dataBase64, 'base64'),
+        format: workerResult.artwork.format,
+      }, filePath);
     }
 
     const track: ScannedTrack = {
