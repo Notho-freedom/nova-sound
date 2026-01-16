@@ -33,6 +33,7 @@ import { HeroCarousel } from "@/components/ui/HeroCarousel";
 import { ContentCarousel } from "@/components/ui/ContentCarousel";
 import { QuickPlayCard } from "@/components/ui/QuickPlayCard";
 import { FeaturedCard } from "@/components/ui/FeaturedCard";
+import { GenreExploreSection } from "@/components/GenreExploreSection";
 
 interface HistoryEntry {
   trackId: string;
@@ -303,41 +304,24 @@ export const HomeView = memo(({
         </section>
       )}
 
-      {/* Explore by Genre - Carousel */}
-      {topGenres.length > 0 && (
-        <section className="pl-6 pr-6 overflow-hidden max-w-full">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Explorer par genre</h3>
-            <HelpIcon
-              title="Genres"
-              description="Explorez votre musique par genre. Cliquez sur un genre pour voir tous les titres de cette catégorie."
-            />
-          </div>
-          <ContentCarousel
-            title="Explorer par genre"
-            subtitle={`${genres.length} genres disponibles`}
-            icon={<Disc className="w-5 h-5 text-secondary" />}
-            action={
-              genres.length > 8 && (
-                <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground">
-                  Voir tout
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              )
-            }
-          >
-            {topGenres.map((genre) => (
-              <GenreCard
-                key={genre.name}
-                name={formatGenreName(genre.name)}
-                trackCount={genre.trackCount}
-                onClick={() => setSelectedGenre(genre.name)}
-                className="flex-shrink-0 snap-start w-40"
-              />
-            ))}
-          </ContentCarousel>
-        </section>
-      )}
+      <GenreExploreSection
+        genres={topGenres.map((genre) => ({
+          name: formatGenreName(genre.name),
+          trackCount: genre.trackCount,
+        }))}
+        onSelectGenre={(genreName) => {
+          const match = topGenres.find((g) => formatGenreName(g.name) === genreName);
+          setSelectedGenre(match?.name ?? genreName);
+        }}
+        onViewAll={
+          onFilterByGenre
+            ? () => {
+                setSelectedGenre(null);
+                onFilterByGenre("");
+              }
+            : undefined
+        }
+      />
 
       {selectedGenre && selectedGenreTracks.length > 0 && (
         <section className="px-6">

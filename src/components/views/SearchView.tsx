@@ -39,6 +39,7 @@ import { usePlayHistory } from "@/hooks/usePlayHistory"
 import { useSearchWorker } from "@/hooks/useSearchWorker"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { Button } from "@/components/ui/button"
+import { GenreExploreSection } from "@/components/GenreExploreSection"
 import { motion, AnimatePresence } from "framer-motion"
 import { ContentCarousel } from "@/components/ui/ContentCarousel"
 import { FeaturedCard } from "@/components/ui/FeaturedCard"
@@ -930,60 +931,16 @@ export const SearchView = ({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    <h2 className="font-display text-lg font-semibold">
-                      {dynamicData.genres.length > 0 ? "Vos genres" : "Explorer par genre"}
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {browseCategories.map((cat, idx) => (
-                      <motion.div
-                        key={cat.name}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.05 }}
-                      >
-                        <button
-                          onClick={() => handleSearch(cat.name)}
-                          className={cn(
-                            "group relative h-28 rounded-2xl overflow-hidden w-full",
-                            "transition-all duration-300 ease-out",
-                            "hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02]",
-                          )}
-                        >
-                          {cat.coverUrl ? (
-                            <>
-                              <img
-                                src={getCoverUrl(cat.coverUrl)}
-                                alt={cat.name}
-                                className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-70 group-hover:scale-110 transition-all duration-500"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-br from-primary/60 to-secondary/80" />
-                            </>
-                          ) : (
-                            <div className={cn("absolute inset-0", cat.color)} />
-                          )}
-                          <div
-                            className="absolute inset-0 opacity-30"
-                            style={{
-                              backgroundImage: `radial-gradient(circle at 80% 20%, white 0%, transparent 50%)`,
-                            }}
-                          />
-                          <div className="relative h-full flex items-end p-4">
-                            <div>
-                              <h3 className="font-display font-bold text-white text-lg drop-shadow-lg">
-                                {cat.name}
-                              </h3>
-                              {cat.count && cat.count > 0 && (
-                                <p className="text-xs text-white/80 mt-1">{cat.count} titres</p>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      </motion.div>
-                    ))}
-                  </div>
+                  <GenreExploreSection
+                    title={dynamicData.genres.length > 0 ? "Vos genres" : "Explorer par genre"}
+                    subtitle={`${browseCategories.length} genres disponibles`}
+                    genres={browseCategories.map((cat) => ({
+                      name: cat.name,
+                      trackCount: cat.count || 0,
+                    }))}
+                    onSelectGenre={(genreName) => handleSearch(genreName)}
+                    showHelp={false}
+                  />
                 </motion.section>
 
                 {/* Recommended Tracks */}
