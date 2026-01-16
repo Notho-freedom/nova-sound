@@ -18,6 +18,7 @@ interface TrackListViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayNext?: (track: Track) => void;
   onAddToQueue?: (track: Track) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
@@ -47,6 +48,7 @@ export const TrackListView = memo(({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
@@ -107,7 +109,7 @@ export const TrackListView = memo(({
             return (
               <tr
                 key={track.id}
-                onClick={() => onTrackSelect(actualIndex)}
+                onClick={() => onPlayTrack ? onPlayTrack(track) : onTrackSelect(actualIndex)}
                 className={cn(
                   "group cursor-pointer transition-all duration-200 ease-out",
                   isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",

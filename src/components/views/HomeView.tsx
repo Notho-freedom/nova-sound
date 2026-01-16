@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { useState, useMemo, useCallback, memo } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
-import { Skeleton } from "@/components/ui/skeleton";
 import { TrackCardSkeleton, PlaylistCardSkeleton, HomeViewSkeleton } from "@/components/ui/skeletons";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { UploadIndicator } from "@/components/UploadIndicator";

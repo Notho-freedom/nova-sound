@@ -322,7 +322,7 @@ export const HeroCarousel = memo(({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-foreground truncate max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg"
+              className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-foreground line-clamp-2 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg"
               style={{
                 textShadow: "0 4px 30px rgba(0,0,0,0.5)",
               }}
@@ -407,26 +407,6 @@ export const HeroCarousel = memo(({
             <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-foreground" />
           </button>
         </>
-      )}
-
-      {/* Dots indicator */}
-      {enhancedSlides.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-8 md:translate-x-0 z-20 flex items-center gap-2">
-          {enhancedSlides.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              aria-label={`Aller au slide ${index + 1}`}
-              title={`Slide ${index + 1}`}
-              className={cn(
-                "transition-all duration-300",
-                index === currentIndex
-                  ? "w-8 h-2 bg-primary rounded-full"
-                  : "w-2 h-2 bg-white/30 rounded-full hover:bg-white/50"
-              )}
-            />
-          ))}
-        </div>
       )}
 
       {/* Progress bar */}

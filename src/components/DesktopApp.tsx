@@ -1989,6 +1989,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
@@ -2006,6 +2007,7 @@ export const DesktopApp = () => {
               const realIndex = tracks.findIndex(t => t.id === track.id);
               if (realIndex !== -1) handleTrackSelect(realIndex);
             }}
+            onPlayTrack={handlePlayTrack}
             title="Favoris"
             emptyMessage="Aucun favori. Cliquez sur ❤️ pour ajouter des titres."
             onPlayNext={handlePlayNext}
@@ -2022,6 +2024,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             onPlayTracks={handlePlayTracks}
             onShuffleTracks={handleShuffleTracks}
             onCreatePlaylist={createPlaylist}
@@ -2309,6 +2312,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             title="Albums"
             viewMode="albums"
             initialSelectedAlbum={albumToOpen}
@@ -2325,6 +2329,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             title="Artistes"
             viewMode="artists"
             onPlayNext={handlePlayNext}
@@ -2345,6 +2350,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onPlayTrackList={handlePlayTrackList}
@@ -2370,6 +2376,7 @@ export const DesktopApp = () => {
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
+            onPlayTrack={handlePlayTrack}
             title="Artistes"
             viewMode="artists"
             onPlayNext={handlePlayNext}

@@ -58,6 +58,7 @@ interface LibraryViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayNext?: (track: Track) => void;
   onAddToQueue?: (track: Track) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
@@ -393,6 +394,7 @@ export const LibraryView = memo(({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
@@ -967,6 +969,7 @@ export const LibraryView = memo(({
                   const realIdx = tracks.findIndex(t => t.id === track.id);
                   if (realIdx !== -1) onTrackSelect(realIdx);
                 }}
+                onPlayTrack={onPlayTrack}
                 onAddToPlaylist={onAddToPlaylist}
                 createPlaylist={createPlaylist}
                 uploadTrack={uploadTrack}
@@ -1752,6 +1755,7 @@ export const LibraryView = memo(({
                               const realIdx = tracks.findIndex(t => t.id === track.id);
                               if (realIdx !== -1) onTrackSelect(realIdx);
                             }}
+                            onPlayTrack={onPlayTrack}
                             onAddToPlaylist={onAddToPlaylist}
                             createPlaylist={createPlaylist}
                           />
@@ -1806,6 +1810,7 @@ export const LibraryView = memo(({
               const realIdx = tracks.findIndex(t => t.id === track.id);
               if (realIdx !== -1) onTrackSelect(realIdx);
             }}
+            onPlayTrack={onPlayTrack}
             onAddToPlaylist={onAddToPlaylist}
             createPlaylist={createPlaylist}
             onNavigateToArtist={onNavigateToArtist}
@@ -1821,6 +1826,7 @@ export const LibraryView = memo(({
               const realIdx = tracks.findIndex(t => t.id === track.id);
               if (realIdx !== -1) onTrackSelect(realIdx);
             }}
+            onPlayTrack={onPlayTrack}
             onAddToPlaylist={onAddToPlaylist}
             createPlaylist={createPlaylist}
             uploadTrack={uploadTrack}
@@ -2125,6 +2131,7 @@ export const LibraryView = memo(({
                   const realIdx = tracks.findIndex(t => t.id === track.id);
                   if (realIdx !== -1) onTrackSelect(realIdx);
                 }}
+                onPlayTrack={onPlayTrack}
                 onAddToPlaylist={onAddToPlaylist}
                 createPlaylist={createPlaylist}
                 onNavigateToArtist={onNavigateToArtist}
@@ -2140,6 +2147,7 @@ export const LibraryView = memo(({
                   const realIdx = tracks.findIndex(t => t.id === track.id);
                   if (realIdx !== -1) onTrackSelect(realIdx);
                 }}
+                onPlayTrack={onPlayTrack}
                 onAddToPlaylist={onAddToPlaylist}
                 createPlaylist={createPlaylist}
                 uploadTrack={uploadTrack}

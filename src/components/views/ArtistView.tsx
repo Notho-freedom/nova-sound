@@ -57,6 +57,7 @@ interface ArtistViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayNext?: (track: Track) => void;
   onAddToQueue?: (track: Track) => void;
   onPlayTrackList?: (tracks: Track[], startIndex?: number) => void;
@@ -116,6 +117,7 @@ export const ArtistView = memo(({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayNext,
   onAddToQueue,
   onPlayTrackList,
@@ -489,7 +491,7 @@ export const ArtistView = memo(({
                       return (
                         <tr
                           key={track.id}
-                          onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                          onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
                           className={cn(
                             "group cursor-pointer transition-colors",
                             isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"
@@ -685,7 +687,7 @@ export const ArtistView = memo(({
                         return (
                           <tr
                             key={track.id}
-                            onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                            onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
                             className={cn(
                               "group cursor-pointer transition-colors",
                               isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"

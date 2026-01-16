@@ -17,6 +17,7 @@ interface TrackGridViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayNext?: (track: Track) => void;
   onAddToQueue?: (track: Track) => void;
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
@@ -42,6 +43,7 @@ export const TrackGridView = ({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
@@ -96,7 +98,7 @@ export const TrackGridView = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => onTrackSelect(actualIndex)}
+                  onClick={() => onPlayTrack ? onPlayTrack(track) : onTrackSelect(actualIndex)}
                   className={cn(
                     "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full",
                     isCurrentTrack && "ring-2 ring-primary",

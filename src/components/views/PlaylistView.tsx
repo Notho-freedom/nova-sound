@@ -55,6 +55,7 @@ interface PlaylistViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayTracks?: (trackIds: string[]) => void;
   onShuffleTracks?: (trackIds: string[]) => void;
   onCreatePlaylist: (name: string, trackIds?: string[]) => Promise<Playlist | null>;
@@ -239,6 +240,7 @@ export const PlaylistView = memo(({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayTracks,
   onShuffleTracks,
   onCreatePlaylist,
@@ -1029,6 +1031,7 @@ export const PlaylistView = memo(({
                         const realIdx = tracks.findIndex(t => t.id === track.id);
                         if (realIdx !== -1) onTrackSelect(realIdx);
                       }}
+                      onPlayTrack={onPlayTrack}
                       onAddToPlaylist={(pId, track) => onAddTracksToPlaylist(pId, [track.id])}
                       createPlaylist={onCreatePlaylist}
                       onNavigateToArtist={onNavigateToArtist}
@@ -1044,6 +1047,7 @@ export const PlaylistView = memo(({
                         const realIdx = tracks.findIndex(t => t.id === track.id);
                         if (realIdx !== -1) onTrackSelect(realIdx);
                       }}
+                      onPlayTrack={onPlayTrack}
                       onAddToPlaylist={(pId, track) => onAddTracksToPlaylist(pId, [track.id])}
                       createPlaylist={onCreatePlaylist}
                       showRemoveFromPlaylist
