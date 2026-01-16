@@ -133,22 +133,32 @@ export async function recoverMissingYouTubeTracks(
   // Extraire tous les videoIds (avec déduplication)
   const videoIdSet = new Set<string>();
   const trackIdToVideoId = new Map<string, string>();
+  const recoveredTracks = new Map<string, Track>();
   
   youtubeTrackIds.forEach(trackId => {
     const videoId = extractVideoIdFromTrackId(trackId);
     if (videoId) {
-      videoIdSet.add(videoId);
-      trackIdToVideoId.set(trackId, videoId);
+      // Vérifier d'abord si le track est déjà en cache
+      const cached = getCachedYouTubeTrackByVideoId(videoId);
+      if (cached) {
+        // Track déjà en cache, pas besoin de le récupérer
+        recoveredTracks.set(trackId, cached);
+      } else {
+        // Ajouter à la liste des videoIds à récupérer
+        videoIdSet.add(videoId);
+        trackIdToVideoId.set(trackId, videoId);
+      }
     }
   });
   
   const videoIds = Array.from(videoIdSet);
   
   if (videoIds.length === 0) {
-    return new Map();
+    if (DEBUG && recoveredTracks.size > 0) {
+      console.log(`[YouTubeRecovery] ✅ ${recoveredTracks.size}/${youtubeTrackIds.length} tracks déjà en cache`);
+    }
+    return recoveredTracks;
   }
-  
-  const recoveredTracks = new Map<string, Track>();
   
   try {
     initYouTubeApiKey();
@@ -209,11 +219,23 @@ export async function recoverMissingYouTubeTracks(
  * Utile pour ne pas bloquer l'UI
  */
 export function queueTrackRecovery(trackIds: string[]): void {
-  const youtubeTrackIds = trackIds.filter(id => 
-    isYouTubeTrackId(id) && 
-    !recoveryInProgress.has(id) &&
-    !recoveryQueue.includes(id) // Éviter les doublons dans la queue
-  );
+  const youtubeTrackIds = trackIds.filter(id => {
+    if (!isYouTubeTrackId(id)) return false;
+    if (recoveryInProgress.has(id)) return false;
+    if (recoveryQueue.includes(id)) return false; // Éviter les doublons dans la queue
+    
+    // Vérifier si le track n'est pas déjà en cache
+    const videoId = extractVideoIdFromTrackId(id);
+    if (videoId) {
+      const cached = getCachedYouTubeTrackByVideoId(videoId);
+      if (cached) {
+        // Track déjà en cache, pas besoin de le récupérer
+        return false;
+      }
+    }
+    
+    return true;
+  });
   
   if (youtubeTrackIds.length === 0) return;
   
