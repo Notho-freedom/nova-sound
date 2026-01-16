@@ -1940,7 +1940,7 @@ export const DesktopApp = () => {
         return (
         <HomeView
           loading={libraryLoading}
-          tracks={tracks}
+          tracks={allTracks}
           currentTrackIndex={currentTrackIndex}
           isPlaying={isPlaying}
           onTrackSelect={handleTrackSelect}
@@ -1984,7 +1984,7 @@ export const DesktopApp = () => {
       case "library":
         return (
           <LibraryView
-            tracks={tracks}
+            tracks={allTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -2304,7 +2304,7 @@ export const DesktopApp = () => {
       case "albums":
         return (
           <LibraryView
-            tracks={tracks}
+            tracks={allTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -2320,7 +2320,7 @@ export const DesktopApp = () => {
       case "artists":
         return (
           <LibraryView
-            tracks={tracks}
+            tracks={allTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -2340,7 +2340,7 @@ export const DesktopApp = () => {
         return selectedArtist ? (
           <ArtistView
             artistName={selectedArtist}
-            tracks={tracks}
+            tracks={allTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
@@ -2365,7 +2365,7 @@ export const DesktopApp = () => {
           />
         ) : (
           <LibraryView
-            tracks={tracks}
+            tracks={allTracks}
             currentTrackIndex={currentTrackIndex}
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}

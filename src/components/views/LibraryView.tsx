@@ -330,6 +330,9 @@ const groupByAlbum = (tracks: Track[]) => {
   const albums = new Map<string, { name: string; artist: string; coverUrl: string; tracks: Track[]; year?: number }>();
   
   tracks.forEach(track => {
+    // Ignorer les tracks sans album (même logique que le badge)
+    if (!track.album) return;
+    
     const key = `${track.album}-${track.artist}`;
     if (!albums.has(key)) {
       albums.set(key, {
