@@ -11,6 +11,7 @@ import { useYouTubeAutocomplete } from "@/hooks/useYouTubeAutocomplete";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
 import { useLibrary } from "@/hooks/useLibrary";
+import { useYouTubeHistoryWorker } from "@/hooks/useYouTubeHistoryWorker";
 import type { Video, Track } from "@/types/music";
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track";
 import { searchYouTubeByArtist } from "@/lib/youtube-artist-search";
@@ -93,157 +94,25 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
   const [isFullApp, setIsFullApp] = useState(false);
   const [isCinemaMode, setIsCinemaMode] = useState(false);
   
-  // Filtrer TOUTES les vidéos YouTube de l'historique (pas de limite)
-  // Utiliser à la fois recentlyWatched, enhancedVideos ET l'historique brut depuis localStorage
-  const youtubeWatchHistory = useMemo(() => {
-    // 1. Vidéos YouTube depuis recentlyWatched
-    const fromRecentlyWatched = recentlyWatched
-      .filter(v => v.mediaSource === 'youtube' || v.youtubeVideoId || (v.filePath && extractYouTubeVideoId(v.filePath)));
-    
-    // 2. Vidéos YouTube depuis enhancedVideos (pour capturer celles qui ne sont pas dans recentlyWatched)
-    const fromEnhancedVideos = enhancedVideos
-      .filter(v => (v.mediaSource === 'youtube' || v.youtubeVideoId || (v.filePath && extractYouTubeVideoId(v.filePath))))
-      .filter(v => !fromRecentlyWatched.some(rw => rw.id === v.id));
-    
-    // 3. Récupérer l'historique brut depuis localStorage pour trouver les vidéos YouTube manquantes
-    let rawWatchHistory: Array<{ videoId: string; watchedAt: string }> = [];
+  const rawWatchHistory = useMemo(() => {
     try {
       const saved = localStorage.getItem("nexus-video-watch-history");
-      if (saved) {
-        rawWatchHistory = JSON.parse(saved);
-      }
-    } catch (error) {
-      // Ignorer les erreurs de parsing
+      return saved ? (JSON.parse(saved) as Array<{ videoId: string; watchedAt: string }>) : [];
+    } catch {
+      return [];
     }
-    
-    // 4. Reconstruire les vidéos YouTube depuis l'historique brut si elles ne sont pas dans enhancedVideos
-    const fromRawHistory: Video[] = [];
-    const existingIds = new Set([...fromRecentlyWatched, ...fromEnhancedVideos].map(v => v.id));
-    
-    // Fonction pour charger les métadonnées YouTube de manière asynchrone
-    const loadVideoMetadata = async (videoId: string): Promise<{ title: string; thumbnailUrl: string; description: string }> => {
-      try {
-        // Utiliser le service YouTube unifié (cache automatique, pas de quota si caché)
-        const { YouTube } = await import('@/services/youtube');
-        const video = await YouTube.getVideo(videoId);
-        
-        if (video) {
-          return {
-            title: video.title,
-            thumbnailUrl: video.thumbnailUrl,
-            description: video.description || '',
-          };
-        }
-      } catch (error) {
-        console.warn(`[YouTubeSearchView] Erreur chargement métadonnées pour ${videoId}:`, error);
-      }
-      
-      // Fallback: retourner des valeurs par défaut
-      return {
-        title: `Vidéo YouTube ${videoId}`,
-        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        description: '',
-      };
-    };
-    
-    for (const entry of rawWatchHistory) {
-      // Vérifier si c'est une vidéo YouTube (ID commence par "youtube-" ou contient un videoId YouTube)
-      if (entry.videoId.startsWith('youtube-') || entry.videoId.includes('youtube-audio-')) {
-        const videoId = entry.videoId.replace('youtube-', '').replace('youtube-audio-', '');
-        const id = `youtube-${videoId}`;
-        
-        if (!existingIds.has(id) && !existingIds.has(entry.videoId)) {
-          // Charger les métadonnées de manière asynchrone
-          loadVideoMetadata(videoId).then(metadata => {
-            // Mettre à jour la vidéo si elle existe toujours
-            // Note: Cette mise à jour se fera au prochain rendu via le useEffect
-          });
-          
-          // Créer une vidéo YouTube minimale depuis l'historique (titre sera mis à jour après)
-          fromRawHistory.push({
-            id: id,
-            filePath: `https://www.youtube.com/watch?v=${videoId}`,
-            title: `Vidéo YouTube ${videoId}`, // Sera mis à jour par loadVideoMetadata
-            description: '',
-            duration: 0,
-            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-            fileSize: 0,
-            addedAt: entry.watchedAt,
-            mediaSource: 'youtube',
-            youtubeVideoId: videoId,
-            type: 'music_video',
-            lastPlayedAt: entry.watchedAt,
-          });
-        }
-      } else {
-        // Vérifier si c'est une URL YouTube
-        const videoId = extractYouTubeVideoId(entry.videoId);
-        if (videoId) {
-          const id = `youtube-${videoId}`;
-          if (!existingIds.has(id) && !existingIds.has(entry.videoId)) {
-            // Charger les métadonnées de manière asynchrone
-            loadVideoMetadata(videoId).then(metadata => {
-              // Mettre à jour la vidéo si elle existe toujours
-            });
-            
-            fromRawHistory.push({
-              id: id,
-              filePath: entry.videoId,
-              title: `Vidéo YouTube ${videoId}`, // Sera mis à jour par loadVideoMetadata
-              description: '',
-              duration: 0,
-              thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-              fileSize: 0,
-              addedAt: entry.watchedAt,
-              mediaSource: 'youtube',
-              youtubeVideoId: videoId,
-              type: 'music_video',
-              lastPlayedAt: entry.watchedAt,
-            });
-          }
-        }
-      }
-    }
-    
-    // 5. Combiner et dédupliquer par ID
-    const allYouTubeVideos = [...fromRecentlyWatched, ...fromEnhancedVideos, ...fromRawHistory];
-    const unique = Array.from(
-      new Map(allYouTubeVideos.map(v => [v.id, v])).values()
-    );
-    
-    // 6. Appliquer les métadonnées enrichies si disponibles
-    const videosWithEnrichment = unique.map(video => {
-      const enrichment = enrichedVideos.get(video.id);
-      if (enrichment) {
-        return { ...video, ...enrichment };
-      }
-      return video;
-    });
-    
-    // 7. Trier par date de visionnage (plus récent en premier)
-    const sorted = videosWithEnrichment.sort((a, b) => {
-      const aTime = a.lastPlayedAt ? new Date(a.lastPlayedAt).getTime() : new Date(a.addedAt).getTime();
-      const bTime = b.lastPlayedAt ? new Date(b.lastPlayedAt).getTime() : new Date(b.addedAt).getTime();
-      return bTime - aTime;
-    });
-    
-    // Log pour débogage (toujours afficher pour voir l'état)
-    console.log(`[YouTubeSearchView] Historique YouTube calculé: ${sorted.length} vidéos`, {
-      fromRecentlyWatched: fromRecentlyWatched.length,
-      fromEnhancedVideos: fromEnhancedVideos.length,
-      fromRawHistory: fromRawHistory.length,
-      recentlyWatchedTotal: recentlyWatched.length,
-      enhancedVideosTotal: enhancedVideos.length,
-      rawWatchHistoryTotal: rawWatchHistory.length,
-      enrichedCount: enrichedVideos.size,
-    });
-    
-    return sorted;
-  }, [recentlyWatched, enhancedVideos, enrichedVideos]);
+  }, []);
+
+  const { sorted: youtubeWatchHistory, missingVideoIds } = useYouTubeHistoryWorker({
+    recentlyWatched,
+    enhancedVideos,
+    rawWatchHistory,
+  });
   
   // Charger les métadonnées pour les vidéos sans titre valide
   useEffect(() => {
-    const videosToEnhance = youtubeWatchHistory.filter(v => 
+    if (missingVideoIds.length === 0) return;
+    const videosToEnhance = youtubeWatchHistory.filter(v =>
       v.title.startsWith('Vidéo YouTube ') && v.youtubeVideoId && !enrichedVideos.has(v.id)
     );
     
@@ -296,7 +165,7 @@ export const YouTubeSearchView = ({ onPlayVideo, onAddToQueue, onPlayAsAudio }: 
         setEnrichedVideos(newEnrichments);
       }
     });
-  }, [youtubeWatchHistory, enrichedVideos]);
+  }, [youtubeWatchHistory, enrichedVideos, missingVideoIds]);
   
   // Fonction helper pour extraire l'artiste d'un titre YouTube
   const extractArtistFromTitle = useCallback((title: string, channelTitle?: string): string | null => {
