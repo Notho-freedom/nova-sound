@@ -344,7 +344,6 @@ export const DesktopApp = () => {
   
   // YouTube Player ref pour lecture persistante en arrière-plan
   const youtubePlayerRef = useRef<YouTubePlayerRef | null>(null);
-  const youtubeActionRef = useRef<{ action: "play" | "pause"; ts: number } | null>(null);
   const youtubePausedMuteRef = useRef(false);
   const youtubePrevVolumeRef = useRef(volume);
 
@@ -632,19 +631,10 @@ export const DesktopApp = () => {
     if ((currentTrack?.mediaSource as string) === 'youtube' && youtubePlayerRef.current) {
       const player = youtubePlayerRef.current;
       
-      console.log('[DesktopApp] handlePlayPause YouTube:', {
-        playerIsPlaying: player.isPlaying,
-        stateIsPlaying: isPlaying,
-        hasPlayer: !!player,
-        hasPause: typeof player.pause === 'function',
-        hasPlay: typeof player.play === 'function',
-      });
-      
       // Utiliser l'état local comme source de vérité (plus fiable que player.isPlaying)
       // Le callback onStateChange synchronisera l'état après l'action
       if (isPlaying) {
         try {
-          console.log('[DesktopApp] Appel de pause() sur le player YouTube');
           youtubePrevVolumeRef.current = volume;
           try {
             player.setVolume(0);
@@ -655,7 +645,6 @@ export const DesktopApp = () => {
             player.toggleMute();
             youtubePausedMuteRef.current = true;
           }
-          youtubeActionRef.current = { action: "pause", ts: performance.now() };
           player.pause();
           // Mettre à jour l'état immédiatement (optimistic update)
           // Le callback onStateChange confirmera la mise à jour
@@ -665,7 +654,6 @@ export const DesktopApp = () => {
         }
       } else {
         try {
-          console.log('[DesktopApp] Appel de play() sur le player YouTube');
           if (!isMuted) {
             try {
               const restoreVolume = volume > 0 ? volume : youtubePrevVolumeRef.current || 100;
@@ -680,7 +668,6 @@ export const DesktopApp = () => {
             }
             youtubePausedMuteRef.current = false;
           }
-          youtubeActionRef.current = { action: "play", ts: performance.now() };
           player.play();
           // Mettre à jour l'état immédiatement (optimistic update)
           flushSync(() => setIsPlaying(true));
@@ -2930,18 +2917,6 @@ export const DesktopApp = () => {
                 handleNext();
               }}
               onStateChange={(playing) => {
-                console.log('[DesktopApp] YouTube onStateChange:', { playing, currentIsPlaying: isPlaying });
-                const pending = youtubeActionRef.current;
-                if (pending && ((pending.action === "play" && playing) || (pending.action === "pause" && !playing))) {
-                  const durationMs = Math.round(performance.now() - pending.ts);
-                  console.log('[metrics][youtube-player]', {
-                    action: pending.action,
-                    durationMs,
-                    trackId: currentTrack?.id,
-                    trackTitle: currentTrack?.title,
-                  });
-                  youtubeActionRef.current = null;
-                }
                 if (playing !== isPlaying) {
                   setIsPlaying(playing);
                 }
@@ -2949,7 +2924,6 @@ export const DesktopApp = () => {
                 // Quand la vidéo YouTube commence à jouer, s'assurer qu'elle est dans l'historique
                 if (playing && currentTrack && (currentTrack.mediaSource as string) === 'youtube' && currentTrack.id) {
                   // Toujours ajouter à l'historique (addToHistory gère les doublons)
-                  console.log('[DesktopApp] Ajout de la vidéo YouTube à l\'historique audio:', currentTrack.title);
                   addToHistory(currentTrack.id, currentTrack.youtubeVideoId);
                   
                   // Émettre l'événement pour VideosView

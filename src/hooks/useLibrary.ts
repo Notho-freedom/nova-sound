@@ -114,13 +114,10 @@ export function useLibrary(): UseLibraryReturn {
   useEffect(() => {
     if (!isElectron || !window.electronAPI) return;
 
-    console.log('🎧 [useLibrary] Registering scan progress listener');
     const unsubscribe = window.electronAPI.onScanProgress((progress) => {
-      console.log('📊 [useLibrary] Received scan progress:', progress);
       setScanProgress(progress);
       setScanning(true); // Ensure scanning is set to true when we receive progress
       if (progress.phase === "complete") {
-        console.log('✅ [useLibrary] Scan complete, updating state');
         setScanning(false);
         setScanProgress(null);
         // Reload library when scan is complete
@@ -139,9 +136,7 @@ export function useLibrary(): UseLibraryReturn {
       }
     });
 
-    console.log('✅ [useLibrary] Scan progress listener registered');
     return () => {
-      console.log('🔌 [useLibrary] Unregistering scan progress listener');
       unsubscribe();
     };
   }, [isElectron]); // Only depend on isElectron, not on functions that change
@@ -198,7 +193,6 @@ export function useLibrary(): UseLibraryReturn {
   const scanLibrary = useCallback(async (directories?: string[]) => {
     if (!isElectron || !window.electronAPI) return;
 
-    console.log('🚀 [useLibrary] Starting scan...', { directories });
     setScanning(true);
     setError(null);
     setScanProgress({ current: 0, total: 0, file: "", phase: "scanning" });

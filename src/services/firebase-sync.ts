@@ -854,7 +854,6 @@ class FirebaseSyncService {
       }
 
       if (data.history && Array.isArray(data.history) && data.history.length > 0) {
-        console.log('[FirebaseSync] Mise à jour historique depuis Firebase:', data.history.length, 'entrées');
         saveOperations.push(() => {
           this.saveToLocalStorage('nexus-play-history', data.history);
           window.dispatchEvent(new CustomEvent('firebase-history-update', { 
@@ -875,8 +874,6 @@ class FirebaseSyncService {
         const currentTheme = this.loadFromLocalStorage<string>('nexus-theme');
         if (!currentTheme || currentTheme === data.theme) {
           saveOperations.push(() => this.saveToLocalStorage('nexus-theme', data.theme));
-        } else {
-          console.log('[FirebaseSync] Skipping theme update: local theme', currentTheme, 'differs from Firebase theme', data.theme);
         }
       }
 

@@ -50,7 +50,6 @@ export function useFavorites(): UseFavoritesReturn {
     const handleFirebaseUpdate = (event: CustomEvent) => {
       const data = event.detail;
       if (data?.favorites && Array.isArray(data.favorites)) {
-        console.log('[useFavorites] Firebase sync: updating favorites');
         setFavorites(data.favorites);
         if (!isElectron) {
           localStorage.setItem("nexus-favorites", JSON.stringify(data.favorites));

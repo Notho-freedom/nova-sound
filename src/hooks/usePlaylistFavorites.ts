@@ -70,7 +70,6 @@ export function usePlaylistFavorites(): UsePlaylistFavoritesReturn {
     const handleFirebaseUpdate = (event: CustomEvent) => {
       const data = event.detail;
       if (data?.favoritePlaylists && Array.isArray(data.favoritePlaylists)) {
-        console.log('[usePlaylistFavorites] Firebase sync: updating favorite playlists');
         setFavoritePlaylistIds(data.favoritePlaylists);
         if (!isElectron) {
           localStorage.setItem("nexus-favorite-playlists", JSON.stringify(data.favoritePlaylists));
@@ -84,7 +83,6 @@ export function usePlaylistFavorites(): UsePlaylistFavoritesReturn {
     const handleLocalUpdate = (event: CustomEvent) => {
       const data = event.detail;
       if (data?.favoritePlaylistIds && Array.isArray(data.favoritePlaylistIds)) {
-        console.log('[usePlaylistFavorites] Mise à jour locale: updating favorite playlists');
         setFavoritePlaylistIds(data.favoritePlaylistIds);
       }
     };

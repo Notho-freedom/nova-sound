@@ -41,23 +41,14 @@ export function useYouTubeSimilarTracks(): UseYouTubeSimilarTracksReturn {
   const [error, setError] = useState<string | null>(null);
 
   const loadSimilar = useCallback(async (track: Track) => {
-    console.log('[useYouTubeSimilarTracks] loadSimilar appelé', {
-      trackId: track.id,
-      mediaSource: track.mediaSource,
-      artist: track.artist,
-      youtubeVideoId: track.youtubeVideoId,
-    });
-
     // Seulement pour les tracks YouTube
     if (track.mediaSource !== 'youtube') {
-      console.log('[useYouTubeSimilarTracks] Track non-YouTube, retour vide');
       setSimilarTracks([]);
       return;
     }
 
     // Vérifier qu'on a un artiste pour la recherche
     if (!track.artist || track.artist.trim() === '') {
-      console.log('[useYouTubeSimilarTracks] Pas d\'artiste, retour vide');
       setSimilarTracks([]);
       return;
     }
@@ -78,10 +69,7 @@ export function useYouTubeSimilarTracks(): UseYouTubeSimilarTracksReturn {
       }
 
       // Rechercher des vidéos de l'artiste via le service unifié
-      console.log(`[useYouTubeSimilarTracks] Recherche pour l'artiste: ${track.artist}`);
-      
       const result = await YouTube.search(`${track.artist} music`, 20);
-      console.log(`[useYouTubeSimilarTracks] ${result.videos.length} vidéos trouvées (source: ${result.source})`);
 
       // Convertir en tracks
       const tracks = result.videos.map(youtubeVideoToTrack);
@@ -91,7 +79,6 @@ export function useYouTubeSimilarTracks(): UseYouTubeSimilarTracksReturn {
         ? tracks.filter(t => t.youtubeVideoId !== track.youtubeVideoId)
         : tracks;
 
-      console.log(`[useYouTubeSimilarTracks] ✅ ${filteredTracks.length} tracks finaux`);
       setSimilarTracks(filteredTracks);
     } catch (err) {
       console.error('[useYouTubeSimilarTracks] ❌ Erreur:', err);

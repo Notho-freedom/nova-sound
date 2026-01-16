@@ -39,7 +39,6 @@ class YouTubeSearchService {
     if (!forceRefresh) {
       const cached = youtubeCache.getSearch(query);
       if (cached && cached.length > 0) {
-        console.log('[YouTubeSearch] Résultats depuis cache');
         return { videos: cached, source: 'cache', fromCache: true };
       }
     }
@@ -62,7 +61,6 @@ class YouTubeSearchService {
 
     // 3. Fallback vers Invidious
     if (useFallback) {
-      console.log('[YouTubeSearch] Utilisation fallback Invidious');
       try {
         const videos = await searchViaInvidious(query);
         if (videos.length > 0) {

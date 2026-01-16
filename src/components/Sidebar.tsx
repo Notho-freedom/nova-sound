@@ -267,68 +267,11 @@ export const Sidebar = ({
   // Utiliser directement favoritePlaylistIds pour que le filtre se mette à jour immédiatement
   const playlists = useMemo(() => {
     const favoriteIdsSet = new Set(favoritePlaylistIds);
-    const filtered = allPlaylists.filter(playlist => favoriteIdsSet.has(playlist.id));
-    console.log('[Sidebar] Playlists favorites filtrées:', filtered.length, 'sur', allPlaylists.length, 'IDs favoris:', favoritePlaylistIds);
-    return filtered;
+    return allPlaylists.filter(playlist => favoriteIdsSet.has(playlist.id));
   }, [allPlaylists, favoritePlaylistIds]);
   
   // Enrich playlists with metadata (covers, duration, artists)
   const playlistMetadata = usePlaylistMetadata(playlists, tracks);
-
-  // Debug: Afficher tous les compteurs reçus et leur état d'affichage
-  useEffect(() => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🎨 [SIDEBAR UI] Compteurs reçus et état d\'affichage');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    const allItems = [
-      ...mainNavItems.map(i => ({ ...i, section: 'Navigation' })),
-      ...libraryItems.map(i => ({ ...i, section: 'Ma Musique' })),
-      ...mediaItems.map(i => ({ ...i, section: 'Médias' })),
-      ...localItems.map(i => ({ ...i, section: 'Cloud' })),
-    ];
-    
-    let displayedCount = 0;
-    let hiddenCount = 0;
-    
-    allItems.forEach(item => {
-      const badge = getBadgeForItem(item.id);
-      const willDisplay = badge !== undefined && badge > 0;
-      
-      if (willDisplay) displayedCount++;
-      else hiddenCount++;
-      
-      const status = willDisplay ? '✅ AFFICHÉ' : '❌ MASQUÉ';
-      const reason = badge === undefined ? '(undefined)' : badge === 0 ? '(= 0)' : '';
-      
-      console.log(`${status} ${item.section} > ${item.label}: ${badge} ${reason}`);
-    });
-    
-    console.log('\n📊 RÉSUMÉ AFFICHAGE:');
-    console.log(`   - Items avec badge affiché: ${displayedCount}/${allItems.length} (${Math.round(displayedCount/allItems.length*100)}%)`);
-    console.log(`   - Items sans badge: ${hiddenCount}/${allItems.length} (${Math.round(hiddenCount/allItems.length*100)}%)`);
-    
-    console.log('\n📋 COMPTEURS REÇUS (props):');
-    console.log(`   - favoritesCount: ${favoritesCount}`);
-    console.log(`   - notificationsCount: ${notificationsCount}`);
-    console.log(`   - recentCount: ${recentCount}`);
-    console.log(`   - albumsCount: ${albumsCount}`);
-    console.log(`   - artistsCount: ${artistsCount}`);
-    console.log(`   - videosCount: ${videosCount}`);
-    console.log(`   - cloudCount: ${cloudCount}`);
-    console.log(`   - playlistsCount: ${playlistsCount}`);
-    
-    console.log('\n🔍 DONNÉES LOCALES:');
-    console.log(`   - Tracks disponibles: ${tracks.length}`);
-    console.log(`   - Playlists visibles (favorites): ${playlists.length}`);
-    console.log(`   - Toutes playlists (props): ${propPlaylists?.length || 'non fourni'}`);
-    
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-  }, [
-    favoritesCount, notificationsCount, recentCount, albumsCount, artistsCount, 
-    videosCount, cloudCount, playlistsCount,
-    tracks.length, playlists.length, propPlaylists?.length
-  ]);
 
   // Optimized view change with startTransition for non-blocking updates
   const handleViewChangeWithMetrics = useCallback((newView: ViewType, source: string) => {
@@ -339,15 +282,7 @@ export const Sidebar = ({
       onViewChange(newView);
     });
 
-    // Measure time after transition completes (production: remove for better perf)
-    if (process.env.NODE_ENV === 'development') {
-      requestAnimationFrame(() => {
-        const duration = performance.now() - startTime;
-        if (duration > 100) {
-          console.log(`⚠️ [Sidebar] Slow navigation to ${newView}: ${duration.toFixed(0)}ms`);
-        }
-      });
-    }
+    void startTime;
   }, [onViewChange]);
 
   const handleCollapsedChange = (value: boolean) => {
