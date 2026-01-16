@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { Playlist, Track } from "@/types/music";
 import { getCoverUrl } from "@/lib/audio";
+import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 
 export interface PlaylistMetadata {
   playlist: Playlist;
@@ -52,7 +53,7 @@ export function usePlaylistMetadata(
     return playlists.map((playlist) => {
       // Trouver tous les tracks de la playlist
       const playlistTracks = playlist.trackIds
-        .map((id) => tracks.find((t) => t.id === id))
+        .map((id) => getTrackFromAllOrCache(tracks, id))
         .filter((t): t is Track => !!t);
 
       // Première couverture pour la preview
