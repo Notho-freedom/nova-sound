@@ -128,12 +128,17 @@ export async function recoverMissingYouTubeTracks(
   
   if (DEBUG) {
     console.log(`[YouTubeRecovery] 📦 Batch récupération de ${youtubeTrackIds.length} tracks`);
+    // Afficher quelques exemples de trackIds pour debug
+    if (youtubeTrackIds.length > 0) {
+      console.log(`[YouTubeRecovery] 🔍 Exemples de trackIds:`, youtubeTrackIds.slice(0, 5));
+    }
   }
   
   // Extraire tous les videoIds (avec déduplication)
   const videoIdSet = new Set<string>();
   const trackIdToVideoId = new Map<string, string>();
   const recoveredTracks = new Map<string, Track>();
+  let failedExtractions = 0;
   
   youtubeTrackIds.forEach(trackId => {
     const videoId = extractVideoIdFromTrackId(trackId);
@@ -148,8 +153,17 @@ export async function recoverMissingYouTubeTracks(
         videoIdSet.add(videoId);
         trackIdToVideoId.set(trackId, videoId);
       }
+    } else {
+      failedExtractions++;
+      if (failedExtractions <= 5) {
+        console.log(`[YouTubeRecovery] ⚠️ Impossible d'extraire videoId de: "${trackId}"`);
+      }
     }
   });
+  
+  if (DEBUG && failedExtractions > 0) {
+    console.log(`[YouTubeRecovery] ⚠️ ${failedExtractions} trackIds n'ont pas pu être extraits`);
+  }
   
   const videoIds = Array.from(videoIdSet);
   
@@ -157,6 +171,17 @@ export async function recoverMissingYouTubeTracks(
     if (DEBUG && recoveredTracks.size > 0) {
       console.log(`[YouTubeRecovery] ✅ ${recoveredTracks.size}/${youtubeTrackIds.length} tracks déjà en cache`);
     }
+    
+    // Émettre l'événement même si les tracks étaient déjà en cache
+    // pour forcer le re-render de l'interface
+    if (recoveredTracks.size > 0 && typeof window !== 'undefined') {
+      const tracksArray = Array.from(recoveredTracks.values());
+      console.log(`[YouTubeRecovery] 📢 Émission événement pour ${tracksArray.length} tracks (depuis cache)`);
+      window.dispatchEvent(new CustomEvent('youtube-tracks-recovered', {
+        detail: { tracks: tracksArray }
+      }));
+    }
+    
     return recoveredTracks;
   }
   
@@ -204,6 +229,15 @@ export async function recoverMissingYouTubeTracks(
     
     if (DEBUG) {
       console.log(`[YouTubeRecovery] ✅ ${recoveredTracks.size}/${youtubeTrackIds.length} tracks récupérés`);
+    }
+    
+    // Émettre un événement pour notifier que des tracks ont été récupérés
+    if (recoveredTracks.size > 0 && typeof window !== 'undefined') {
+      const tracksArray = Array.from(recoveredTracks.values());
+      console.log(`[YouTubeRecovery] 📢 Émission événement pour ${tracksArray.length} tracks (depuis API)`);
+      window.dispatchEvent(new CustomEvent('youtube-tracks-recovered', {
+        detail: { tracks: tracksArray }
+      }));
     }
     
     return recoveredTracks;
@@ -298,26 +332,38 @@ function extractVideoIdFromTrackId(trackId: string): string | null {
     return extractYouTubeVideoId(trackId);
   }
   
-  // Préfixes connus
+  // Préfixes connus - en ordre de plus spécifique au plus général
   const prefixes = [
     'youtube-audio-',
     'youtube-',
+    'youtube_audio-',
+    'youtube_audio_',
+    'youtube_',
     'yt-track-',
+    'yt_track-',
+    'yt_track_',
     'yt-',
+    'yt_'
   ];
   
   for (const prefix of prefixes) {
     if (trackId.startsWith(prefix)) {
       const extracted = trackId.substring(prefix.length);
-      // Vérifier que c'est bien un videoId (11 caractères alphanumériques)
-      if (extracted.length === 11) {
+      // Les videoId YouTube font toujours 11 caractères alphanumériques avec _ et -
+      // Mais on accepte aussi les IDs plus longs au cas où (pour les tracks locaux avec préfixe youtube)
+      if (extracted.length >= 10 && extracted.length <= 12 && /^[a-zA-Z0-9_-]+$/.test(extracted)) {
+        return extracted;
+      }
+      // Si ce n'est pas un videoId valide mais qu'on a un préfixe YouTube,
+      // retourner quand même l'ID extrait pour qu'il soit traité
+      if (extracted.length > 0) {
         return extracted;
       }
     }
   }
   
-  // Si le trackId fait 11 caractères, peut-être que c'est directement le videoId
-  if (trackId.length === 11 && /^[a-zA-Z0-9_-]+$/.test(trackId)) {
+  // Si le trackId fait entre 10 et 12 caractères alphanumériques, c'est probablement un videoId direct
+  if (trackId.length >= 10 && trackId.length <= 12 && /^[a-zA-Z0-9_-]+$/.test(trackId)) {
     return trackId;
   }
   
@@ -332,7 +378,10 @@ function isYouTubeTrackId(trackId: string): boolean {
   
   return (
     trackId.startsWith('youtube-') ||
+    trackId.startsWith('youtube_audio-') ||
+    trackId.startsWith('youtube_') ||
     trackId.startsWith('yt-') ||
+    trackId.startsWith('yt_') ||
     trackId.includes('youtube.com') ||
     trackId.includes('youtu.be') ||
     (trackId.length === 11 && /^[a-zA-Z0-9_-]+$/.test(trackId))

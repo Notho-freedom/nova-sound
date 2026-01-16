@@ -123,9 +123,34 @@ export const DesktopApp = () => {
       } catch {}
     };
     
+    // Écouter aussi les événements de récupération de tracks (depuis youtube-track-recovery)
+    const handleTracksRecovered = async (event: CustomEvent<{ tracks: Track[] }>) => {
+      console.log('[DesktopApp] 🔄 Tracks récupérés détectés, rechargement du cache...');
+      const { tracks } = event.detail;
+      
+      // Recharger tout le cache depuis localStorage pour avoir les tracks fraîchement récupérés
+      try {
+        const { getYouTubeTracksCache } = await import('@/lib/youtube-track-cache');
+        const cachedTracks = getYouTubeTracksCache();
+        if (cachedTracks && cachedTracks.size > 0) {
+          const cachedArray = Array.from(cachedTracks.values());
+          setYoutubeTracksCache(prev => {
+            const newMap = new Map(prev);
+            newMap.set('persistent-cache', cachedArray);
+            return newMap;
+          });
+          console.log(`[DesktopApp] ✅ ${cachedArray.length} tracks rechargés dans l'état`);
+        }
+      } catch (err) {
+        console.error('[DesktopApp] Erreur rechargement cache:', err);
+      }
+    };
+    
     window.addEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
+    window.addEventListener('youtube-tracks-recovered', handleTracksRecovered as EventListener);
     return () => {
       window.removeEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
+      window.removeEventListener('youtube-tracks-recovered', handleTracksRecovered as EventListener);
     };
   }, []);
   
@@ -198,7 +223,7 @@ export const DesktopApp = () => {
     // Lancer la récupération après un court délai pour ne pas bloquer le démarrage
     const timer = setTimeout(recoverMissingTracks, 2000);
     return () => clearTimeout(timer);
-  }, [libraryLoading, favorites, history, playlists, allTracks]);
+  }, [libraryLoading]); // Retirer les autres dépendances pour éviter la boucle infinie
   
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();

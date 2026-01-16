@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -115,6 +116,7 @@ const PlaylistCard = memo(({
   onDelete,
   canUpload,
   onUpload,
+  cacheVersion = 0, // Pour forcer le re-render quand le cache change
 }: { 
   playlist: Playlist;
   tracks: Track[];
@@ -125,12 +127,13 @@ const PlaylistCard = memo(({
   onDelete: () => void;
   canUpload?: boolean;
   onUpload?: () => void;
+  cacheVersion?: number;
 }) => {
   const playlistTracks = useMemo(() => 
     playlist.trackIds
       .map((id) => getTrackFromAllOrCache(tracks, id))
       .filter((t): t is Track => !!t),
-    [playlist.trackIds, tracks]
+    [playlist.trackIds, tracks, cacheVersion] // Ajouter cacheVersion comme dépendance
   );
   
   const coverUrl = playlistTracks[0]?.coverUrl ? getCoverUrl(playlistTracks[0].coverUrl) : null;
@@ -268,9 +271,18 @@ export const PlaylistView = memo(({
   }, [initialPlaylistId]);
   
   // Récupération automatique des tracks YouTube manquants pour toutes les playlists
+  // Utiliser un ref pour éviter les appels multiples
+  const hasRecoveredRef = React.useRef(false);
+  
   useEffect(() => {
+    // Éviter les appels multiples
+    if (hasRecoveredRef.current) return;
+    
     const recoverPlaylistTracks = async () => {
       if (!playlists || playlists.length === 0) return;
+      
+      // Marquer comme récupéré pour éviter les boucles
+      hasRecoveredRef.current = true;
       
       // Collecter tous les trackIds de toutes les playlists
       const allTrackIds = new Set<string>();
@@ -305,7 +317,21 @@ export const PlaylistView = memo(({
     // Différer la récupération pour ne pas bloquer le rendu initial
     const timer = setTimeout(recoverPlaylistTracks, 1000);
     return () => clearTimeout(timer);
-  }, [playlists, tracks]);
+  }, [playlists]); // Retirer tracks des dépendances pour éviter la boucle
+  
+  // Écouter les événements de récupération de tracks pour forcer le re-render
+  useEffect(() => {
+    const handleTracksRecovered = () => {
+      // Incrémenter le compteur pour forcer le recalcul de playlistTracks
+      setRecoveredTracksCount(prev => prev + 1);
+      console.log('[PlaylistView] 🔄 Mise à jour de l\'interface après récupération des tracks');
+    };
+    
+    window.addEventListener('youtube-tracks-recovered', handleTracksRecovered);
+    return () => {
+      window.removeEventListener('youtube-tracks-recovered', handleTracksRecovered);
+    };
+  }, []);
   
   const [selectedTracksForPlaylist, setSelectedTracksForPlaylist] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -329,6 +355,7 @@ export const PlaylistView = memo(({
   const [tableSortOrder, setTableSortOrder] = useState<"asc" | "desc">("asc");
   const [filterArtist, setFilterArtist] = useState<string | null>(null);
   const [filterAlbum, setFilterAlbum] = useState<string | null>(null);
+  const [recoveredTracksCount, setRecoveredTracksCount] = useState(0); // Pour forcer le re-render
 
   // Get selected playlist
   const selectedPlaylist = useMemo(() => 
@@ -347,7 +374,7 @@ export const PlaylistView = memo(({
     return selectedPlaylist.trackIds
       .map((id) => getTrackFromAllOrCache(tracks, id))
       .filter((t): t is Track => !!t);
-  }, [selectedPlaylist, tracks]);
+  }, [selectedPlaylist, tracks, recoveredTracksCount]); // Ajouter recoveredTracksCount pour forcer le re-render
 
   // Filter playlists
   const filteredPlaylists = useMemo(() => {
@@ -1215,6 +1242,7 @@ export const PlaylistView = memo(({
                 key={playlist.id}
                 playlist={playlist}
                 tracks={tracks}
+                cacheVersion={recoveredTracksCount}
                 onSelect={() => setSelectedPlaylistId(playlist.id)}
                 onPlay={() => handlePlayPlaylist(playlist.id)}
                 onShuffle={() => handleShufflePlaylist(playlist.id)}
@@ -1223,7 +1251,7 @@ export const PlaylistView = memo(({
                 canUpload={canUploadToCloudinary}
                 onUpload={() => {
                   const pTracks = playlist.trackIds
-                    .map(id => tracks.find(t => t.id === id))
+                    .map(id => getTrackFromAllOrCache(tracks, id))
                     .filter((t): t is Track => !!t);
                   uploadPlaylist(pTracks);
                 }}
@@ -1240,7 +1268,7 @@ export const PlaylistView = memo(({
         >
           {filteredPlaylists.map((playlist) => {
             const pTracks = playlist.trackIds
-              .map(id => tracks.find(t => t.id === id))
+              .map(id => getTrackFromAllOrCache(tracks, id))
               .filter((t): t is Track => !!t);
             const coverUrl = pTracks[0]?.coverUrl ? getCoverUrl(pTracks[0].coverUrl) : null;
 

@@ -202,8 +202,16 @@ export function getCachedYouTubeTrack(trackId: string): Track | null {
     extractedId = trackId.substring('youtube-audio-'.length);
   } else if (trackId.startsWith('youtube-')) {
     extractedId = trackId.substring('youtube-'.length);
+  } else if (trackId.startsWith('youtube_')) {
+    extractedId = trackId.substring('youtube_'.length);
   } else if (trackId.startsWith('yt-track-')) {
     extractedId = trackId.substring('yt-track-'.length);
+  } else if (trackId.startsWith('yt-track_')) {
+    extractedId = trackId.substring('yt-track_'.length);
+  } else if (trackId.startsWith('yt-')) {
+    extractedId = trackId.substring('yt-'.length);
+  } else if (trackId.startsWith('yt_')) {
+    extractedId = trackId.substring('yt_'.length);
   }
   
   if (extractedId !== trackId) {

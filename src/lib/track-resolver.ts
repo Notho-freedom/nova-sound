@@ -36,7 +36,9 @@ function isYouTubeTrackId(trackId: string): boolean {
   
   return (
     trackId.startsWith('youtube-') ||
+    trackId.startsWith('youtube_') ||
     trackId.startsWith('yt-') ||
+    trackId.startsWith('yt_') ||
     trackId.includes('youtube.com') ||
     trackId.includes('youtu.be') ||
     (trackId.length === 11 && /^[a-zA-Z0-9_-]+$/.test(trackId))
