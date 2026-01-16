@@ -955,36 +955,6 @@ export const SearchView = ({
             ) : (
               /* Browse Mode - No Search */
               <div className="space-y-10">
-                {/* Search History */}
-                {searchHistory.length > 0 && (
-                  <section>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <History className="w-5 h-5 text-muted-foreground" />
-                        <h2 className="font-display text-lg font-semibold">Recherches récentes</h2>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearHistory}
-                        className="text-xs text-muted-foreground"
-                      >
-                        Effacer tout
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {searchHistory.map((term) => (
-                        <HistoryChip
-                          key={term}
-                          term={term}
-                          onSelect={() => handleSearch(term)}
-                          onRemove={() => removeFromHistory(term)}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )}
-
                 {/* Top Artists */}
                 {dynamicData.topArtists.length > 0 && (
                   <motion.section

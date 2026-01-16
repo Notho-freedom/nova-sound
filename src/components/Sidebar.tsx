@@ -161,17 +161,14 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           >
             {label}
           </span>
-          {badge !== undefined && (
+          {badge !== undefined && badge > 0 && (
             <span
               className={cn(
                 "min-w-[20px] h-5 px-1.5 text-xs font-bold rounded-full flex items-center justify-center transition-all duration-300",
-                badge > 0 ? (
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/10 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
-                ) : "bg-red-500/20 text-red-400 opacity-50"
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-white/10 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
               )}
-              title={badge === 0 ? "Aucun élément trouvé" : undefined}
             >
               {badge > 99 ? "99+" : badge}
             </span>
@@ -187,13 +184,12 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent side="right" className="flex items-center gap-2 bg-card/95 backdrop-blur-xl border-border/50">
           <span className="font-medium">{label}</span>
-          {badge !== undefined && (
+          {badge !== undefined && badge > 0 && (
             <span 
               className={cn(
                 "px-1.5 py-0.5 text-xs font-bold rounded-full flex items-center justify-center",
-                badge > 0 ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-400"
+                "bg-primary/20 text-primary"
               )}
-              title={badge === 0 ? "Aucun élément trouvé" : undefined}
             >
               {badge}
             </span>
