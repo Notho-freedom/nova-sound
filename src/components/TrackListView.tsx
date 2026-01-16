@@ -72,7 +72,7 @@ export const TrackListView = memo(({
 }: TrackListViewProps) => {
   return (
     <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden relative">
-      <div className="overflow-y-auto">
+      <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
         <table className="w-full">
           <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
             <tr className="border-b border-border/30">

@@ -728,7 +728,7 @@ export const LibraryView = memo(({
 
           {/* Track list */}
           <GlassCard className="overflow-hidden">
-            <ScrollArea className="max-h-[calc(100vh-450px)]">
+            <div className="overflow-y-auto max-h-[calc(100vh-450px)]">
               <table className="w-full">
                 <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur-md">
                   <tr className="border-b border-border/30">
@@ -816,7 +816,7 @@ export const LibraryView = memo(({
                   })}
                 </tbody>
               </table>
-            </ScrollArea>
+            </div>
           </GlassCard>
         </motion.div>
       </PageContainer>

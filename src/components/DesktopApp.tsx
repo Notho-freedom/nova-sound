@@ -1944,6 +1944,7 @@ export const DesktopApp = () => {
           currentTrackIndex={currentTrackIndex}
           isPlaying={isPlaying}
           onTrackSelect={handleTrackSelect}
+          onPlayTrack={handlePlayTrack}
           onPlayNext={handlePlayNext}
           onAddToQueue={handleAddToQueue}
           onAddToPlaylist={handleAddToPlaylist}

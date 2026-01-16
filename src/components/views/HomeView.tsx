@@ -45,6 +45,7 @@ interface HomeViewProps {
   currentTrackIndex: number;
   isPlaying: boolean;
   onTrackSelect: (index: number) => void;
+  onPlayTrack?: (track: Track) => void;
   onPlayPause?: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
@@ -127,6 +128,7 @@ export const HomeView = memo(({
   currentTrackIndex,
   isPlaying,
   onTrackSelect,
+  onPlayTrack,
   onPlayPause,
   onNext,
   onPrevious,
@@ -349,7 +351,7 @@ export const HomeView = memo(({
                   imageUrl={getCoverUrl(track.coverUrl)}
                   isPlaying={isPlaying}
                   isCurrent={isCurrent}
-                  onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                  onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
                 />
               );
             })}
@@ -511,8 +513,8 @@ export const HomeView = memo(({
                     imageUrl={getCoverUrl(track.coverUrl)}
                     isPlaying={isPlaying}
                     isCurrent={isCurrent}
-                    onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                    onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                    onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
+                    onPlay={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
                     size="md"
                     className="snap-start"
                   />
@@ -545,8 +547,8 @@ export const HomeView = memo(({
                   badgeColor="bg-yellow-500"
                   isPlaying={isPlaying}
                   isCurrent={isCurrent}
-                  onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
-                  onPlay={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                  onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
+                  onPlay={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
                   size="md"
                   className="snap-start"
                 />
@@ -593,7 +595,7 @@ export const HomeView = memo(({
                   return (
                     <tr
                       key={`favorite-${track.id}-${idx}`}
-                      onClick={() => actualIndex !== -1 && onTrackSelect(actualIndex)}
+                      onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
                       className={cn(
                         "group cursor-pointer transition-all duration-200",
                         isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"
