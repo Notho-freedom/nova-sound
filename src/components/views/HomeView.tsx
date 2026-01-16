@@ -4,13 +4,14 @@ import { Play, Clock, TrendingUp, Sparkles, Heart, Music, Disc, Timer, Users, St
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { TrackCardSkeleton, PlaylistCardSkeleton, HomeViewSkeleton } from "@/components/ui/skeletons";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { UploadIndicator } from "@/components/UploadIndicator";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useHomeWorker } from "@/hooks/useHomeWorker";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useBunnyUpload } from "@/hooks/useBunnyUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
@@ -70,48 +71,6 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-// Fisher-Yates shuffle
-function fisherYatesShuffle<T>(array: T[], seed: number = 0): T[] {
-  const shuffled = [...array];
-  let currentIndex = shuffled.length;
-  let seedValue = seed;
-  const random = () => {
-    seedValue = (seedValue * 9301 + 49297) % 233280;
-    return seedValue / 233280;
-  };
-  while (currentIndex !== 0) {
-    const randomIndex = Math.floor(random() * currentIndex);
-    currentIndex--;
-    [shuffled[currentIndex], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[currentIndex]];
-  }
-  return shuffled;
-}
-
-const generatePlaylistSelections = (tracks: Track[], history: HistoryEntry[] = []) => {
-  const playCountMap = new Map<string, number>();
-  history.forEach(entry => playCountMap.set(entry.trackId, entry.playCount || 1));
-
-  const tracksWithCounts: Array<{ track: Track; playCount: number }> = [];
-  for (const track of tracks) {
-    const playCount = playCountMap.get(track.id) || 0;
-    if (playCount > 0) {
-      tracksWithCounts.push({ track, playCount });
-    }
-  }
-  
-  tracksWithCounts.sort((a, b) => b.playCount - a.playCount);
-  const topTracks = tracksWithCounts;
-  
-  const shuffled1 = fisherYatesShuffle(topTracks, Date.now() % 1000);
-  const shuffled2 = fisherYatesShuffle(topTracks, (Date.now() + 1) % 1000);
-  const shuffled3 = fisherYatesShuffle(topTracks, (Date.now() + 2) % 1000);
-
-  return {
-    discoveries: shuffled1.map(item => item.track),
-    similar: shuffled2.map(item => item.track),
-    mix: shuffled3.map(item => item.track),
-  };
-};
 
 // Greeting based on time of day
 const getGreeting = () => {
@@ -165,40 +124,6 @@ export const HomeView = memo(({
   const currentTrack = currentTrackIndex >= 0 ? tracks[currentTrackIndex] : null;
   const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
 
-  // Helpers
-  const getUniqueTracks = useCallback((trackList: Track[]) => {
-    const seen = new Set<string>();
-    return trackList.filter(track => {
-      if (seen.has(track.id)) return false;
-      seen.add(track.id);
-      return true;
-    });
-  }, []);
-
-  // Memoized data
-  // IMPORTANT: displayRecent et displayFavorites sont calculés à partir de recentTracks et favoriteTracks
-  // Ces données ne sont JAMAIS supprimées par les fonctions de lecture
-  const displayRecent = useMemo(() => 
-    recentTracks.length > 0 
-      ? getUniqueTracks(recentTracks)
-      : getUniqueTracks(tracks),
-    [recentTracks, tracks, getUniqueTracks]
-  );
-  
-  const displayFavorites = useMemo(() => 
-    favoriteTracks.length > 0 ? getUniqueTracks(favoriteTracks) : [],
-    [favoriteTracks, getUniqueTracks]
-  );
-
-  const playlistSelections = useMemo(() => 
-    generatePlaylistSelections(tracks, history),
-    [tracks, history]
-  );
-
-  const newTracks = useMemo(() => {
-    return getUniqueTracks(tracks).reverse();
-  }, [tracks, getUniqueTracks]);
-
   const topGenres = useMemo(() => genres, [genres]);
 
   // IMPORTANT: Ces données sont calculées à partir de l'historique et ne sont JAMAIS supprimées
@@ -208,90 +133,27 @@ export const HomeView = memo(({
     return stats.recentArtists;
   }, [stats]);
 
+  const { computed } = useHomeWorker({
+    tracks,
+    recentTracks,
+    favoriteTracks,
+    history,
+    currentTrack,
+    recentArtists,
+  });
+
+  const displayRecent = computed?.displayRecent ?? (recentTracks.length ? recentTracks : tracks);
+  const displayFavorites = computed?.displayFavorites ?? (favoriteTracks.length ? favoriteTracks : []);
+  const playlistSelections = computed?.playlistSelections ?? { discoveries: [], similar: [], mix: [] };
+  const newTracks = computed?.newTracks ?? tracks;
+
   // Hero slides
-  const heroSlides = useMemo(() => {
-    const slides = [];
-    
-    // Current track or first recent
-    if (currentTrack) {
-      slides.push({
-        id: currentTrack.id,
-        title: currentTrack.title,
-        subtitle: "En cours de lecture",
-        description: `${currentTrack.artist} • ${currentTrack.album}`,
-        imageUrl: getCoverUrl(currentTrack.coverUrl),
-        gradient: "from-primary/40 to-secondary/40",
-      });
-    }
+  const heroSlides = (computed?.heroSlides ?? []).map((slide) => ({
+    ...slide,
+    imageUrl: getCoverUrl(slide.coverUrl ?? undefined),
+  }));
 
-    // Top artists - use all available recent artists (not limited)
-    recentArtists.forEach(artist => {
-      const artistTrack = tracks.find(t => t.artist === artist.name);
-      if (artistTrack) {
-        slides.push({
-          id: `artist-${artist.name}`,
-          title: artist.name,
-          subtitle: "Artiste populaire",
-          description: `${artist.trackCount} titres • ${artist.playCount} écoutes`,
-          imageUrl: artist.imageUrl || getCoverUrl(artistTrack.coverUrl),
-          gradient: "from-secondary/40 to-accent/40",
-        });
-      }
-    });
-
-    // Recent albums (all available, not limited to 6)
-    const seenAlbums = new Set<string>();
-    displayRecent.forEach(track => {
-      const albumKey = `${track.album}-${track.artist}`;
-      if (!seenAlbums.has(albumKey) && track.album !== "Album inconnu") {
-        seenAlbums.add(albumKey);
-        slides.push({
-          id: `album-${albumKey}`,
-          title: track.album,
-          subtitle: "Album récent",
-          description: track.artist,
-          imageUrl: getCoverUrl(track.coverUrl),
-          gradient: "from-accent/40 to-primary/40",
-        });
-      }
-    });
-
-    // Fallback: Add individual tracks as slides if we have fewer than 5 slides total
-    if (slides.length < 5) {
-      const seenTracks = new Set(slides.map(s => s.id));
-      displayRecent.forEach(track => {
-        if (slides.length < 12 && !seenTracks.has(track.id)) {
-          seenTracks.add(track.id);
-          slides.push({
-            id: track.id,
-            title: track.title,
-            subtitle: "Titre récent",
-            description: `${track.artist} • ${track.album}`,
-            imageUrl: getCoverUrl(track.coverUrl),
-            gradient: "from-primary/40 to-secondary/40",
-          });
-        }
-      });
-    }
-
-    return slides;
-  }, [currentTrack, recentArtists, displayRecent, tracks]);
-
-  // Quick play items (6 items for the grid)
-  const quickPlayItems = useMemo(() => {
-    const items: Track[] = [];
-    const seen = new Set<string>();
-
-    // Add recent tracks
-    displayRecent.forEach(track => {
-      if (items.length < 6 && !seen.has(track.id)) {
-        seen.add(track.id);
-        items.push(track);
-      }
-    });
-
-    return items;
-  }, [displayRecent]);
+  const quickPlayItems = computed?.quickPlayItems ?? [];
 
   // Loading skeleton
   if (loading) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react"
+import { useState, useEffect, useMemo, useRef, memo } from "react"
 import {
   Search,
   Play,
@@ -36,6 +36,7 @@ import { useUploadedStatus } from "@/hooks/useUploadedStatus"
 import { useCloudSync } from "@/hooks/useCloudSync"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
 import { usePlayHistory } from "@/hooks/usePlayHistory"
+import { useSearchWorker } from "@/hooks/useSearchWorker"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -394,16 +395,9 @@ export const SearchView = ({
     localStorage.setItem("nexus-search-history", JSON.stringify(newHistory))
   }
 
-  const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
-    const seen = new Set<string>()
-    return trackList.filter((track) => {
-      if (seen.has(track.id)) {
-        return false
-      }
-      seen.add(track.id)
-      return true
-    })
-  }, [])
+  const favoriteTrackIds = useMemo(() => {
+    return tracks.filter((t) => isFavorite(t.id)).map((t) => t.id)
+  }, [tracks, isFavorite])
 
   // Effect to search YouTube when query changes (with debounce)
   useEffect(() => {
@@ -438,93 +432,17 @@ export const SearchView = ({
     }
   }, [youtubeResults])
 
-  // Search results (local + YouTube)
-  const searchResults = useMemo(() => {
-    if (!query.trim()) return { tracks: [], albums: [], artists: [] }
+  const { computed } = useSearchWorker({
+    query,
+    tracks,
+    youtubeTracks,
+    searchHistory,
+    history,
+    favoriteTrackIds,
+  })
 
-    const q = query.toLowerCase()
-
-    // Local tracks
-    const matchedTracks = tracks.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || t.album.toLowerCase().includes(q),
-    )
-
-    // Combine local and YouTube tracks
-    const allTracks = [...matchedTracks, ...youtubeTracks]
-    const uniqueMatchedTracks = getUniqueTracks(allTracks)
-
-    // Group by album
-    const albumsMap = new Map<string, { name: string; artist: string; coverUrl: string; count: number }>()
-    matchedTracks.forEach((t) => {
-      const key = `${t.album}-${t.artist}`
-      if (!albumsMap.has(key)) {
-        albumsMap.set(key, { name: t.album, artist: t.artist, coverUrl: t.coverUrl, count: 0 })
-      }
-      albumsMap.get(key)!.count++
-    })
-
-    // Group by artist
-    const artistsMap = new Map<string, { name: string; coverUrl: string; count: number }>()
-    matchedTracks.forEach((t) => {
-      if (!artistsMap.has(t.artist)) {
-        artistsMap.set(t.artist, { name: t.artist, coverUrl: t.coverUrl, count: 0 })
-      }
-      artistsMap.get(t.artist)!.count++
-    })
-
-    return {
-      tracks: uniqueMatchedTracks,
-      albums: Array.from(albumsMap.values()),
-      artists: Array.from(artistsMap.values()),
-    }
-  }, [query, tracks, youtubeTracks, getUniqueTracks])
-
-  // Dynamic data based on user's library
-  const dynamicData = useMemo(() => {
-    // Top played artists from history
-    const artistPlayCounts = new Map<string, { count: number; track: Track }>()
-    history.forEach((entry) => {
-      const track = tracks.find((t) => t.id === entry.trackId)
-      if (track) {
-        const current = artistPlayCounts.get(track.artist) || { count: 0, track }
-        artistPlayCounts.set(track.artist, { count: current.count + entry.playCount, track })
-      }
-    })
-    const topArtists = Array.from(artistPlayCounts.entries())
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, data]) => ({ name, playCount: data.count, coverUrl: data.track.coverUrl }))
-
-    // Recently added tracks (last 12) - using reverse order as proxy for recently added
-    const recentTracks = [...tracks].slice(-12).reverse()
-
-    // Get real genres from library with counts
-    const genreMap = new Map<string, { count: number; coverUrl: string }>()
-    tracks.forEach((t) => {
-      if (t.genre) {
-        const current = genreMap.get(t.genre) || { count: 0, coverUrl: t.coverUrl }
-        genreMap.set(t.genre, { count: current.count + 1, coverUrl: t.coverUrl || current.coverUrl })
-      }
-    })
-    const genres = Array.from(genreMap.entries())
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, data]) => ({ name, count: data.count, coverUrl: data.coverUrl }))
-
-    // Recommended based on favorites
-    const favoriteTrackIds = tracks.filter((t) => isFavorite(t.id)).map((t) => t.id)
-    const favoriteArtists = new Set(
-      tracks.filter((t) => favoriteTrackIds.includes(t.id)).map((t) => t.artist)
-    )
-    const recommended = tracks
-      .filter((t) => !favoriteTrackIds.includes(t.id) && favoriteArtists.has(t.artist))
-
-    return {
-      topArtists,
-      recentTracks,
-      genres,
-      recommended,
-    }
-  }, [tracks, history, isFavorite])
+  const searchResults = computed?.searchResults ?? { tracks: [], albums: [], artists: [] }
+  const dynamicData = computed?.dynamicData ?? { topArtists: [], recentTracks: [], genres: [], recommended: [] }
 
   // Fallback browse categories if no genres
   const browseCategories = dynamicData.genres.length > 0 
@@ -549,46 +467,9 @@ export const SearchView = ({
     if (cleaned) saveToHistory(cleaned)
   }
 
-  const suggestionPool = useMemo(() => {
-    const pool: string[] = []
-    pool.push(...searchHistory)
-    searchResults.tracks.forEach((t) => {
-      if (t.title) pool.push(t.title)
-      if (t.artist) pool.push(t.artist)
-    })
-    youtubeTracks.forEach((t) => {
-      if (t.title) pool.push(t.title)
-      if (t.artist) pool.push(t.artist)
-    })
-    return pool
-  }, [searchHistory, searchResults.tracks, youtubeTracks])
-
-  const autoCompleteSuggestion = useMemo(() => {
-    const base = query.trim().toLowerCase()
-    if (!base) return ""
-    const found = suggestionPool.find((s) => s && s.toLowerCase().startsWith(base))
-    return found || ""
-  }, [query, suggestionPool])
-
-  const inlineSuggestions = useMemo(() => {
-    if (!query.trim()) return searchHistory
-    const base = query.trim().toLowerCase()
-    const relatedArtists = searchResults.tracks
-      .map((t) => t.artist)
-      .filter((a) => a && a.toLowerCase().includes(base))
-    const relatedTitles = searchResults.tracks
-      .map((t) => t.title)
-      .filter((t) => t && t.toLowerCase().includes(base))
-    const merged = [...searchHistory.filter((h) => h.toLowerCase().includes(base)), ...relatedArtists, ...relatedTitles]
-    const unique: string[] = []
-    merged.forEach((m) => {
-      if (m && !unique.some((u) => u.toLowerCase() === m.toLowerCase())) unique.push(m)
-    })
-    return unique
-  }, [query, searchHistory, searchResults.tracks])
-
-  const hasResults =
-    query && (searchResults.tracks.length > 0 || searchResults.albums.length > 0 || searchResults.artists.length > 0)
+  const autoCompleteSuggestion = computed?.autoCompleteSuggestion ?? ""
+  const inlineSuggestions = computed?.inlineSuggestions ?? (query.trim() ? [] : searchHistory)
+  const hasResults = computed?.hasResults ?? false
 
   return (
     <TooltipProvider>
@@ -783,7 +664,7 @@ export const SearchView = ({
                             )}
                           >
                             <img
-                              src={getCoverUrl(artist.coverUrl) || "/placeholder.svg"}
+                              src={getCoverUrl(artist.coverUrl ?? undefined) || "/placeholder.svg"}
                               alt={artist.name}
                               className="w-full h-full object-cover"
                             />
@@ -831,7 +712,7 @@ export const SearchView = ({
                         >
                           <div className="relative aspect-square overflow-hidden">
                             <img
-                              src={getCoverUrl(album.coverUrl) || "/placeholder.svg"}
+                              src={getCoverUrl(album.coverUrl ?? undefined) || "/placeholder.svg"}
                               alt={album.name}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                             />
@@ -978,7 +859,7 @@ export const SearchView = ({
                         >
                           <div className="relative w-full aspect-square rounded-full overflow-hidden ring-2 ring-white/10 group-hover:ring-primary/50 transition-all duration-300">
                             <img
-                              src={getCoverUrl(artist.coverUrl) || "/placeholder.svg"}
+                              src={getCoverUrl(artist.coverUrl ?? undefined) || "/placeholder.svg"}
                               alt={artist.name}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                             />
