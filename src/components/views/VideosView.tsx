@@ -511,9 +511,9 @@ export const VideosView = memo(() => {
   return (
     <div className="absolute inset-0 flex flex-col animate-in fade-in duration-300 overflow-hidden">
       {/* Navigation Tabs */}
-      <div className="flex-shrink-0 border-b border-border/30 bg-background/80 backdrop-blur-sm px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+      <div className="flex-shrink-0 px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-card/40 backdrop-blur-2xl border border-border/30 shadow-xl">
+          <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setViewMode("home")}
@@ -601,27 +601,30 @@ export const VideosView = memo(() => {
 
           {/* Search */}
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Rechercher..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (e.target.value) setViewMode("browse");
-                }}
-                className="pl-10 pr-10 w-64"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Effacer la recherche"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+            <div className="flex-1 min-w-[220px] relative group">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 opacity-0 group-focus-within:opacity-100 blur transition-opacity" />
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-emerald-400 transition-colors" />
+                <Input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (e.target.value) setViewMode("browse");
+                  }}
+                  className="pl-12 pr-10 w-64 h-12 bg-background/50 border-border/50 rounded-xl focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
+                    aria-label="Effacer la recherche"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Add buttons */}

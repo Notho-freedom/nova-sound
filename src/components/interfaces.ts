@@ -21,8 +21,6 @@ export type ViewType =
   | "albums"
   | "artists"
   | "videos"
-  | "local"
-  | "downloads"
   | "settings"
   | "album-detail"
   | "artist-detail"

@@ -1200,17 +1200,42 @@ export const PlaylistView = memo(({
       </div>
 
       {/* Toolbar */}
-      <Toolbar className="mb-6">
-        <SearchBar
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Rechercher une playlist..."
-        />
-        <div className="flex items-center gap-2">
-          <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Badge variant="outline" className="border-dashed border-primary/40 text-primary bg-primary/5">Vue dynamique</Badge>
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-card/40 backdrop-blur-2xl border border-border/30 shadow-xl">
+          {/* Search Input */}
+          <div className="flex-1 min-w-[250px] relative group">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 opacity-0 group-focus-within:opacity-100 blur transition-opacity" />
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-emerald-400 transition-colors" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher une playlist..."
+                className="pl-12 h-12 bg-background/50 border-border/50 rounded-xl focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
+                  title="Effacer la recherche"
+                  aria-label="Effacer la recherche"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1.5 rounded-xl bg-muted/50 border border-border/30">
+              <ViewToggle view={viewMode} onViewChange={setViewMode} />
+            </div>
+            <Badge variant="outline" className="border-dashed border-primary/40 text-primary bg-primary/5">
+              Vue dynamique
+            </Badge>
+          </div>
         </div>
-      </Toolbar>
+      </div>
 
       {/* Loading */}
       {loading ? (

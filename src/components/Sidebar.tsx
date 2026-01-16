@@ -10,8 +10,6 @@ import {
   Users, 
   Video,
   Plus,
-  FolderOpen,
-  Download,
   ChevronLeft,
   ChevronRight,
   Music,
@@ -44,8 +42,6 @@ export type ViewType =
   | "albums" 
   | "artists" 
   | "videos"
-  | "local"
-  | "downloads"
   | "cloud"
   | "settings"
   | "audio-senses"
@@ -65,8 +61,6 @@ interface SidebarProps {
   albumsCount?: number;
   artistsCount?: number;
   videosCount?: number;
-  localCount?: number;
-  downloadsCount?: number;
   cloudCount?: number;
   playlistsCount?: number;
   collapsed?: boolean;
@@ -96,8 +90,6 @@ const mediaItems = [
 ];
 
 const localItems = [
-  { id: "local" as ViewType, icon: FolderOpen, label: "Fichiers Locaux" },
-  { id: "downloads" as ViewType, icon: Download, label: "Téléchargements" },
   { id: "cloud" as ViewType, icon: Cloud, label: "Cloud Storage", color: "text-cyan-400" },
 ];
 
@@ -227,8 +219,6 @@ export const Sidebar = ({
   albumsCount,
   artistsCount,
   videosCount,
-  localCount,
-  downloadsCount,
   cloudCount,
   playlistsCount,
   collapsed: controlledCollapsed,
@@ -263,10 +253,6 @@ export const Sidebar = ({
         return artistsCount;
       case "videos":
         return videosCount;
-      case "local":
-        return localCount;
-      case "downloads":
-        return downloadsCount;
       case "cloud":
         return cloudCount;
       default:
@@ -299,7 +285,7 @@ export const Sidebar = ({
       ...mainNavItems.map(i => ({ ...i, section: 'Navigation' })),
       ...libraryItems.map(i => ({ ...i, section: 'Ma Musique' })),
       ...mediaItems.map(i => ({ ...i, section: 'Médias' })),
-      ...localItems.map(i => ({ ...i, section: 'Local' })),
+      ...localItems.map(i => ({ ...i, section: 'Cloud' })),
     ];
     
     let displayedCount = 0;
@@ -329,8 +315,6 @@ export const Sidebar = ({
     console.log(`   - albumsCount: ${albumsCount}`);
     console.log(`   - artistsCount: ${artistsCount}`);
     console.log(`   - videosCount: ${videosCount}`);
-    console.log(`   - localCount: ${localCount}`);
-    console.log(`   - downloadsCount: ${downloadsCount}`);
     console.log(`   - cloudCount: ${cloudCount}`);
     console.log(`   - playlistsCount: ${playlistsCount}`);
     
@@ -342,7 +326,7 @@ export const Sidebar = ({
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   }, [
     favoritesCount, notificationsCount, recentCount, albumsCount, artistsCount, 
-    videosCount, localCount, downloadsCount, cloudCount, playlistsCount,
+    videosCount, cloudCount, playlistsCount,
     tracks.length, playlists.length, propPlaylists?.length
   ]);
 
@@ -508,9 +492,9 @@ export const Sidebar = ({
               </div>
             </div>
 
-            {/* Local Files */}
+            {/* Cloud */}
             <div className="mb-6">
-              <SectionTitle collapsed={collapsed}>Local</SectionTitle>
+              <SectionTitle collapsed={collapsed}>Cloud</SectionTitle>
               <div className="space-y-1">
                 {localItems.map((item) => (
                   <NavItem

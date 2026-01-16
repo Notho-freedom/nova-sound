@@ -22,7 +22,6 @@ const SettingsView = lazy(() => import("./views/SettingsView").then(m => ({ defa
 const NotificationsView = lazy(() => import("./views/NotificationsView").then(m => ({ default: m.NotificationsView })));
 const ArtistView = lazy(() => import("./views/ArtistView").then(m => ({ default: m.ArtistView })));
 const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
-const DownloadsView = lazy(() => import("./views/DownloadsView").then(m => ({ default: m.DownloadsView })));
 const CloudView = lazy(() => import("./views/CloudView").then(m => ({ default: m.CloudView })));
 const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })));
 
@@ -31,7 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileTableSkeleton, SettingsViewSkeleton, NotificationListSkeleton } from "@/components/ui/skeletons";
-import { Clock, Music, Play } from "lucide-react";
+import { Clock, Music, Play, Search, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useLibrary } from "@/hooks/useLibrary";
@@ -51,6 +50,7 @@ import { YouTubePlayer, type YouTubePlayerRef } from "@/components/YouTubePlayer
 import { getCachedYouTubeTrackByVideoId } from "@/lib/youtube-track-cache";
 import { mapHistoryEntriesToTracks } from "@/lib/history-utils";
 import { getTrackFromAllOrCache } from "@/lib/track-resolver";
+import { Input } from "@/components/ui/input";
 import { CoachmarkProvider } from "@/features/coachmarks";
 import "@/features/coachmarks/styles/coachmarks-theme.css";
 import { recoverMissingYouTubeTracks } from "@/lib/youtube-track-recovery";
@@ -312,29 +312,22 @@ export const DesktopApp = () => {
     goForward, 
     canGoBack, 
     canGoForward,
-    viewParams 
+    viewParams
   } = useViewNavigation();
   
   // Alias for compatibility with existing code
   const setCurrentView = navigateTo;
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isShuffle, setIsShuffle] = useState(queueIsShuffled);
-  const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
-  // Load volume from localStorage on mount
-  const [volume, setVolume] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('nexus-volume');
-      return saved ? parseInt(saved, 10) : 70;
-    }
-    return 70;
-  });
+  const [volume, setVolume] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isArtistInfoOpen, setIsArtistInfoOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
@@ -342,6 +335,7 @@ export const DesktopApp = () => {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [playlistToOpen, setPlaylistToOpen] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [recentSearchQuery, setRecentSearchQuery] = useState<string>("");
   // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
 
   // Audio element ref for real playback
@@ -1884,7 +1878,6 @@ export const DesktopApp = () => {
     const artistsWithInfo = allTracks.filter(t => t.artist);
     const uniqueArtists = new Set(artistsWithInfo.map(t => t.artist));
 
-    const localFiles = allTracks.filter(t => t.filePath || t.mediaSource === 'local');
     const cloudFiles = allTracks.filter(t =>
       t.mediaSource === 'cloudinary' ||
       t.mediaSource === 'nexus' ||
@@ -1907,7 +1900,6 @@ export const DesktopApp = () => {
           recent: validRecentTracks.length,
           albums: uniqueAlbums.size,
           artists: uniqueArtists.size,
-          local: localFiles.length,
           cloud: cloudFiles.length,
           playlists: playlists.length,
         },
@@ -1925,8 +1917,6 @@ export const DesktopApp = () => {
       albums: uniqueAlbums.size,
       artists: uniqueArtists.size,
       videos: 0, // Sera géré par VideosView avec son propre état
-      local: localFiles.length,
-      downloads: 0, // Sera géré par DownloadsView avec son propre état
       cloud: cloudFiles.length,
       playlists: playlists.length,
     };
@@ -2067,6 +2057,17 @@ export const DesktopApp = () => {
         // Get cover images for recent tracks
         const recentCovers = recentTracks.filter(t => t.coverUrl).slice(0, 4);
         const addedCovers = recentlyAddedTracks.filter(t => t.coverUrl).slice(0, 4);
+        const normalizedRecentQuery = recentSearchQuery.trim().toLowerCase();
+        const matchesRecentQuery = (track: Track) => {
+          if (!normalizedRecentQuery) return true;
+          return (
+            track.title?.toLowerCase().includes(normalizedRecentQuery) ||
+            track.artist?.toLowerCase().includes(normalizedRecentQuery) ||
+            track.album?.toLowerCase().includes(normalizedRecentQuery)
+          );
+        };
+        const visibleRecentTracks = recentTracks.filter(matchesRecentQuery);
+        const visibleRecentlyAddedTracks = recentlyAddedTracks.filter(matchesRecentQuery);
         
         return (
           <div className="min-h-full pb-8 relative">
@@ -2168,10 +2169,10 @@ export const DesktopApp = () => {
                     </p>
                     
                     {/* Action Button */}
-                    {recentTracks.length > 0 && (
+                    {visibleRecentTracks.length > 0 && (
                       <Button 
                         onClick={() => {
-                          const track = recentTracks[0];
+                          const track = visibleRecentTracks[0];
                           const realIndex = tracks.findIndex(t => t.id === track.id);
                           if (realIndex !== -1) handleTrackSelect(realIndex);
                         }} 
@@ -2228,10 +2229,38 @@ export const DesktopApp = () => {
               </div>
             </div>
 
+            {/* Action Bar */}
+            <div className="px-6">
+              <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-card/40 backdrop-blur-2xl border border-border/30 shadow-xl">
+                <div className="flex-1 min-w-[250px] relative group">
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 opacity-0 group-focus-within:opacity-100 blur transition-opacity" />
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-emerald-400 transition-colors" />
+                    <Input
+                      value={recentSearchQuery}
+                      onChange={(e) => setRecentSearchQuery(e.target.value)}
+                      placeholder="Rechercher dans vos récents..."
+                      className="pl-12 h-12 bg-background/50 border-border/50 rounded-xl focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
+                    />
+                    {recentSearchQuery && (
+                      <button
+                        onClick={() => setRecentSearchQuery("")}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
+                        title="Effacer la recherche"
+                        aria-label="Effacer la recherche"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Content Sections */}
             <div className="px-6 space-y-8">
               {/* Recently Played Section */}
-              {recentTracks.length > 0 && (
+              {visibleRecentTracks.length > 0 && (
                 <motion.section
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -2243,17 +2272,17 @@ export const DesktopApp = () => {
                     </div>
                     <div>
                       <h2 className="font-semibold text-xl">Écouté récemment</h2>
-                      <p className="text-sm text-muted-foreground">{recentTracks.length} pistes</p>
+                      <p className="text-sm text-muted-foreground">{visibleRecentTracks.length} pistes</p>
                     </div>
                   </div>
                   <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
                     <LibraryView
-                      tracks={recentTracks}
+                      tracks={visibleRecentTracks}
                       currentTrackIndex={currentTrackIndex}
                       isPlaying={isPlaying}
                       onTrackSelect={(index) => {
                         // Play directly from recentTracks list
-                        handlePlayTrackList(recentTracks, index);
+                        handlePlayTrackList(visibleRecentTracks, index);
                       }}
                       title=""
                       showFilters={false}
@@ -2269,7 +2298,7 @@ export const DesktopApp = () => {
               )}
 
               {/* Recently Added Section */}
-              {recentlyAddedTracks.length > 0 && (
+              {visibleRecentlyAddedTracks.length > 0 && (
                 <motion.section
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -2281,17 +2310,17 @@ export const DesktopApp = () => {
                     </div>
                     <div>
                       <h2 className="font-semibold text-xl">Récemment ajoutées</h2>
-                      <p className="text-sm text-muted-foreground">{recentlyAddedTracks.length} nouvelles pistes</p>
+                      <p className="text-sm text-muted-foreground">{visibleRecentlyAddedTracks.length} nouvelles pistes</p>
                     </div>
                   </div>
                   <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
                     <LibraryView
-                      tracks={recentlyAddedTracks}
+                      tracks={visibleRecentlyAddedTracks}
                       currentTrackIndex={currentTrackIndex}
                       isPlaying={isPlaying}
                       onTrackSelect={(index) => {
                         // Play directly from recentlyAddedTracks list
-                        handlePlayTrackList(recentlyAddedTracks, index);
+                        handlePlayTrackList(visibleRecentlyAddedTracks, index);
                       }}
                       title=""
                       showFilters={false}
@@ -2306,7 +2335,7 @@ export const DesktopApp = () => {
               )}
 
               {/* Empty state */}
-              {recentTracks.length === 0 && recentlyAddedTracks.length === 0 && (
+              {visibleRecentTracks.length === 0 && visibleRecentlyAddedTracks.length === 0 && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2418,31 +2447,6 @@ export const DesktopApp = () => {
         );
       case "videos":
         return <VideosView />;
-      case "local":
-        return (
-          <LibraryView
-            tracks={tracks.filter(t => t.filePath)}
-            currentTrackIndex={currentTrackIndex}
-            isPlaying={isPlaying}
-            onTrackSelect={(index) => {
-              const localTracks = tracks.filter(t => t.filePath);
-              const track = localTracks[index];
-              const realIndex = tracks.findIndex(t => t.id === track.id);
-              if (realIndex !== -1) handleTrackSelect(realIndex);
-            }}
-            title="Fichiers Locaux"
-            viewMode="folders"
-            onPlayNext={handlePlayNext}
-            onAddToQueue={handleAddToQueue}
-            onAddToPlaylist={handleAddToPlaylist}
-          />
-        );
-      case "downloads":
-        return (
-          <Suspense fallback={<div className="px-6 py-4"><FileTableSkeleton count={8} /></div>}>
-            <DownloadsView />
-          </Suspense>
-        );
       case "cloud":
         return (
           <Suspense fallback={<div className="px-6 py-4"><FileTableSkeleton count={5} /></div>}>
@@ -2655,8 +2659,6 @@ export const DesktopApp = () => {
             albumsCount={sidebarCounts.albums}
             artistsCount={sidebarCounts.artists}
             videosCount={sidebarCounts.videos}
-            localCount={sidebarCounts.local}
-            downloadsCount={sidebarCounts.downloads}
             cloudCount={sidebarCounts.cloud}
             playlistsCount={sidebarCounts.playlists}
             collapsed={sidebarCollapsed}

@@ -139,13 +139,11 @@ export function useViewNavigation() {
     settings: () => navigateTo('settings'),
     notifications: () => navigateTo('notifications'),
     videos: () => navigateTo('videos'),
-    downloads: () => navigateTo('downloads'),
     cloud: () => navigateTo('cloud'),
     audioSenses: () => navigateTo('audio-senses'),
     albums: () => navigateTo('albums'),
     artists: () => navigateTo('artists'),
     recent: () => navigateTo('recent'),
-    local: () => navigateTo('local'),
     // Navigation avec paramètres
     album: (albumId: string) => navigateTo('album-detail', { params: { albumId } }),
     artist: (artistId: string) => navigateTo('artist-detail', { params: { artistId } }),
