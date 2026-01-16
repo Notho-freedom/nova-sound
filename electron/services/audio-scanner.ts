@@ -39,8 +39,51 @@ interface ScanProgress {
 // Supported audio formats
 const AUDIO_EXTENSIONS = ['.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus', '.aac', '.wma', '.aiff'];
 
+const FILE_STAT_CACHE_TTL_MS = 30000;
+const FILE_STAT_CACHE_MAX = 5000;
+
 let watcher: FSWatcher | null = null;
 let isScanning = false;
+let lastProgressAt = 0;
+let lastProgressPhase: ScanProgress['phase'] | null = null;
+const fileStatCache = new Map<string, { value: { size: number; mtime: Date } | null; checkedAt: number }>();
+
+function pruneFileStatCache() {
+  const now = Date.now();
+  for (const [key, value] of fileStatCache.entries()) {
+    if (now - value.checkedAt > FILE_STAT_CACHE_TTL_MS) {
+      fileStatCache.delete(key);
+    }
+  }
+
+  while (fileStatCache.size > FILE_STAT_CACHE_MAX) {
+    const firstKey = fileStatCache.keys().next().value as string | undefined;
+    if (!firstKey) break;
+    fileStatCache.delete(firstKey);
+  }
+}
+let pendingTrackEvents: ScannedTrack[] = [];
+let pendingTrackTimer: NodeJS.Timeout | null = null;
+
+function flushPendingTrackEvents() {
+  if (pendingTrackEvents.length === 0) return;
+  const windows = BrowserWindow.getAllWindows();
+  const batch = pendingTrackEvents;
+  pendingTrackEvents = [];
+  pendingTrackTimer = null;
+  batch.forEach(track => {
+    windows.forEach(window => {
+      window.webContents.send('library:track-added', track);
+    });
+  });
+}
+
+function queueTrackAddedEvent(track: ScannedTrack) {
+  pendingTrackEvents.push(track);
+  if (!pendingTrackTimer) {
+    pendingTrackTimer = setTimeout(flushPendingTrackEvents, 100);
+  }
+}
 
 const metadataWorkerPool = new WorkerPool<
   { filePath: string },
@@ -92,10 +135,19 @@ async function scanDirectory(dirPath: string): Promise<string[]> {
  * Get file stats
  */
 async function getFileStats(filePath: string): Promise<{ size: number; mtime: Date } | null> {
+  const cached = fileStatCache.get(filePath);
+  if (cached && Date.now() - cached.checkedAt < FILE_STAT_CACHE_TTL_MS) {
+    return cached.value;
+  }
   try {
     const stats = await fs.stat(filePath);
-    return { size: stats.size, mtime: stats.mtimeMs ? new Date(stats.mtimeMs) : stats.mtime };
+    const value = { size: stats.size, mtime: stats.mtimeMs ? new Date(stats.mtimeMs) : stats.mtime };
+    fileStatCache.set(filePath, { value, checkedAt: Date.now() });
+    pruneFileStatCache();
+    return value;
   } catch {
+    fileStatCache.set(filePath, { value: null, checkedAt: Date.now() });
+    pruneFileStatCache();
     return null;
   }
 }
@@ -153,6 +205,13 @@ async function processAudioFile(filePath: string): Promise<ScannedTrack | null> 
  * Send progress update to renderer
  */
 function sendProgress(progress: ScanProgress) {
+  const now = Date.now();
+  const shouldForce = progress.phase === 'complete' || progress.phase === 'indexing' || progress.phase !== lastProgressPhase;
+  if (!shouldForce && now - lastProgressAt < 200) {
+    return;
+  }
+  lastProgressAt = now;
+  lastProgressPhase = progress.phase;
   const windows = BrowserWindow.getAllWindows();
   windows.forEach(window => {
     window.webContents.send('library:scan-progress', progress);
@@ -208,18 +267,30 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
     // Skip files that already exist and haven't been modified
     const filesToProcess: string[] = [];
     const skippedFiles: string[] = [];
-    
-    for (const filePath of allFiles) {
-      const existingTrack = existingPaths.get(filePath);
-      if (existingTrack) {
-        // Check if file was modified since last scan
-        const stats = await getFileStats(filePath);
-        if (stats && new Date(existingTrack.lastModified).getTime() === stats.mtime.getTime()) {
-          skippedFiles.push(filePath);
-          continue;
+    const STAT_BATCH_SIZE = 25;
+
+    for (let i = 0; i < allFiles.length; i += STAT_BATCH_SIZE) {
+      const batch = allFiles.slice(i, i + STAT_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (filePath) => {
+          const existingTrack = existingPaths.get(filePath);
+          if (!existingTrack) return { filePath, skip: false };
+
+          const stats = await getFileStats(filePath);
+          if (stats && new Date(existingTrack.lastModified).getTime() === stats.mtime.getTime()) {
+            return { filePath, skip: true };
+          }
+          return { filePath, skip: false };
+        })
+      );
+
+      for (const result of batchResults) {
+        if (result.skip) {
+          skippedFiles.push(result.filePath);
+        } else {
+          filesToProcess.push(result.filePath);
         }
       }
-      filesToProcess.push(filePath);
     }
     
     console.log(`\n🔄 Processing: ${filesToProcess.length} new/modified files`);
@@ -233,7 +304,7 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
     
     // Phase 3: Extract metadata with adaptive batch sizing
     // Optimize batch size based on system performance
-    const BATCH_SIZE = 15; // Increased from 10 for better throughput
+    const BATCH_SIZE = Math.max(8, Math.min(20, os.cpus().length * 3));
     let processedCount = skippedFiles.length;
     let successCount = 0;
     let errorCount = 0;
@@ -248,10 +319,7 @@ async function scanLibrary(directories: string[]): Promise<ScannedTrack[]> {
           const track = await processAudioFile(filePath);
           if (track) {
             // Send real-time updates to renderer
-            const windows = BrowserWindow.getAllWindows();
-            windows.forEach(window => {
-              window.webContents.send('library:track-added', track);
-            });
+            queueTrackAddedEvent(track);
             return { success: true, track };
           }
           return { success: false, track: null };
@@ -350,10 +418,7 @@ function startWatching(directories: string[]) {
         if (track) {
           await storage.addTrack(track);
           // Notify renderer
-          const windows = BrowserWindow.getAllWindows();
-          windows.forEach(window => {
-            window.webContents.send('library:track-added', track);
-          });
+          queueTrackAddedEvent(track);
         }
       }
     })
