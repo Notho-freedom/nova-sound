@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Video, VideoGenre, WatchProgress } from "@/types/music";
 import { useVideos } from "./useVideos";
+import { useVideoLibraryWorker } from "./useVideoLibraryWorker";
 
 // Storage keys
 const WATCHLIST_KEY = "nexus-video-watchlist";
@@ -140,76 +141,29 @@ export function useVideoLibrary(): UseVideoLibraryReturn {
     });
   }, []);
 
-  // Enhanced videos with user data
-  const enhancedVideos = useMemo(() => {
-    return videos.map((video) => ({
-      ...video,
-      isFavorite: state.favorites.includes(video.id),
-      isInWatchlist: state.watchlist.includes(video.id),
-      watchProgress: state.watchProgress[video.id] || undefined,
-      userRating: state.userRatings[video.id] || undefined,
-    }));
-  }, [videos, state]);
+  const { computed } = useVideoLibraryWorker({ videos, state });
 
-  // Continue watching (videos with progress but not completed)
-  const continueWatching = useMemo(() => {
-    return enhancedVideos
-      .filter((v) => v.watchProgress && !v.watchProgress.completed && v.watchProgress.percentage > 5)
-      .sort((a, b) => {
-        const aTime = new Date(a.watchProgress!.lastWatchedAt).getTime();
-        const bTime = new Date(b.watchProgress!.lastWatchedAt).getTime();
-        return bTime - aTime;
-      });
-  }, [enhancedVideos]);
+  const enhancedVideos = computed?.enhancedVideos ?? videos;
+  const continueWatching = computed?.continueWatching ?? [];
+  const recentlyAdded = computed?.recentlyAdded ?? [];
+  const recentlyWatched = computed?.recentlyWatched ?? [];
+  const watchlistVideos = computed?.watchlistVideos ?? [];
+  const favoriteVideos = computed?.favoriteVideos ?? [];
+  const availableGenres = computed?.availableGenres ?? [];
+  const genreMap = computed?.genreMap ?? {};
+  const movies = computed?.movies ?? [];
+  const series = computed?.series ?? [];
+  const episodes = computed?.episodes ?? [];
+  const clips = computed?.clips ?? [];
 
-  // Recently added (last 30 days)
-  const recentlyAdded = useMemo(() => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    return enhancedVideos
-      .filter((v) => new Date(v.addedAt).getTime() > thirtyDaysAgo)
-      .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
-  }, [enhancedVideos]);
-
-  // Recently watched
-  const recentlyWatched = useMemo(() => {
-    const watchedIds = state.watchHistory.map((h) => h.videoId);
-    return watchedIds
-      .map((id) => enhancedVideos.find((v) => v.id === id))
-      .filter((v) => v !== undefined) as Video[];
-  }, [enhancedVideos, state.watchHistory]);
-
-  // Watchlist videos
-  const watchlistVideos = useMemo(() => {
-    return enhancedVideos.filter((v) => state.watchlist.includes(v.id));
-  }, [enhancedVideos, state.watchlist]);
-
-  // Favorite videos
-  const favoriteVideos = useMemo(() => {
-    return enhancedVideos.filter((v) => state.favorites.includes(v.id));
-  }, [enhancedVideos, state.favorites]);
-
-  // Available genres
-  const availableGenres = useMemo(() => {
-    const genreSet = new Set<VideoGenre>();
-    enhancedVideos.forEach((v) => {
-      v.genres?.forEach((g) => genreSet.add(g));
-    });
-    return Array.from(genreSet).sort();
-  }, [enhancedVideos]);
-
-  // Get videos by genre
   const getVideosByGenre = useCallback(
     (genre: VideoGenre) => {
+      const fromMap = genreMap[genre];
+      if (fromMap) return fromMap;
       return enhancedVideos.filter((v) => v.genres?.includes(genre));
     },
-    [enhancedVideos]
+    [genreMap, enhancedVideos]
   );
-
-  // Videos by type
-  const movies = useMemo(() => enhancedVideos.filter((v) => v.type === "movie"), [enhancedVideos]);
-  const series = useMemo(() => enhancedVideos.filter((v) => v.type === "series"), [enhancedVideos]);
-  const episodes = useMemo(() => enhancedVideos.filter((v) => v.type === "episode"), [enhancedVideos]);
-  const clips = useMemo(() => enhancedVideos.filter((v) => v.type === "clip" || v.type === "music_video"), [enhancedVideos]);
 
   // Watchlist actions
   const addToWatchlist = useCallback(
