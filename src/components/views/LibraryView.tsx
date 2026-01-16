@@ -50,6 +50,7 @@ import { UploadIndicator } from "@/components/UploadIndicator";
 import { AlbumGridSkeleton, TrackGridSkeleton, TrackTableSkeleton } from "@/components/ui/skeletons";
 import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/PageLayout";
 import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
+import { useLibraryWorker } from "@/hooks/useLibraryWorker";
 import { fetchYouTubeChannelPlaylists, fetchYouTubePlaylistVideos } from "@/lib/youtube-playlists";
 import { extractYouTubeChannelId } from "@/lib/youtube";
 import { youtubeSuggestionsToTracks } from "@/lib/youtube-artist-search";
@@ -112,7 +113,7 @@ const AlbumCard = memo(({
   onSelect, 
   onPlay,
 }: { 
-  album: { name: string; artist: string; coverUrl: string; tracks: Track[]; year?: number };
+  album: { name: string; artist: string; coverUrl?: string | null; tracks: Track[]; year?: number | null };
   onSelect: () => void;
   onPlay: () => void;
 }) => (
@@ -327,69 +328,6 @@ const StatCard = memo(({ icon: Icon, label, value, color }: {
 ));
 StatCard.displayName = "StatCard";
 
-// Group tracks by album
-const groupByAlbum = (tracks: Track[]) => {
-  const albums = new Map<string, { name: string; artist: string; coverUrl: string; tracks: Track[]; year?: number }>();
-  
-  tracks.forEach(track => {
-    // Ignorer les tracks sans album (même logique que le badge)
-    if (!track.album) return;
-    
-    const key = `${track.album}-${track.artist}`;
-    if (!albums.has(key)) {
-      albums.set(key, {
-        name: track.album,
-        artist: track.artist,
-        coverUrl: track.coverUrl,
-        tracks: [],
-        year: track.year
-      });
-    }
-    albums.get(key)!.tracks.push(track);
-  });
-  
-  return Array.from(albums.values()).sort((a, b) => a.name.localeCompare(b.name));
-};
-
-// Group tracks by artist
-const groupByArtist = (tracks: Track[]) => {
-  const artists = new Map<string, { name: string; tracks: Track[]; albums: Set<string> }>();
-  
-  tracks.forEach(track => {
-    if (!artists.has(track.artist)) {
-      artists.set(track.artist, {
-        name: track.artist,
-        tracks: [],
-        albums: new Set()
-      });
-    }
-    const artist = artists.get(track.artist)!;
-    artist.tracks.push(track);
-    artist.albums.add(track.album);
-  });
-  
-  return Array.from(artists.values()).sort((a, b) => a.name.localeCompare(b.name));
-};
-
-// Group tracks by folder
-const groupByFolder = (tracks: Track[]) => {
-  const folders = new Map<string, { path: string; tracks: Track[] }>();
-  
-  tracks.forEach(track => {
-    if (!track.filePath) return;
-    const folderPath = track.filePath.replace(/[/\\][^/\\]+$/, '');
-    if (!folders.has(folderPath)) {
-      folders.set(folderPath, {
-        path: folderPath,
-        tracks: []
-      });
-    }
-    folders.get(folderPath)!.tracks.push(track);
-  });
-  
-  return Array.from(folders.values()).sort((a, b) => a.path.localeCompare(b.path));
-};
-
 export const LibraryView = memo(({
   tracks,
   currentTrackIndex,
@@ -451,125 +389,28 @@ export const LibraryView = memo(({
   const [youtubePlaylists, setYoutubePlaylists] = useState<Array<{ id: string; title: string; videoCount: number; tracks: Track[] }>>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
 
-  // Utility function to remove duplicates
-  const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
-    const seen = new Set<string>();
-    return trackList.filter(track => {
-      if (seen.has(track.id)) return false;
-      seen.add(track.id);
-      return true;
-    });
-  }, []);
+  const { computed } = useLibraryWorker({
+    tracks,
+    searchQuery,
+    sortMode,
+    albumsSearchQuery,
+    albumsFilterArtist,
+    albumsSortBy,
+    albumsSortOrder,
+    artistsSearchQuery,
+    artistsSortBy,
+    artistsSortOrder,
+  });
 
-  const filteredAndSortedTracks = useMemo(() => {
-    const uniqueTracks = getUniqueTracks(tracks);
-    
-    if (searchQuery.trim()) {
-      try {
-        const { searchAndSortTracks } = require('@/lib/search-utils');
-        return searchAndSortTracks(uniqueTracks, searchQuery, sortMode);
-      } catch {
-        const query = searchQuery.toLowerCase();
-        const filtered = uniqueTracks.filter(track =>
-          track.title.toLowerCase().includes(query) ||
-          track.artist.toLowerCase().includes(query) ||
-          track.album.toLowerCase().includes(query)
-        );
-        const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
-        return [...filtered].sort((a, b) => {
-          switch (sortMode) {
-            case "title": return collator.compare(a.title, b.title);
-            case "artist": return collator.compare(a.artist, b.artist);
-            case "album": return collator.compare(a.album, b.album);
-            case "duration": return b.duration - a.duration;
-            case "date": return (b.addedAt || "").localeCompare(a.addedAt || "");
-            default: return 0;
-          }
-        });
-      }
-    }
-    
-    const collator = new Intl.Collator('fr', { sensitivity: 'base', numeric: true });
-    return [...uniqueTracks].sort((a, b) => {
-      switch (sortMode) {
-        case "title": return collator.compare(a.title, b.title);
-        case "artist": return collator.compare(a.artist, b.artist);
-        case "album": return collator.compare(a.album, b.album);
-        case "duration": return b.duration - a.duration;
-        case "date": return (b.addedAt || "").localeCompare(a.addedAt || "");
-        default: return 0;
-      }
-    });
-  }, [tracks, sortMode, searchQuery, getUniqueTracks]);
-
-  const albums = useMemo(() => groupByAlbum(tracks), [tracks]);
-  const artists = useMemo(() => groupByArtist(tracks), [tracks]);
-  const folders = useMemo(() => groupByFolder(tracks), [tracks]);
-
-  // Filtered and sorted albums
-  const filteredAndSortedAlbums = useMemo(() => {
-    let filtered = albums;
-
-    if (albumsSearchQuery.trim()) {
-      const query = albumsSearchQuery.toLowerCase();
-      filtered = filtered.filter(album =>
-        album.name.toLowerCase().includes(query) ||
-        album.artist.toLowerCase().includes(query)
-      );
-    }
-
-    if (albumsFilterArtist) {
-      filtered = filtered.filter(album => album.artist === albumsFilterArtist);
-    }
-
-    return [...filtered].sort((a, b) => {
-      let comparison = 0;
-      switch (albumsSortBy) {
-        case "name": comparison = a.name.localeCompare(b.name); break;
-        case "artist": comparison = a.artist.localeCompare(b.artist); break;
-        case "year": comparison = (a.year || 0) - (b.year || 0); break;
-        case "tracks": comparison = a.tracks.length - b.tracks.length; break;
-      }
-      return albumsSortOrder === "asc" ? comparison : -comparison;
-    });
-  }, [albums, albumsSearchQuery, albumsFilterArtist, albumsSortBy, albumsSortOrder]);
-
-  // Get unique artists for album filter
-  const uniqueAlbumArtists = useMemo(() => {
-    const artistsSet = new Set<string>();
-    albums.forEach(album => {
-      if (album.artist) artistsSet.add(album.artist);
-    });
-    return Array.from(artistsSet).sort();
-  }, [albums]);
-
-  // Filtered and sorted artists
-  const filteredAndSortedArtists = useMemo(() => {
-    let filtered = artists;
-
-    if (artistsSearchQuery.trim()) {
-      const query = artistsSearchQuery.toLowerCase();
-      filtered = filtered.filter(artist => artist.name.toLowerCase().includes(query));
-    }
-
-    return [...filtered].sort((a, b) => {
-      let comparison = 0;
-      switch (artistsSortBy) {
-        case "name": comparison = a.name.localeCompare(b.name); break;
-        case "albums": comparison = a.albums.size - b.albums.size; break;
-        case "tracks": comparison = a.tracks.length - b.tracks.length; break;
-      }
-      return artistsSortOrder === "asc" ? comparison : -comparison;
-    });
-  }, [artists, artistsSearchQuery, artistsSortBy, artistsSortOrder]);
-
-  const totalDuration = tracks.reduce((acc, track) => acc + track.duration, 0);
-
-  // Get random cover images for visual display
-  const randomCovers = useMemo(() => {
-    const coversWithImages = tracks.filter(t => t.coverUrl);
-    return coversWithImages.sort(() => Math.random() - 0.5);
-  }, [tracks]);
+  const filteredAndSortedTracks = computed?.filteredAndSortedTracks ?? tracks;
+  const albums = computed?.albums ?? [];
+  const artists = computed?.artists ?? [];
+  const folders = computed?.folders ?? [];
+  const filteredAndSortedAlbums = computed?.filteredAndSortedAlbums ?? albums;
+  const uniqueAlbumArtists = computed?.uniqueAlbumArtists ?? [];
+  const filteredAndSortedArtists = computed?.filteredAndSortedArtists ?? artists;
+  const totalDuration = computed?.totalDuration ?? 0;
+  const randomCovers = computed?.randomCovers ?? [];
 
   // Handle initial album selection
   useEffect(() => {
@@ -660,7 +501,7 @@ export const LibraryView = memo(({
           {/* Background gradient with album cover */}
           <div className="absolute inset-0 h-[400px] overflow-hidden">
             <img
-              src={getCoverUrl(album.coverUrl)}
+              src={getCoverUrl(album.coverUrl ?? undefined)}
               alt=""
               className="w-full h-full object-cover opacity-100 blur-[8px] scale-110"
             />
@@ -689,7 +530,7 @@ export const LibraryView = memo(({
                 className="relative"
               >
                 <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-2xl ring-4 ring-primary/20">
-                  <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
+                  <img src={getCoverUrl(album.coverUrl ?? undefined)} alt={album.name} className="w-full h-full object-cover" />
                 </div>
               </motion.div>
 
