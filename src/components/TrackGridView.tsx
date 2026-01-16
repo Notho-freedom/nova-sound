@@ -1,16 +1,19 @@
-import { Play } from "lucide-react";
+import { Play, Cloud } from "lucide-react";
+import { useMemo, type CSSProperties } from "react";
+import { FixedSizeGrid as Grid, type GridChildComponentProps } from "react-window";
+import { AutoSizer } from "react-virtualized-auto-sizer";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { UploadIndicator } from "@/components/UploadIndicator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
-import { Cloud } from "lucide-react";
 
 interface TrackGridViewProps {
   tracks: Track[];
@@ -31,7 +34,7 @@ interface TrackGridViewProps {
   uploadTrackToNexus?: (track: Track) => void;
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToNexus?: boolean;
-  columns?: 2 | 3 | 4 | 5;
+  columns?: number;
   isUploaded?: (trackId: string) => boolean;
   getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
   onNavigateToArtist?: (artist: string) => void;
@@ -63,134 +66,271 @@ export const TrackGridView = ({
   onNavigateToArtist,
   onNavigateToAlbum,
 }: TrackGridViewProps) => {
-  const gridCols = {
+  const indexById = useMemo(() => {
+    const map = new Map<string, number>();
+    tracks.forEach((track, idx) => {
+      if (!map.has(track.id)) map.set(track.id, idx);
+    });
+    return map;
+  }, [tracks]);
+
+  const gridCols: Record<number, string> = {
     2: "grid-cols-2",
     3: "grid-cols-2 md:grid-cols-3",
     4: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
     5: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
   };
 
-  return (
-    <div className={cn("grid gap-4", gridCols[columns])}>
-      {tracks.map((track) => {
-        const actualIndex = tracks.findIndex(t => t.id === track.id);
-        const isCurrentTrack = currentTrackIndex === actualIndex;
+  const shouldVirtualize = tracks.length > 200;
 
-        return (
-          <TrackContextMenu
-            key={track.id}
-            track={track}
-            playlists={playlists}
-            isFavorite={isFavorite?.(track.id) || false}
-            onPlay={() => onTrackSelect(actualIndex)}
-            onPlayNext={() => onPlayNext?.(track)}
-            onAddToQueue={() => onAddToQueue?.(track)}
-            onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-            onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
-            onToggleFavorite={() => toggleFavorite?.(track.id)}
-            onUploadToCloudinary={() => uploadTrack?.(track)}
-            canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
-            isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-            onUploadToNexus={() => uploadTrackToNexus?.(track)}
-            canUploadToNexus={canUploadToNexus && !!track.filePath}
-            isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onPlayTrack ? onPlayTrack(track) : onTrackSelect(actualIndex)}
-                  className={cn(
-                    "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full",
-                    isCurrentTrack && "ring-2 ring-primary",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
-                  )}
-                >
-              <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
-                <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105" />
-                {/* Upload indicator badge */}
-                {isUploaded?.(track.id) && (
-                  <div className="absolute top-2 right-2 z-20">
-                    <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
-                  </div>
+  const cellData = useMemo(() => ({
+    tracks,
+    indexById,
+    currentTrackIndex,
+    isPlaying,
+    onTrackSelect,
+    onPlayTrack,
+    onPlayNext,
+    onAddToQueue,
+    onAddToPlaylist,
+    playlists,
+    isFavorite,
+    toggleFavorite,
+    createPlaylist,
+    uploadTrack,
+    getTrackProgress,
+    canUploadToCloudinary,
+    uploadTrackToNexus,
+    getNexusTrackProgress,
+    canUploadToNexus,
+    isUploaded,
+    getUploadedProvider,
+    onNavigateToArtist,
+    onNavigateToAlbum,
+    columnCount: columns,
+  }), [
+    tracks,
+    indexById,
+    currentTrackIndex,
+    isPlaying,
+    onTrackSelect,
+    onPlayTrack,
+    onPlayNext,
+    onAddToQueue,
+    onAddToPlaylist,
+    playlists,
+    isFavorite,
+    toggleFavorite,
+    createPlaylist,
+    uploadTrack,
+    getTrackProgress,
+    canUploadToCloudinary,
+    uploadTrackToNexus,
+    getNexusTrackProgress,
+    canUploadToNexus,
+    isUploaded,
+    getUploadedProvider,
+    onNavigateToArtist,
+    onNavigateToAlbum,
+    columns,
+  ]);
+
+  const Cell = ({ columnIndex, rowIndex, style, data }: GridChildComponentProps<typeof cellData>) => {
+    const index = rowIndex * data.columnCount + columnIndex;
+    if (index >= data.tracks.length) return null;
+    const track = data.tracks[index];
+    const actualIndex = data.indexById.get(track.id) ?? index;
+    const isCurrentTrack = data.currentTrackIndex === actualIndex;
+
+    const gap = 16;
+    const baseStyle = style as CSSProperties;
+    const left = typeof baseStyle.left === "number" ? baseStyle.left : 0;
+    const top = typeof baseStyle.top === "number" ? baseStyle.top : 0;
+    const width = typeof baseStyle.width === "number" ? baseStyle.width : 0;
+    const height = typeof baseStyle.height === "number" ? baseStyle.height : 0;
+    const adjustedStyle = {
+      ...style,
+      left: left + gap / 2,
+      top: top + gap / 2,
+      width: width - gap,
+      height: height - gap,
+    } as CSSProperties;
+
+    return (
+      <div style={adjustedStyle}>
+        <TrackContextMenu
+          track={track}
+          playlists={data.playlists}
+          isFavorite={data.isFavorite?.(track.id) || false}
+          onPlay={() => data.onTrackSelect(actualIndex)}
+          onPlayNext={() => data.onPlayNext?.(track)}
+          onAddToQueue={() => data.onAddToQueue?.(track)}
+          onAddToPlaylist={(playlistId) => data.onAddToPlaylist?.(playlistId, track)}
+          onCreatePlaylist={() => data.createPlaylist?.("Nouvelle playlist", [track.id])}
+          onToggleFavorite={() => data.toggleFavorite?.(track.id)}
+          onUploadToCloudinary={() => data.uploadTrack?.(track)}
+          canUploadToCloudinary={data.canUploadToCloudinary && !!track.filePath}
+          isUploading={data.getTrackProgress?.(track.id)?.status === "uploading"}
+          onUploadToNexus={() => data.uploadTrackToNexus?.(track)}
+          canUploadToNexus={data.canUploadToNexus && !!track.filePath}
+          isUploadingToNexus={data.getNexusTrackProgress?.(track.id)?.status === "uploading"}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onPlayTrack ? data.onPlayTrack(track) : data.onTrackSelect(actualIndex);
+                }}
+                className={cn(
+                  "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full h-full",
+                  isCurrentTrack && "ring-2 ring-primary",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                 )}
-                {/* Upload progress overlay */}
-                {getTrackProgress?.(track.id) && (
-                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
-                    <div className="text-center">
-                      <Cloud className="w-4 h-4 text-white mb-1 mx-auto" />
-                      <span className="text-[10px] text-white font-medium">
-                        {getTrackProgress(track.id)?.progress || 0}%
-                      </span>
+              >
+                <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+                  <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105" />
+                  {data.isUploaded?.(track.id) && (
+                    <div className="absolute top-2 right-2 z-20">
+                      <UploadIndicator provider={data.getUploadedProvider?.(track.id) || undefined} size="sm" />
                     </div>
-                  </div>
-                )}
-                {/* Progress bar */}
-                {getTrackProgress?.(track.id)?.status === 'uploading' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30">
-                    <div 
-                      className="h-full bg-primary transition-all duration-200 ease-out"
-                      style={{ width: `${getTrackProgress(track.id)?.progress || 0}%` }}
-                    />
-                  </div>
-                )}
-                {/* Play overlay */}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-out">
-                  <div className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center shadow-lg",
-                    isCurrentTrack && isPlaying ? "bg-primary" : "bg-primary/90"
-                  )}>
-                    {isCurrentTrack && isPlaying ? (
-                      <div className="flex items-center gap-1">
-                        <div className="w-1 h-4 bg-white rounded-full animate-wave" />
-                        <div className="w-1 h-4 bg-white rounded-full animate-wave" style={{ animationDelay: "0.1s" }} />
-                        <div className="w-1 h-4 bg-white rounded-full animate-wave" style={{ animationDelay: "0.2s" }} />
+                  )}
+                  {data.getTrackProgress?.(track.id) && (
+                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
+                      <div className="text-center">
+                        <Cloud className="w-4 h-4 text-white mb-1 mx-auto" />
+                        <span className="text-[10px] text-white font-medium">
+                          Upload {data.getTrackProgress?.(track.id)?.progress.toFixed(0)}%
+                        </span>
                       </div>
-                    ) : (
-                      <Play className="w-6 h-6 text-white fill-current ml-0.5" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-medium text-sm line-clamp-1">{track.title}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{track.artist}</p>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{track.album}</span>
+                    <span>{formatTime(track.duration)}</span>
+                  </div>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">{track.title} - {track.artist}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TrackContextMenu>
+      </div>
+    );
+  };
+
+  if (!shouldVirtualize) {
+    return (
+      <div className={cn("grid gap-4", gridCols[columns] ?? gridCols[5])}>
+        {tracks.map((track, idx) => {
+          const actualIndex = indexById.get(track.id) ?? idx;
+          const isCurrentTrack = currentTrackIndex === actualIndex;
+
+          return (
+            <TrackContextMenu
+              key={track.id}
+              track={track}
+              playlists={playlists}
+              isFavorite={isFavorite?.(track.id) || false}
+              onPlay={() => onTrackSelect(actualIndex)}
+              onPlayNext={() => onPlayNext?.(track)}
+              onAddToQueue={() => onAddToQueue?.(track)}
+              onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+              onCreatePlaylist={() => createPlaylist?.("Nouvelle playlist", [track.id])}
+              onToggleFavorite={() => toggleFavorite?.(track.id)}
+              onUploadToCloudinary={() => uploadTrack?.(track)}
+              canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+              isUploading={getTrackProgress?.(track.id)?.status === "uploading"}
+              onUploadToNexus={() => uploadTrackToNexus?.(track)}
+              canUploadToNexus={canUploadToNexus && !!track.filePath}
+              isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === "uploading"}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onPlayTrack ? onPlayTrack(track) : onTrackSelect(actualIndex)}
+                    className={cn(
+                      "group p-4 rounded-xl text-left transition-all duration-200 ease-out hover:bg-card/50 hover:scale-[1.02] active:scale-[0.98] w-full",
+                      isCurrentTrack && "ring-2 ring-primary",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                     )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium truncate text-foreground mb-1 flex-1">{track.title}</p>
-                {isUploaded?.(track.id) && (
-                  <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">{formatTime(track.duration)}</p>
-            </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="text-sm font-medium">{track.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {onNavigateToArtist ? (
-                    <button
-                      className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
-                      onClick={e => { e.stopPropagation(); onNavigateToArtist(track.artist); }}
-                    >
-                      {track.artist}
-                    </button>
-                  ) : track.artist}
-                </div>
-                {track.album && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {onNavigateToAlbum ? (
-                      <button
-                        className="underline hover:text-primary hover:bg-primary/10 rounded px-1 transition-colors focus:outline-none"
-                        onClick={e => { e.stopPropagation(); onNavigateToAlbum(track.album, track.artist); }}
-                      >
-                        {track.album}
-                      </button>
-                    ) : track.album}
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground mt-1">{formatTime(track.duration)}</div>
-              </TooltipContent>
-            </Tooltip>
-          </TrackContextMenu>
-        );
-      })}
+                  >
+                    <div className="aspect-square rounded-lg overflow-hidden mb-3 relative shadow-lg">
+                      <img src={getCoverUrl(track.coverUrl)} alt={track.album} className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105" />
+                      {isUploaded?.(track.id) && (
+                        <div className="absolute top-2 right-2 z-20">
+                          <UploadIndicator provider={getUploadedProvider?.(track.id) || undefined} size="sm" />
+                        </div>
+                      )}
+                      {getTrackProgress?.(track.id) && (
+                        <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
+                          <div className="text-center">
+                            <Cloud className="w-4 h-4 text-white mb-1 mx-auto" />
+                            <span className="text-[10px] text-white font-medium">
+                              Upload {getTrackProgress?.(track.id)?.progress.toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-medium text-sm line-clamp-1">{track.title}</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{track.artist}</p>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{track.album}</span>
+                        <span>{formatTime(track.duration)}</span>
+                      </div>
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">{track.title} - {track.artist}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TrackContextMenu>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-[calc(100vh-320px)]">
+      <AutoSizer
+        renderProp={({ height, width }) => {
+          if (!height || !width) return null;
+          const gap = 16;
+          const minColWidth = 220;
+          const maxColumns = columns;
+          const computedColumns = Math.max(1, Math.min(maxColumns, Math.floor(width / (minColWidth + gap))));
+          const columnWidth = Math.floor((width - gap * (computedColumns - 1)) / computedColumns);
+          const rowHeight = columnWidth + 80;
+          const rowCount = Math.ceil(tracks.length / computedColumns);
+          const gridData = { ...cellData, columnCount: computedColumns };
+
+          return (
+            <Grid
+              height={height}
+              width={width}
+              columnCount={computedColumns}
+              columnWidth={columnWidth + gap}
+              rowCount={rowCount}
+              rowHeight={rowHeight + gap}
+              itemData={gridData}
+              overscanRowCount={2}
+              overscanColumnCount={1}
+            >
+              {Cell}
+            </Grid>
+          );
+        }}
+      />
     </div>
   );
 };
