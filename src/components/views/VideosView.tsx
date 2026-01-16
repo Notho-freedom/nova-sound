@@ -40,6 +40,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
+import { useVideosWorker } from "@/hooks/useVideosWorker";
 import { useVideoUpload } from "@/hooks/useVideoUpload";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
@@ -261,28 +262,20 @@ export const VideosView = memo(() => {
   const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
   const [youtubeAudioOnly, setYoutubeAudioOnly] = useState(false);
 
-  // Get featured videos for hero rotation
-  const featuredVideos = useMemo(() => {
-    const videos: Video[] = [];
-    // Priority: continue watching > recently added > recently watched > top rated
-    videos.push(...continueWatching);
-    videos.push(...recentlyAdded);
-    videos.push(...recentlyWatched);
-    
-    // Add top rated videos
-    const topRated = [...enhancedVideos]
-      .filter(v => v.ratings && v.ratings.length > 0)
-      .sort((a, b) => {
-        const aRating = a.ratings?.[0]?.value || 0;
-        const bRating = b.ratings?.[0]?.value || 0;
-        return bRating - aRating;
-      });
-    videos.push(...topRated);
-    
-    // Remove duplicates
-    const unique = videos.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
-    return unique;
-  }, [continueWatching, recentlyAdded, recentlyWatched, enhancedVideos]);
+  const { computed } = useVideosWorker({
+    enhancedVideos,
+    continueWatching,
+    recentlyAdded,
+    recentlyWatched,
+    watchlistVideos,
+    favoriteVideos,
+    viewMode,
+    searchQuery,
+    selectedGenre,
+    sortBy,
+  });
+
+  const featuredVideos = computed?.featuredVideos ?? [];
 
   // Auto-rotate hero video every 10 seconds
   const [heroVideoIndex, setHeroVideoIndex] = useState(0);
@@ -298,74 +291,9 @@ export const VideosView = memo(() => {
     return () => clearInterval(interval);
   }, [featuredVideos.length]);
 
-  // Filtered and sorted videos for browse mode
-  const filteredVideos = useMemo(() => {
-    let result = [...enhancedVideos];
+  const filteredVideos = computed?.filteredVideos ?? [];
 
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (v) =>
-          (v.title?.toLowerCase() || '').includes(query) ||
-          (v.description?.toLowerCase() || '').includes(query) ||
-          (v.director?.toLowerCase() || '').includes(query) ||
-          (v.cast?.some((c) => (c?.toLowerCase() || '').includes(query)) || false)
-      );
-    }
-
-    // Genre filter
-    if (selectedGenre) {
-      result = result.filter((v) => v.genres?.includes(selectedGenre));
-    }
-
-    // Sort
-    switch (sortBy) {
-      case "title":
-        result.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      case "duration":
-        result.sort((a, b) => b.duration - a.duration);
-        break;
-      case "size":
-        result.sort((a, b) => b.fileSize - a.fileSize);
-        break;
-      case "rating":
-        result.sort((a, b) => (b.userRating || 0) - (a.userRating || 0));
-        break;
-      case "added":
-        result.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
-        break;
-      case "recent":
-      default:
-        result.sort((a, b) => {
-          const aTime = a.lastPlayedAt ? new Date(a.lastPlayedAt).getTime() : 0;
-          const bTime = b.lastPlayedAt ? new Date(b.lastPlayedAt).getTime() : 0;
-          return bTime - aTime || new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
-        });
-    }
-
-    return result;
-  }, [enhancedVideos, searchQuery, selectedGenre, sortBy]);
-
-  // Get videos by current view
-  const displayVideos = useMemo(() => {
-    switch (viewMode) {
-      case "watchlist":
-        return watchlistVideos;
-      case "favorites":
-        return favoriteVideos;
-      case "history":
-        return recentlyWatched;
-      case "browse":
-        return filteredVideos;
-      case "youtube":
-        return []; // Mode YouTube: pas de vidéos locales, YouTubeSearchView gère sa propre liste
-      case "home":
-      default:
-        return enhancedVideos;
-    }
-  }, [viewMode, watchlistVideos, favoriteVideos, recentlyWatched, filteredVideos, enhancedVideos]);
+  const displayVideos = computed?.displayVideos ?? enhancedVideos;
 
   // Handlers
   const handlePlayVideo = useCallback((video: Video, audioOnly?: boolean) => {

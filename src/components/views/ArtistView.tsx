@@ -40,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrackContextMenu } from "@/components/TrackContextMenu";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useArtistWorker } from "@/hooks/useArtistWorker";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNexusUpload } from "@/hooks/useNexusUpload";
 import { useUploadedStatus } from "@/hooks/useUploadedStatus";
@@ -176,53 +177,17 @@ export const ArtistView = memo(({
   const [playlistTracks, setPlaylistTracks] = useState<Track[]>([]);
   const [convertingPlaylistId, setConvertingPlaylistId] = useState<string | null>(null);
 
-  // Get artist tracks from the library
-  const artistTracks = useMemo(() => {
-    return tracks.filter(t => t.artist.toLowerCase() === artistName.toLowerCase());
-  }, [tracks, artistName]);
+  const { computed } = useArtistWorker({ tracks, artistName });
 
-  // Get albums
-  const albums = useMemo(() => {
-    const albumsMap = new Map<string, { 
-      name: string; 
-      coverUrl: string; 
-      year?: number;
-      tracks: Track[];
-      totalDuration: number;
-    }>();
-    
-    artistTracks.forEach(track => {
-      const key = track.album || "Singles";
-      if (!albumsMap.has(key)) {
-        albumsMap.set(key, { 
-          name: key, 
-          coverUrl: track.coverUrl, 
-          year: track.year,
-          tracks: [],
-          totalDuration: 0,
-        });
-      }
-      const album = albumsMap.get(key)!;
-      album.tracks.push(track);
-      album.totalDuration += track.duration;
-    });
-    
-    return Array.from(albumsMap.values())
-      .sort((a, b) => (b.year || 0) - (a.year || 0));
-  }, [artistTracks]);
-
-  // Get popular tracks (sort by some metric - here we just take first 5)
-  const popularTracks = useMemo(() => {
-    return artistTracks;
-  }, [artistTracks]);
-
-  // Get total stats
-  const stats = useMemo(() => ({
-    totalTracks: artistTracks.length,
-    totalAlbums: albums.length,
-    totalDuration: artistTracks.reduce((sum, t) => sum + t.duration, 0),
-    genres: [...new Set(artistTracks.flatMap(t => t.genre ? [t.genre] : []))],
-  }), [artistTracks, albums]);
+  const artistTracks = computed?.artistTracks ?? [];
+  const albums = computed?.albums ?? [];
+  const popularTracks = computed?.popularTracks ?? [];
+  const stats = computed?.stats ?? {
+    totalTracks: 0,
+    totalAlbums: 0,
+    totalDuration: 0,
+    genres: [],
+  };
 
   // Get similar artists from metadata
   const similarArtists = useMemo(() => {
@@ -598,7 +563,7 @@ export const ArtistView = memo(({
                         key={album.name}
                         title={album.name}
                         subtitle={album.year ? String(album.year) : `${album.tracks.length} titres`}
-                        imageUrl={getCoverUrl(album.coverUrl)}
+                        imageUrl={getCoverUrl(album.coverUrl ?? undefined)}
                         onClick={() => onAlbumClick?.(album.name, artistName)}
                         onPlay={() => {
                           const idx = tracks.findIndex(t => t.id === album.tracks[0].id);
@@ -651,7 +616,7 @@ export const ArtistView = memo(({
                     onClick={() => onAlbumClick?.(album.name, artistName)}
                   >
                     <img
-                      src={getCoverUrl(album.coverUrl)}
+                      src={getCoverUrl(album.coverUrl ?? undefined)}
                       alt={album.name}
                       className="w-full h-full object-cover"
                     />
