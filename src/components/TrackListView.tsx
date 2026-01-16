@@ -163,22 +163,40 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       const tooltipText = `${track.title} - ${track.artist}${track.album ? ` (${track.album})` : ''} - ${formatTime(track.duration)}`;
 
       return (
-        <div
-          style={style}
-          onClick={() => data.onPlayTrack ? data.onPlayTrack(track) : data.onTrackSelect(actualIndex)}
-          className={cn(
-            "grid items-center cursor-pointer",
-            "border-b border-border/30",
-            isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
-            "transition-all duration-200 ease-out",
-          )}
-          role="row"
-          aria-selected={isCurrentTrack}
+        <TrackContextMenu
+          track={track}
+          playlists={data.playlists}
+          isFavorite={data.isFavorite?.(track.id) || false}
+          onPlay={() => data.onTrackSelect(actualIndex)}
+          onPlayNext={() => data.onPlayNext?.(track)}
+          onAddToQueue={() => data.onAddToQueue?.(track)}
+          onAddToPlaylist={(playlistId) => data.onAddToPlaylist?.(playlistId, track)}
+          onCreatePlaylist={() => data.createPlaylist?.("Nouvelle playlist", [track.id])}
+          onToggleFavorite={() => data.toggleFavorite?.(track.id)}
+          onUploadToCloudinary={() => data.uploadTrack?.(track)}
+          canUploadToCloudinary={data.canUploadToCloudinary && !!track.filePath}
+          isUploading={data.getTrackProgress?.(track.id)?.status === 'uploading'}
+          onUploadToNexus={() => data.uploadTrackToNexus?.(track)}
+          canUploadToNexus={data.canUploadToNexus && !!track.filePath}
+          isUploadingToNexus={data.getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+          onRemoveFromPlaylist={data.showRemoveFromPlaylist ? () => data.onRemoveFromPlaylist?.(track) : undefined}
         >
           <div
-            className="grid items-center px-4 py-2.5"
-            style={{ gridTemplateColumns: columnsTemplate }}
+            style={style}
+            onClick={() => data.onPlayTrack ? data.onPlayTrack(track) : data.onTrackSelect(actualIndex)}
+            className={cn(
+              "grid items-center cursor-pointer",
+              "border-b border-border/30",
+              isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
+              "transition-all duration-200 ease-out",
+            )}
+            role="row"
+            aria-selected={isCurrentTrack}
           >
+            <div
+              className="grid items-center px-4 py-2.5"
+              style={{ gridTemplateColumns: columnsTemplate }}
+            >
             <div className="flex items-center justify-center">
               {isCurrentTrack && data.isPlaying ? (
                 <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
@@ -254,34 +272,16 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
               {data.isUploaded?.(track.id) && (
                 <UploadIndicator provider={data.getUploadedProvider?.(track.id) || undefined} size="sm" />
               )}
-              <TrackContextMenu
-                track={track}
-                playlists={data.playlists}
-                isFavorite={data.isFavorite?.(track.id) || false}
-                onPlay={() => data.onTrackSelect(actualIndex)}
-                onPlayNext={() => data.onPlayNext?.(track)}
-                onAddToQueue={() => data.onAddToQueue?.(track)}
-                onAddToPlaylist={(playlistId) => data.onAddToPlaylist?.(playlistId, track)}
-                onCreatePlaylist={() => data.createPlaylist?.("Nouvelle playlist", [track.id])}
-                onToggleFavorite={() => data.toggleFavorite?.(track.id)}
-                onUploadToCloudinary={() => data.uploadTrack?.(track)}
-                canUploadToCloudinary={data.canUploadToCloudinary && !!track.filePath}
-                isUploading={data.getTrackProgress?.(track.id)?.status === 'uploading'}
-                onUploadToNexus={() => data.uploadTrackToNexus?.(track)}
-                canUploadToNexus={data.canUploadToNexus && !!track.filePath}
-                isUploadingToNexus={data.getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                onRemoveFromPlaylist={data.showRemoveFromPlaylist ? () => data.onRemoveFromPlaylist?.(track) : undefined}
+              <button
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                onClick={(e) => e.stopPropagation()}
               >
-                <button
-                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </TrackContextMenu>
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
+        </TrackContextMenu>
       );
     });
 
