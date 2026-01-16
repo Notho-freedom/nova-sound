@@ -114,7 +114,6 @@ export const NowPlayingBar = ({
   isAudioAIPro = false,
   // onShowKaraoke, // DÉSACTIVÉ
 }: NowPlayingBarProps) => {
-  const [isHoveringProgress, setIsHoveringProgress] = useState(false)
   const [isHoveringVolume, setIsHoveringVolume] = useState(false)
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2
@@ -136,50 +135,18 @@ export const NowPlayingBar = ({
         )}
       >
         {/* Ambient glow from album art */}
-        <div
-          className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse at 10% 50%, hsl(var(--primary) / 0.3), transparent 50%)`,
-          }}
-        />
+        <div className="absolute inset-0 opacity-30 pointer-events-none now-playing-ambient" />
 
         {/* Progress Bar - Interactive full width */}
         <div
           className="relative h-1.5 w-full group cursor-pointer"
-          onMouseEnter={() => setIsHoveringProgress(true)}
-          onMouseLeave={() => setIsHoveringProgress(false)}
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect()
             const percent = (e.clientX - rect.left) / rect.width
             onSeek([percent * effectiveDuration])
           }}
         >
-          {/* Background track */}
-          <div className="absolute inset-0 bg-white/5" />
-
-          {/* Buffered indicator */}
-          <div className="absolute inset-y-0 left-0 w-1/3 bg-white/10" />
-
-          {/* Progress fill with gradient */}
-          <div
-            className="absolute inset-y-0 left-0 transition-all duration-150 ease-out"
-            style={{ width: `${progress}%` }}
-          >
-            <div className="h-full bg-gradient-to-r from-primary via-primary to-secondary" />
-            {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/50 to-secondary/50 blur-sm" />
-          </div>
-
-          {/* Hover scrubber */}
-          <div
-            className={cn(
-              "absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full",
-              "bg-white shadow-lg shadow-black/50",
-              "transition-all duration-200",
-              isHoveringProgress ? "opacity-100 scale-100" : "opacity-0 scale-75",
-            )}
-            style={{ left: `calc(${progress}% - 8px)` }}
-          />
+          <progress className="now-playing-progress" value={progress} max={100} />
         </div>
 
         {/* Main Content */}
@@ -192,6 +159,7 @@ export const NowPlayingBar = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onShowPlayer}
+                    aria-label="Ouvrir le lecteur"
                     className={cn(
                       "relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 group",
                       "ring-2 ring-white/10 hover:ring-primary/50",
@@ -210,19 +178,10 @@ export const NowPlayingBar = ({
                     {isPlaying && (
                       <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                         <div className="flex items-end gap-0.5 h-4">
-                          <div className="w-1 bg-primary rounded-full animate-wave" style={{ height: "100%" }} />
-                          <div
-                            className="w-1 bg-primary rounded-full animate-wave"
-                            style={{ animationDelay: "0.1s", height: "70%" }}
-                          />
-                          <div
-                            className="w-1 bg-primary rounded-full animate-wave"
-                            style={{ animationDelay: "0.2s", height: "85%" }}
-                          />
-                          <div
-                            className="w-1 bg-primary rounded-full animate-wave"
-                            style={{ animationDelay: "0.3s", height: "60%" }}
-                          />
+                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-full" />
+                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-70 wave-delay-100" />
+                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-85 wave-delay-200" />
+                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-60 wave-delay-300" />
                         </div>
                       </div>
                     )}
@@ -265,6 +224,7 @@ export const NowPlayingBar = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onToggleFavorite}
+                    aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       isFavorite ? "text-rose-500 hover:text-rose-400" : "text-muted-foreground/50 hover:text-rose-500",
@@ -295,6 +255,7 @@ export const NowPlayingBar = ({
                   <TooltipTrigger asChild>
                     <button
                       onClick={onShuffle}
+                      aria-label="Lecture aléatoire"
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
                         isShuffle ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
@@ -311,6 +272,7 @@ export const NowPlayingBar = ({
                 {/* Previous */}
                 <button
                   onClick={onPrevious}
+                  aria-label="Piste précédente"
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-foreground/80 hover:text-foreground",
@@ -324,6 +286,7 @@ export const NowPlayingBar = ({
                 {/* Play/Pause - Main button */}
                 <button
                   onClick={onPlayPause}
+                  aria-label={isPlaying ? "Pause" : "Lecture"}
                   className={cn(
                     "w-12 h-12 rounded-full flex items-center justify-center",
                     "bg-white text-black",
@@ -343,6 +306,7 @@ export const NowPlayingBar = ({
                 {/* Next */}
                 <button
                   onClick={onNext}
+                  aria-label="Piste suivante"
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-foreground/80 hover:text-foreground",
@@ -358,6 +322,7 @@ export const NowPlayingBar = ({
                   <TooltipTrigger asChild>
                     <button
                       onClick={onRepeat}
+                      aria-label="Répétition"
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
                         repeatMode !== "off"
@@ -395,11 +360,8 @@ export const NowPlayingBar = ({
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <button
+                      aria-label="Analyse audio"
                       onClick={() => {
-                        logMetric("audio_analysis_click", {
-                          isPro: audioAnalysis.isPro,
-                          hasTranscription: Boolean(audioAnalysis.transcription),
-                        })
                         if (audioAnalysis.isPro && !audioAnalysis.transcription && onStartAIAnalysis) {
                           onStartAIAnalysis();
                           toast.info("Analyse IA en cours...", { duration: 3000 });
@@ -470,6 +432,7 @@ export const NowPlayingBar = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => onShowArtistInfo?.()}
+                    aria-label="Profil artiste"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-primary",
@@ -509,6 +472,7 @@ export const NowPlayingBar = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onShowLyrics}
+                    aria-label="Afficher les paroles"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
@@ -528,6 +492,7 @@ export const NowPlayingBar = ({
                   <button
                     data-coachmark="player-queue-btn"
                     onClick={onToggleQueue}
+                    aria-label="Ouvrir la file d'attente"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       isQueueOpen ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
@@ -545,6 +510,7 @@ export const NowPlayingBar = ({
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
+                    aria-label="Appareils"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
@@ -566,6 +532,7 @@ export const NowPlayingBar = ({
               >
                 <button
                   onClick={onMuteToggle}
+                  aria-label={isMuted ? "Activer le son" : "Couper le son"}
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-muted-foreground/50 hover:text-foreground",
@@ -596,6 +563,7 @@ export const NowPlayingBar = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onFullscreen}
+                    aria-label="Plein écran"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
@@ -613,6 +581,7 @@ export const NowPlayingBar = ({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
+                    aria-label="Plus d'options"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",

@@ -1999,6 +1999,10 @@ export const DesktopApp = () => {
             setAlbumToOpen(albumKey);
             setCurrentView("albums");
           }}
+          onFilterByGenre={(genreName) => {
+            setSearchQuery(genreName);
+            setCurrentView("search");
+          }}
         />
         );
       case "search":

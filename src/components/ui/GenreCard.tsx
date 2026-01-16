@@ -112,7 +112,7 @@ export const GenreCard = memo(
           <div className="relative h-full p-4 flex flex-col justify-end">
             <div className="flex items-center gap-2">
               {icon && <div className="text-white/90">{icon}</div>}
-              <h3 className="font-display text-lg font-bold text-white drop-shadow-lg capitalize">{name}</h3>
+              <h3 className="font-display text-lg font-bold text-white drop-shadow-lg capitalize truncate">{name}</h3>
             </div>
             {trackCount !== undefined && (
               <p className="text-white/70 text-xs mt-0.5">
