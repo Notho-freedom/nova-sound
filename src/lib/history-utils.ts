@@ -1,6 +1,7 @@
 import type { Track } from "@/types/music";
 import type { HistoryEntry } from "@/hooks/usePlayHistory";
 import { getCachedYouTubeTrackByVideoId } from "@/lib/youtube-track-cache";
+import { queueTrackRecovery } from "@/lib/youtube-track-recovery";
 
 export function mapHistoryEntriesToTracks(
   history: HistoryEntry[],
@@ -8,6 +9,9 @@ export function mapHistoryEntriesToTracks(
   queueTracks: Track[],
   libraryTracks: Track[]
 ): Track[] {
+  // Collecter les tracks manquants pour récupération batch
+  const missingYouTubeIds: string[] = [];
+  
   const mapped = history
     .map(h => {
       // 1) Direct lookup by id in allTracks
@@ -21,6 +25,9 @@ export function mapHistoryEntriesToTracks(
 
         const cached = getCachedYouTubeTrackByVideoId(h.youtubeVideoId);
         if (cached) return cached;
+        
+        // Track YouTube manquant - ajouter pour récupération
+        missingYouTubeIds.push(h.trackId);
       }
 
       // 3) Check the active queue
@@ -28,9 +35,21 @@ export function mapHistoryEntriesToTracks(
       if (trackInQueue) return trackInQueue;
 
       // 4) Fallback to library
-      return libraryTracks.find(t => t.id === h.trackId);
+      const libraryTrack = libraryTracks.find(t => t.id === h.trackId);
+      
+      // Si toujours pas trouvé, vérifier si c'est un track YouTube
+      if (!libraryTrack && isYouTubeTrackId(h.trackId)) {
+        missingYouTubeIds.push(h.trackId);
+      }
+      
+      return libraryTrack;
     })
     .filter((t): t is Track => t !== undefined);
+
+  // Lancer la récupération des tracks YouTube manquants en arrière-plan
+  if (missingYouTubeIds.length > 0) {
+    queueTrackRecovery(missingYouTubeIds);
+  }
 
   // Remove duplicates preserving order
   const seen = new Set<string>();
@@ -43,3 +62,19 @@ export function mapHistoryEntriesToTracks(
   }
   return unique;
 }
+
+/**
+ * Vérifie si un trackId correspond à un track YouTube
+ */
+function isYouTubeTrackId(trackId: string): boolean {
+  if (!trackId) return false;
+  
+  return (
+    trackId.startsWith('youtube-') ||
+    trackId.startsWith('yt-') ||
+    trackId.includes('youtube.com') ||
+    trackId.includes('youtu.be') ||
+    (trackId.length === 11 && /^[a-zA-Z0-9_-]+$/.test(trackId))
+  );
+}
+

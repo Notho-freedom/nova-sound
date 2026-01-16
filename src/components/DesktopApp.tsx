@@ -53,6 +53,7 @@ import { mapHistoryEntriesToTracks } from "@/lib/history-utils";
 import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 import { CoachmarkProvider } from "@/features/coachmarks";
 import "@/features/coachmarks/styles/coachmarks-theme.css";
+import { recoverMissingYouTubeTracks } from "@/lib/youtube-track-recovery";
 //import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 //import { useAudioVibes } from "@/hooks/useAudioVibes";
 //import { useAudioAI } from "@/hooks/useAudioAI";
@@ -156,6 +157,49 @@ export const DesktopApp = () => {
     addTracksToPlaylist, 
     removeTracksFromPlaylist 
   } = usePlaylists();
+  
+  // Récupération automatique des tracks YouTube manquants au démarrage
+  useEffect(() => {
+    const recoverMissingTracks = async () => {
+      // Attendre que les données soient chargées
+      if (libraryLoading) return;
+      
+      try {
+        // Collecter tous les IDs de tracks référencés
+        const referencedIds = new Set<string>();
+        
+        // Favoris
+        favorites.forEach(id => referencedIds.add(id));
+        
+        // Historique
+        history.forEach(entry => {
+          referencedIds.add(entry.trackId);
+        });
+        
+        // Playlists
+        playlists.forEach(playlist => {
+          playlist.trackIds?.forEach(id => referencedIds.add(id));
+        });
+        
+        // Filtrer les IDs qui ne sont pas dans allTracks
+        const missingIds = Array.from(referencedIds).filter(id => {
+          return !allTracks.find(t => t.id === id);
+        });
+        
+        if (missingIds.length > 0) {
+          console.log(`[DesktopApp] 🔄 Récupération de ${missingIds.length} tracks YouTube manquants...`);
+          await recoverMissingYouTubeTracks(missingIds);
+        }
+      } catch (error) {
+        console.warn('[DesktopApp] Erreur récupération tracks YouTube:', error);
+      }
+    };
+    
+    // Lancer la récupération après un court délai pour ne pas bloquer le démarrage
+    const timer = setTimeout(recoverMissingTracks, 2000);
+    return () => clearTimeout(timer);
+  }, [libraryLoading, favorites, history, playlists, allTracks]);
+  
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
   const { notifications, notifySuccess, notifyError } = useNotifications();
