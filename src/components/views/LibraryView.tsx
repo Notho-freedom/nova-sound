@@ -22,6 +22,7 @@ import {
   Sparkles,
   Library,
   Filter,
+  Share2,
 } from "lucide-react";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
@@ -647,181 +648,250 @@ export const LibraryView = memo(({
     const album = albums.find(a => `${a.name}-${a.artist}` === selectedAlbum);
     if (!album) return null;
 
-    return (
-      <PageContainer>
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          className="space-y-6"
-        >
-          {/* Back button */}
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onClick={handleBack}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <ChevronRight className="w-4 h-4 rotate-180 transition-transform group-hover:-translate-x-1" />
-            Retour aux albums
-          </motion.button>
+    const albumDuration = album.tracks.reduce((a, t) => a + t.duration, 0);
+    const hours = Math.floor(albumDuration / 3600);
+    const minutes = Math.floor((albumDuration % 3600) / 60);
+    const durationText = hours > 0 ? `${hours}h ${minutes}min` : `${minutes} min`;
 
-          {/* Album Header */}
-          <div className="flex flex-col md:flex-row gap-6">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 mx-auto md:mx-0"
-            >
-              <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
-            </motion.div>
-            
-            <div className="flex flex-col justify-end text-center md:text-left">
-              <Badge variant="secondary" className="w-fit mx-auto md:mx-0 mb-2">Album</Badge>
-              <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{album.name}</h1>
-              <p className="text-lg text-muted-foreground mb-4">{album.artist}</p>
-              
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm text-muted-foreground mb-4">
-                {album.year && <Badge variant="outline">{album.year}</Badge>}
-                <span className="flex items-center gap-1">
-                  <Music className="w-4 h-4" />
-                  {album.tracks.length} titres
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  {formatDuration(album.tracks.reduce((a, t) => a + t.duration, 0))}
-                </span>
-              </div>
-              
-              <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                <Button 
-                  onClick={() => {
-                    const firstTrack = album.tracks[0];
-                    const idx = tracks.findIndex(t => t.id === firstTrack.id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }} 
-                  className="gap-2"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  Lecture
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="gap-2" 
-                  onClick={() => {
-                    const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
-                    const idx = tracks.findIndex(t => t.id === shuffled[0].id);
-                    if (idx !== -1) onTrackSelect(idx);
-                  }}
-                >
-                  <Shuffle className="w-4 h-4" />
-                  Aléatoire
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => album.tracks.forEach(track => toggleFavorite(track.id))}
-                >
-                  <Heart className={cn("w-4 h-4", album.tracks.some(t => isFavorite(t.id)) && "fill-red-500 text-red-500")} />
-                </Button>
-              </div>
-            </div>
+    return (
+      <div className="pb-8 overflow-hidden">
+        {/* Hero Section with Background */}
+        <div className="relative">
+          {/* Background gradient with album cover */}
+          <div className="absolute inset-0 h-[400px] overflow-hidden">
+            <img
+              src={getCoverUrl(album.coverUrl)}
+              alt=""
+              className="w-full h-full object-cover opacity-100 blur-[8px] scale-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background" />
           </div>
 
-          {/* Track list */}
-          <GlassCard className="overflow-hidden">
-            <div className="overflow-y-auto max-h-[calc(100vh-450px)]">
-              <table className="w-full">
-                <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur-md">
-                  <tr className="border-b border-border/30">
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
-                    <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
-                    <th className="px-4 py-3 w-12"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {album.tracks.map((track, idx) => {
-                    const actualIndex = tracks.findIndex(t => t.id === track.id);
-                    const isCurrentTrack = currentTrackIndex === actualIndex;
+          {/* Content */}
+          <div className="relative px-6 pt-8 pb-6">
+            {/* Back button */}
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={handleBack}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
+            >
+              <ChevronRight className="w-4 h-4 rotate-180 transition-transform group-hover:-translate-x-1" />
+              Retour aux albums
+            </motion.button>
 
-                    return (
-                      <motion.tr
-                        key={`album-track-${track.id}-${idx}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.03 }}
-                        ref={isCurrentTrack ? currentTrackRef : null}
-                        onClick={() => onTrackSelect(actualIndex)}
-                        className={cn(
-                          "group cursor-pointer transition-all duration-200",
-                          isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
-                        )}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="w-6 flex items-center justify-center">
-                            {isCurrentTrack && isPlaying ? (
-                              <div className="flex items-center gap-0.5">
-                                <div className="w-1 h-4 bg-primary rounded-full animate-pulse" />
-                                <div className="w-1 h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.1s" }} />
-                                <div className="w-1 h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
-                              </div>
-                            ) : (
-                              <>
-                                <span className="text-sm text-muted-foreground group-hover:hidden">{track.trackNumber || idx + 1}</span>
-                                <Play className="w-4 h-4 text-foreground hidden group-hover:block fill-current" />
-                              </>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
-                              {track.title}
-                            </p>
-                            {isUploaded(track.id) && (
-                              <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <TrackContextMenu
-                            track={track}
-                            playlists={playlists}
-                            isFavorite={isFavorite(track.id)}
-                            onPlay={() => onTrackSelect(actualIndex)}
-                            onPlayNext={() => onPlayNext?.(track)}
-                            onAddToQueue={() => onAddToQueue?.(track)}
-                            onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                            onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
-                            onToggleFavorite={() => toggleFavorite(track.id)}
-                            onUploadToCloudinary={() => uploadTrack?.(track)}
-                            canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
-                            isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
-                            onUploadToNexus={() => uploadTrackToNexus?.(track)}
-                            canUploadToNexus={canUploadToNexus && !!track.filePath}
-                            isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
-                          >
-                            <button
-                              onClick={(e) => e.stopPropagation()}
-                              className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                            >
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
-                          </TrackContextMenu>
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Album Header */}
+            <div className="flex flex-col md:flex-row gap-6 items-center md:items-end">
+              {/* Album Cover */}
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative"
+              >
+                <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-2xl ring-4 ring-primary/20">
+                  <img src={getCoverUrl(album.coverUrl)} alt={album.name} className="w-full h-full object-cover" />
+                </div>
+              </motion.div>
+
+              {/* Album Info */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-center md:text-left flex-1"
+              >
+                <Badge variant="secondary" className="mb-2">Album</Badge>
+                <div className="flex items-center gap-2 justify-center md:justify-start">
+                  <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
+                    {album.name}
+                  </h1>
+                  <HelpIcon description="Écoutez tous les titres de cet album, créez des playlists ou explorez l'artiste." />
+                </div>
+
+                {/* Artist link */}
+                <button
+                  onClick={() => onNavigateToArtist?.(album.artist)}
+                  className="text-lg text-muted-foreground hover:text-primary hover:underline mb-4 transition-colors"
+                >
+                  {album.artist}
+                </button>
+
+                {/* Quick stats */}
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground mb-4">
+                  {album.year && (
+                    <Badge variant="outline" className="font-semibold">{album.year}</Badge>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <Music className="w-4 h-4" />
+                    {album.tracks.length} titre{album.tracks.length > 1 ? "s" : ""}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4" />
+                    {durationText}
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                  <Button
+                    onClick={() => {
+                      const firstTrack = album.tracks[0];
+                      if (onPlayTrack) {
+                        onPlayTrack(firstTrack);
+                      } else {
+                        const idx = tracks.findIndex(t => t.id === firstTrack.id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }
+                    }}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <Play className="w-5 h-5 fill-current" />
+                    Lecture
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="gap-2"
+                    onClick={() => {
+                      const shuffled = [...album.tracks].sort(() => Math.random() - 0.5);
+                      if (onPlayTrack) {
+                        onPlayTrack(shuffled[0]);
+                      } else {
+                        const idx = tracks.findIndex(t => t.id === shuffled[0].id);
+                        if (idx !== -1) onTrackSelect(idx);
+                      }
+                    }}
+                  >
+                    <Shuffle className="w-5 h-5" />
+                    Aléatoire
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    className="gap-2"
+                    onClick={() => album.tracks.forEach(track => toggleFavorite(track.id))}
+                  >
+                    <Heart className={cn("w-5 h-5", album.tracks.some(t => isFavorite(t.id)) && "fill-red-500 text-red-500")} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </Button>
+                </div>
+              </motion.div>
             </div>
-          </GlassCard>
-        </motion.div>
-      </PageContainer>
+          </div>
+        </div>
+
+        {/* Track List Section */}
+        <div className="px-6 mt-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Disc3 className="w-5 h-5 text-primary" />
+              Pistes
+            </h2>
+            <GlassCard className="overflow-hidden">
+              <div className="overflow-y-auto max-h-[calc(100vh-450px)]">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur-md">
+                    <tr className="border-b border-border/30">
+                      <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
+                      <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
+                      <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
+                      <th className="px-4 py-3 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {album.tracks.map((track, idx) => {
+                      const actualIndex = tracks.findIndex(t => t.id === track.id);
+                      const isCurrentTrack = currentTrackIndex === actualIndex;
+
+                      return (
+                        <motion.tr
+                          key={`album-track-${track.id}-${idx}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          ref={isCurrentTrack ? currentTrackRef : null}
+                          onClick={() => onPlayTrack ? onPlayTrack(track) : onTrackSelect(actualIndex)}
+                          className={cn(
+                            "group cursor-pointer transition-all duration-200",
+                            isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/30"
+                          )}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="w-6 flex items-center justify-center">
+                              {isCurrentTrack && isPlaying ? (
+                                <div className="flex items-center gap-0.5">
+                                  <div className="w-1 h-4 bg-primary rounded-full animate-pulse" />
+                                  <div className="w-1 h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.1s" }} />
+                                  <div className="w-1 h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-sm text-muted-foreground group-hover:hidden">{track.trackNumber || idx + 1}</span>
+                                  <Play className="w-4 h-4 text-foreground hidden group-hover:block fill-current" />
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <p className={cn("text-sm font-medium", isCurrentTrack ? "text-primary" : "text-foreground")}>
+                                {track.title}
+                              </p>
+                              {isUploaded(track.id) && (
+                                <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <TrackContextMenu
+                              track={track}
+                              playlists={playlists}
+                              isFavorite={isFavorite(track.id)}
+                              onPlay={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
+                              onPlayNext={() => onPlayNext?.(track)}
+                              onAddToQueue={() => onAddToQueue?.(track)}
+                              onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
+                              onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                              onToggleFavorite={() => toggleFavorite(track.id)}
+                              onUploadToCloudinary={() => uploadTrack?.(track)}
+                              canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
+                              isUploading={getTrackProgress?.(track.id)?.status === 'uploading'}
+                              onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                              canUploadToNexus={canUploadToNexus && !!track.filePath}
+                              isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                            >
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+                            </TrackContextMenu>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
