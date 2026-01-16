@@ -58,7 +58,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
     import('@/services/firebase').then(({ firebaseService }) => {
       // S'abonner aux changements d'état d'authentification
-      unsubscribe = firebaseService.onAuthStateChanged((user) => {
+      unsubscribe = firebaseService.onAuthStateChange((user) => {
         console.log('[FirebaseProvider] Auth state changed:', user ? `${user.email || 'anonymous'} (${user.uid})` : 'signed out');
         setAuthUser(user);
         

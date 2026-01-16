@@ -330,7 +330,7 @@ export function initializeAuthListener(): void {
   authListenerInitialized = true;
 
   // S'abonner aux changements d'état Firebase
-  firebaseService.onAuthStateChanged((user) => {
+  firebaseService.onAuthStateChange((user) => {
     const currentPhase = currentState.phase;
     const currentUid = currentState.uid;
     

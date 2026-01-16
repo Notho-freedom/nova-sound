@@ -24,7 +24,7 @@ export function useFirebaseAuth() {
         setLoading(false);
 
         // S'abonner aux changements d'état d'authentification
-        unsubscribe = firebaseService.onAuthStateChanged((newUser) => {
+        unsubscribe = firebaseService.onAuthStateChange((newUser) => {
           if (mounted) {
             console.log('[useFirebaseAuth] Auth state changed:', newUser ? `${newUser.email || 'anonymous'}` : 'signed out');
             setUser(newUser);
