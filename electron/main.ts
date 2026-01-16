@@ -1694,12 +1694,18 @@ app.whenReady().then(async () => {
   registerLocalAudioProtocol();
   registerLocalVideoProtocol();
   registerLocalImageProtocol();
-  
-  // Initialize storage and services
-  await storage.init();
-  await initServices();
-  
+
+  // Create window ASAP for faster dev startup
   createWindow();
+
+  // Initialize storage and services
+  if (isDev || cliOptions.dev) {
+    storage.init().catch((error) => console.error('❌ Failed to initialize storage:', error));
+    initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
+  } else {
+    await storage.init();
+    await initServices();
+  }
   
   // Handle pending OAuth callback if window was not ready
   if ((app as any).pendingOAuthCallback) {

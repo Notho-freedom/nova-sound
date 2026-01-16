@@ -16,7 +16,7 @@ export class WorkerPool<TInput, TOutput> {
 
   constructor(private readonly workerUrl: URL, size: number) {
     for (let i = 0; i < size; i += 1) {
-      const worker = new Worker(workerUrl, { type: "module" });
+      const worker = new Worker(workerUrl);
       worker.on("message", (message: { id: number; result?: TOutput; error?: string }) => {
         const task = this.pending.get(message.id);
         if (!task) return;

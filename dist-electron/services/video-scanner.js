@@ -4,12 +4,10 @@ import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { watch } from 'chokidar';
 import { v4 as uuidv4 } from 'uuid';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { storage } from './storage.js';
-import ffmpegStatic from 'ffmpeg-static';
 import { fileURLToPath } from 'url';
-const execAsync = promisify(exec);
+import { WorkerPool } from './worker-pool.js';
+import * as os from 'os';
 // Get default thumbnail path (album-cover-1.jpg)
 function getDefaultThumbnailPath() {
     try {
@@ -60,8 +58,63 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Supported video formats
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ogv'];
+const FILE_STAT_CACHE_TTL_MS = 30000;
+const FILE_STAT_CACHE_MAX = 5000;
 let watcher = null;
 let isScanning = false;
+let lastProgressAt = 0;
+let lastProgressPhase = null;
+const fileStatCache = new Map();
+function pruneFileStatCache() {
+    const now = Date.now();
+    for (const [key, value] of fileStatCache.entries()) {
+        if (now - value.checkedAt > FILE_STAT_CACHE_TTL_MS) {
+            fileStatCache.delete(key);
+        }
+    }
+    while (fileStatCache.size > FILE_STAT_CACHE_MAX) {
+        const firstKey = fileStatCache.keys().next().value;
+        if (!firstKey)
+            break;
+        fileStatCache.delete(firstKey);
+    }
+}
+let pendingNewVideos = [];
+let pendingUpdatedVideos = [];
+let pendingVideoTimer = null;
+function flushPendingVideoEvents() {
+    if (pendingNewVideos.length === 0 && pendingUpdatedVideos.length === 0)
+        return;
+    const windows = BrowserWindow.getAllWindows();
+    const newBatch = pendingNewVideos;
+    const updatedBatch = pendingUpdatedVideos;
+    pendingNewVideos = [];
+    pendingUpdatedVideos = [];
+    pendingVideoTimer = null;
+    newBatch.forEach(video => {
+        windows.forEach(window => {
+            window.webContents.send('videos:new', video);
+        });
+    });
+    updatedBatch.forEach(video => {
+        windows.forEach(window => {
+            window.webContents.send('videos:updated', video);
+        });
+    });
+}
+function queueVideoNewEvent(video) {
+    pendingNewVideos.push(video);
+    if (!pendingVideoTimer) {
+        pendingVideoTimer = setTimeout(flushPendingVideoEvents, 120);
+    }
+}
+function queueVideoUpdatedEvent(video) {
+    pendingUpdatedVideos.push(video);
+    if (!pendingVideoTimer) {
+        pendingVideoTimer = setTimeout(flushPendingVideoEvents, 120);
+    }
+}
+const thumbnailWorkerPool = new WorkerPool(new URL('../workers/video-thumbnail-worker.js', import.meta.url), Math.max(2, Math.min(4, Math.max(1, os.cpus().length - 1))));
 /**
  * Check if a file is a supported video file
  */
@@ -100,49 +153,22 @@ async function scanDirectory(dirPath) {
  * Get file stats
  */
 async function getFileStats(filePath) {
+    const cached = fileStatCache.get(filePath);
+    if (cached && Date.now() - cached.checkedAt < FILE_STAT_CACHE_TTL_MS) {
+        return cached.value;
+    }
     try {
         const stats = await fs.stat(filePath);
-        return { size: stats.size, mtime: stats.mtimeMs ? new Date(stats.mtimeMs) : stats.mtime };
+        const value = { size: stats.size, mtime: stats.mtimeMs ? new Date(stats.mtimeMs) : stats.mtime };
+        fileStatCache.set(filePath, { value, checkedAt: Date.now() });
+        pruneFileStatCache();
+        return value;
     }
     catch {
+        fileStatCache.set(filePath, { value: null, checkedAt: Date.now() });
+        pruneFileStatCache();
         return null;
     }
-}
-// Check if ffmpeg is available (static or system)
-let ffmpegAvailable = null;
-let ffmpegPath = null;
-async function checkFfmpegAvailable() {
-    if (ffmpegAvailable !== null)
-        return ffmpegAvailable;
-    // First, try to use bundled ffmpeg-static
-    if (ffmpegStatic) {
-        try {
-            // Check if the static binary exists
-            const fsSync = await import('fs');
-            if (fsSync.existsSync(ffmpegStatic)) {
-                ffmpegPath = ffmpegStatic;
-                ffmpegAvailable = true;
-                console.log('Using bundled ffmpeg-static for thumbnail generation:', ffmpegStatic);
-                return true;
-            }
-        }
-        catch (error) {
-            console.log('Bundled ffmpeg-static not found, trying system ffmpeg...');
-        }
-    }
-    // Fallback to system ffmpeg if available
-    try {
-        await execAsync('ffmpeg -version');
-        ffmpegPath = 'ffmpeg';
-        ffmpegAvailable = true;
-        console.log('Using system ffmpeg for thumbnail generation');
-    }
-    catch {
-        ffmpegAvailable = false;
-        ffmpegPath = null;
-        console.log('ffmpeg is not available (neither bundled nor system) - thumbnails will not be generated');
-    }
-    return ffmpegAvailable;
 }
 /**
  * Generate thumbnail for video using ffmpeg
@@ -157,70 +183,17 @@ async function generateThumbnail(filePath, forceRegenerate = false, useFirstFram
                 return existingThumbnail;
             }
         }
-        // Check if ffmpeg is available and get path (static or system)
-        const hasFfmpeg = await checkFfmpegAvailable();
-        if (!hasFfmpeg || !ffmpegPath) {
+        const workerResult = await thumbnailWorkerPool.runTask({ filePath, useFirstFrame });
+        if (!workerResult?.thumbnailDataBase64) {
+            console.log(`Failed to generate thumbnail for ${path.basename(filePath)} in worker`);
             return null;
         }
-        // Create temp directory in user data folder
-        const os = await import('os');
-        const tempDir = os.tmpdir();
-        const thumbnailPath = path.join(tempDir, `nexus_thumb_${Date.now()}.jpg`);
-        // Try to generate thumbnail - first try at second 2, then fallback to first frame
-        const timeOffsets = useFirstFrame ? ['00:00:00'] : ['00:00:02', '00:00:00'];
-        for (const timeOffset of timeOffsets) {
-            try {
-                // Use -y to overwrite, -hide_banner for less output
-                // -ss before -i is faster (seeks before decoding)
-                // Use the ffmpeg path (static or system)
-                await execAsync(`"${ffmpegPath}" -y -hide_banner -loglevel error -ss ${timeOffset} -i "${filePath}" -vframes 1 -vf "scale=320:-1" "${thumbnailPath}"`, {
-                    timeout: 30000, // 30 second timeout
-                });
-                // Check if thumbnail was created
-                try {
-                    await fs.access(thumbnailPath);
-                }
-                catch {
-                    console.log(`Thumbnail not created for ${filePath} at ${timeOffset}`);
-                    continue; // Try next time offset
-                }
-                // Read the generated thumbnail
-                const thumbnailData = await fs.readFile(thumbnailPath);
-                // Verify it's not empty
-                if (thumbnailData.length === 0) {
-                    console.log(`Empty thumbnail generated for ${filePath} at ${timeOffset}`);
-                    continue; // Try next time offset
-                }
-                // Save to storage
-                const savedUrl = await storage.saveThumbnail(thumbnailData, filePath);
-                // Clean up temp file
-                try {
-                    await fs.unlink(thumbnailPath);
-                }
-                catch {
-                    // Ignore cleanup errors
-                }
-                const frameType = timeOffset === '00:00:00' ? 'first frame' : 'frame at 2s';
-                console.log(`Generated thumbnail (${frameType}) for: ${path.basename(filePath)}`);
-                return savedUrl;
-            }
-            catch (ffmpegError) {
-                // ffmpeg failed for this time offset, try next one
-                console.log(`ffmpeg failed for ${path.basename(filePath)} at ${timeOffset}:`, ffmpegError.message);
-                // Clean up temp file if it exists
-                try {
-                    await fs.unlink(thumbnailPath);
-                }
-                catch {
-                    // Ignore cleanup errors
-                }
-                // Continue to next time offset
-                continue;
-            }
+        const thumbnailData = Buffer.from(workerResult.thumbnailDataBase64, 'base64');
+        if (thumbnailData.length === 0) {
+            console.log(`Empty thumbnail generated for ${path.basename(filePath)} in worker`);
+            return null;
         }
-        // All attempts failed
-        console.log(`Failed to generate thumbnail for ${path.basename(filePath)} after trying all time offsets`);
-        return null;
+        return await storage.saveThumbnail(thumbnailData, filePath);
     }
     catch (error) {
         console.error(`Error generating thumbnail for ${filePath}:`, error);
@@ -308,6 +281,13 @@ async function processVideoFile(filePath) {
  * Send progress update to renderer
  */
 function sendProgress(progress) {
+    const now = Date.now();
+    const shouldForce = progress.phase === 'complete' || progress.phase === 'indexing' || progress.phase !== lastProgressPhase;
+    if (!shouldForce && now - lastProgressAt < 200) {
+        return;
+    }
+    lastProgressAt = now;
+    lastProgressPhase = progress.phase;
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(window => {
         window.webContents.send('videos:scan-progress', progress);
@@ -322,9 +302,11 @@ async function scanVideos(directories) {
         return [];
     }
     isScanning = true;
-    const allVideos = [];
+    const newVideos = [];
+    const updatedVideos = [];
     const existingVideos = await storage.getVideos();
-    const existingPaths = new Set(existingVideos.map(v => v.filePath));
+    const existingByPath = new Map(existingVideos.map(v => [v.filePath, v]));
+    const scanStartTime = Date.now();
     try {
         // Phase 1: Scan directories
         sendProgress({
@@ -334,64 +316,149 @@ async function scanVideos(directories) {
             phase: 'scanning',
         });
         const allVideoFiles = [];
-        for (const dir of directories) {
-            const files = await scanDirectory(dir);
-            allVideoFiles.push(...files);
+        const scanPromises = directories.map(async (dir) => {
+            try {
+                console.log(`📂 Scanning directory: ${dir}`);
+                const files = await scanDirectory(dir);
+                console.log(`✅ Found ${files.length} video files in ${dir}`);
+                return files;
+            }
+            catch (error) {
+                console.error(`❌ Error scanning ${dir}:`, error);
+                return [];
+            }
+        });
+        const directoryResults = await Promise.all(scanPromises);
+        directoryResults.forEach(files => allVideoFiles.push(...files));
+        const total = allVideoFiles.length;
+        console.log(`\n📊 Total video files found: ${total}`);
+        if (total === 0) {
+            sendProgress({ current: 0, total: 0, file: 'Aucun fichier trouvé', phase: 'complete' });
+            return [];
+        }
+        // Phase 2: Filter and process files
+        const filesToProcess = [];
+        const skippedFiles = [];
+        const STAT_BATCH_SIZE = 25;
+        for (let i = 0; i < allVideoFiles.length; i += STAT_BATCH_SIZE) {
+            const batch = allVideoFiles.slice(i, i + STAT_BATCH_SIZE);
+            const batchResults = await Promise.all(batch.map(async (filePath) => {
+                const existingVideo = existingByPath.get(filePath);
+                if (!existingVideo)
+                    return { filePath, skip: false };
+                const stats = await getFileStats(filePath);
+                if (stats && new Date(existingVideo.lastModified).getTime() === stats.mtime.getTime()) {
+                    return { filePath, skip: true };
+                }
+                return { filePath, skip: false };
+            }));
+            for (const result of batchResults) {
+                if (result.skip) {
+                    skippedFiles.push(result.filePath);
+                }
+                else {
+                    filesToProcess.push(result.filePath);
+                }
+            }
+        }
+        console.log(`\n🔄 Processing: ${filesToProcess.length} new/modified files`);
+        console.log(`⏭️  Skipping: ${skippedFiles.length} unchanged files`);
+        if (filesToProcess.length === 0) {
+            console.log('✅ Video library is up to date');
+            sendProgress({ current: total, total, file: 'Bibliothèque à jour', phase: 'complete' });
+            return [];
         }
         sendProgress({
-            current: allVideoFiles.length,
-            total: allVideoFiles.length,
+            current: skippedFiles.length,
+            total,
             file: '',
             phase: 'extracting',
         });
         // Phase 2: Process files
-        for (let i = 0; i < allVideoFiles.length; i++) {
-            const filePath = allVideoFiles[i];
+        const BATCH_SIZE = Math.max(4, Math.min(12, os.cpus().length * 2));
+        let processedCount = skippedFiles.length;
+        let successCount = 0;
+        let errorCount = 0;
+        for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
+            const batch = filesToProcess.slice(i, i + BATCH_SIZE);
+            const batchStartTime = Date.now();
+            const batchPromises = batch.map(async (filePath) => {
+                try {
+                    const video = await processVideoFile(filePath);
+                    if (!video)
+                        return null;
+                    const existing = existingByPath.get(filePath);
+                    if (existing) {
+                        video.id = existing.id;
+                        video.addedAt = existing.addedAt;
+                    }
+                    return video;
+                }
+                catch (error) {
+                    console.error(`❌ Error processing ${path.basename(filePath)}:`, error);
+                    return null;
+                }
+            });
+            const batchResults = await Promise.all(batchPromises);
+            for (const result of batchResults) {
+                if (result) {
+                    if (existingByPath.has(result.filePath)) {
+                        updatedVideos.push(result);
+                    }
+                    else {
+                        newVideos.push(result);
+                    }
+                    successCount++;
+                }
+                else {
+                    errorCount++;
+                }
+            }
+            processedCount += batch.length;
+            const batchTime = Date.now() - batchStartTime;
+            const avgTimePerFile = batchTime / batch.length;
+            const remainingFiles = filesToProcess.length - (i + batch.length);
+            const estimatedTimeRemaining = (remainingFiles * avgTimePerFile) / 1000;
             sendProgress({
-                current: i + 1,
-                total: allVideoFiles.length,
-                file: path.basename(filePath),
+                current: processedCount,
+                total,
+                file: `${path.basename(batch[batch.length - 1] || '')} (${successCount} OK, ${errorCount} erreurs)`,
                 phase: 'extracting',
             });
-            // Skip if already exists
-            if (existingPaths.has(filePath)) {
-                continue;
-            }
-            const video = await processVideoFile(filePath);
-            if (video) {
-                allVideos.push(video);
+            if ((i / BATCH_SIZE) % 5 === 0) {
+                console.log(`⏳ Progress: ${processedCount}/${total} (${Math.round((processedCount / total) * 100)}%) - ETA: ${Math.round(estimatedTimeRemaining)}s`);
             }
         }
         // Phase 3: Save to storage
         sendProgress({
-            current: allVideos.length,
-            total: allVideos.length,
+            current: processedCount,
+            total,
             file: '',
             phase: 'indexing',
         });
-        if (allVideos.length > 0) {
-            console.log(`Adding ${allVideos.length} videos to storage`);
-            await storage.addVideos(allVideos);
-            console.log('Videos added to storage successfully');
-            // Notify renderer of all new videos
-            const windows = BrowserWindow.getAllWindows();
-            allVideos.forEach(video => {
-                windows.forEach(window => {
-                    window.webContents.send('videos:new', video);
-                });
-            });
-            console.log(`Sent ${allVideos.length} video:new events to renderer`);
+        if (newVideos.length > 0 || updatedVideos.length > 0) {
+            const updatedByPath = new Map(updatedVideos.map(v => [v.filePath, v]));
+            const mergedVideos = existingVideos.map(v => updatedByPath.get(v.filePath) ?? v);
+            mergedVideos.push(...newVideos);
+            console.log(`Saving ${newVideos.length} new and ${updatedVideos.length} updated videos to storage`);
+            await storage.saveVideos(mergedVideos);
+            console.log('Videos saved successfully');
+            newVideos.forEach(queueVideoNewEvent);
+            updatedVideos.forEach(queueVideoUpdatedEvent);
+            console.log(`Sent ${newVideos.length} video:new and ${updatedVideos.length} videos:updated events to renderer`);
         }
         else {
-            console.log('No new videos to add');
+            console.log('No new or updated videos to save');
         }
         sendProgress({
-            current: allVideos.length,
-            total: allVideos.length,
+            current: processedCount,
+            total,
             file: '',
             phase: 'complete',
         });
-        return allVideos;
+        const scanDuration = ((Date.now() - scanStartTime) / 1000).toFixed(1);
+        console.log(`\n✅ Video scan complete in ${scanDuration}s`);
+        return newVideos;
     }
     catch (error) {
         console.error('Error scanning videos:', error);
@@ -437,10 +504,7 @@ function startWatching(directories) {
                     }
                 }
                 // Notify renderer
-                const windows = BrowserWindow.getAllWindows();
-                windows.forEach(window => {
-                    window.webContents.send('videos:new', video);
-                });
+                queueVideoNewEvent(video);
             }
         }
     });
@@ -491,10 +555,7 @@ async function generateMissingThumbnailsBackground() {
                     if (thumbnail) {
                         await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
                         // Notify renderer of update
-                        const windows = BrowserWindow.getAllWindows();
-                        windows.forEach(window => {
-                            window.webContents.send('videos:updated', { ...video, thumbnailUrl: thumbnail });
-                        });
+                        queueVideoUpdatedEvent({ ...video, thumbnailUrl: thumbnail });
                     }
                     else {
                         // Try first frame
@@ -502,10 +563,7 @@ async function generateMissingThumbnailsBackground() {
                         if (firstFrameThumbnail) {
                             await storage.updateVideo(video.id, { thumbnailUrl: firstFrameThumbnail });
                             // Notify renderer of update
-                            const windows = BrowserWindow.getAllWindows();
-                            windows.forEach(window => {
-                                window.webContents.send('videos:updated', { ...video, thumbnailUrl: firstFrameThumbnail });
-                            });
+                            queueVideoUpdatedEvent({ ...video, thumbnailUrl: firstFrameThumbnail });
                         }
                         else {
                             // Ultimate fallback: use default thumbnail
@@ -513,10 +571,7 @@ async function generateMissingThumbnailsBackground() {
                             if (defaultThumbnail) {
                                 await storage.updateVideo(video.id, { thumbnailUrl: defaultThumbnail });
                                 // Notify renderer of update
-                                const windows = BrowserWindow.getAllWindows();
-                                windows.forEach(window => {
-                                    window.webContents.send('videos:updated', { ...video, thumbnailUrl: defaultThumbnail });
-                                });
+                                queueVideoUpdatedEvent({ ...video, thumbnailUrl: defaultThumbnail });
                             }
                         }
                     }
@@ -594,12 +649,7 @@ export function initVideoScanner() {
         if (newVideos.length > 0) {
             await storage.addVideos(newVideos);
             // Notify renderer
-            const windows = BrowserWindow.getAllWindows();
-            newVideos.forEach(video => {
-                windows.forEach(window => {
-                    window.webContents.send('videos:new', video);
-                });
-            });
+            newVideos.forEach(queueVideoNewEvent);
         }
         return newVideos;
     });
@@ -617,10 +667,7 @@ export function initVideoScanner() {
         };
         await storage.addVideos([video]);
         // Notify renderer
-        const windows = BrowserWindow.getAllWindows();
-        windows.forEach(window => {
-            window.webContents.send('videos:new', video);
-        });
+        queueVideoNewEvent(video);
         return video;
     });
     // Regenerate thumbnail for a specific video
@@ -633,57 +680,52 @@ export function initVideoScanner() {
         let generated = 0;
         let failed = 0;
         console.log(`Checking ${videos.length} videos for missing thumbnails...`);
-        for (const video of videos) {
-            // Check if video has a valid thumbnail
-            const hasThumbnail = video.thumbnailUrl &&
-                (video.thumbnailUrl.startsWith('file://') ||
-                    video.thumbnailUrl.startsWith('local-image://') ||
-                    video.thumbnailUrl.startsWith('http://') ||
-                    video.thumbnailUrl.startsWith('https://'));
-            if (!hasThumbnail) {
-                console.log(`Generating thumbnail for: ${path.basename(video.filePath)}`);
-                // Try to generate thumbnail (will try second 2, then first frame)
-                const thumbnail = await generateThumbnail(video.filePath, false);
-                if (thumbnail) {
-                    await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
-                    generated++;
-                    // Notify renderer of update
-                    const windows = BrowserWindow.getAllWindows();
-                    windows.forEach(window => {
-                        window.webContents.send('videos:updated', { ...video, thumbnailUrl: thumbnail });
-                    });
-                }
-                else {
-                    // If still no thumbnail, try first frame explicitly
-                    const firstFrameThumbnail = await generateThumbnail(video.filePath, false, true);
-                    if (firstFrameThumbnail) {
-                        await storage.updateVideo(video.id, { thumbnailUrl: firstFrameThumbnail });
+        const batchSize = 5;
+        for (let i = 0; i < videos.length; i += batchSize) {
+            const batch = videos.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (video) => {
+                // Check if video has a valid thumbnail
+                const hasThumbnail = video.thumbnailUrl &&
+                    (video.thumbnailUrl.startsWith('file://') ||
+                        video.thumbnailUrl.startsWith('local-image://') ||
+                        video.thumbnailUrl.startsWith('http://') ||
+                        video.thumbnailUrl.startsWith('https://'));
+                if (!hasThumbnail) {
+                    console.log(`Generating thumbnail for: ${path.basename(video.filePath)}`);
+                    // Try to generate thumbnail (will try second 2, then first frame)
+                    const thumbnail = await generateThumbnail(video.filePath, false);
+                    if (thumbnail) {
+                        await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
                         generated++;
                         // Notify renderer of update
-                        const windows = BrowserWindow.getAllWindows();
-                        windows.forEach(window => {
-                            window.webContents.send('videos:updated', { ...video, thumbnailUrl: firstFrameThumbnail });
-                        });
+                        queueVideoUpdatedEvent({ ...video, thumbnailUrl: thumbnail });
                     }
                     else {
-                        // Ultimate fallback: use default thumbnail
-                        const defaultThumbnail = getDefaultThumbnailUrl();
-                        if (defaultThumbnail) {
-                            await storage.updateVideo(video.id, { thumbnailUrl: defaultThumbnail });
+                        // If still no thumbnail, try first frame explicitly
+                        const firstFrameThumbnail = await generateThumbnail(video.filePath, false, true);
+                        if (firstFrameThumbnail) {
+                            await storage.updateVideo(video.id, { thumbnailUrl: firstFrameThumbnail });
                             generated++;
                             // Notify renderer of update
-                            const windows = BrowserWindow.getAllWindows();
-                            windows.forEach(window => {
-                                window.webContents.send('videos:updated', { ...video, thumbnailUrl: defaultThumbnail });
-                            });
+                            queueVideoUpdatedEvent({ ...video, thumbnailUrl: firstFrameThumbnail });
                         }
                         else {
-                            failed++;
-                            console.log(`Failed to generate thumbnail for: ${path.basename(video.filePath)}`);
+                            // Ultimate fallback: use default thumbnail
+                            const defaultThumbnail = getDefaultThumbnailUrl();
+                            if (defaultThumbnail) {
+                                await storage.updateVideo(video.id, { thumbnailUrl: defaultThumbnail });
+                                generated++;
+                                // Notify renderer of update
+                                queueVideoUpdatedEvent({ ...video, thumbnailUrl: defaultThumbnail });
+                            }
+                            else {
+                                failed++;
+                                console.log(`Failed to generate thumbnail for: ${path.basename(video.filePath)}`);
+                            }
                         }
                     }
                 }
-            }
+            }));
         }
         console.log(`Thumbnail generation complete: ${generated} generated, ${failed} failed`);
         return { generated, failed, total: videos.length };
@@ -692,26 +734,30 @@ export function initVideoScanner() {
     ipcMain.handle('videos:regenerateAllThumbnails', async () => {
         const videos = await storage.getVideos();
         let regenerated = 0;
-        for (const video of videos) {
-            // Check for both old file:// and new local-image:// formats
-            const hasThumbnail = video.thumbnailUrl &&
-                (video.thumbnailUrl.startsWith('file://') || video.thumbnailUrl.startsWith('local-image://'));
-            if (!hasThumbnail) {
-                // Try to generate thumbnail (will try second 2, then first frame)
-                const thumbnail = await generateThumbnail(video.filePath, true);
-                if (thumbnail) {
-                    await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
-                    regenerated++;
-                }
-                else {
-                    // If still no thumbnail, try first frame explicitly
-                    const firstFrameThumbnail = await generateThumbnail(video.filePath, true, true);
-                    if (firstFrameThumbnail) {
-                        await storage.updateVideo(video.id, { thumbnailUrl: firstFrameThumbnail });
+        const batchSize = 5;
+        for (let i = 0; i < videos.length; i += batchSize) {
+            const batch = videos.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (video) => {
+                // Check for both old file:// and new local-image:// formats
+                const hasThumbnail = video.thumbnailUrl &&
+                    (video.thumbnailUrl.startsWith('file://') || video.thumbnailUrl.startsWith('local-image://'));
+                if (!hasThumbnail) {
+                    // Try to generate thumbnail (will try second 2, then first frame)
+                    const thumbnail = await generateThumbnail(video.filePath, true);
+                    if (thumbnail) {
+                        await storage.updateVideo(video.id, { thumbnailUrl: thumbnail });
                         regenerated++;
                     }
+                    else {
+                        // If still no thumbnail, try first frame explicitly
+                        const firstFrameThumbnail = await generateThumbnail(video.filePath, true, true);
+                        if (firstFrameThumbnail) {
+                            await storage.updateVideo(video.id, { thumbnailUrl: firstFrameThumbnail });
+                            regenerated++;
+                        }
+                    }
                 }
-            }
+            }));
         }
         return regenerated;
     });

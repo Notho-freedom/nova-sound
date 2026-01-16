@@ -439,70 +439,72 @@ export const HomeView = memo(({
             ) : null}
           />
           <div className="bg-card/30 backdrop-blur-sm rounded-2xl overflow-hidden border border-border/30">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/30">
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
-                  <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">Album</th>
-                  <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayFavorites.map((track, idx) => {
-                  const actualIndex = tracks.findIndex(t => t.id === track.id);
-                  const isCurrentTrack = currentTrackIndex === actualIndex;
-                  
-                  return (
-                    <tr
-                      key={`favorite-${track.id}-${idx}`}
-                      onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
-                      className={cn(
-                        "group cursor-pointer transition-all duration-200",
-                        isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"
-                      )}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="w-6 flex items-center justify-center">
-                          {isCurrentTrack && isPlaying ? (
-                            <div className="flex items-center gap-0.5">
-                              <div className="w-1 h-4 bg-primary rounded-full animate-wave" />
-                              <div className="w-1 h-4 bg-primary rounded-full animate-wave" style={{ animationDelay: '0.1s' }} />
-                              <div className="w-1 h-4 bg-primary rounded-full animate-wave" style={{ animationDelay: '0.2s' }} />
-                            </div>
-                          ) : (
-                            <>
-                              <span className="text-sm text-muted-foreground group-hover:hidden">{idx + 1}</span>
-                              <Play className="w-4 h-4 text-foreground hidden group-hover:block fill-current" />
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
-                            <img src={getCoverUrl(track.coverUrl)} alt={track.album} loading="lazy" className="w-full h-full object-cover" />
+            <div className="overflow-y-auto h-[360px] overflow-x-hidden">
+              <table className="w-full table-fixed">
+                <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur-md">
+                  <tr className="border-b border-border/30">
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-[45%]">Titre</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell w-[35%]">Album</th>
+                    <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground w-[80px]">Durée</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayFavorites.map((track, idx) => {
+                    const actualIndex = tracks.findIndex(t => t.id === track.id);
+                    const isCurrentTrack = currentTrackIndex === actualIndex;
+                    
+                    return (
+                      <tr
+                        key={`favorite-${track.id}-${idx}`}
+                        onClick={() => onPlayTrack ? onPlayTrack(track) : (actualIndex !== -1 && onTrackSelect(actualIndex))}
+                        className={cn(
+                          "group cursor-pointer transition-all duration-200",
+                          isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40"
+                        )}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="w-6 flex items-center justify-center">
+                            {isCurrentTrack && isPlaying ? (
+                              <div className="flex items-center gap-0.5">
+                                <div className="w-1 h-4 bg-primary rounded-full animate-wave" />
+                                <div className="w-1 h-4 bg-primary rounded-full animate-wave" style={{ animationDelay: '0.1s' }} />
+                                <div className="w-1 h-4 bg-primary rounded-full animate-wave" style={{ animationDelay: '0.2s' }} />
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-sm text-muted-foreground group-hover:hidden">{idx + 1}</span>
+                                <Play className="w-4 h-4 text-foreground hidden group-hover:block fill-current" />
+                              </>
+                            )}
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>{track.title}</p>
-                              {isUploaded(track.id) && <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
+                              <img src={getCoverUrl(track.coverUrl)} alt={track.album} loading="lazy" className="w-full h-full object-cover" />
                             </div>
-                            <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className={cn("text-sm font-medium truncate", isCurrentTrack ? "text-primary" : "text-foreground")}>{track.title}</p>
+                                {isUploaded(track.id) && <UploadIndicator provider={getUploadedProvider(track.id) || undefined} size="sm" />}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <p className="text-sm text-muted-foreground truncate">{track.album}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <p className="text-sm text-muted-foreground truncate">{track.album}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-sm text-muted-foreground font-mono">{formatTime(track.duration)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       )}

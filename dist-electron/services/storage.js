@@ -6,6 +6,8 @@ import * as crypto from 'crypto';
 const DATA_DIR = path.join(app.getPath('userData'), 'nexus-data');
 const ARTWORK_DIR = path.join(DATA_DIR, 'artwork');
 const THUMBNAILS_DIR = path.join(DATA_DIR, 'thumbnails');
+const THUMBNAIL_CACHE_TTL_MS = 30000;
+const THUMBNAIL_CACHE_MAX = 2000;
 const PATHS = {
     library: path.join(DATA_DIR, 'library.json'),
     videos: path.join(DATA_DIR, 'videos.json'),
@@ -74,6 +76,21 @@ async function writeJSON(filePath, data) {
 // Storage class
 class Storage {
     initialized = false;
+    thumbnailCache = new Map();
+    pruneThumbnailCache() {
+        const now = Date.now();
+        for (const [key, value] of this.thumbnailCache.entries()) {
+            if (now - value.checkedAt > THUMBNAIL_CACHE_TTL_MS) {
+                this.thumbnailCache.delete(key);
+            }
+        }
+        while (this.thumbnailCache.size > THUMBNAIL_CACHE_MAX) {
+            const firstKey = this.thumbnailCache.keys().next().value;
+            if (!firstKey)
+                break;
+            this.thumbnailCache.delete(firstKey);
+        }
+    }
     async init() {
         if (this.initialized)
             return;
@@ -227,18 +244,30 @@ class Storage {
         const thumbnailPath = path.join(THUMBNAILS_DIR, filename);
         await fs.writeFile(thumbnailPath, thumbnailData);
         // Return local-image:// URL for custom protocol (works better with CSP)
-        return `local-image://${encodeURIComponent(thumbnailPath)}`;
+        const url = `local-image://${encodeURIComponent(thumbnailPath)}`;
+        this.thumbnailCache.set(sourceFilePath, { url, checkedAt: Date.now() });
+        this.pruneThumbnailCache();
+        return url;
     }
     async getThumbnailPath(sourceFilePath) {
+        const cached = this.thumbnailCache.get(sourceFilePath);
+        if (cached && Date.now() - cached.checkedAt < THUMBNAIL_CACHE_TTL_MS) {
+            return cached.url;
+        }
         const hash = crypto.createHash('md5').update(sourceFilePath).digest('hex');
         const filename = `${hash}.jpg`;
         const thumbnailPath = path.join(THUMBNAILS_DIR, filename);
         try {
             await fs.access(thumbnailPath);
             // Return local-image:// URL for custom protocol (works better with CSP)
-            return `local-image://${encodeURIComponent(thumbnailPath)}`;
+            const url = `local-image://${encodeURIComponent(thumbnailPath)}`;
+            this.thumbnailCache.set(sourceFilePath, { url, checkedAt: Date.now() });
+            this.pruneThumbnailCache();
+            return url;
         }
         catch {
+            this.thumbnailCache.set(sourceFilePath, { url: null, checkedAt: Date.now() });
+            this.pruneThumbnailCache();
             return null;
         }
     }
