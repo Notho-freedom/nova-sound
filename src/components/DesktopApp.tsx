@@ -124,33 +124,35 @@ export const DesktopApp = () => {
     };
     
     // Écouter aussi les événements de récupération de tracks (depuis youtube-track-recovery)
-    const handleTracksRecovered = async (event: CustomEvent<{ tracks: Track[] }>) => {
+    const handleTracksRecovered = (event: Event) => {
       console.log('[DesktopApp] 🔄 Tracks récupérés détectés, rechargement du cache...');
-      const { tracks } = event.detail;
-      
+      const { tracks } = (event as CustomEvent<{ tracks: Track[] }>).detail || { tracks: [] };
+
       // Recharger tout le cache depuis localStorage pour avoir les tracks fraîchement récupérés
-      try {
-        const { getYouTubeTracksCache } = await import('@/lib/youtube-track-cache');
-        const cachedTracks = getYouTubeTracksCache();
-        if (cachedTracks && cachedTracks.size > 0) {
-          const cachedArray = Array.from(cachedTracks.values());
-          setYoutubeTracksCache(prev => {
-            const newMap = new Map(prev);
-            newMap.set('persistent-cache', cachedArray);
-            return newMap;
-          });
-          console.log(`[DesktopApp] ✅ ${cachedArray.length} tracks rechargés dans l'état`);
+      void (async () => {
+        try {
+          const { getYouTubeTracksCache } = await import('@/lib/youtube-track-cache');
+          const cachedTracks = getYouTubeTracksCache();
+          if (cachedTracks && cachedTracks.size > 0) {
+            const cachedArray = Array.from(cachedTracks.values());
+            setYoutubeTracksCache(prev => {
+              const newMap = new Map(prev);
+              newMap.set('persistent-cache', cachedArray);
+              return newMap;
+            });
+            console.log(`[DesktopApp] ✅ ${cachedArray.length} tracks rechargés dans l'état`);
+          }
+        } catch (err) {
+          console.error('[DesktopApp] Erreur rechargement cache:', err);
         }
-      } catch (err) {
-        console.error('[DesktopApp] Erreur rechargement cache:', err);
-      }
+      })();
     };
     
     window.addEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
-    window.addEventListener('youtube-tracks-recovered', handleTracksRecovered as EventListener);
+    window.addEventListener('youtube-tracks-recovered', handleTracksRecovered);
     return () => {
       window.removeEventListener('youtube-tracks-loaded', handleYouTubeTracksLoaded as EventListener);
-      window.removeEventListener('youtube-tracks-recovered', handleTracksRecovered as EventListener);
+      window.removeEventListener('youtube-tracks-recovered', handleTracksRecovered);
     };
   }, []);
   
