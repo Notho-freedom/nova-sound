@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { nexusServerService } from '@/services/nexus-server';
 import { authService } from '@/services/auth';
+import { stripeService } from '@/services/stripe';
 import { notificationService } from '@/services/notification-service';
 import { toast } from 'sonner';
 import type { Track } from '@/types/music';
@@ -114,7 +115,17 @@ export function useNexusUpload(): UseNexusUploadReturn {
 
     if (!isAuthenticated) {
       isAuthenticated = nexusServerService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
       isPro = nexusServerService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
     }
     
     if (!isAuthenticated) {
@@ -443,7 +454,17 @@ export function useNexusUpload(): UseNexusUploadReturn {
 
     if (!isAuthenticated) {
       isAuthenticated = nexusServerService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
       isPro = nexusServerService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
     }
     
     if (!isAuthenticated || !isPro) {
@@ -506,7 +527,17 @@ export function useNexusUpload(): UseNexusUploadReturn {
 
     if (!isAuthenticated) {
       isAuthenticated = nexusServerService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
       isPro = nexusServerService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
     }
     
     if (!isAuthenticated || !isPro) {

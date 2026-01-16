@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { notificationService } from '@/services/notification-service';
 import { authService } from '@/services/auth';
+import { stripeService } from '@/services/stripe';
 import { toast } from 'sonner';
 import type { Track } from '@/types/music';
 
@@ -56,7 +57,17 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
 
     if (!isAuthenticated) {
       isAuthenticated = authService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
       isPro = authService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
     }
     
     if (!isAuthenticated) {
@@ -452,7 +463,17 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
 
     if (!isAuthenticated) {
       isAuthenticated = authService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
       isPro = authService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
     }
     
     if (!isAuthenticated || !isPro) {
@@ -509,7 +530,17 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
 
     if (!isAuthenticated) {
       isAuthenticated = authService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
       isPro = authService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
     }
     
     if (!isAuthenticated || !isPro) {
