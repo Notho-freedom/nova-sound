@@ -1,5 +1,5 @@
 import { Play, Cloud } from "lucide-react";
-import { useMemo, type CSSProperties } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import { FixedSizeGrid as Grid, type GridChildComponentProps } from "react-window";
 import { AutoSizer } from "react-virtualized-auto-sizer";
 import { Track } from "@/types/music";
@@ -41,7 +41,7 @@ interface TrackGridViewProps {
   onNavigateToAlbum?: (album: string, artist: string) => void;
 }
 
-export const TrackGridView = ({
+export const TrackGridView = memo(({
   tracks,
   currentTrackIndex,
   isPlaying,
@@ -323,6 +323,10 @@ export const TrackGridView = ({
               rowCount={rowCount}
               rowHeight={rowHeight + gap}
               itemData={gridData}
+              itemKey={({ columnIndex, rowIndex, data }) => {
+                const index = rowIndex * data.columnCount + columnIndex;
+                return data.tracks[index]?.id ?? `${rowIndex}-${columnIndex}`;
+              }}
               overscanRowCount={2}
               overscanColumnCount={1}
             >
@@ -333,5 +337,7 @@ export const TrackGridView = ({
       />
     </div>
   );
-};
+});
+
+TrackGridView.displayName = "TrackGridView";
 

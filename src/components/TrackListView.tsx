@@ -1,13 +1,13 @@
 import { memo, useMemo } from "react";
-  import { Play, MoreHorizontal } from "lucide-react";
-  import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
-  import { AutoSizer } from "react-virtualized-auto-sizer";
-  import { Track } from "@/types/music";
-  import { cn } from "@/lib/utils";
-  import { getCoverUrl } from "@/lib/audio";
-  import { TrackContextMenu } from "@/components/TrackContextMenu";
-  import { UploadIndicator } from "@/components/UploadIndicator";
-  import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Play, MoreHorizontal } from "lucide-react";
+import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
+import { AutoSizer } from "react-virtualized-auto-sizer";
+import { Track } from "@/types/music";
+import { cn } from "@/lib/utils";
+import { getCoverUrl } from "@/lib/audio";
+import { TrackContextMenu } from "@/components/TrackContextMenu";
+import { UploadIndicator } from "@/components/UploadIndicator";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -309,6 +309,7 @@ import { memo, useMemo } from "react";
                     itemCount={tracks.length}
                     itemSize={56}
                     itemData={rowData}
+                    itemKey={(index, data) => data.tracks[index]?.id ?? index}
                     overscanCount={6}
                   >
                     {Row}
