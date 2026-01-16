@@ -50,6 +50,7 @@ import { PlaylistGridSkeleton, TrackTableSkeleton } from "@/components/ui/skelet
 import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/PageLayout";
 import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
 import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
+import { usePlaylistWorker } from "@/hooks/usePlaylistWorker";
 
 interface PlaylistViewProps {
   tracks: Track[];
@@ -376,86 +377,26 @@ export const PlaylistView = memo(({
       .filter((t): t is Track => !!t);
   }, [selectedPlaylist, tracks, recoveredTracksCount]); // Ajouter recoveredTracksCount pour forcer le re-render
 
-  // Filter playlists
-  const filteredPlaylists = useMemo(() => {
-    if (!searchQuery.trim()) return playlists;
-    const query = searchQuery.toLowerCase();
-    return playlists.filter(
-      (p) => p.name.toLowerCase().includes(query) || p.description?.toLowerCase().includes(query)
-    );
-  }, [playlists, searchQuery]);
+  const { computed } = usePlaylistWorker({
+    tracks,
+    playlists,
+    searchQuery,
+    selectedPlaylistId,
+    tableSearchQuery,
+    filterArtist,
+    filterAlbum,
+    tableSortBy,
+    tableSortOrder,
+  });
 
-  // Available tracks (not in current playlist)
-  const availableTracks = useMemo(() => {
-    if (!selectedPlaylist) return tracks;
-    return tracks.filter((t) => !selectedPlaylist.trackIds.includes(t.id));
-  }, [tracks, selectedPlaylist]);
-
-  // Unique tracks
-  const uniqueTracks = useMemo(() => {
-    const seen = new Set<string>();
-    return tracks.filter((track) => {
-      if (seen.has(track.id)) return false;
-      seen.add(track.id);
-      return true;
-    });
-  }, [tracks]);
-
-  const uniqueAvailableTracks = useMemo(() => {
-    const seen = new Set<string>();
-    return availableTracks.filter((track) => {
-      if (seen.has(track.id)) return false;
-      seen.add(track.id);
-      return true;
-    });
-  }, [availableTracks]);
-
-  // Unique artists and albums
-  const uniqueArtists = useMemo(() => {
-    const artists = new Set<string>();
-    uniqueTracks.forEach(track => track.artist && artists.add(track.artist));
-    return Array.from(artists).sort();
-  }, [uniqueTracks]);
-
-  const uniqueAlbums = useMemo(() => {
-    const albums = new Set<string>();
-    uniqueTracks.forEach(track => track.album && albums.add(track.album));
-    return Array.from(albums).sort();
-  }, [uniqueTracks]);
-
-  // Filtered and sorted tracks
-  const filteredAndSortedTracks = useMemo(() => {
-    let filtered = uniqueTracks;
-
-    if (tableSearchQuery.trim()) {
-      const query = tableSearchQuery.toLowerCase();
-      filtered = filtered.filter(track =>
-        track.title.toLowerCase().includes(query) ||
-        track.artist.toLowerCase().includes(query) ||
-        track.album.toLowerCase().includes(query)
-      );
-    }
-
-    if (filterArtist) filtered = filtered.filter(track => track.artist === filterArtist);
-    if (filterAlbum) filtered = filtered.filter(track => track.album === filterAlbum);
-
-    return [...filtered].sort((a, b) => {
-      let comparison = 0;
-      switch (tableSortBy) {
-        case "title": comparison = a.title.localeCompare(b.title); break;
-        case "artist": comparison = a.artist.localeCompare(b.artist); break;
-        case "album": comparison = a.album.localeCompare(b.album); break;
-        case "duration": comparison = a.duration - b.duration; break;
-      }
-      return tableSortOrder === "asc" ? comparison : -comparison;
-    });
-  }, [uniqueTracks, tableSearchQuery, filterArtist, filterAlbum, tableSortBy, tableSortOrder]);
-
-  // Stats
-  const totalTracks = useMemo(() => 
-    playlists.reduce((acc, p) => acc + p.trackIds.length, 0),
-    [playlists]
-  );
+  const filteredPlaylists = computed?.filteredPlaylists ?? playlists;
+  const availableTracks = computed?.availableTracks ?? tracks;
+  const uniqueTracks = computed?.uniqueTracks ?? tracks;
+  const uniqueAvailableTracks = computed?.uniqueAvailableTracks ?? availableTracks;
+  const uniqueArtists = computed?.uniqueArtists ?? [];
+  const uniqueAlbums = computed?.uniqueAlbums ?? [];
+  const filteredAndSortedTracks = computed?.filteredAndSortedTracks ?? uniqueTracks;
+  const totalTracks = computed?.totalTracks ?? playlists.reduce((acc, p) => acc + p.trackIds.length, 0);
 
   // Handlers
   const handleCreatePlaylist = async () => {

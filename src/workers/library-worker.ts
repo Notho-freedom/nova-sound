@@ -245,3 +245,5 @@ self.onmessage = (event: MessageEvent<{ id: number; payload: ComputePayload }>) 
   const result = compute(payload);
   (self as DedicatedWorkerGlobalScope).postMessage({ id, result });
 };
+
+export {};
