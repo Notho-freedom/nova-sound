@@ -75,7 +75,7 @@ export function I18nProvider({
       if (!params) return template;
       return Object.keys(params).reduce(
         (result, paramKey) =>
-          result.replaceAll(`{${paramKey}}`, String(params[paramKey])),
+          result.split(`{${paramKey}}`).join(String(params[paramKey])),
         template
       );
     },

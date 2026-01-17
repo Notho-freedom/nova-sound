@@ -405,6 +405,7 @@ export const messages = {
   settingsNexusUnlimitedStorage: "Lifetime unlimited storage",
   settingsNexusProOnly: "Available with Pro plan",
   settingsPlanPro: "Pro plan",
+  settingsPlanProPrice: "€9.99/month",
   settingsPlanFree: "Free plan",
   settingsManageSubscription: "Manage subscription",
   settingsUpgradeToProPrice: "Upgrade to Pro €9.99/month",

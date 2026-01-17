@@ -1945,12 +1945,11 @@ export const SettingsView = () => {
               {metadataReport && (
                 <SettingsCard title={t("settingsCardMetadataCompleteness")} icon={Tag} className="lg:col-span-2">
                   <div className="space-y-3">
-                    <div className="relative h-2 rounded-full bg-muted/30 overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
-                        style={{ width: `${metadataReport.stats.completionPercentage}%` }}
-                      />
-                    </div>
+                    <progress
+                      className="settings-metadata-progress h-2 w-full"
+                      value={metadataReport.stats.completionPercentage}
+                      max={100}
+                    />
                     <p className="text-sm text-center font-semibold text-foreground">
                       {t("settingsMetadataCompletion", {
                         percentage: metadataReport.stats.completionPercentage,

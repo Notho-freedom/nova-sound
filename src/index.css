@@ -934,6 +934,27 @@
     background: #dc2626;
   }
 
+  .settings-metadata-progress {
+    appearance: none;
+    border: none;
+    background: transparent;
+  }
+
+  .settings-metadata-progress::-webkit-progress-bar {
+    background: rgba(148, 163, 184, 0.3);
+    border-radius: 9999px;
+  }
+
+  .settings-metadata-progress::-webkit-progress-value {
+    background: linear-gradient(to right, #3b82f6, #06b6d4);
+    border-radius: 9999px;
+  }
+
+  .settings-metadata-progress::-moz-progress-bar {
+    background: linear-gradient(to right, #3b82f6, #06b6d4);
+    border-radius: 9999px;
+  }
+
   .pulse-delay-100 {
     animation-delay: 0.1s;
   }
