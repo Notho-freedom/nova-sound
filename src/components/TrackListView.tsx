@@ -38,6 +38,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
     canUploadToLocal?: boolean;
     canUploadToNexus?: boolean;
+    isAuthenticated?: boolean;
     showHistory?: boolean;
     showAlbum?: boolean;
     showTrackNumber?: boolean;
@@ -72,6 +73,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     getNexusTrackProgress,
     canUploadToLocal = false,
     canUploadToNexus = false,
+    isAuthenticated = false,
     showHistory = false,
     showAlbum = true,
     showTrackNumber = false,
@@ -125,6 +127,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       getNexusTrackProgress,
       canUploadToLocal,
       canUploadToNexus,
+      isAuthenticated,
       showHistory,
       showAlbum,
       showTrackNumber,
@@ -158,6 +161,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       getNexusTrackProgress,
       canUploadToLocal,
       canUploadToNexus,
+      isAuthenticated,
       showHistory,
       showAlbum,
       showTrackNumber,
@@ -201,6 +205,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
           onUploadToLocal={() => data.uploadTrackToNexus?.(track, 'local')}
           canUploadToLocal={data.canUploadToLocal && !!track.filePath}
           isUploadingToLocal={data.getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+          isAuthenticated={data.isAuthenticated}
           onRemoveFromPlaylist={data.showRemoveFromPlaylist ? () => data.onRemoveFromPlaylist?.(track) : undefined}
         >
           <div

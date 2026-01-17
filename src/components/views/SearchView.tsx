@@ -815,6 +815,7 @@ export const SearchView = ({
                             onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
                             canUploadToLocal={canUploadToLocal && !!track.filePath && !isYouTubeTrack}
                             isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === "uploading"}
+                            isAuthenticated={nexusAuthenticated}
                           >
                             <SearchTrackItem
                               track={track}

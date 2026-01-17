@@ -522,6 +522,7 @@ export const ArtistView = memo(({
                               onUploadToLocal={nexusUpload.uploadTrack ? () => nexusUpload.uploadTrack(track, 'local') : undefined}
                               canUploadToLocal={canUploadToLocal && !!track.filePath}
                               isUploadingToLocal={nexusUpload.getTrackProgress(track.id)?.status === 'uploading'}
+                              isAuthenticated={nexusAuthenticated}
                               isUploaded={isUploaded(track.id)}
                               getUploadedProvider={getUploadedProvider}
                             >

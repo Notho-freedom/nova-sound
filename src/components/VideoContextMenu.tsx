@@ -70,6 +70,7 @@ interface VideoContextMenuProps {
   onUploadToNexus?: () => void;
   canUploadToNexus?: boolean;
   isUploadingToNexus?: boolean;
+  isAuthenticated?: boolean;
   onManageSubtitles?: () => void;
   onSelectAudioTrack?: () => void;
   onRate?: (rating: number) => void;
@@ -105,10 +106,14 @@ export const VideoContextMenu = ({
   onUploadToNexus,
   canUploadToNexus = false,
   isUploadingToNexus = false,
+  isAuthenticated = false,
   onManageSubtitles,
   onSelectAudioTrack,
   onRate,
 }: VideoContextMenuProps) => {
+  const uploadsEnabled = isAuthenticated === true;
+  const hasLocalFile = !!video.filePath;
+  const allowCta = uploadsEnabled && hasLocalFile;
   const watchProgress = video.watchProgress;
   const progressPercent = watchProgress ? Math.round(watchProgress.percentage) : 0;
 
@@ -246,8 +251,8 @@ export const VideoContextMenu = ({
             <ContextMenuSeparator />
             {onUploadToCloudinary && (
               <ContextMenuItem
-                onClick={canUploadToCloudinary ? onUploadToCloudinary : () => openProUploadCta({ server: "cloudinary" })}
-                disabled={isUploadingToCloudinary}
+                onClick={allowCta ? (canUploadToCloudinary ? onUploadToCloudinary : () => openProUploadCta({ server: "cloudinary" })) : undefined}
+                disabled={isUploadingToCloudinary || !allowCta}
               >
                 {isUploadingToCloudinary ? (
                   <>
@@ -265,8 +270,8 @@ export const VideoContextMenu = ({
             )}
             {onUploadToBunny && (
               <ContextMenuItem
-                onClick={canUploadToBunny ? onUploadToBunny : () => openProUploadCta({ server: "bunny" })}
-                disabled={isUploadingToBunny}
+                onClick={allowCta ? (canUploadToBunny ? onUploadToBunny : () => openProUploadCta({ server: "bunny" })) : undefined}
+                disabled={isUploadingToBunny || !allowCta}
               >
                 {isUploadingToBunny ? (
                   <>
@@ -284,8 +289,8 @@ export const VideoContextMenu = ({
             )}
             {onUploadToNexus && (
               <ContextMenuItem
-                onClick={canUploadToNexus ? onUploadToNexus : () => openProUploadCta({ server: "planethoster" })}
-                disabled={isUploadingToNexus}
+                onClick={allowCta ? (canUploadToNexus ? onUploadToNexus : () => openProUploadCta({ server: "planethoster" })) : undefined}
+                disabled={isUploadingToNexus || !allowCta}
               >
                 {isUploadingToNexus ? (
                   <>

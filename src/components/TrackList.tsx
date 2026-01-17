@@ -34,6 +34,7 @@ interface TrackListProps {
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToLocal?: boolean;
   canUploadToNexus?: boolean;
+  isAuthenticated?: boolean;
   isUploaded?: (trackId: string) => boolean;
   getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
 }
@@ -66,6 +67,7 @@ export const TrackList = memo(({
   getNexusTrackProgress,
   canUploadToLocal = false,
   canUploadToNexus = false,
+  isAuthenticated = false,
   isUploaded,
   getUploadedProvider,
 }: TrackListProps) => {
@@ -95,6 +97,7 @@ export const TrackList = memo(({
           onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
           canUploadToLocal={canUploadToLocal && !!track.filePath}
           isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+          isAuthenticated={isAuthenticated}
         >
           <div
             onClick={() => onTrackSelect(index)}

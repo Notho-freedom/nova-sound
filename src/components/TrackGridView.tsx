@@ -38,6 +38,7 @@ interface TrackGridViewProps {
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToLocal?: boolean;
   canUploadToNexus?: boolean;
+  isAuthenticated?: boolean;
   columns?: number;
   isUploaded?: (trackId: string) => boolean;
   getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
@@ -68,6 +69,7 @@ export const TrackGridView = memo(({
   getNexusTrackProgress,
   canUploadToLocal = false,
   canUploadToNexus = false,
+  isAuthenticated = false,
   columns = 5,
   isUploaded,
   getUploadedProvider,
@@ -196,6 +198,7 @@ export const TrackGridView = memo(({
           onUploadToLocal={() => data.uploadTrackToNexus?.(track, 'local')}
           canUploadToLocal={data.canUploadToLocal && !!track.filePath}
           isUploadingToLocal={data.getNexusTrackProgress?.(track.id)?.status === "uploading"}
+          isAuthenticated={data.isAuthenticated}
         >
           <Tooltip>
             <TooltipTrigger asChild>
@@ -278,6 +281,7 @@ export const TrackGridView = memo(({
               onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
               canUploadToLocal={canUploadToLocal && !!track.filePath}
               isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === "uploading"}
+              isAuthenticated={isAuthenticated}
             >
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -1058,6 +1058,7 @@ export const PlaylistView = memo(({
                       uploadTrackToNexus={uploadTrackToNexus}
                       getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                       canUploadToNexus={canUploadToNexus}
+                      isAuthenticated={nexusAuthenticated}
                       isUploaded={isUploaded}
                       getUploadedProvider={getUploadedProvider}
                     />
@@ -1086,6 +1087,7 @@ export const PlaylistView = memo(({
                       uploadTrackToNexus={uploadTrackToNexus}
                       getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                       canUploadToNexus={canUploadToNexus}
+                      isAuthenticated={nexusAuthenticated}
                       isUploaded={isUploaded}
                       getUploadedProvider={getUploadedProvider}
                       onNavigateToArtist={onNavigateToArtist}

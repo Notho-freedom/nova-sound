@@ -58,6 +58,7 @@ interface TrackContextMenuProps {
   onUploadToLocal?: () => void;
   canUploadToLocal?: boolean;
   isUploadingToLocal?: boolean;
+  isAuthenticated?: boolean;
   // New optional upload state helpers
   // Accept either a boolean (already-evaluated) or a function that can be called with a trackId
   isUploaded?: boolean | ((trackId: string) => boolean);
@@ -92,9 +93,14 @@ export const TrackContextMenu = ({
   onUploadToLocal,
   canUploadToLocal = false,
   isUploadingToLocal = false,
+  isAuthenticated = false,
   isUploaded,
   getUploadedProvider,
 }: TrackContextMenuProps) => {
+  const uploadsEnabled = isAuthenticated === true;
+  const hasLocalFile = !!track.filePath;
+  const allowCta = uploadsEnabled && hasLocalFile;
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -198,8 +204,8 @@ export const TrackContextMenu = ({
               <ContextMenuSubContent className="w-56">
                 {onUploadToCloudinary && (
                   <ContextMenuItem 
-                    onClick={canUploadToCloudinary ? onUploadToCloudinary : () => openProUploadCta({ server: "cloudinary" })}
-                    disabled={isUploading}
+                    onClick={allowCta ? (canUploadToCloudinary ? onUploadToCloudinary : () => openProUploadCta({ server: "cloudinary" })) : undefined}
+                    disabled={isUploading || !allowCta}
                   >
                     {isUploading ? (
                       <>
@@ -217,8 +223,8 @@ export const TrackContextMenu = ({
                 )}
                 {onUploadToBunny && (
                   <ContextMenuItem 
-                    onClick={canUploadToBunny ? onUploadToBunny : () => openProUploadCta({ server: "bunny" })}
-                    disabled={isUploadingToBunny}
+                    onClick={allowCta ? (canUploadToBunny ? onUploadToBunny : () => openProUploadCta({ server: "bunny" })) : undefined}
+                    disabled={isUploadingToBunny || !allowCta}
                   >
                     {isUploadingToBunny ? (
                       <>
@@ -237,8 +243,8 @@ export const TrackContextMenu = ({
                 {onUploadToNexus && (
                   <>
                     <ContextMenuItem 
-                      onClick={canUploadToNexus ? onUploadToNexus : () => openProUploadCta({ server: "planethoster" })}
-                      disabled={isUploadingToNexus}
+                      onClick={allowCta ? (canUploadToNexus ? onUploadToNexus : () => openProUploadCta({ server: "planethoster" })) : undefined}
+                      disabled={isUploadingToNexus || !allowCta}
                     >
                       {isUploadingToNexus ? (
                         <>
@@ -258,7 +264,7 @@ export const TrackContextMenu = ({
                 {onUploadToLocal && (
                   <ContextMenuItem 
                     onClick={onUploadToLocal}
-                    disabled={isUploadingToLocal || !canUploadToLocal}
+                    disabled={isUploadingToLocal || !uploadsEnabled || !canUploadToLocal}
                   >
                     {isUploadingToLocal ? (
                       <>

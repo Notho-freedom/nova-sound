@@ -721,6 +721,7 @@ export const LibraryView = memo(({
                               onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
                               canUploadToLocal={canUploadToLocal && !!track.filePath}
                               isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                              isAuthenticated={nexusAuthenticated}
                             >
                               <button
                                 onClick={(e) => e.stopPropagation()}
@@ -900,6 +901,7 @@ export const LibraryView = memo(({
                 uploadTrackToNexus={uploadTrackToNexus}
                 getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                 canUploadToNexus={canUploadToNexus}
+                isAuthenticated={nexusAuthenticated}
                 isUploaded={isUploaded}
                 getUploadedProvider={getUploadedProvider}
               />
@@ -1690,6 +1692,7 @@ export const LibraryView = memo(({
                             uploadTrackToNexus={uploadTrackToNexus}
                             getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                             canUploadToNexus={canUploadToNexus}
+                            isAuthenticated={nexusAuthenticated}
                             isUploaded={isUploaded}
                             getUploadedProvider={getUploadedProvider}
                           />
@@ -1766,9 +1769,14 @@ export const LibraryView = memo(({
             uploadTrack={uploadTrack}
             getTrackProgress={(id) => getTrackProgress(id) ?? null}
             canUploadToCloudinary={canUploadToCloudinary}
+            canUploadToLocal={canUploadToLocal}
+            uploadTrackToBunny={uploadTrackToBunny}
+            getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
+            canUploadToBunny={canUploadToBunny}
             uploadTrackToNexus={uploadTrackToNexus}
             getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
             canUploadToNexus={canUploadToNexus}
+            isAuthenticated={nexusAuthenticated}
             isUploaded={isUploaded}
             getUploadedProvider={getUploadedProvider}
             onNavigateToArtist={onNavigateToArtist}
@@ -2080,6 +2088,7 @@ export const LibraryView = memo(({
                 uploadTrackToNexus={uploadTrackToNexus}
                 getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                 canUploadToNexus={canUploadToNexus}
+                isAuthenticated={nexusAuthenticated}
                 isUploaded={isUploaded}
                 getUploadedProvider={getUploadedProvider}
               />
@@ -2106,6 +2115,7 @@ export const LibraryView = memo(({
                 uploadTrackToNexus={uploadTrackToNexus}
                 getNexusTrackProgress={(id) => getNexusTrackProgress(id) ?? null}
                 canUploadToNexus={canUploadToNexus}
+                isAuthenticated={nexusAuthenticated}
                 isUploaded={isUploaded}
                 getUploadedProvider={getUploadedProvider}
                 onNavigateToArtist={onNavigateToArtist}

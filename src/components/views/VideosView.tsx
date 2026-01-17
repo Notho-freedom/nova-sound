@@ -908,6 +908,7 @@ export const VideosView = memo(() => {
                     canUploadToCloudinary={cloudinaryConfigured && nexusIsPro && nexusAuthenticated} // Pro only (serveur 0)
                     canUploadToBunny={nexusIsPro && nexusAuthenticated} // Pro only (serveur 1)
                     canUploadToNexus={nexusIsPro && nexusAuthenticated} // Pro only (serveur 2)
+                    isAuthenticated={nexusAuthenticated}
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
                     <div
@@ -1110,6 +1111,7 @@ export const VideosView = memo(() => {
                           onUploadToNexus={() => uploadVideoToNexus(video)}
                           canUploadToCloudinary={cloudinaryConfigured && nexusIsPro && nexusAuthenticated} // Pro only (serveur 0)
                           canUploadToNexus={nexusIsPro && nexusAuthenticated}
+                          isAuthenticated={nexusAuthenticated}
                           onRate={(rating) => setUserRating(video.id, rating)}
                         >
                           <tr
@@ -1266,6 +1268,7 @@ export const VideosView = memo(() => {
                     canUploadToCloudinary={cloudinaryConfigured && nexusIsPro && nexusAuthenticated} // Pro only (serveur 0)
                     canUploadToBunny={nexusIsPro && nexusAuthenticated} // Pro only (serveur 1)
                     canUploadToNexus={nexusIsPro && nexusAuthenticated} // Pro only (serveur 2)
+                    isAuthenticated={nexusAuthenticated}
                     onRate={(rating) => setUserRating(video.id, rating)}
                   >
                     <div

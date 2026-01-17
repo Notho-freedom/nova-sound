@@ -454,6 +454,7 @@ export const HomeView = memo(({
                   onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
                   canUploadToLocal={canUploadToLocal && !!track.filePath}
                   isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                  isAuthenticated={nexusAuthenticated}
                 >
                   <FeaturedCard
                     title={track.title}
