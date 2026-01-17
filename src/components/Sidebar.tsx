@@ -110,7 +110,7 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
       className={cn(
         "relative w-full flex items-center rounded-xl transition-all duration-300 ease-out group",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-        collapsed ? "px-3 py-3 justify-center" : "px-4 py-3 gap-3",
+        collapsed ? "px-0 py-3 justify-center" : "px-4 py-3 gap-3",
         isActive
           ? "bg-gradient-to-r from-primary/20 via-primary/10 to-transparent text-primary shadow-lg shadow-primary/10"
           : "text-muted-foreground hover:text-foreground hover:bg-white/5 active:bg-white/10",
@@ -137,11 +137,22 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           className={cn(
             "flex-shrink-0 transition-all duration-300",
             collapsed ? "w-5 h-5" : "w-[18px] h-[18px]",
-            isActive ? "scale-110" : "group-hover:scale-110",
+            isActive ? "scale-105" : "group-hover:scale-110",
             color && !isActive && color,
           )}
         />
       </div>
+
+      {collapsed && badge !== undefined && badge > 0 && (
+        <span
+          className={cn(
+            "absolute top-2 right-2 min-w-[6px] h-[6px] px-1 text-[10px] font-bold rounded-full",
+            "flex items-center justify-center",
+            isActive ? "bg-primary text-primary-foreground" : "bg-primary/20 text-primary"
+          )}
+        >
+        </span>
+      )}
 
       {!collapsed && (
         <>
@@ -359,7 +370,7 @@ export const Sidebar = ({
         <button
           onClick={() => handleCollapsedChange(!collapsed)}
           className={cn(
-            "absolute -right-3 top-20 z-50",
+            "absolute -right-3 top-20 z-99",
             "w-6 h-6 rounded-full",
             "bg-card/90 backdrop-blur-xl border border-white/10",
             "flex items-center justify-center",

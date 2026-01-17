@@ -339,6 +339,29 @@ export const DesktopApp = () => {
   const [recentSearchQuery, setRecentSearchQuery] = useState<string>("");
   // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
 
+  // Restore sidebar collapsed state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem('nexus-sidebar-collapsed');
+      if (saved !== null) {
+        setSidebarCollapsed(saved === 'true');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  // Persist sidebar collapsed state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem('nexus-sidebar-collapsed', String(sidebarCollapsed));
+    } catch {
+      // ignore storage errors
+    }
+  }, [sidebarCollapsed]);
+
   // Audio element ref for real playback
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
