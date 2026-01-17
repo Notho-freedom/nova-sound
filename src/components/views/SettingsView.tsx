@@ -35,6 +35,7 @@ import {
   Search,
   Tag,
   Clock,
+  Globe,
 } from "lucide-react";
 import { Youtube } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -437,7 +438,7 @@ const ConfigAlert = ({ configured, service }: { configured: boolean; service: st
 
 export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders, refreshLibrary } = useLibrary();
-  const { t, locale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const themeOptions = [
     { id: "dark", label: t("settingsThemeDark"), color: "bg-gradient-to-br from-zinc-900 to-zinc-950", border: "border-cyan-500" },
     { id: "light", label: t("settingsThemeLight"), color: "bg-gradient-to-br from-zinc-50 to-zinc-100", border: "border-blue-500" },
@@ -2045,6 +2046,30 @@ export const SettingsView = () => {
                     </button>
                   ))}
                 </div>
+              </SettingsCard>
+
+              <SettingsCard title={t("settingsCardLanguage")} icon={Globe}>
+                <SettingRow
+                  label={t("settingsLanguageLabel")}
+                  description={t("settingsLanguageDescription")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={locale === "fr" ? "default" : "outline"}
+                      onClick={() => setLocale("fr")}
+                    >
+                      {t("settingsLanguageFrench")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={locale === "en" ? "default" : "outline"}
+                      onClick={() => setLocale("en")}
+                    >
+                      {t("settingsLanguageEnglish")}
+                    </Button>
+                  </div>
+                </SettingRow>
               </SettingsCard>
 
               <SettingsCard title={t("settingsCardNotifications")} icon={Bell}>
