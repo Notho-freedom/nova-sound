@@ -1973,7 +1973,7 @@ export const DesktopApp = () => {
       case "home":
         return (
         <HomeView
-          loading={libraryLoading}
+          loading={libraryLoading || scanning}
           tracks={allTracks}
           currentTrackIndex={currentTrackIndex}
           isPlaying={isPlaying}
