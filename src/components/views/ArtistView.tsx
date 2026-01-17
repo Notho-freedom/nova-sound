@@ -475,8 +475,8 @@ export const ArtistView = memo(({
                             {isCurrentTrack && isPlaying ? (
                               <div className="flex items-center justify-center gap-0.5">
                                 <div className="w-1 h-4 bg-primary rounded-full animate-pulse" />
-                                <div className="w-1 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.1s' }} />
-                                <div className="w-1 h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                <div className="w-1 h-3 bg-primary rounded-full animate-pulse pulse-delay-100" />
+                                <div className="w-1 h-4 bg-primary rounded-full animate-pulse pulse-delay-200" />
                               </div>
                             ) : (
                               <>

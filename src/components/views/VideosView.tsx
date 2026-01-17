@@ -950,10 +950,11 @@ export const VideosView = memo(() => {
                               }
                               
                               // If default also failed, show icon
-                              target.style.display = 'none';
+                              target.classList.add('hidden');
                               const fallback = target.nextElementSibling as HTMLElement;
                               if (fallback) {
-                                fallback.style.display = 'flex';
+                                fallback.classList.remove('hidden');
+                                fallback.classList.add('flex');
                               }
                             }}
                           />
@@ -965,18 +966,16 @@ export const VideosView = memo(() => {
                             onError={(e) => {
                               // Hide image and show fallback icon if default also fails
                               const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
+                              target.classList.add('hidden');
                               const fallback = target.nextElementSibling as HTMLElement;
                               if (fallback) {
-                                fallback.style.display = 'flex';
+                                fallback.classList.remove('hidden');
+                                fallback.classList.add('flex');
                               }
                             }}
                           />
                         )}
-                        <div 
-                          className="w-full h-full flex items-center justify-center hidden"
-                          style={{ display: 'none' }}
-                        >
+                        <div className="hidden w-full h-full items-center justify-center">
                           <Film className="w-12 h-12 text-muted-foreground" />
                         </div>
 
@@ -1057,12 +1056,11 @@ export const VideosView = memo(() => {
 
                         {/* Progress bar */}
                         {video.watchProgress && !video.watchProgress.completed && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/30">
-                            <div
-                              className="h-full bg-red-600"
-                              style={{ width: `${video.watchProgress.percentage}%` }}
-                            />
-                          </div>
+                          <progress
+                            className="video-progress absolute bottom-0 left-0 right-0 h-1 w-full"
+                            value={video.watchProgress.percentage}
+                            max={100}
+                          />
                         )}
                       </div>
 
@@ -1323,12 +1321,11 @@ export const VideosView = memo(() => {
                         )}
 
                         {video.watchProgress && !video.watchProgress.completed && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/30">
-                            <div
-                              className="h-full bg-red-600"
-                              style={{ width: `${video.watchProgress.percentage}%` }}
-                            />
-                          </div>
+                          <progress
+                            className="video-progress absolute bottom-0 left-0 right-0 h-1 w-full"
+                            value={video.watchProgress.percentage}
+                            max={100}
+                          />
                         )}
                       </div>
                       <p className="text-sm font-medium mt-2 truncate">{video.title}</p>
