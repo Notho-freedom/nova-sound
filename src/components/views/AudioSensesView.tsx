@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { useAudioSenses, type AudioSensesData } from '@/hooks/useAudioSenses';
 import { useQueue } from '@/hooks/useQueue';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HelpButton, HelpIcon } from '@/components/ui/HelpButton';
+import { useI18n } from '@/i18n';
 
 interface AudioSensesViewProps {
   audioElement: HTMLAudioElement | null;
@@ -27,6 +28,7 @@ interface AudioSensesViewProps {
  * Vue complète pour visualiser tous les sens audio
  */
 export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
+  const { t } = useI18n();
   const sensesData = useAudioSenses(audioElement, {
     enablePitchDetection: true,
     enableBPMDetection: true,
@@ -37,6 +39,14 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
   const canvasEnergyBandsRef = useRef<HTMLCanvasElement>(null);
   const canvasPeakHistoryRef = useRef<HTMLCanvasElement>(null);
   const canvasEnvelopeRef = useRef<HTMLCanvasElement>(null);
+
+  const energyBandLabels = useMemo(() => ({
+    bass: t('audioSensesBandBass'),
+    lowMid: t('audioSensesBandLowMid'),
+    mid: t('audioSensesBandMid'),
+    highMid: t('audioSensesBandHighMid'),
+    treble: t('audioSensesBandTreble'),
+  }), [t]);
 
   // Dessiner Waveform
   useEffect(() => {
@@ -131,11 +141,11 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
     ctx.clearRect(0, 0, width, height);
 
     const bands = [
-      { name: 'Bass', value: sensesData.energyBands.bass, color: '#ef4444' },
-      { name: 'Low-Mid', value: sensesData.energyBands.lowMid, color: '#f97316' },
-      { name: 'Mid', value: sensesData.energyBands.mid, color: '#3b82f6' },
-      { name: 'High-Mid', value: sensesData.energyBands.highMid, color: '#8b5cf6' },
-      { name: 'Treble', value: sensesData.energyBands.treble, color: '#ec4899' },
+      { name: energyBandLabels.bass, value: sensesData.energyBands.bass, color: '#ef4444' },
+      { name: energyBandLabels.lowMid, value: sensesData.energyBands.lowMid, color: '#f97316' },
+      { name: energyBandLabels.mid, value: sensesData.energyBands.mid, color: '#3b82f6' },
+      { name: energyBandLabels.highMid, value: sensesData.energyBands.highMid, color: '#8b5cf6' },
+      { name: energyBandLabels.treble, value: sensesData.energyBands.treble, color: '#ec4899' },
     ];
 
     const barWidth = width / bands.length;
@@ -159,7 +169,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
       ctx.fillText(band.name, x + barWidth / 2, height - 5);
       ctx.fillText(Math.round(band.value).toString(), x + barWidth / 2, height - 20);
     });
-  }, [sensesData]);
+  }, [sensesData, energyBandLabels]);
 
   // Dessiner Peak History
   useEffect(() => {
@@ -293,15 +303,15 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
             <Radio className="w-8 h-8 text-primary" />
-            Sens Audio - Analyse en Temps Réel
+            {t('audioSensesTitle')}
           </h1>
           <p className="text-muted-foreground">
-            Visualisation complète de tous les paramètres audio détectés
+            {t('audioSensesSubtitle')}
           </p>
         </div>
         <HelpButton
-          title="Audio Senses"
-          description="Explorez les différentes dimensions de votre audio en temps réel : forme d'onde, spectre de fréquence, énergie des bandes, pics et analyse ADSR. Comprenez la composition acoustique de votre musique."
+          title={t('audioSensesHelpTitle')}
+          description={t('audioSensesHelpDescription')}
           size="icon-sm"
         />
       </div>
@@ -312,8 +322,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              Waveform (Amplitude Temporelle)
-              <HelpIcon description="La forme d'onde montre l'amplitude du signal audio au fil du temps. Les pics rouges indiquent les moments les plus forts." />
+              {t('audioSensesWaveformTitle')}
+              <HelpIcon description={t('audioSensesWaveformHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -325,13 +335,13 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             />
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Amplitude max:</span>
+                <span className="text-muted-foreground">{t('audioSensesMaxAmplitude')}</span>
                 <span className="ml-2 font-mono">
                   {Math.max(...sensesData.waveform.map(v => Math.abs(v - 128))).toFixed(0)}
                 </span>
               </div>
               <div>
-                <span className="text-muted-foreground">Échantillons:</span>
+                <span className="text-muted-foreground">{t('audioSensesSamples')}</span>
                 <span className="ml-2 font-mono">{sensesData.waveform.length}</span>
               </div>
             </div>
@@ -343,8 +353,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <RadioIcon className="w-5 h-5" />
-              FFT Spectrum (20Hz - 20kHz)
-              <HelpIcon description="Le spectre FFT analyse les fréquences présentes dans l'audio. Rouge=basses, Bleu=mids, Violet=aigus." />
+              {t('audioSensesFftTitle')}
+              <HelpIcon description={t('audioSensesFftHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -357,21 +367,21 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-red-500">●</span>
-                <span className="ml-2">Basses (20-200Hz)</span>
+                <span className="ml-2">{t('audioSensesFftBass')}</span>
                 <div className="font-mono text-xs mt-1">
                   {Math.round(sensesData.bass)}
                 </div>
               </div>
               <div>
                 <span className="text-blue-500">●</span>
-                <span className="ml-2">Mids (200-2kHz)</span>
+                <span className="ml-2">{t('audioSensesFftMid')}</span>
                 <div className="font-mono text-xs mt-1">
                   {Math.round(sensesData.mid)}
                 </div>
               </div>
               <div>
                 <span className="text-purple-500">●</span>
-                <span className="ml-2">Highs (2k-20kHz)</span>
+                <span className="ml-2">{t('audioSensesFftHigh')}</span>
                 <div className="font-mono text-xs mt-1">
                   {Math.round(sensesData.treble)}
                 </div>
@@ -385,8 +395,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Gauge className="w-5 h-5" />
-              Energy Bands (5 Bandes)
-              <HelpIcon description="Analyse d'énergie dans 5 bandes de fréquence : basses, bas-mediums, mediums, haut-mediums et aigus." />
+              {t('audioSensesEnergyTitle')}
+              <HelpIcon description={t('audioSensesEnergyHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -398,11 +408,11 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             />
             <div className="mt-4 grid grid-cols-5 gap-2 text-xs">
               {[
-                { name: 'Bass', value: sensesData.energyBands.bass },
-                { name: 'Low-Mid', value: sensesData.energyBands.lowMid },
-                { name: 'Mid', value: sensesData.energyBands.mid },
-                { name: 'High-Mid', value: sensesData.energyBands.highMid },
-                { name: 'Treble', value: sensesData.energyBands.treble },
+                { name: energyBandLabels.bass, value: sensesData.energyBands.bass },
+                { name: energyBandLabels.lowMid, value: sensesData.energyBands.lowMid },
+                { name: energyBandLabels.mid, value: sensesData.energyBands.mid },
+                { name: energyBandLabels.highMid, value: sensesData.energyBands.highMid },
+                { name: energyBandLabels.treble, value: sensesData.energyBands.treble },
               ].map((band) => (
                 <div key={band.name} className="text-center">
                   <div className="font-mono font-bold">{Math.round(band.value)}</div>
@@ -418,28 +428,28 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Volume2 className="w-5 h-5" />
-              Volume & RMS
-              <HelpIcon description="Volume mesuré (0-100%), RMS (niveau d'énergie effective) et énergie globale du signal." />
+              {t('audioSensesVolumeTitle')}
+              <HelpIcon description={t('audioSensesVolumeHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Volume</span>
+                <span>{t('audioSensesVolumeLabel')}</span>
                 <span className="font-mono">{(sensesData.volume * 100).toFixed(1)}%</span>
               </div>
               <Progress value={sensesData.volume * 100} className="h-3" />
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>RMS (Root Mean Square)</span>
+                <span>{t('audioSensesRmsLabel')}</span>
                 <span className="font-mono">{(sensesData.rms * 100).toFixed(1)}%</span>
               </div>
               <Progress value={sensesData.rms * 100} className="h-3" />
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Énergie Globale</span>
+                <span>{t('audioSensesGlobalEnergy')}</span>
                 <span className="font-mono">{Math.round(sensesData.energy)}</span>
               </div>
               <Progress value={(sensesData.energy / 255) * 100} className="h-3" />
@@ -452,8 +462,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5" />
-              Peak Detection
-              <HelpIcon description="Détection des pics acoustiques au fil du temps. Montre quand et où les moments forts se produisent." />
+              {t('audioSensesPeakTitle')}
+              <HelpIcon description={t('audioSensesPeakHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -465,21 +475,21 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             />
             <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Pic actuel:</span>
+                <span className="text-muted-foreground">{t('audioSensesPeakCurrent')}</span>
                 <div className="font-mono text-lg font-bold text-primary">
                   {(sensesData.peak * 100).toFixed(1)}%
                 </div>
               </div>
               <div>
-                <span className="text-muted-foreground">Pics détectés:</span>
+                <span className="text-muted-foreground">{t('audioSensesPeakDetected')}</span>
                 <div className="font-mono text-lg">
                   {sensesData.peakHistory.filter(p => p > 0.7).length}
                 </div>
               </div>
               <div>
-                <span className="text-muted-foreground">Historique:</span>
+                <span className="text-muted-foreground">{t('audioSensesPeakHistory')}</span>
                 <div className="font-mono text-lg">
-                  {sensesData.peakHistory.length} échantillons
+                  {t('audioSensesSamplesCount', { count: sensesData.peakHistory.length })}
                 </div>
               </div>
             </div>
@@ -491,8 +501,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
-              Envelope Following (ADSR)
-              <HelpIcon description="Analyse ADSR : Attack (montée), Decay (descente initiale), Sustain (soutien), Release (libération). Révèle le caractère dynamique du son." />
+              {t('audioSensesEnvelopeTitle')}
+              <HelpIcon description={t('audioSensesEnvelopeHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -505,28 +515,28 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             <div className="mt-4 grid grid-cols-4 gap-4 text-sm">
               <div>
                 <span className="text-green-500">●</span>
-                <span className="ml-2">Attack</span>
+                <span className="ml-2">{t('audioSensesAttack')}</span>
                 <div className="font-mono text-xs mt-1">
                   {sensesData.envelope.attack}ms
                 </div>
               </div>
               <div>
                 <span className="text-orange-500">●</span>
-                <span className="ml-2">Decay</span>
+                <span className="ml-2">{t('audioSensesDecay')}</span>
                 <div className="font-mono text-xs mt-1">
                   {sensesData.envelope.decay}ms
                 </div>
               </div>
               <div>
                 <span className="text-blue-500">●</span>
-                <span className="ml-2">Sustain</span>
+                <span className="ml-2">{t('audioSensesSustain')}</span>
                 <div className="font-mono text-xs mt-1">
                   {(sensesData.envelope.sustain * 100).toFixed(0)}%
                 </div>
               </div>
               <div>
                 <span className="text-red-500">●</span>
-                <span className="ml-2">Release</span>
+                <span className="ml-2">{t('audioSensesRelease')}</span>
                 <div className="font-mono text-xs mt-1">
                   {sensesData.envelope.release}ms
                 </div>
@@ -540,8 +550,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Music className="w-5 h-5" />
-              Pitch Detection / Note Detection
-              <HelpIcon description="Détection automatique de la note musicale fondamentale et de sa fréquence en Hz. La confiance indique la certitude de la détection." />
+              {t('audioSensesPitchTitle')}
+              <HelpIcon description={t('audioSensesPitchHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -558,13 +568,13 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Fréquence:</span>
+                <span className="text-muted-foreground">{t('audioSensesFrequency')}</span>
                 <div className="font-mono text-lg">
                   {sensesData.pitch.frequency.toFixed(2)} Hz
                 </div>
               </div>
               <div>
-                <span className="text-muted-foreground">Confiance:</span>
+                <span className="text-muted-foreground">{t('audioSensesConfidence')}</span>
                 <div className="font-mono text-lg">
                   {(sensesData.pitch.confidence * 100).toFixed(1)}%
                 </div>
@@ -582,8 +592,8 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              Tempo / BPM Estimation
-              <HelpIcon description="Estimation du tempo en BPM (battements par minute) et de la phase du beat. Synchronisez avec le rythme musical." />
+              {t('audioSensesTempoTitle')}
+              <HelpIcon description={t('audioSensesTempoHelp')} />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -591,17 +601,17 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
               <div className="text-5xl font-bold mb-2 text-primary">
                 {Math.round(sensesData.tempo.bpm)}
               </div>
-              <div className="text-sm text-muted-foreground">BPM</div>
+              <div className="text-sm text-muted-foreground">{t('audioSensesBpmLabel')}</div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Confiance:</span>
+                <span className="text-muted-foreground">{t('audioSensesConfidence')}</span>
                 <div className="font-mono text-lg">
                   {(sensesData.tempo.confidence * 100).toFixed(1)}%
                 </div>
               </div>
               <div>
-                <span className="text-muted-foreground">Phase du beat:</span>
+                <span className="text-muted-foreground">{t('audioSensesBeatPhase')}</span>
                 <div className="font-mono text-lg">
                   {(sensesData.tempo.beatPhase * 100).toFixed(0)}%
                 </div>
@@ -609,7 +619,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Beat Phase</span>
+                <span>{t('audioSensesBeatPhaseLabel')}</span>
                 <span className="font-mono">
                   {(sensesData.tempo.beatPhase * 100).toFixed(0)}%
                 </span>
@@ -618,7 +628,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
             </div>
             {sensesData.tempo.beatPhase > 0.9 && (
               <div className="text-center text-primary font-bold animate-pulse">
-                ● BEAT
+                {t('audioSensesBeatPulse')}
               </div>
             )}
           </CardContent>
@@ -628,7 +638,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
       {/* Résumé en bas */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Résumé des Sens Audio</CardTitle>
+          <CardTitle>{t('audioSensesSummaryTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 text-sm">
@@ -636,49 +646,49 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
               <div className="text-2xl font-bold text-red-500">
                 {Math.round(sensesData.energyBands.bass)}
               </div>
-              <div className="text-muted-foreground">Bass</div>
+              <div className="text-muted-foreground">{t('audioSensesBandBass')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-500">
                 {Math.round(sensesData.energyBands.mid)}
               </div>
-              <div className="text-muted-foreground">Mid</div>
+              <div className="text-muted-foreground">{t('audioSensesBandMid')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-500">
                 {Math.round(sensesData.energyBands.treble)}
               </div>
-              <div className="text-muted-foreground">Treble</div>
+              <div className="text-muted-foreground">{t('audioSensesBandTreble')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
                 {(sensesData.volume * 100).toFixed(0)}%
               </div>
-              <div className="text-muted-foreground">Volume</div>
+              <div className="text-muted-foreground">{t('audioSensesVolumeLabel')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-500">
                 {(sensesData.peak * 100).toFixed(0)}%
               </div>
-              <div className="text-muted-foreground">Peak</div>
+              <div className="text-muted-foreground">{t('audioSensesPeakLabel')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
                 {sensesData.pitch.note}{sensesData.pitch.octave}
               </div>
-              <div className="text-muted-foreground">Note</div>
+              <div className="text-muted-foreground">{t('audioSensesNoteLabel')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">
                 {Math.round(sensesData.tempo.bpm)}
               </div>
-              <div className="text-muted-foreground">BPM</div>
+              <div className="text-muted-foreground">{t('audioSensesBpmLabel')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
                 {sensesData.pitch.frequency.toFixed(0)}Hz
               </div>
-              <div className="text-muted-foreground">Freq</div>
+              <div className="text-muted-foreground">{t('audioSensesFrequencyLabel')}</div>
             </div>
           </div>
         </CardContent>

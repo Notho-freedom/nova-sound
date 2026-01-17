@@ -1,17 +1,27 @@
 import { NotificationListSkeleton } from "@/components/ui/skeletons";
 import { useState } from "react";
-import { Bell, Check, AlertCircle, Info, X, Trash2 } from "lucide-react";
+import { Bell, Check, AlertCircle, Info, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
+import { HelpButton } from "@/components/ui/HelpButton";
+import { useI18n } from "@/i18n";
 
 export const NotificationsView = () => {
-    const [loading, setLoading] = useState(false); // Remplacer par vrai loading si async
-  const { notifications, clearNotifications, enabled, setEnabled } = useNotifications();
+  const [loading, setLoading] = useState(false); // Remplacer par vrai loading si async
+  const { notifications, clearNotifications } = useNotifications();
+  const { t, locale } = useI18n();
   const [filter, setFilter] = useState<"all" | "success" | "error" | "warning" | "info">("all");
+
+  const filterLabels: Record<"all" | "success" | "error" | "warning" | "info", string> = {
+    all: t("notificationsFilterAll"),
+    success: t("notificationsFilterSuccess"),
+    error: t("notificationsFilterError"),
+    warning: t("notificationsFilterWarning"),
+    info: t("notificationsFilterInfo"),
+  };
 
   const filteredNotifications = notifications.filter((notif) => {
     if (filter === "all") return true;
@@ -58,15 +68,18 @@ export const NotificationsView = () => {
               <div>
                 <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
                   <Bell className="w-6 h-6" />
-                  Notifications
+                  {t("notificationsTitle")}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {notifications.length} notification{notifications.length > 1 ? "s" : ""}
+                  {t("notificationsCount", {
+                    count: notifications.length,
+                    suffix: notifications.length > 1 ? "s" : "",
+                  })}
                 </p>
               </div>
               <HelpButton
-                title="Notifications"
-                description="Suivez toutes les mises à jour de votre application : synchronisations réussies, téléchargements, erreurs et messages système importants."
+                title={t("notificationsHelpTitle")}
+                description={t("notificationsHelpDescription")}
                 size="icon-sm"
               />
             </div>
@@ -80,11 +93,11 @@ export const NotificationsView = () => {
                     className="gap-2 transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Effacer tout
+                    {t("notificationsClearAll")}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <div className="text-sm">Supprimer toutes les notifications</div>
+                  <div className="text-sm">{t("notificationsClearAllTooltip")}</div>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -101,7 +114,7 @@ export const NotificationsView = () => {
                     onClick={() => setFilter(filterType)}
                     className="h-7 text-xs capitalize transition-all duration-200 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2"
                   >
-                    {filterType === "all" ? "Toutes" : filterType}
+                    {filterLabels[filterType]}
                     {filterType !== "all" && (
                       <span className="ml-1 text-xs opacity-70">
                         ({notifications.filter((n) => n.type === filterType).length})
@@ -111,9 +124,9 @@ export const NotificationsView = () => {
                 </TooltipTrigger>
                 <TooltipContent>
                   <div className="text-sm">
-                    {filterType === "all" 
-                      ? "Afficher toutes les notifications" 
-                      : `Afficher uniquement les notifications ${filterType}`}
+                    {filterType === "all"
+                      ? t("notificationsFilterAllTooltip")
+                      : t("notificationsFilterOnlyTooltip", { type: filterLabels[filterType] })}
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -131,12 +144,14 @@ export const NotificationsView = () => {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Bell className="w-16 h-16 text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-medium text-foreground mb-2">
-                {filter === "all" ? "Aucune notification" : `Aucune notification ${filter}`}
+                {filter === "all"
+                  ? t("notificationsEmptyTitleAll")
+                  : t("notificationsEmptyTitleType", { type: filterLabels[filter] })}
               </h3>
               <p className="text-sm text-muted-foreground">
                 {filter === "all"
-                  ? "Vous n'avez pas encore de notifications"
-                  : `Aucune notification de type \"${filter}\"`}
+                  ? t("notificationsEmptyDescriptionAll")
+                  : t("notificationsEmptyDescriptionType", { type: filterLabels[filter] })}
               </p>
             </div>
           ) : (
@@ -163,13 +178,16 @@ export const NotificationsView = () => {
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground mt-2">
-                            {new Date(notification.timestamp).toLocaleString("fr-FR", {
+                            {new Date(notification.timestamp).toLocaleString(
+                              locale === "fr" ? "fr-FR" : "en-US",
+                              {
                               day: "2-digit",
                               month: "long",
                               year: "numeric",
                               hour: "2-digit",
                               minute: "2-digit",
-                            })}
+                              }
+                            )}
                           </p>
                         </div>
                       </div>

@@ -29,6 +29,7 @@ import { CreatePlaylistModal } from "@/components/PlaylistModal";
 import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { toast } from "sonner";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useI18n } from "@/i18n";
 
 import type { Track, Playlist } from "@/types/music";
 
@@ -68,30 +69,6 @@ interface SidebarProps {
   onPlayPlaylist?: (playlistId: string) => void;
   onShufflePlaylist?: (playlistId: string) => void;
 }
-
-const mainNavItems = [
-  { id: "home" as ViewType, icon: Home, label: "Accueil" },
-  { id: "search" as ViewType, icon: Search, label: "Rechercher" },
-  { id: "library" as ViewType, icon: Library, label: "Bibliothèque" },
-  { id: "playlists" as ViewType, icon: ListMusic, label: "Playlists" },
-  { id: "notifications" as ViewType, icon: Bell, label: "Notifications" },
-];
-
-const libraryItems = [
-  { id: "favorites" as ViewType, icon: Heart, label: "Favoris", color: "text-rose-400" },
-  { id: "recent" as ViewType, icon: Clock, label: "Récents", color: "text-amber-400" },
-  { id: "albums" as ViewType, icon: Disc3, label: "Albums", color: "text-violet-400" },
-  { id: "artists" as ViewType, icon: Users, label: "Artistes", color: "text-emerald-400" },
-];
-
-const mediaItems = [
-  { id: "videos" as ViewType, icon: Video, label: "Vidéos" },
-  { id: "audio-senses" as ViewType, icon: Radio, label: "Sens Audio" },
-];
-
-const localItems = [
-  { id: "cloud" as ViewType, icon: Cloud, label: "Cloud Storage", color: "text-cyan-400" },
-];
 
 interface NavItemProps {
   icon: typeof Home;
@@ -237,6 +214,7 @@ export const Sidebar = ({
   onPlayPlaylist,
   onShufflePlaylist,
 }: SidebarProps) => {
+  const { t } = useI18n();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? internalCollapsed;
   const hookPlaylists = usePlaylists();
@@ -244,6 +222,42 @@ export const Sidebar = ({
   const allPlaylists = propPlaylists ?? hookPlaylists.playlists;
   const { createPlaylist, updatePlaylist, deletePlaylist } = hookPlaylists;
   const { notifySuccess } = useNotifications();
+
+  const mainNavItems = useMemo(
+    () => [
+      { id: "home" as ViewType, icon: Home, label: t("navHome") },
+      { id: "search" as ViewType, icon: Search, label: t("navSearch") },
+      { id: "library" as ViewType, icon: Library, label: t("navLibrary") },
+      { id: "playlists" as ViewType, icon: ListMusic, label: t("navPlaylists") },
+      { id: "notifications" as ViewType, icon: Bell, label: t("navNotifications") },
+    ],
+    [t]
+  );
+
+  const libraryItems = useMemo(
+    () => [
+      { id: "favorites" as ViewType, icon: Heart, label: t("navFavorites"), color: "text-rose-400" },
+      { id: "recent" as ViewType, icon: Clock, label: t("navRecent"), color: "text-amber-400" },
+      { id: "albums" as ViewType, icon: Disc3, label: t("navAlbums"), color: "text-violet-400" },
+      { id: "artists" as ViewType, icon: Users, label: t("navArtists"), color: "text-emerald-400" },
+    ],
+    [t]
+  );
+
+  const mediaItems = useMemo(
+    () => [
+      { id: "videos" as ViewType, icon: Video, label: t("navVideos") },
+      { id: "audio-senses" as ViewType, icon: Radio, label: t("navAudioSenses") },
+    ],
+    [t]
+  );
+
+  const localItems = useMemo(
+    () => [
+      { id: "cloud" as ViewType, icon: Cloud, label: t("navCloudStorage"), color: "text-cyan-400" },
+    ],
+    [t]
+  );
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<{ id: string; name: string } | null>(null);
   
@@ -360,7 +374,7 @@ export const Sidebar = ({
                 <h1 className="font-display text-lg font-bold tracking-wider bg-gradient-to-r from-primary via-foreground to-secondary bg-clip-text text-transparent">
                   NEXUS
                 </h1>
-                <p className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/50">Audio System</p>
+                <p className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/50">{t("appSubtitle")}</p>
               </div>
             )}
           </div>
@@ -403,7 +417,7 @@ export const Sidebar = ({
 
             {/* Your Library */}
             <div className="mb-6">
-              <SectionTitle collapsed={collapsed}>Ma Musique</SectionTitle>
+              <SectionTitle collapsed={collapsed}>{t("sectionMyMusic")}</SectionTitle>
               <div className="space-y-1">
                 {libraryItems.map((item) => (
                   <NavItem
@@ -422,7 +436,7 @@ export const Sidebar = ({
 
             {/* Media */}
             <div className="mb-6">
-              <SectionTitle collapsed={collapsed}>Médias</SectionTitle>
+              <SectionTitle collapsed={collapsed}>{t("sectionMedia")}</SectionTitle>
               <div className="space-y-1">
                 {mediaItems.map((item) => (
                   <NavItem
@@ -440,7 +454,7 @@ export const Sidebar = ({
 
             {/* Cloud */}
             <div className="mb-6">
-              <SectionTitle collapsed={collapsed}>Cloud</SectionTitle>
+              <SectionTitle collapsed={collapsed}>{t("sectionCloud")}</SectionTitle>
               <div className="space-y-1">
                 {localItems.map((item) => (
                   <NavItem
@@ -470,7 +484,7 @@ export const Sidebar = ({
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setCreateModalOpen(true)}
-                          aria-label="Créer une playlist"
+                          aria-label={t("actionCreatePlaylist")}
                           className={cn(
                             "p-1.5 rounded-lg transition-all duration-300",
                             "text-muted-foreground/50 hover:text-primary",
@@ -481,11 +495,11 @@ export const Sidebar = ({
                           <Plus className="w-4 h-4" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent>Créer une playlist</TooltipContent>
+                      <TooltipContent>{t("actionCreatePlaylist")}</TooltipContent>
                     </Tooltip>
                   }
                 >
-                  Playlists
+                  {t("sectionPlaylists")}
                 </SectionTitle>
 
                 <div className="space-y-1">
@@ -511,9 +525,9 @@ export const Sidebar = ({
                         setEditingPlaylist({ id: playlist.id, name: playlist.name })
                       }}
                       onDelete={async () => {
-                        if (confirm(`Supprimer la playlist "${playlist.name}" ?`)) {
+                        if (confirm(t("actionDeletePlaylistConfirm", { name: playlist.name }))) {
                           await deletePlaylist(playlist.id)
-                          const message = "Playlist supprimée"
+                          const message = t("toastPlaylistDeleted")
                           toast.success(message)
                           notifySuccess(message)
                         }
@@ -648,7 +662,7 @@ export const Sidebar = ({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="bg-card/95 backdrop-blur-xl border-border/50">
-                  <span className="font-medium">Playlists ({playlists.length})</span>
+                  <span className="font-medium">{t("tooltipPlaylistsCount", { count: playlists.length })}</span>
                 </TooltipContent>
               </Tooltip>
             )}

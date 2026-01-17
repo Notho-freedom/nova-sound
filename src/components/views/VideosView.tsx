@@ -62,6 +62,7 @@ import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { useYouTubeSuggestions } from "@/hooks/useYouTubeSuggestions";
 import { useLibrary } from "@/hooks/useLibrary";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
+import { useI18n } from "@/i18n";
 
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
@@ -73,46 +74,24 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-const formatSize = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
-
-const genreLabels: Record<VideoGenre, string> = {
-  action: "Action",
-  adventure: "Aventure",
-  animation: "Animation",
-  comedy: "Comédie",
-  crime: "Crime",
-  documentary: "Documentaire",
-  drama: "Drame",
-  family: "Familial",
-  fantasy: "Fantasy",
-  horror: "Horreur",
-  music: "Musical",
-  mystery: "Mystère",
-  romance: "Romance",
-  scifi: "Science-Fiction",
-  thriller: "Thriller",
-  war: "Guerre",
-  western: "Western",
-  sport: "Sport",
-  biography: "Biographie",
-  history: "Histoire",
-  anime: "Anime",
-  gaming: "Gaming",
-  tutorial: "Tutoriel",
-  vlog: "Vlog",
-  short: "Court-métrage",
-  other: "Autre",
+const formatSize = (bytes: number, sizeLabels: string[]) => {
+  if (bytes < 1024) return `${bytes} ${sizeLabels[0]}`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} ${sizeLabels[1]}`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} ${sizeLabels[2]}`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} ${sizeLabels[3]}`;
 };
 
 type SortOption = "recent" | "title" | "duration" | "size" | "rating" | "added";
 type ViewMode = "home" | "browse" | "watchlist" | "favorites" | "history" | "youtube";
 
 export const VideosView = memo(() => {
+  const { t } = useI18n();
+  const sizeLabels = [
+    t("videosSizeBytes"),
+    t("videosSizeKB"),
+    t("videosSizeMB"),
+    t("videosSizeGB"),
+  ];
   const {
     loading,
     error,
@@ -245,6 +224,35 @@ export const VideosView = memo(() => {
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
   const { isUploaded: isVideoUploaded, getUploadedProvider } = useUploadedStatus();
 
+  const genreLabels: Record<VideoGenre, string> = {
+    action: t("videosGenreAction"),
+    adventure: t("videosGenreAdventure"),
+    animation: t("videosGenreAnimation"),
+    comedy: t("videosGenreComedy"),
+    crime: t("videosGenreCrime"),
+    documentary: t("videosGenreDocumentary"),
+    drama: t("videosGenreDrama"),
+    family: t("videosGenreFamily"),
+    fantasy: t("videosGenreFantasy"),
+    horror: t("videosGenreHorror"),
+    music: t("videosGenreMusic"),
+    mystery: t("videosGenreMystery"),
+    romance: t("videosGenreRomance"),
+    scifi: t("videosGenreSciFi"),
+    thriller: t("videosGenreThriller"),
+    war: t("videosGenreWar"),
+    western: t("videosGenreWestern"),
+    sport: t("videosGenreSport"),
+    biography: t("videosGenreBiography"),
+    history: t("videosGenreHistory"),
+    anime: t("videosGenreAnime"),
+    gaming: t("videosGenreGaming"),
+    tutorial: t("videosGenreTutorial"),
+    vlog: t("videosGenreVlog"),
+    short: t("videosGenreShort"),
+    other: t("videosGenreOther"),
+  };
+
   // View states
   const [viewMode, setViewMode] = useState<ViewMode>("home");
   const [displayMode, setDisplayMode] = useState<"grid" | "list">("grid");
@@ -314,17 +322,17 @@ export const VideosView = memo(() => {
   const handleToggleWatchlist = useCallback((video: Video) => {
     if (isInWatchlist(video.id)) {
       removeFromWatchlist(video.id);
-      toast.success("Retiré de Ma liste");
+      toast.success(t("videosToastRemovedFromWatchlist"));
     } else {
       addToWatchlist(video.id);
-      toast.success("Ajouté à Ma liste");
+      toast.success(t("videosToastAddedToWatchlist"));
     }
-  }, [isInWatchlist, addToWatchlist, removeFromWatchlist]);
+  }, [isInWatchlist, addToWatchlist, removeFromWatchlist, t]);
 
   const handleToggleFavorite = useCallback((video: Video) => {
     toggleFavorite(video.id);
-    toast.success(isFavorite(video.id) ? "Retiré des favoris" : "Ajouté aux favoris");
-  }, [toggleFavorite, isFavorite]);
+    toast.success(isFavorite(video.id) ? t("videosToastRemovedFromFavorites") : t("videosToastAddedToFavorites"));
+  }, [toggleFavorite, isFavorite, t]);
 
   // Cinema Mode View
   if (selectedVideo && isCinemaMode) {
@@ -451,9 +459,9 @@ export const VideosView = memo(() => {
                 )}
               >
                 <Sparkles className="w-4 h-4 inline mr-2" />
-                Accueil
+                {t("videosTabHome")}
               </button>
-              <HelpIcon description="Découvrez vos vidéos continuées, récemment ajoutées et tendances populaires." />
+              <HelpIcon description={t("videosHelpHome")} />
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -464,9 +472,9 @@ export const VideosView = memo(() => {
                 )}
               >
                 <Grid className="w-4 h-4 inline mr-2" />
-                Parcourir
+                {t("videosTabBrowse")}
               </button>
-              <HelpIcon description="Parcourez toutes vos vidéos locales par catégorie, genre, ou recherche." />
+              <HelpIcon description={t("videosHelpBrowse")} />
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -477,14 +485,14 @@ export const VideosView = memo(() => {
                 )}
               >
                 <Bookmark className="w-4 h-4 inline mr-2" />
-                Ma liste
+                {t("videosTabWatchlist")}
                 {watchlistVideos.length > 0 && (
                   <Badge variant="secondary" className="ml-2">
                     {watchlistVideos.length}
                   </Badge>
                 )}
               </button>
-              <HelpIcon description="Vos vidéos à regarder plus tard. Organisez vos favoris pour voir plus tard." />
+              <HelpIcon description={t("videosHelpWatchlist")} />
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -495,9 +503,9 @@ export const VideosView = memo(() => {
                 )}
               >
                 <Heart className="w-4 h-4 inline mr-2" />
-                Favoris
+                {t("videosTabFavorites")}
               </button>
-              <HelpIcon description="Vos vidéos marquées comme préférées pour accès rapide." />
+              <HelpIcon description={t("videosHelpFavorites")} />
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -508,9 +516,9 @@ export const VideosView = memo(() => {
                 )}
               >
                 <History className="w-4 h-4 inline mr-2" />
-                Historique
+                {t("videosTabHistory")}
               </button>
-              <HelpIcon description="Toutes les vidéos que vous avez regardées récemment." />
+              <HelpIcon description={t("videosHelpHistory")} />
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -523,7 +531,7 @@ export const VideosView = memo(() => {
                 <Youtube className="w-4 h-4 inline mr-2" />
                 YouTube
               </button>
-              <HelpIcon description="Recherchez et intégrez des vidéos YouTube directement." />
+              <HelpIcon description={t("videosHelpYouTube")} />
             </div>
           </div>
 
@@ -535,7 +543,7 @@ export const VideosView = memo(() => {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-emerald-400 transition-colors" />
                 <Input
                   type="text"
-                  placeholder="Rechercher..."
+                  placeholder={t("videosSearchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -547,7 +555,7 @@ export const VideosView = memo(() => {
                   <button
                     onClick={() => setSearchQuery("")}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
-                    aria-label="Effacer la recherche"
+                    aria-label={t("videosClearSearchAria")}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -567,7 +575,7 @@ export const VideosView = memo(() => {
               }}
             >
               <FolderOpen className="w-4 h-4 mr-2" />
-              Ajouter
+              {t("videosAdd")}
             </Button>
           </div>
         </div>
@@ -589,7 +597,7 @@ export const VideosView = memo(() => {
             <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
               <VideoIcon className="w-10 h-10 text-destructive" />
             </div>
-            <h3 className="text-lg font-medium mb-2">Erreur</h3>
+            <h3 className="text-lg font-medium mb-2">{t("videosErrorTitle")}</h3>
             <p className="text-muted-foreground text-sm max-w-md mb-6">{error}</p>
           </div>
         )}
@@ -600,10 +608,9 @@ export const VideosView = memo(() => {
             <div className="w-24 h-24 rounded-full bg-muted/30 flex items-center justify-center mb-6">
               <Film className="w-12 h-12 text-muted-foreground" />
             </div>
-            <h3 className="text-2xl font-bold mb-3">Bienvenue dans votre vidéothèque</h3>
+            <h3 className="text-2xl font-bold mb-3">{t("videosEmptyTitle")}</h3>
             <p className="text-muted-foreground text-base max-w-lg mb-8">
-              Ajoutez vos films, séries et vidéos pour créer votre bibliothèque personnelle.
-              Profitez d'une expérience de streaming comme Netflix, directement depuis vos fichiers.
+              {t("videosEmptyDescription")}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 max-w-2xl w-full">
@@ -618,7 +625,7 @@ export const VideosView = memo(() => {
                 size="lg"
               >
                 <FolderOpen className="w-5 h-5 mr-2" />
-                Ouvrir un dossier
+                {t("videosEmptyOpenFolder")}
               </Button>
 
               <Button
@@ -635,7 +642,7 @@ export const VideosView = memo(() => {
                 size="lg"
               >
                 <FileVideo className="w-5 h-5 mr-2" />
-                Ouvrir des fichiers
+                {t("videosEmptyOpenFiles")}
               </Button>
 
               <Button
@@ -645,7 +652,7 @@ export const VideosView = memo(() => {
                 size="lg"
               >
                 <Link className="w-5 h-5 mr-2" />
-                Depuis une URL
+                {t("videosEmptyFromUrl")}
               </Button>
             </div>
           </div>
@@ -669,7 +676,7 @@ export const VideosView = memo(() => {
               {/* Continue Watching */}
               {continueWatching.length > 0 && (
                 <VideoCarousel
-                  title="Reprendre la lecture"
+                  title={t("videosCarouselContinueWatching")}
                   videos={continueWatching}
                   onVideoSelect={handlePlayVideo}
                   onViewDetails={handleViewDetails}
@@ -684,7 +691,7 @@ export const VideosView = memo(() => {
               {/* Watchlist */}
               {watchlistVideos.length > 0 && (
                 <VideoCarousel
-                  title="Ma liste"
+                  title={t("videosCarouselWatchlist")}
                   videos={watchlistVideos}
                   onVideoSelect={handlePlayVideo}
                   onViewDetails={handleViewDetails}
@@ -698,7 +705,7 @@ export const VideosView = memo(() => {
               {/* Recently Added */}
               {recentlyAdded.length > 0 && (
                 <VideoCarousel
-                  title="Ajoutés récemment"
+                  title={t("videosCarouselRecentlyAdded")}
                   videos={recentlyAdded}
                   onVideoSelect={handlePlayVideo}
                   onViewDetails={handleViewDetails}
@@ -712,7 +719,7 @@ export const VideosView = memo(() => {
               {/* Top 10 Style */}
               {enhancedVideos.length >= 10 && (
                 <VideoCarousel
-                  title="Les plus regardés"
+                  title={t("videosCarouselMostWatched")}
                   videos={enhancedVideos
                     .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))}
                   onVideoSelect={handlePlayVideo}
@@ -732,7 +739,7 @@ export const VideosView = memo(() => {
                 );
                 return youtubeWatchedVideos.length > 0 ? (
                   <VideoCarousel
-                    title="Vidéos YouTube regardées"
+                    title={t("videosCarouselYouTubeWatched")}
                     videos={youtubeWatchedVideos}
                     onVideoSelect={handlePlayVideo}
                     onViewDetails={handleViewDetails}
@@ -765,7 +772,7 @@ export const VideosView = memo(() => {
 
               {/* All Videos */}
               <VideoCarousel
-                title="Toutes les vidéos"
+                title={t("videosCarouselAllVideos")}
                 videos={enhancedVideos}
                 onVideoSelect={handlePlayVideo}
                 onViewDetails={handleViewDetails}
@@ -789,10 +796,10 @@ export const VideosView = memo(() => {
               >
                 <SelectTrigger className="w-40">
                   <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Genre" />
+                  <SelectValue placeholder={t("videosGenrePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous les genres</SelectItem>
+                  <SelectItem value="all">{t("videosGenreAll")}</SelectItem>
                   {availableGenres.map((genre) => (
                     <SelectItem key={genre} value={genre}>
                       {genreLabels[genre] || genre}
@@ -804,15 +811,15 @@ export const VideosView = memo(() => {
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
                 <SelectTrigger className="w-40">
                   <SortAsc className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Trier par" />
+                  <SelectValue placeholder={t("videosSortPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="recent">Récents</SelectItem>
-                  <SelectItem value="title">Titre</SelectItem>
-                  <SelectItem value="duration">Durée</SelectItem>
-                  <SelectItem value="size">Taille</SelectItem>
-                  <SelectItem value="rating">Note</SelectItem>
-                  <SelectItem value="added">Date d'ajout</SelectItem>
+                  <SelectItem value="recent">{t("videosSortRecent")}</SelectItem>
+                  <SelectItem value="title">{t("videosSortTitle")}</SelectItem>
+                  <SelectItem value="duration">{t("videosSortDuration")}</SelectItem>
+                  <SelectItem value="size">{t("videosSortSize")}</SelectItem>
+                  <SelectItem value="rating">{t("videosSortRating")}</SelectItem>
+                  <SelectItem value="added">{t("videosSortAdded")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -836,7 +843,7 @@ export const VideosView = memo(() => {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {selectionMode ? "Désactiver la sélection" : "Activer la sélection multiple"}
+                    {selectionMode ? t("videosSelectionDisable") : t("videosSelectionEnable")}
                   </TooltipContent>
                 </Tooltip>
 
@@ -845,7 +852,7 @@ export const VideosView = memo(() => {
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => setDisplayMode("grid")}
-                        aria-label="Vue grille"
+                        aria-label={t("videosViewGridAria")}
                         className={cn(
                           "p-2 rounded transition-all",
                           displayMode === "grid"
@@ -856,13 +863,13 @@ export const VideosView = memo(() => {
                         <Grid className="w-4 h-4" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent>Vue grille</TooltipContent>
+                    <TooltipContent>{t("videosViewGridTooltip")}</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => setDisplayMode("list")}
-                        aria-label="Vue liste"
+                        aria-label={t("videosViewListAria")}
                         className={cn(
                           "p-2 rounded transition-all",
                           displayMode === "list"
@@ -873,15 +880,21 @@ export const VideosView = memo(() => {
                         <List className="w-4 h-4" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent>Vue liste</TooltipContent>
+                    <TooltipContent>{t("videosViewListTooltip")}</TooltipContent>
                   </Tooltip>
                 </div>
               </div>
 
               <span className="text-sm text-muted-foreground">
                 {selectionMode && selectedVideoIds.size > 0 
-                  ? `${selectedVideoIds.size} sélectionné(s)`
-                  : `${filteredVideos.length} vidéo(s)`
+                  ? t("videosSelectionCount", {
+                      count: selectedVideoIds.size,
+                      suffix: selectedVideoIds.size > 1 ? "s" : "",
+                    })
+                  : t("videosCount", {
+                      count: filteredVideos.length,
+                      suffix: filteredVideos.length > 1 ? "s" : "",
+                    })
                 }
               </span>
             </div>
@@ -981,7 +994,7 @@ export const VideosView = memo(() => {
                         {selectionMode && (
                           <div className="absolute top-2 right-2 z-10">
                             <label className="sr-only" htmlFor={`video-checkbox-${video.id}`}>
-                              Sélectionner {video.title}
+                              {t("videosSelectAria", { title: video.title })}
                             </label>
                             <input
                               id={`video-checkbox-${video.id}`}
@@ -1001,7 +1014,7 @@ export const VideosView = memo(() => {
                               }}
                               onClick={(e) => e.stopPropagation()}
                               className="w-5 h-5 rounded border-2 border-white bg-black/50 checked:bg-primary checked:border-primary"
-                              aria-label={`Sélectionner ${video.title}`}
+                              aria-label={t("videosSelectAria", { title: video.title })}
                             />
                           </div>
                         )}
@@ -1014,7 +1027,7 @@ export const VideosView = memo(() => {
                                 <Button
                                   size="icon"
                                   className="w-12 h-12 rounded-full bg-primary"
-                                  aria-label={`Lire ${video.title}`}
+                                  aria-label={t("videosPlayAria", { title: video.title })}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handlePlayVideo(video);
@@ -1023,7 +1036,7 @@ export const VideosView = memo(() => {
                                   <Play className="w-6 h-6 fill-current" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Lire {video.title}</TooltipContent>
+                              <TooltipContent>{t("videosPlayTooltip", { title: video.title })}</TooltipContent>
                             </Tooltip>
                           </div>
                         )}
@@ -1036,7 +1049,9 @@ export const VideosView = memo(() => {
                                 {formatTime(video.duration)}
                               </div>
                             </TooltipTrigger>
-                            <TooltipContent>Durée: {formatTime(video.duration)}</TooltipContent>
+                            <TooltipContent>
+                              {t("videosDurationTooltip", { time: formatTime(video.duration) })}
+                            </TooltipContent>
                           </Tooltip>
                         )}
 
@@ -1060,7 +1075,7 @@ export const VideosView = memo(() => {
                         </Tooltip>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           {video.year && <span>{video.year}</span>}
-                          <span>{formatSize(video.fileSize)}</span>
+                          <span>{formatSize(video.fileSize, sizeLabels)}</span>
                         </div>
                       </div>
                     </div>
@@ -1077,19 +1092,19 @@ export const VideosView = memo(() => {
                     <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md">
                       <tr className="border-b border-border/30">
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Titre
+                          {t("videosColumnTitle")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden md:table-cell">
-                          Durée
+                          {t("videosColumnDuration")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden lg:table-cell">
-                          Taille
+                          {t("videosColumnSize")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hidden lg:table-cell">
-                          Format
+                          {t("videosColumnFormat")}
                         </th>
                         <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Actions
+                          {t("videosColumnActions")}
                         </th>
                       </tr>
                     </thead>
@@ -1159,7 +1174,7 @@ export const VideosView = memo(() => {
                             </td>
                             <td className="px-4 py-3 hidden lg:table-cell">
                               <span className="text-sm text-muted-foreground">
-                                {formatSize(video.fileSize)}
+                                {formatSize(video.fileSize, sizeLabels)}
                               </span>
                             </td>
                             <td className="px-4 py-3 hidden lg:table-cell">
@@ -1178,7 +1193,7 @@ export const VideosView = memo(() => {
                                 }}
                               >
                                 <Play className="w-4 h-4 mr-2" />
-                                Lire
+                                {t("videosActionPlay")}
                               </Button>
                             </td>
                           </tr>
@@ -1202,7 +1217,7 @@ export const VideosView = memo(() => {
             }}
             onAddToQueue={(video) => {
               // Ajouter à la file d'attente si nécessaire
-              toast.success("Vidéo ajoutée à la file");
+              toast.success(t("videosToastAddedToQueue"));
             }}
             onPlayAsAudio={(track) => {
               // Jouer comme audio et naviguer vers inline player
@@ -1219,12 +1234,15 @@ export const VideosView = memo(() => {
             <PageHeader
               title={
                 viewMode === "watchlist"
-                  ? "Ma liste"
+                  ? t("videosWatchlistTitle")
                   : viewMode === "favorites"
-                  ? "Favoris"
-                  : "Historique"
+                  ? t("videosFavoritesTitle")
+                  : t("videosHistoryTitle")
               }
-              subtitle={`${displayVideos.length} vidéo(s)`}
+              subtitle={t("videosCount", {
+                count: displayVideos.length,
+                suffix: displayVideos.length > 1 ? "s" : "",
+              })}
             />
 
             {displayVideos.length === 0 ? (
@@ -1235,16 +1253,16 @@ export const VideosView = memo(() => {
                   {viewMode === "history" && <History className="w-10 h-10 text-muted-foreground" />}
                 </div>
                 <h3 className="text-lg font-medium mb-2">
-                  {viewMode === "watchlist" && "Votre liste est vide"}
-                  {viewMode === "favorites" && "Aucun favori"}
-                  {viewMode === "history" && "Aucun historique"}
+                  {viewMode === "watchlist" && t("videosEmptyWatchlistTitle")}
+                  {viewMode === "favorites" && t("videosEmptyFavoritesTitle")}
+                  {viewMode === "history" && t("videosEmptyHistoryTitle")}
                 </h3>
                 <p className="text-muted-foreground text-sm max-w-md">
                   {viewMode === "watchlist" &&
-                    "Ajoutez des vidéos à votre liste pour les retrouver facilement."}
+                    t("videosEmptyWatchlistDescription")}
                   {viewMode === "favorites" &&
-                    "Marquez des vidéos comme favoris pour y accéder rapidement."}
-                  {viewMode === "history" && "Vos vidéos regardées apparaîtront ici."}
+                    t("videosEmptyFavoritesDescription")}
+                  {viewMode === "history" && t("videosEmptyHistoryDescription")}
                 </p>
               </div>
             ) : (
@@ -1327,10 +1345,10 @@ export const VideosView = memo(() => {
       {showUrlDialog && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 p-4">
           <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Ajouter une vidéo depuis une URL</h3>
+            <h3 className="text-lg font-semibold mb-4">{t("videosAddFromUrlTitle")}</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">URL de la vidéo</label>
+                <label className="text-sm font-medium mb-2 block">{t("videosUrlLabel")}</label>
                 <Input
                   type="url"
                   placeholder="https://example.com/video.mp4"
@@ -1340,10 +1358,10 @@ export const VideosView = memo(() => {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Titre (optionnel)</label>
+                <label className="text-sm font-medium mb-2 block">{t("videosTitleOptionalLabel")}</label>
                 <Input
                   type="text"
-                  placeholder="Titre de la vidéo"
+                  placeholder={t("videosTitlePlaceholder")}
                   value={urlTitle}
                   onChange={(e) => setUrlTitle(e.target.value)}
                   className="w-full"
@@ -1360,7 +1378,7 @@ export const VideosView = memo(() => {
                 }}
                 className="flex-1"
               >
-                Annuler
+                {t("videosCancel")}
               </Button>
               <Button
                 onClick={async () => {
@@ -1374,7 +1392,7 @@ export const VideosView = memo(() => {
                 disabled={!urlInput.trim()}
                 className="flex-1"
               >
-                Ajouter
+                {t("videosAddConfirm")}
               </Button>
             </div>
           </div>

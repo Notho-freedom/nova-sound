@@ -64,6 +64,7 @@ import { SettingsViewSkeleton } from "@/components/ui/skeletons";
 import { testYouTubeApiKey } from "@/lib/youtube-api-test";
 import { redisCache } from "@/services/redis-cache";
 import { CoachmarkTrigger } from "@/features/coachmarks";
+import { useI18n } from "@/i18n";
 
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
@@ -161,6 +162,7 @@ const SettingsCard = ({
 // Config status alert
 // Recognition Card Component
 const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshLibrary: () => Promise<void> }) => {
+  const { t } = useI18n();
   const [recognizing, setRecognizing] = useState(false);
   const [results, setResults] = useState<RecognitionResult[]>([]);
   const [patterns, setPatterns] = useState<DetectedGroup[]>([]);
@@ -173,7 +175,7 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
 
   const handleRecognize = async () => {
     if (!isElectron || !window.electronAPI?.recognizeAll) {
-      toast.error("Fonctionnalité disponible uniquement dans l'application desktop");
+      toast.error(t("infoDesktopOnly"));
       return;
     }
 
@@ -182,10 +184,15 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       const recognitionResults = await window.electronAPI.recognizeAll();
       setResults(recognitionResults);
       setShowResults(true);
-      toast.success(`${recognitionResults.length} pistes reconnues`);
+      toast.success(
+        t("settingsRecognitionTracksRecognized", {
+          count: recognitionResults.length,
+          suffix: recognitionResults.length > 1 ? "s" : "",
+        })
+      );
     } catch (error) {
       console.error('Erreur lors de la reconnaissance:', error);
-      toast.error("Erreur lors de la reconnaissance");
+      toast.error(t("settingsRecognitionError"));
     } finally {
       setRecognizing(false);
     }
@@ -198,7 +205,12 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
 
     try {
       const updated = await window.electronAPI.applyRecognition(results);
-      toast.success(`${updated} pistes mises à jour`);
+      toast.success(
+        t("settingsRecognitionTracksUpdated", {
+          count: updated,
+          suffix: updated > 1 ? "s" : "",
+        })
+      );
       setResults([]);
       setShowResults(false);
       // Attendre un peu pour que les événements soient traités
@@ -207,13 +219,13 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       await refreshLibrary();
     } catch (error) {
       console.error('Erreur lors de l\'application:', error);
-      toast.error("Erreur lors de l'application des résultats");
+      toast.error(t("settingsRecognitionApplyError"));
     }
   };
 
   const handleDetectPatterns = async () => {
     if (!isElectron || !window.electronAPI?.detectPatterns) {
-      toast.error("Fonctionnalité disponible uniquement dans l'application desktop");
+      toast.error(t("infoDesktopOnly"));
       return;
     }
 
@@ -222,10 +234,15 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       const detectedPatterns = await window.electronAPI.detectPatterns();
       setPatterns(detectedPatterns);
       setShowPatterns(true);
-      toast.success(`${detectedPatterns.length} patterns détectés`);
+      toast.success(
+        t("settingsRecognitionPatternsDetected", {
+          count: detectedPatterns.length,
+          suffix: detectedPatterns.length > 1 ? "s" : "",
+        })
+      );
     } catch (error) {
       console.error('Erreur lors de la détection:', error);
-      toast.error("Erreur lors de la détection des patterns");
+      toast.error(t("settingsRecognitionPatternsError"));
     } finally {
       setRecognizing(false);
     }
@@ -238,7 +255,12 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
 
     try {
       const updated = await window.electronAPI.applyDetectedGroup(group);
-      toast.success(`${updated} pistes mises à jour`);
+      toast.success(
+        t("settingsRecognitionTracksUpdated", {
+          count: updated,
+          suffix: updated > 1 ? "s" : "",
+        })
+      );
       // Attendre un peu pour que les événements soient traités
       await new Promise(resolve => setTimeout(resolve, 500));
       // Rafraîchir la bibliothèque
@@ -248,7 +270,7 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
       if (newPatterns) setPatterns(newPatterns);
     } catch (error) {
       console.error('Erreur lors de l\'application:', error);
-      toast.error("Erreur lors de l'application du pattern");
+      toast.error(t("settingsRecognitionPatternApplyError"));
     }
   };
 
@@ -257,13 +279,16 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
   }
 
   return (
-    <SettingsCard title="Reconnaissance automatique" icon={Wand2} className="lg:col-span-2">
+    <SettingsCard title={t("settingsCardRecognitionAuto")} icon={Wand2} className="lg:col-span-2">
       <div className="space-y-4">
         <div className="p-3 rounded-lg bg-muted/30">
           <p className="text-sm text-muted-foreground">
             {unknownTracks.length > 0 
-              ? `${unknownTracks.length} pistes avec métadonnées manquantes`
-              : "Toutes les pistes sont identifiées"}
+              ? t("settingsRecognitionMissingMetadata", {
+                  count: unknownTracks.length,
+                  suffix: unknownTracks.length > 1 ? "s" : "",
+                })
+              : t("settingsRecognitionAllIdentified")}
           </p>
         </div>
 
@@ -277,12 +302,12 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
             {recognizing ? (
               <>
                 <Wand2 className="w-4 h-4 mr-2" />
-                Analyse en cours...
+                {t("settingsRecognitionAnalyzing")}
               </>
             ) : (
               <>
                 <Wand2 className="w-4 h-4 mr-2" />
-                Reconnaître toutes les pistes
+                {t("settingsRecognitionAnalyzeAll")}
               </>
             )}
           </Button>
@@ -294,14 +319,16 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
             disabled={recognizing || unknownTracks.length === 0}
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            Détecter les patterns
+            {t("settingsRecognitionDetectPatterns")}
           </Button>
         </div>
 
         {showResults && results.length > 0 && (
           <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium">Résultats de reconnaissance ({results.length})</h4>
+              <h4 className="text-sm font-medium">
+                {t("settingsRecognitionResultsTitle", { count: results.length })}
+              </h4>
               <Button variant="ghost" size="sm" onClick={() => setShowResults(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -325,7 +352,7 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
               ))}
               {results.length > 10 && (
                 <p className="text-xs text-muted-foreground text-center">
-                  ... et {results.length - 10} autres
+                  {t("settingsRecognitionResultsMore", { count: results.length - 10 })}
                 </p>
               )}
             </div>
@@ -336,7 +363,10 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
               onClick={handleApplyResults}
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
-              Appliquer les résultats ({results.length} pistes)
+              {t("settingsRecognitionApplyResults", {
+                count: results.length,
+                suffix: results.length > 1 ? "s" : "",
+              })}
             </Button>
           </div>
         )}
@@ -344,7 +374,9 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
         {showPatterns && patterns.length > 0 && (
           <div className="mt-4 p-4 rounded-lg bg-accent/5 border border-accent/20">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium">Patterns détectés ({patterns.length})</h4>
+              <h4 className="text-sm font-medium">
+                {t("settingsRecognitionPatternsTitle", { count: patterns.length })}
+              </h4>
               <Button variant="ghost" size="sm" onClick={() => setShowPatterns(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -358,9 +390,16 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
                       <p className="text-xs text-muted-foreground">{pattern.album}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-mono">{pattern.tracks.length} pistes</p>
+                      <p className="text-xs font-mono">
+                        {t("settingsRecognitionTracksCount", {
+                          count: pattern.tracks.length,
+                          suffix: pattern.tracks.length > 1 ? "s" : "",
+                        })}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        {Math.round(pattern.confidence * 100)}% confiance
+                        {t("settingsRecognitionConfidence", {
+                          value: Math.round(pattern.confidence * 100),
+                        })}
                       </p>
                     </div>
                   </div>
@@ -371,7 +410,7 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
                     onClick={() => handleApplyPattern(pattern)}
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Appliquer ce pattern
+                    {t("settingsRecognitionApplyPattern")}
                   </Button>
                 </div>
               ))}
@@ -384,12 +423,13 @@ const RecognitionCard = ({ tracks, refreshLibrary }: { tracks: Track[]; refreshL
 };
 
 const ConfigAlert = ({ configured, service }: { configured: boolean; service: string }) => {
+  const { t } = useI18n();
   if (configured) return null;
   return (
     <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-4">
       <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
       <p className="text-xs text-yellow-500">
-        {service} non configuré. Ajoutez les variables dans votre fichier .env
+        {t("settingsConfigAlert", { service })}
       </p>
     </div>
   );
@@ -397,6 +437,18 @@ const ConfigAlert = ({ configured, service }: { configured: boolean; service: st
 
 export const SettingsView = () => {
   const { tracks, scanning, scanProgress, scanLibrary, selectMusicFolders, refreshLibrary } = useLibrary();
+  const { t, locale } = useI18n();
+  const themeOptions = [
+    { id: "dark", label: t("settingsThemeDark"), color: "bg-gradient-to-br from-zinc-900 to-zinc-950", border: "border-cyan-500" },
+    { id: "light", label: t("settingsThemeLight"), color: "bg-gradient-to-br from-zinc-50 to-zinc-100", border: "border-blue-500" },
+    { id: "cyberpunk", label: t("settingsThemeCyberpunk"), color: "bg-gradient-to-br from-purple-900 via-yellow-600 to-purple-800", border: "border-yellow-500" },
+    { id: "minimal", label: t("settingsThemeMinimal"), color: "bg-gradient-to-br from-zinc-900 to-black", border: "border-white" },
+    { id: "spotify", label: t("settingsThemeSpotify"), color: "bg-gradient-to-br from-[#121212] via-[#1DB954] to-[#191414]", border: "border-[#1DB954]" },
+    { id: "apple-music", label: t("settingsThemeAppleMusic"), color: "bg-gradient-to-br from-[#1a0f0f] via-[#FC3C44] to-[#2a1515]", border: "border-[#FC3C44]" },
+    { id: "youtube-music", label: t("settingsThemeYouTubeMusic"), color: "bg-gradient-to-br from-[#121212] via-[#FF0000] to-[#1a0a0a]", border: "border-[#FF0000]" },
+    { id: "tidal", label: t("settingsThemeTidal"), color: "bg-gradient-to-br from-[#0a1a1f] via-[#00FFFF] to-[#0f1f2a]", border: "border-[#00FFFF]" },
+    { id: "deezer", label: t("settingsThemeDeezer"), color: "bg-gradient-to-br from-[#00C7F2] via-[#FF0090] to-[#0a1a1f]", border: "border-[#00C7F2]" },
+  ];
   const {
     qualityAnalysis,
     qualityLoading,
@@ -502,7 +554,7 @@ export const SettingsView = () => {
         const { firebaseService } = await import('@/services/firebase');
         const token = await firebaseService.getIdToken();
         if (!token) {
-          setBunnyStatus({ configured: false, message: 'Token non disponible' });
+          setBunnyStatus({ configured: false, message: t("settingsBunnyTokenUnavailable") });
           return;
         }
         
@@ -514,11 +566,11 @@ export const SettingsView = () => {
           const data = await response.json();
           setBunnyStatus(data);
         } else {
-          setBunnyStatus({ configured: false, message: 'Erreur de vérification' });
+          setBunnyStatus({ configured: false, message: t("settingsBunnyCheckError") });
         }
       } catch (error) {
         console.error('Error loading Bunny status:', error);
-        setBunnyStatus({ configured: false, message: 'Erreur de connexion' });
+        setBunnyStatus({ configured: false, message: t("settingsBunnyConnectionError") });
       } finally {
         setBunnyStatusLoading(false);
       }
@@ -808,8 +860,8 @@ export const SettingsView = () => {
     const canceled = urlParams.get("canceled");
 
     if (success === "true") {
-      toast.success("Paiement réussi !", {
-        description: "Bienvenue dans le plan Pro !",
+      toast.success(t("settingsPaymentSuccess"), {
+        description: t("settingsPaymentWelcomePro"),
       });
       // Reload subscription status
       if (nexusAuthenticated && stripeInitialized) {
@@ -818,7 +870,7 @@ export const SettingsView = () => {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (canceled === "true") {
-      toast.info("Paiement annulé");
+      toast.info(t("settingsPaymentCanceled"));
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -861,7 +913,12 @@ export const SettingsView = () => {
     if (folders.length > 0) {
       const newDirs = [...(settings.musicDirectories || []), ...folders];
       await updateSetting("musicDirectories", newDirs);
-      notifySuccess(`${folders.length} dossier(s) ajouté(s)`);
+      notifySuccess(
+        t("settingsFoldersAdded", {
+          count: folders.length,
+          suffix: folders.length > 1 ? "s" : "",
+        })
+      );
       // Déclencher le scan automatique
       await scanLibrary(newDirs);
     }
@@ -872,7 +929,12 @@ export const SettingsView = () => {
     if (folders.length > 0) {
       const newDirs = [...(settings.videoDirectories || []), ...folders];
       await updateSetting("videoDirectories", newDirs);
-      notifySuccess(`${folders.length} dossier(s) vidéo ajouté(s)`);
+      notifySuccess(
+        t("settingsVideoFoldersAdded", {
+          count: folders.length,
+          suffix: folders.length > 1 ? "s" : "",
+        })
+      );
       // Déclencher le scan automatique
       await scanVideos(newDirs);
     }
@@ -881,7 +943,7 @@ export const SettingsView = () => {
   const handleRemoveVideoFolder = async (folder: string) => {
     const newDirs = (settings.videoDirectories || []).filter((d) => d !== folder);
     await updateSetting("videoDirectories", newDirs);
-    notifySuccess("Dossier vidéo retiré");
+    notifySuccess(t("settingsVideoFolderRemoved"));
   };
 
   const handleScanVideos = async () => {
@@ -891,7 +953,7 @@ export const SettingsView = () => {
   const handleRemoveMusicFolder = async (folder: string) => {
     const newDirs = (settings.musicDirectories || []).filter((d) => d !== folder);
     await updateSetting("musicDirectories", newDirs);
-    notifySuccess("Dossier retiré");
+    notifySuccess(t("settingsFolderRemoved"));
   };
 
   const handleScanLibrary = async () => {
@@ -902,9 +964,9 @@ export const SettingsView = () => {
     if (isElectron && window.electronAPI?.authenticateLastFm) {
       try {
         await window.electronAPI.authenticateLastFm();
-        notifySuccess("Connecté à Last.fm");
+        notifySuccess(t("settingsConnectedToService", { service: t("settingsScrobblingLastFm") }));
       } catch (err) {
-        notifyError("Échec de connexion à Last.fm");
+        notifyError(t("settingsConnectionFailedService", { service: t("settingsScrobblingLastFm") }));
       }
     }
   };
@@ -913,9 +975,9 @@ export const SettingsView = () => {
     if (isElectron && window.electronAPI?.authenticateLibreFm) {
       try {
         await window.electronAPI.authenticateLibreFm();
-        notifySuccess("Connecté à Libre.fm");
+        notifySuccess(t("settingsConnectedToService", { service: t("settingsScrobblingLibreFm") }));
       } catch (err) {
-        notifyError("Échec de connexion à Libre.fm");
+        notifyError(t("settingsConnectionFailedService", { service: t("settingsScrobblingLibreFm") }));
       }
     }
   };
@@ -930,14 +992,19 @@ export const SettingsView = () => {
           username: undefined,
         },
       }));
-      notifySuccess(`Déconnecté de ${service === "lastfm" ? "Last.fm" : "Libre.fm"}`);
+      notifySuccess(
+        t("settingsDisconnectedFromService", {
+          service:
+            service === "lastfm" ? t("settingsScrobblingLastFm") : t("settingsScrobblingLibreFm"),
+        })
+      );
     }
   };
 
   // Test YouTube API key
   const handleTestYouTube = async () => {
     if (!youtubeApiKey.trim()) {
-      notifyError("Veuillez entrer une clé API pour tester");
+      notifyError(t("settingsYouTubeEnterKeyToTest"));
       return;
     }
 
@@ -956,7 +1023,7 @@ export const SettingsView = () => {
     } catch (err: any) {
       const errorResult = {
         success: false,
-        message: err.message || "Erreur lors du test",
+        message: err.message || t("settingsYouTubeTestError"),
       };
       setYoutubeTestResult(errorResult);
       notifyError(errorResult.message);
@@ -989,7 +1056,7 @@ export const SettingsView = () => {
         }
       }
       
-      notifySuccess(keyToSave ? "Clé API YouTube sauvegardée" : "Clé API YouTube supprimée");
+      notifySuccess(keyToSave ? t("settingsYouTubeKeySaved") : t("settingsYouTubeKeyRemoved"));
       setYoutubeTestResult(null);
       // Cacher la zone de config après sauvegarde réussie
       if (keyToSave) {
@@ -999,7 +1066,7 @@ export const SettingsView = () => {
       }
     } catch (err) {
       console.error("Failed to save YouTube API key:", err);
-      notifyError("Erreur lors de la sauvegarde de la clé API YouTube");
+      notifyError(t("settingsYouTubeKeySaveError"));
     } finally {
       setSavingYouTube(false);
     }
@@ -1008,7 +1075,7 @@ export const SettingsView = () => {
   // Save Cloudinary config
   const handleSaveCloudinary = async () => {
     if (!cloudinaryForm.cloudName || !cloudinaryForm.uploadPreset) {
-      notifyError("Cloud Name et Upload Preset sont requis");
+      notifyError(t("settingsCloudinaryMissingFields"));
       return;
     }
     
@@ -1019,9 +1086,9 @@ export const SettingsView = () => {
         apiKey: cloudinaryForm.apiKey,
         uploadPreset: cloudinaryForm.uploadPreset,
       });
-      notifySuccess("Configuration Cloudinary sauvegardée");
+      notifySuccess(t("settingsCloudinaryConfigSaved"));
     } catch (err) {
-      notifyError("Erreur lors de la sauvegarde");
+      notifyError(t("settingsCloudinaryConfigError"));
     } finally {
       setSavingCloudinary(false);
     }
@@ -1031,7 +1098,7 @@ export const SettingsView = () => {
   const handleClearCloudinary = () => {
     clearCloudinaryConfig();
     setCloudinaryForm({ cloudName: "", apiKey: "", uploadPreset: "" });
-    notifySuccess("Configuration Cloudinary supprimée");
+    notifySuccess(t("settingsCloudinaryConfigDeleted"));
   };
 
   // Google Sign In
@@ -1039,8 +1106,8 @@ export const SettingsView = () => {
     // Check if Google OAuth Client ID is configured
     const clientId = await authService.getGoogleClientId();
     if (!clientId) {
-      toast.error("Google OAuth non configuré", {
-        description: "Configurez le Client ID OAuth dans les paramètres ou ajoutez GOOGLE_CLIENT_ID dans les variables d'environnement serveur",
+      toast.error(t("settingsGoogleOAuthNotConfigured"), {
+        description: t("settingsGoogleOAuthNotConfiguredDescription"),
       });
       return;
     }
@@ -1070,21 +1137,24 @@ export const SettingsView = () => {
     try {
       const result = await cleanupMissing();
       if (result) {
-        toast.success(`✅ Nettoyage terminé`, {
-          description: `${result.removed} fichier(s) manquant(s) supprimé(s), ${result.remaining} référence(s) valide(s) restante(s)`
+        toast.success(t("settingsCleanupDoneTitle"), {
+          description: t("settingsCleanupDoneDescription", {
+            removed: result.removed,
+            remaining: result.remaining,
+          }),
         });
       }
     } catch (error) {
       console.error("Cleanup error:", error);
-      toast.error("Erreur lors du nettoyage");
+      toast.error(t("settingsCleanupError"));
     }
   };
 
   // Handle upgrade to pro
   const handleUpgradeToPro = async () => {
     if (!stripeInitialized) {
-      toast.error("Stripe non configuré", {
-        description: "Ajoutez NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY dans .env",
+      toast.error(t("settingsStripeNotConfigured"), {
+        description: t("settingsStripePublishableKeyMissing"),
       });
       return;
     }
@@ -1094,11 +1164,11 @@ export const SettingsView = () => {
   // Handle manage billing
   const handleManageBilling = async () => {
     if (!stripeInitialized) {
-      toast.error("Stripe non configuré");
+      toast.error(t("settingsStripeNotConfigured"));
       return;
     }
     if (!nexusAuthenticated) {
-      toast.error("Connectez-vous d'abord");
+      toast.error(t("settingsSignInFirst"));
       return;
     }
     try {
@@ -1107,15 +1177,15 @@ export const SettingsView = () => {
     } catch (error: unknown) {
       console.error("Manage billing error:", error);
       const err = error as { message?: string };
-      const errorMessage = err.message || "Erreur lors de l'accès au portail de facturation";
+      const errorMessage = err.message || t("settingsBillingPortalAccessError");
       
       // Check if it's a portal configuration error
       if (errorMessage.includes("Billing Portal") || errorMessage.includes("portal")) {
-        toast.error("Portail non configuré", { 
-          description: "Le portail de facturation Stripe n'est pas configuré. Si vous avez un abonnement Pro activé manuellement, contactez le support." 
+        toast.error(t("settingsBillingPortalNotConfigured"), {
+          description: t("settingsBillingPortalNotConfiguredDescription"),
         });
       } else {
-        toast.error("Erreur", { description: errorMessage });
+        toast.error(t("settingsBillingPortalError"), { description: errorMessage });
       }
     } finally {
       setSubscriptionLoading(false);
@@ -1125,11 +1195,11 @@ export const SettingsView = () => {
   // Handle upgrade to monthly
   const handleUpgradeMonthly = async () => {
     if (!stripeInitialized) {
-      toast.error("Stripe non configuré");
+      toast.error(t("settingsStripeNotConfigured"));
       return;
     }
     if (!nexusAuthenticated) {
-      toast.error("Connectez-vous d'abord");
+      toast.error(t("settingsSignInFirst"));
       return;
     }
     try {
@@ -1149,17 +1219,17 @@ export const SettingsView = () => {
       // Validate that we have a real price ID (not the default fallback)
       if (monthlyPriceId === 'price_pro_monthly' || !monthlyPriceId.startsWith('price_')) {
         console.error('[SettingsView] Invalid price ID:', monthlyPriceId);
-        toast.error("Configuration Stripe incomplète", {
-          description: `Les Price IDs ne sont pas configurés. Valeur actuelle: ${monthlyPriceId}`
+        toast.error(t("settingsStripeConfigIncomplete"), {
+          description: t("settingsStripePriceIdMissing", { value: monthlyPriceId }),
         });
         return;
       }
       
-      toast.info("Redirection vers Stripe...");
+      toast.info(t("settingsStripeRedirecting"));
       await stripeService.redirectToCheckout(monthlyPriceId);
     } catch (error: any) {
       console.error("Upgrade error:", error);
-      toast.error("Erreur", { description: error.message });
+      toast.error(t("settingsBillingPortalError"), { description: error.message });
     } finally {
       setSubscriptionLoading(false);
     }
@@ -1168,11 +1238,11 @@ export const SettingsView = () => {
   // Handle upgrade to yearly
   const handleUpgradeYearly = async () => {
     if (!stripeInitialized) {
-      toast.error("Stripe non configuré");
+      toast.error(t("settingsStripeNotConfigured"));
       return;
     }
     if (!nexusAuthenticated) {
-      toast.error("Connectez-vous d'abord");
+      toast.error(t("settingsSignInFirst"));
       return;
     }
     try {
@@ -1186,17 +1256,17 @@ export const SettingsView = () => {
       
       // Validate that we have a real price ID (not the default fallback)
       if (yearlyPriceId === 'price_pro_yearly' || !yearlyPriceId.startsWith('price_')) {
-        toast.error("Configuration Stripe incomplète", {
-          description: "Les Price IDs ne sont pas configurés. Vérifiez votre fichier .env.local"
+        toast.error(t("settingsStripeConfigIncomplete"), {
+          description: t("settingsStripePriceIdMissingYearly"),
         });
         return;
       }
       
-      toast.info("Redirection vers Stripe...");
+      toast.info(t("settingsStripeRedirecting"));
       await stripeService.redirectToCheckout(yearlyPriceId);
     } catch (error: any) {
       console.error("Upgrade error:", error);
-      toast.error("Erreur", { description: error.message });
+      toast.error(t("settingsBillingPortalError"), { description: error.message });
     } finally {
       setSubscriptionLoading(false);
     }
@@ -1210,7 +1280,8 @@ export const SettingsView = () => {
   // Theme change handler
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme as any);
-    notifySuccess(`Thème ${newTheme} appliqué`);
+    const themeLabel = themeOptions.find((option) => option.id === newTheme)?.label ?? newTheme;
+    notifySuccess(t("settingsThemeApplied", { theme: themeLabel }));
   };
 
   if (loading) {
@@ -1222,8 +1293,8 @@ export const SettingsView = () => {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
         <div className="px-6 py-4">
-          <h1 className="font-display text-2xl font-bold text-foreground">Paramètres</h1>
-          <p className="text-sm text-muted-foreground mt-1">Personnalisez votre expérience NEXUS</p>
+          <h1 className="font-display text-2xl font-bold text-foreground">{t("settingsTitle")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("settingsSubtitle")}</p>
         </div>
       </div>
 
@@ -1233,27 +1304,27 @@ export const SettingsView = () => {
           <TabsList className="bg-muted/30 p-1 h-auto">
             <TabsTrigger value="audio" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Volume2 className="w-4 h-4" />
-              Audio
+              {t("settingsTabAudio")}
             </TabsTrigger>
             <TabsTrigger value="library" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Music className="w-4 h-4" />
-              Bibliothèque
+              {t("settingsTabLibrary")}
             </TabsTrigger>
             <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Palette className="w-4 h-4" />
-              Affichage
+              {t("settingsTabAppearance")}
             </TabsTrigger>
             <TabsTrigger value="cloud" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Cloud className="w-4 h-4" />
-              Cloud
+              {t("settingsTabCloud")}
             </TabsTrigger>
             <TabsTrigger value="subscription" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <Crown className="w-4 h-4" />
-              Abonnements
+              {t("settingsTabSubscription")}
             </TabsTrigger>
             <TabsTrigger value="account" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
               <User className="w-4 h-4" />
-              Compte
+              {t("settingsTabAccount")}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1262,12 +1333,12 @@ export const SettingsView = () => {
           {/* Audio Tab */}
           <TabsContent value="audio" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SettingsCard title="Lecture" icon={Volume2}>
+              <SettingsCard title={t("settingsCardPlayback")} icon={Volume2}>
                 <SettingRow 
-                  label="Crossfade" 
-                  description="Transition fluide entre les pistes"
-                  helpText="Ajoute une transition en fondu entre les pistes. Réglez la durée en secondes pour que la transition soit plus longue ou plus courte."
-                  helpTitle="Crossfade"
+                  label={t("settingsAudioCrossfadeLabel")} 
+                  description={t("settingsAudioCrossfadeDescription")}
+                  helpText={t("settingsAudioCrossfadeHelp")}
+                  helpTitle={t("settingsAudioCrossfadeLabel")}
                 >
                   <div className="flex items-center gap-3">
                     <Switch
@@ -1283,57 +1354,59 @@ export const SettingsView = () => {
                           onValueChange={(v) => updateSetting("crossfadeDuration", v[0])}
                           className="w-20"
                         />
-                        <span className="text-xs text-muted-foreground w-6">{settings.crossfadeDuration}s</span>
+                        <span className="text-xs text-muted-foreground w-6">
+                          {settings.crossfadeDuration}s
+                        </span>
                       </>
                     )}
                   </div>
                 </SettingRow>
                 <SettingRow 
-                  label="Lecture sans interruption" 
-                  description="Supprime les silences entre les pistes"
-                  helpText="Élimine les petits silences naturels au début et à la fin des pistes pour une lecture fluide et continue."
+                  label={t("settingsAudioGaplessLabel")} 
+                  description={t("settingsAudioGaplessDescription")}
+                  helpText={t("settingsAudioGaplessHelp")}
                 >
                   <Switch checked={settings.gaplessPlayback} onCheckedChange={(v) => updateSetting("gaplessPlayback", v)} />
                 </SettingRow>
                 <SettingRow 
-                  label="Normalisation" 
-                  description="Égalise le volume des pistes"
-                  helpText="Ajuste automatiquement le volume de chaque piste pour éviter les variations trop importantes. Idéal si vos pistes ont des volumes très différents."
+                  label={t("settingsAudioNormalizeLabel")} 
+                  description={t("settingsAudioNormalizeDescription")}
+                  helpText={t("settingsAudioNormalizeHelp")}
                 >
                   <Switch checked={settings.normalizeVolume} onCheckedChange={(v) => updateSetting("normalizeVolume", v)} />
                 </SettingRow>
                 <SettingRow 
-                  label="Égaliseur" 
-                  description="Ajustez les fréquences"
-                  helpText="Permet d'ajuster les basses, aigus et autres fréquences pour adapter le son à vos préférences."
+                  label={t("settingsAudioEqualizerLabel")} 
+                  description={t("settingsAudioEqualizerDescription")}
+                  helpText={t("settingsAudioEqualizerHelp")}
                 >
                   <Switch checked={settings.equalizerEnabled} onCheckedChange={(v) => updateSetting("equalizerEnabled", v)} />
                 </SettingRow>
               </SettingsCard>
 
-              <SettingsCard title="Paroles" icon={Mic2}>
+              <SettingsCard title={t("settingsCardLyrics")} icon={Mic2}>
                 <SettingRow 
-                  label="Afficher les paroles" 
-                  description="Récupère depuis LRCLIB"
-                  helpText="Affiche les paroles synchronisées des chansons. Les paroles sont récupérées automatiquement si disponibles."
+                  label={t("settingsLyricsShowLabel")} 
+                  description={t("settingsLyricsShowDescription")}
+                  helpText={t("settingsLyricsShowHelp")}
                 >
                   <Switch checked={settings.showLyrics} onCheckedChange={(v) => updateSetting("showLyrics", v)} />
                 </SettingRow>
                 <SettingRow 
-                  label="Paroles synchronisées" 
-                  description="Défilement automatique"
-                  helpText="Les paroles s'affichent et défillent automatiquement en temps réel avec la musique."
+                  label={t("settingsLyricsSyncedLabel")} 
+                  description={t("settingsLyricsSyncedDescription")}
+                  helpText={t("settingsLyricsSyncedHelp")}
                 >
                   <Switch checked={settings.showLyrics} disabled />
-                  <span className="text-xs text-muted-foreground ml-2">Toujours activé</span>
+                  <span className="text-xs text-muted-foreground ml-2">{t("settingsLyricsAlwaysOn")}</span>
                 </SettingRow>
               </SettingsCard>
 
-              <SettingsCard title="Scrobbling" icon={Sparkles} className="lg:col-span-2">
+              <SettingsCard title={t("settingsCardScrobbling")} icon={Sparkles} className="lg:col-span-2">
                 <SettingRow 
-                  label="Activer le scrobbling" 
-                  description="Envoie vos écoutes à Last.fm/Libre.fm"
-                  helpText="Le scrobbling enregistre automatiquement toutes les pistes que vous écoutez sur votre profil Last.fm ou Libre.fm. Cela vous permet de suivre vos statistiques d'écoute."
+                  label={t("settingsScrobblingEnableLabel")} 
+                  description={t("settingsScrobblingEnableDescription")}
+                  helpText={t("settingsScrobblingEnableHelp")}
                 >
                   <Switch checked={settings.scrobblingEnabled} onCheckedChange={(v) => updateSetting("scrobblingEnabled", v)} disabled={!isElectron} />
                 </SettingRow>
@@ -1351,7 +1424,7 @@ export const SettingsView = () => {
                             <Check className="w-3 h-3" /> {scrobblerStatus.lastFm.username}
                           </p>
                         ) : (
-                          <p className="text-xs text-muted-foreground">Non connecté</p>
+                          <p className="text-xs text-muted-foreground">{t("settingsScrobblingNotConnected")}</p>
                         )}
                       </div>
                     </div>
@@ -1361,7 +1434,7 @@ export const SettingsView = () => {
                       onClick={scrobblerStatus.lastFm.connected ? () => handleDisconnectScrobbler("lastfm") : handleConnectLastFm}
                       disabled={!isElectron}
                     >
-                      {scrobblerStatus.lastFm.connected ? "Déconnecter" : "Connecter"}
+                      {scrobblerStatus.lastFm.connected ? t("settingsScrobblingDisconnect") : t("settingsScrobblingConnect")}
                     </Button>
                   </div>
 
@@ -1378,7 +1451,7 @@ export const SettingsView = () => {
                             <Check className="w-3 h-3" /> {scrobblerStatus.libreFm.username}
                           </p>
                         ) : (
-                          <p className="text-xs text-muted-foreground">Non connecté</p>
+                          <p className="text-xs text-muted-foreground">{t("settingsScrobblingNotConnected")}</p>
                         )}
                       </div>
                     </div>
@@ -1388,7 +1461,7 @@ export const SettingsView = () => {
                       onClick={scrobblerStatus.libreFm.connected ? () => handleDisconnectScrobbler("librefm") : handleConnectLibreFm}
                       disabled={!isElectron}
                     >
-                      {scrobblerStatus.libreFm.connected ? "Déconnecter" : "Connecter"}
+                      {scrobblerStatus.libreFm.connected ? t("settingsScrobblingDisconnect") : t("settingsScrobblingConnect")}
                     </Button>
                   </div>
                 </div>
@@ -1399,13 +1472,13 @@ export const SettingsView = () => {
           {/* Library Tab */}
           <TabsContent value="library" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SettingsCard title="Dossiers de musique" icon={FolderOpen} className="lg:col-span-2">
+              <SettingsCard title={t("settingsCardMusicFolders")} icon={FolderOpen} className="lg:col-span-2">
                 <div className="space-y-3">
                   {(settings.musicDirectories || []).length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm">Aucun dossier configuré</p>
-                      <p className="text-xs mt-1">Ajoutez des dossiers pour scanner votre musique</p>
+                      <p className="text-sm">{t("settingsLibraryEmptyTitle")}</p>
+                      <p className="text-xs mt-1">{t("settingsLibraryEmptyDescription")}</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -1430,11 +1503,11 @@ export const SettingsView = () => {
                   <div className="flex items-center gap-3 pt-2">
                     <Button variant="outline" size="sm" onClick={handleAddMusicFolder} disabled={!isElectron}>
                       <Plus className="w-4 h-4 mr-2" />
-                      Ajouter un dossier
+                      {t("settingsLibraryAddFolder")}
                     </Button>
                     <Button variant="default" size="sm" onClick={handleScanLibrary} disabled={scanning || (settings.musicDirectories || []).length === 0}>
                       <RefreshCw className={cn("w-4 h-4 mr-2", scanning && "animate-spin")} />
-                      {scanning ? "Scan en cours..." : "Scanner"}
+                      {scanning ? t("settingsLibraryScanInProgress") : t("settingsLibraryScan")}
                     </Button>
                   </div>
                 </div>
@@ -1449,9 +1522,9 @@ export const SettingsView = () => {
                             <RefreshCw className="w-4 h-4 text-primary animate-spin" />
                           </div>
                           <span className="font-medium text-foreground">
-                            {scanProgress.phase === "scanning" ? "🔍 Recherche des fichiers..." : 
-                             scanProgress.phase === "extracting" ? "🎵 Extraction des métadonnées..." : 
-                             scanProgress.phase === "indexing" ? "📊 Indexation..." : "✅ Terminé"}
+                            {scanProgress.phase === "scanning" ? t("settingsLibraryScanPhaseScanning") : 
+                             scanProgress.phase === "extracting" ? t("settingsLibraryScanPhaseExtracting") : 
+                             scanProgress.phase === "indexing" ? t("settingsLibraryScanPhaseIndexing") : t("settingsLibraryScanPhaseDone")}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -1478,23 +1551,23 @@ export const SettingsView = () => {
                     {/* Statistiques temps réel */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       <div className="p-3 rounded-lg bg-card border border-border/50">
-                        <p className="text-xs text-muted-foreground mb-1">Fichiers trouvés</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("settingsLibraryFilesFound")}</p>
                         <p className="text-lg font-bold text-foreground">{scanProgress.total}</p>
                       </div>
                       <div className="p-3 rounded-lg bg-card border border-border/50">
-                        <p className="text-xs text-muted-foreground mb-1">Traités</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("settingsLibraryFilesProcessed")}</p>
                         <p className="text-lg font-bold text-primary">{scanProgress.current}</p>
                       </div>
                       <div className="p-3 rounded-lg bg-card border border-border/50">
-                        <p className="text-xs text-muted-foreground mb-1">Restants</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("settingsLibraryFilesRemaining")}</p>
                         <p className="text-lg font-bold text-orange-500">{Math.max(0, scanProgress.total - scanProgress.current)}</p>
                       </div>
                       <div className="p-3 rounded-lg bg-card border border-border/50">
-                        <p className="text-xs text-muted-foreground mb-1">Phase</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("settingsLibraryPhase")}</p>
                         <p className="text-sm font-semibold text-foreground capitalize">
-                          {scanProgress.phase === "scanning" ? "Recherche" : 
-                           scanProgress.phase === "extracting" ? "Extraction" : 
-                           scanProgress.phase === "indexing" ? "Indexation" : "Terminé"}
+                          {scanProgress.phase === "scanning" ? t("settingsLibraryScanPhaseLabelScanning") : 
+                           scanProgress.phase === "extracting" ? t("settingsLibraryScanPhaseLabelExtracting") : 
+                           scanProgress.phase === "indexing" ? t("settingsLibraryScanPhaseLabelIndexing") : t("settingsLibraryScanPhaseLabelDone")}
                         </p>
                       </div>
                     </div>
@@ -1502,59 +1575,69 @@ export const SettingsView = () => {
                 )}
               </SettingsCard>
 
-              <SettingsCard title="Statistiques de la bibliothèque" icon={HardDrive}>
+              <SettingsCard title={t("settingsCardLibraryStats")} icon={HardDrive}>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Pistes</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsLibraryStatsTracks")}</span>
                     <span className="text-sm font-mono text-foreground font-semibold">{tracks.length.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Albums</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsLibraryStatsAlbums")}</span>
                     <span className="text-sm font-mono text-foreground">{new Set(tracks.map(t => t.album)).size.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Artistes</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsLibraryStatsArtists")}</span>
                     <span className="text-sm font-mono text-foreground">{new Set(tracks.map(t => t.artist)).size.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                    <span className="text-sm text-muted-foreground">Genres</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsLibraryStatsGenres")}</span>
                     <span className="text-sm font-mono text-foreground">{new Set(tracks.filter(t => t.genre).map(t => t.genre)).size.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Taille totale</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsLibraryStatsTotalSize")}</span>
                     <span className="text-sm font-mono text-foreground">
                       {(() => {
                         const totalBytes = tracks.reduce((sum, t) => sum + (t.fileSize || 0), 0);
                         const gb = totalBytes / (1024 * 1024 * 1024);
-                        return gb >= 1 ? `${gb.toFixed(2)} Go` : `${(totalBytes / (1024 * 1024)).toFixed(0)} Mo`;
+                        return gb >= 1
+                          ? `${gb.toFixed(2)} ${t("settingsLibraryUnitGB")}`
+                          : `${(totalBytes / (1024 * 1024)).toFixed(0)} ${t("settingsLibraryUnitMB")}`;
                       })()}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Durée totale</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsLibraryStatsTotalDuration")}</span>
                     <span className="text-sm font-mono text-foreground">
                       {(() => {
                         const totalSeconds = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
                         const hours = Math.floor(totalSeconds / 3600);
                         const minutes = Math.floor((totalSeconds % 3600) / 60);
-                        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                        return hours > 0
+                          ? t("settingsLibraryDurationHoursMinutes", { hours, minutes })
+                          : t("settingsLibraryDurationMinutes", { minutes });
                       })()}
                     </span>
                   </div>
                 </div>
               </SettingsCard>
 
-              <SettingsCard title="Options de scan" icon={Music}>
-                <SettingRow label="Scanner au démarrage" description="Recherche automatique des nouveaux fichiers">
+              <SettingsCard title={t("settingsCardScanOptions")} icon={Music}>
+                <SettingRow
+                  label={t("settingsLibraryScanOnStartupLabel")}
+                  description={t("settingsLibraryScanOnStartupDescription")}
+                >
                   <Switch checked={settings.autoScanOnStartup} onCheckedChange={(v) => updateSetting("autoScanOnStartup", v)} />
                 </SettingRow>
-                <SettingRow label="Surveiller les dossiers" description="Détection en temps réel des changements">
+                <SettingRow
+                  label={t("settingsLibraryWatchFoldersLabel")}
+                  description={t("settingsLibraryWatchFoldersDescription")}
+                >
                   <Switch checked={false} disabled />
-                  <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
+                  <span className="text-xs text-muted-foreground ml-2">{t("settingsComingSoon")}</span>
                 </SettingRow>
               </SettingsCard>
 
-              <SettingsCard title="Outils avancés" icon={Sparkles} className="lg:col-span-2">
+              <SettingsCard title={t("settingsCardAdvancedTools")} icon={Sparkles} className="lg:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Analyse de qualité */}
                   <div className="p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
@@ -1563,25 +1646,25 @@ export const SettingsView = () => {
                         <Sparkles className="w-5 h-5 text-blue-500" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-sm">Analyse de qualité</h4>
-                        <p className="text-xs text-muted-foreground">Bitrate, format, intégrité</p>
+                        <h4 className="font-semibold text-sm">{t("settingsAdvancedQualityTitle")}</h4>
+                        <p className="text-xs text-muted-foreground">{t("settingsAdvancedQualitySubtitle")}</p>
                       </div>
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground mb-3">
                       <div className="flex items-center justify-between">
-                        <span>Haute qualité (≥320kbps)</span>
+                        <span>{t("settingsAdvancedQualityHigh")}</span>
                         <span className="font-mono text-foreground">
                           {tracks.filter(t => (t.bitrate || 0) >= 320).length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>Qualité moyenne (128-320kbps)</span>
+                        <span>{t("settingsAdvancedQualityMedium")}</span>
                         <span className="font-mono text-foreground">
                           {tracks.filter(t => (t.bitrate || 0) >= 128 && (t.bitrate || 0) < 320).length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>Basse qualité (&lt;128kbps)</span>
+                        <span>{t("settingsAdvancedQualityLow")}</span>
                         <span className="font-mono text-orange-500">
                           {tracks.filter(t => (t.bitrate || 0) > 0 && (t.bitrate || 0) < 128).length}
                         </span>
@@ -1597,12 +1680,12 @@ export const SettingsView = () => {
                       {qualityLoading ? (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Analyse...
+                          {t("settingsAdvancedAnalyzeInProgress")}
                         </>
                       ) : (
                         <>
                           <Check className="w-4 h-4 mr-2" />
-                          Analyser la qualité
+                          {t("settingsAdvancedAnalyzeQuality")}
                         </>
                       )}
                     </Button>
@@ -1615,16 +1698,16 @@ export const SettingsView = () => {
                         <Copy className="w-5 h-5 text-purple-500" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-sm">Doublons</h4>
-                        <p className="text-xs text-muted-foreground">Détection intelligente</p>
+                        <h4 className="font-semibold text-sm">{t("settingsAdvancedDuplicatesTitle")}</h4>
+                        <p className="text-xs text-muted-foreground">{t("settingsAdvancedDuplicatesSubtitle")}</p>
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground mb-3">
-                      <p>Recherche des fichiers en double basée sur:</p>
+                      <p>{t("settingsAdvancedDuplicatesIntro")}</p>
                       <ul className="list-disc list-inside mt-1 space-y-1">
-                        <li>Titre + Artiste identiques</li>
-                        <li>Durée similaire (±3s)</li>
-                        <li>Empreinte audio</li>
+                        <li>{t("settingsAdvancedDuplicatesCriteria1")}</li>
+                        <li>{t("settingsAdvancedDuplicatesCriteria2")}</li>
+                        <li>{t("settingsAdvancedDuplicatesCriteria3")}</li>
                       </ul>
                     </div>
                     <Button 
@@ -1637,12 +1720,12 @@ export const SettingsView = () => {
                       {duplicatesLoading ? (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Recherche...
+                          {t("settingsAdvancedDuplicatesSearching")}
                         </>
                       ) : (
                         <>
                           <Search className="w-4 h-4 mr-2" />
-                          Rechercher les doublons
+                          {t("settingsAdvancedDuplicatesSearch")}
                         </>
                       )}
                     </Button>
@@ -1655,13 +1738,13 @@ export const SettingsView = () => {
                         <AlertCircle className="w-5 h-5 text-orange-500" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-sm">Fichiers manquants</h4>
-                        <p className="text-xs text-muted-foreground">Vérification d'intégrité</p>
+                        <h4 className="font-semibold text-sm">{t("settingsAdvancedMissingFilesTitle")}</h4>
+                        <p className="text-xs text-muted-foreground">{t("settingsAdvancedMissingFilesSubtitle")}</p>
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground mb-3">
-                      <p>Vérifie si tous les fichiers référencés existent encore sur le disque.</p>
-                      <p className="mt-1 text-orange-500">Nettoie les références obsolètes.</p>
+                      <p>{t("settingsAdvancedMissingFilesDescription")}</p>
+                      <p className="mt-1 text-orange-500">{t("settingsAdvancedMissingFilesCleanupNote")}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button 
@@ -1674,12 +1757,12 @@ export const SettingsView = () => {
                         {integrityLoading ? (
                           <>
                             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                            Vérification...
+                            {t("settingsAdvancedIntegrityChecking")}
                           </>
                         ) : (
                           <>
                             <RefreshCw className="w-4 h-4 mr-2" />
-                            Vérifier
+                            {t("settingsAdvancedIntegrityCheck")}
                           </>
                         )}
                       </Button>
@@ -1694,12 +1777,14 @@ export const SettingsView = () => {
                           {cleanupLoading ? (
                             <>
                               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              Nettoyage...
+                              {t("settingsAdvancedIntegrityCleaning")}
                             </>
                           ) : (
                             <>
                               <AlertCircle className="w-4 h-4 mr-2" />
-                              Nettoyer ({integrityResult.stats.missing})
+                              {t("settingsAdvancedIntegrityCleanup", {
+                                count: integrityResult.stats.missing,
+                              })}
                             </>
                           )}
                         </Button>
@@ -1714,25 +1799,25 @@ export const SettingsView = () => {
                         <Tag className="w-5 h-5 text-green-500" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-sm">Métadonnées</h4>
-                        <p className="text-xs text-muted-foreground">Complétion automatique</p>
+                        <h4 className="font-semibold text-sm">{t("settingsAdvancedMetadataTitle")}</h4>
+                        <p className="text-xs text-muted-foreground">{t("settingsAdvancedMetadataSubtitle")}</p>
                       </div>
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground mb-3">
                       <div className="flex items-center justify-between">
-                        <span>Sans pochette</span>
+                        <span>{t("settingsAdvancedMetadataMissingCover")}</span>
                         <span className="font-mono text-foreground">
                           {tracks.filter(t => !t.coverUrl).length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>Sans genre</span>
+                        <span>{t("settingsAdvancedMetadataMissingGenre")}</span>
                         <span className="font-mono text-foreground">
                           {tracks.filter(t => !t.genre).length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>Sans année</span>
+                        <span>{t("settingsAdvancedMetadataMissingYear")}</span>
                         <span className="font-mono text-foreground">
                           {tracks.filter(t => !t.year).length}
                         </span>
@@ -1748,12 +1833,12 @@ export const SettingsView = () => {
                       {metadataLoading ? (
                         <>
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Analyse...
+                          {t("settingsAdvancedMetadataAnalyzing")}
                         </>
                       ) : (
                         <>
                           <Download className="w-4 h-4 mr-2" />
-                          Analyser les métadonnées
+                          {t("settingsAdvancedMetadataAnalyze")}
                         </>
                       )}
                     </Button>
@@ -1765,33 +1850,35 @@ export const SettingsView = () => {
 
               {/* Quality Analysis Results */}
               {qualityAnalysis && (
-                <SettingsCard title="Résultats d'analyse de qualité" icon={Sparkles} className="lg:col-span-2">
+                <SettingsCard title={t("settingsCardQualityResults")} icon={Sparkles} className="lg:col-span-2">
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <p className="text-xs text-muted-foreground">Haute qualité</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsQualityHigh")}</p>
                         <p className="text-lg font-bold text-green-500">{qualityAnalysis.stats.highQualityCount}</p>
                         <p className="text-xs text-muted-foreground">≥ 320 kbps</p>
                       </div>
                       <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                        <p className="text-xs text-muted-foreground">Qualité moyenne</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsQualityMedium")}</p>
                         <p className="text-lg font-bold text-blue-500">{qualityAnalysis.stats.mediumQualityCount}</p>
                         <p className="text-xs text-muted-foreground">128-320 kbps</p>
                       </div>
                       <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                        <p className="text-xs text-muted-foreground">Basse qualité</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsQualityLow")}</p>
                         <p className="text-lg font-bold text-orange-500">{qualityAnalysis.stats.lowQualityCount}</p>
                         <p className="text-xs text-muted-foreground">&lt; 128 kbps</p>
                       </div>
                       <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                        <p className="text-xs text-muted-foreground">Inconnu</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsQualityUnknown")}</p>
                         <p className="text-lg font-bold text-foreground">{qualityAnalysis.stats.unknownCount}</p>
-                        <p className="text-xs text-muted-foreground">Bitrate missing</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsQualityUnknownBitrate")}</p>
                       </div>
                     </div>
                     <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                      <p className="text-sm font-semibold mb-2">Bitrate moyen: <span className="text-primary">{qualityAnalysis.stats.averageBitrate} kbps</span></p>
-                      <p className="text-xs text-muted-foreground">Formats détectés:</p>
+                      <p className="text-sm font-semibold mb-2">
+                        {t("settingsQualityAverageBitrate", { value: qualityAnalysis.stats.averageBitrate })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{t("settingsQualityFormatsDetected")}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {Object.entries(qualityAnalysis.stats.formats).map(([format, count]) => (
                           <span key={format} className="text-xs bg-primary/10 px-2 py-1 rounded">
@@ -1806,28 +1893,32 @@ export const SettingsView = () => {
 
               {/* Integrity Check Results */}
               {integrityResult && (
-                <SettingsCard title="Résultats de vérification d'intégrité" icon={Check} className="lg:col-span-2">
+                <SettingsCard title={t("settingsCardIntegrityResults")} icon={Check} className="lg:col-span-2">
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <p className="text-xs text-muted-foreground">Fichiers valides</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsIntegrityValidFiles")}</p>
                         <p className="text-lg font-bold text-green-500">{integrityResult.stats.valid}</p>
                         <p className="text-xs text-muted-foreground">{integrityResult.stats.percentage}%</p>
                       </div>
                       <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <p className="text-xs text-muted-foreground">Fichiers manquants</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsIntegrityMissingFiles")}</p>
                         <p className="text-lg font-bold text-red-500">{integrityResult.stats.missing}</p>
                         <p className="text-xs text-muted-foreground">{100 - integrityResult.stats.percentage}%</p>
                       </div>
                       <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsIntegrityTotal")}</p>
                         <p className="text-lg font-bold text-blue-500">{integrityResult.totalTracks}</p>
-                        <p className="text-xs text-muted-foreground">pistes</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsIntegrityTracksLabel")}</p>
                       </div>
                     </div>
                     {integrityResult.missingFiles.length > 0 && (
                       <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <p className="text-sm font-semibold text-red-500 mb-2">Fichiers manquants ({integrityResult.missingFiles.length}):</p>
+                        <p className="text-sm font-semibold text-red-500 mb-2">
+                          {t("settingsIntegrityMissingFilesTitle", {
+                            count: integrityResult.missingFiles.length,
+                          })}
+                        </p>
                         <div className="max-h-32 overflow-y-auto">
                           <ul className="text-xs space-y-1">
                             {integrityResult.missingFiles.slice(0, 5).map((track) => (
@@ -1837,7 +1928,9 @@ export const SettingsView = () => {
                             ))}
                             {integrityResult.missingFiles.length > 5 && (
                               <li className="text-muted-foreground italic">
-                                + {integrityResult.missingFiles.length - 5} autres...
+                                {t("settingsIntegrityMoreMissing", {
+                                  count: integrityResult.missingFiles.length - 5,
+                                })}
                               </li>
                             )}
                           </ul>
@@ -1850,7 +1943,7 @@ export const SettingsView = () => {
 
               {/* Metadata Analysis Results */}
               {metadataReport && (
-                <SettingsCard title="Analyse de complétude des métadonnées" icon={Tag} className="lg:col-span-2">
+                <SettingsCard title={t("settingsCardMetadataCompleteness")} icon={Tag} className="lg:col-span-2">
                   <div className="space-y-3">
                     <div className="relative h-2 rounded-full bg-muted/30 overflow-hidden">
                       <div 
@@ -1859,31 +1952,36 @@ export const SettingsView = () => {
                       />
                     </div>
                     <p className="text-sm text-center font-semibold text-foreground">
-                      {metadataReport.stats.completionPercentage}% de complétude
+                      {t("settingsMetadataCompletion", {
+                        percentage: metadataReport.stats.completionPercentage,
+                      })}
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                        <p className="text-xs text-muted-foreground">Sans pochette</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsMetadataMissingCover")}</p>
                         <p className="text-lg font-bold text-yellow-500">{metadataReport.stats.missingCover}</p>
                       </div>
                       <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                        <p className="text-xs text-muted-foreground">Sans genre</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsMetadataMissingGenre")}</p>
                         <p className="text-lg font-bold text-purple-500">{metadataReport.stats.missingGenre}</p>
                       </div>
                       <div className="p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                        <p className="text-xs text-muted-foreground">Sans année</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsMetadataMissingYear")}</p>
                         <p className="text-lg font-bold text-pink-500">{metadataReport.stats.missingYear}</p>
                       </div>
                       <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                        <p className="text-xs text-muted-foreground">Sans artiste</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsMetadataMissingArtist")}</p>
                         <p className="text-lg font-bold text-indigo-500">{metadataReport.stats.missingArtist}</p>
                       </div>
                     </div>
 
                     <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                       <p className="text-sm font-semibold text-green-500">
-                        {metadataReport.stats.complete} pistes avec métadonnées complètes
+                        {t("settingsMetadataCompleteTracks", {
+                          count: metadataReport.stats.complete,
+                          suffix: metadataReport.stats.complete > 1 ? "s" : "",
+                        })}
                       </p>
                     </div>
                   </div>
@@ -1892,15 +1990,22 @@ export const SettingsView = () => {
 
               {/* Duplicate Results */}
               {duplicates && duplicates.length > 0 && (
-                <SettingsCard title="Doublons détectés" icon={Copy} className="lg:col-span-2">
+                <SettingsCard title={t("settingsCardDuplicatesDetected")} icon={Copy} className="lg:col-span-2">
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      {duplicates.length} groupe{duplicates.length > 1 ? 's' : ''} de doublons détecté{duplicates.length > 1 ? 's' : ''}
+                      {t("settingsDuplicatesGroupsDetected", {
+                        count: duplicates.length,
+                        suffix: duplicates.length > 1 ? "s" : "",
+                      })}
                     </p>
                     {duplicates.map((group, idx) => (
                       <div key={idx} className="p-3 rounded-lg bg-muted/30 border border-border/50">
                         <p className="text-xs font-semibold text-muted-foreground mb-2">
-                          {group.reason === 'exact-match' ? '🎯 Correspondance exacte' : group.reason === 'similar-duration' ? '⏱️ Durée similaire' : '📝 Titre/Artiste similaires'} ({group.confidence}% confiance)
+                          {group.reason === 'exact-match'
+                            ? t("settingsDuplicatesReasonExact")
+                            : group.reason === 'similar-duration'
+                              ? t("settingsDuplicatesReasonSimilarDuration")
+                              : t("settingsDuplicatesReasonSimilarTitleArtist")} {t("settingsDuplicatesConfidence", { value: group.confidence })}
                         </p>
                         <ul className="space-y-1">
                           {group.tracks.map((track) => (
@@ -1920,19 +2025,9 @@ export const SettingsView = () => {
           {/* Appearance Tab */}
           <TabsContent value="appearance" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SettingsCard title="Thème" icon={Palette}>
+              <SettingsCard title={t("settingsCardTheme")} icon={Palette}>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  {[
-                    { id: "dark", label: "Sombre", color: "bg-gradient-to-br from-zinc-900 to-zinc-950", border: "border-cyan-500" },
-                    { id: "light", label: "Clair", color: "bg-gradient-to-br from-zinc-50 to-zinc-100", border: "border-blue-500" },
-                    { id: "cyberpunk", label: "Cyberpunk", color: "bg-gradient-to-br from-purple-900 via-yellow-600 to-purple-800", border: "border-yellow-500" },
-                    { id: "minimal", label: "Minimal", color: "bg-gradient-to-br from-zinc-900 to-black", border: "border-white" },
-                    { id: "spotify", label: "Spotify", color: "bg-gradient-to-br from-[#121212] via-[#1DB954] to-[#191414]", border: "border-[#1DB954]" },
-                    { id: "apple-music", label: "Apple Music", color: "bg-gradient-to-br from-[#1a0f0f] via-[#FC3C44] to-[#2a1515]", border: "border-[#FC3C44]" },
-                    { id: "youtube-music", label: "YouTube Music", color: "bg-gradient-to-br from-[#121212] via-[#FF0000] to-[#1a0a0a]", border: "border-[#FF0000]" },
-                    { id: "tidal", label: "Tidal", color: "bg-gradient-to-br from-[#0a1a1f] via-[#00FFFF] to-[#0f1f2a]", border: "border-[#00FFFF]" },
-                    { id: "deezer", label: "Deezer", color: "bg-gradient-to-br from-[#00C7F2] via-[#FF0090] to-[#0a1a1f]", border: "border-[#00C7F2]" },
-                  ].map((t) => (
+                  {themeOptions.map((t) => (
                     <button
                       key={t.id}
                       onClick={() => handleThemeChange(t.id)}
@@ -1953,39 +2048,45 @@ export const SettingsView = () => {
                 </div>
               </SettingsCard>
 
-              <SettingsCard title="Notifications" icon={Bell}>
-                <SettingRow label="Notifications de bureau" description="Affiche le titre en cours">
+              <SettingsCard title={t("settingsCardNotifications")} icon={Bell}>
+                <SettingRow
+                  label={t("settingsNotificationsDesktopLabel")}
+                  description={t("settingsNotificationsDesktopDescription")}
+                >
                   <Switch 
                     checked={notificationsEnabled} 
                     onCheckedChange={(v) => {
                       setNotificationsEnabled(v);
-                      if (v) notifySuccess("Notifications activées");
-                      else notifySuccess("Notifications désactivées");
+                      if (v) notifySuccess(t("settingsNotificationsEnabled"));
+                      else notifySuccess(t("settingsNotificationsDisabled"));
                     }} 
                   />
                 </SettingRow>
-                <SettingRow label="Son de notification" description="Joue un son">
+                <SettingRow
+                  label={t("settingsNotificationsSoundLabel")}
+                  description={t("settingsNotificationsSoundDescription")}
+                >
                   <Switch checked={false} disabled />
-                  <span className="text-xs text-muted-foreground ml-2">Bientôt disponible</span>
+                  <span className="text-xs text-muted-foreground ml-2">{t("settingsComingSoon")}</span>
                 </SettingRow>
                 <div className="mt-3 pt-3 border-t border-border/30">
                   <p className="text-xs text-muted-foreground">
-                    Consultez l'historique des notifications dans le panneau dédié du menu latéral.
+                    {t("settingsNotificationsHistoryHint")}
                   </p>
                 </div>
               </SettingsCard>
 
-              <SettingsCard title="Raccourcis clavier" icon={Keyboard} className="lg:col-span-2">
+              <SettingsCard title={t("settingsCardShortcuts")} icon={Keyboard} className="lg:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
                   {[
-                    { action: "Lecture/Pause", shortcut: "Espace" },
-                    { action: "Titre suivant", shortcut: "Ctrl + →" },
-                    { action: "Titre précédent", shortcut: "Ctrl + ←" },
-                    { action: "Volume +", shortcut: "Ctrl + ↑" },
-                    { action: "Volume -", shortcut: "Ctrl + ↓" },
-                    { action: "Muet", shortcut: "Ctrl + M" },
-                    { action: "Plein écran", shortcut: "F11" },
-                    { action: "Fermer", shortcut: "Échap" },
+                    { action: t("settingsShortcutPlayPause"), shortcut: t("settingsShortcutKeySpace") },
+                    { action: t("settingsShortcutNextTrack"), shortcut: t("settingsShortcutKeyCtrlRight") },
+                    { action: t("settingsShortcutPrevTrack"), shortcut: t("settingsShortcutKeyCtrlLeft") },
+                    { action: t("settingsShortcutVolumeUp"), shortcut: t("settingsShortcutKeyCtrlUp") },
+                    { action: t("settingsShortcutVolumeDown"), shortcut: t("settingsShortcutKeyCtrlDown") },
+                    { action: t("settingsShortcutMute"), shortcut: t("settingsShortcutKeyCtrlM") },
+                    { action: t("settingsShortcutFullscreen"), shortcut: t("settingsShortcutKeyF11") },
+                    { action: t("settingsShortcutClose"), shortcut: t("settingsShortcutKeyEsc") },
                   ].map(({ action, shortcut }) => (
                     <SettingRow key={action} label={action}>
                       <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono text-muted-foreground">{shortcut}</kbd>
@@ -2000,16 +2101,16 @@ export const SettingsView = () => {
           <TabsContent value="cloud" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Cloudinary */}
-              <SettingsCard title="Cloudinary" icon={Cloud}>
+              <SettingsCard title={t("settingsCardCloudinary")} icon={Cloud}>
                 <div className="space-y-4">
                   <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <p className="text-sm text-blue-400 flex items-center gap-2">
                       <Info className="w-4 h-4" />
-                      Cloud public (Serveur 0)
+                      {t("settingsCloudinaryPublicServer")}
                       <Crown className="w-3.5 h-3.5 text-amber-400" />
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Les utilisateurs Free utilisent le stockage local (25 Go)
+                      {t("settingsCloudinaryFreeStorageHint")}
                     </p>
                   </div>
                   
@@ -2018,33 +2119,33 @@ export const SettingsView = () => {
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                         <p className="text-sm text-green-400 flex items-center gap-2">
                           <Check className="w-4 h-4" />
-                          Configuré: {cloudinaryConfig?.cloudName}
+                          {t("settingsCloudinaryConfigured", { name: cloudinaryConfig?.cloudName || "" })}
                         </p>
                       </div>
                       <Button variant="outline" size="sm" className="w-full" onClick={handleClearCloudinary}>
                         <X className="w-4 h-4 mr-2" />
-                        Supprimer la configuration
+                        {t("settingsCloudinaryRemoveConfig")}
                       </Button>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       <div>
-                        <Label className="text-xs">Cloud Name *</Label>
+                        <Label className="text-xs">{t("settingsCloudinaryCloudNameLabel")}</Label>
                         <Input
                           value={cloudinaryForm.cloudName}
                           onChange={(e) => setCloudinaryForm(prev => ({ ...prev, cloudName: e.target.value }))}
-                          placeholder="votre-cloud-name"
+                          placeholder={t("settingsCloudinaryCloudNamePlaceholder")}
                           className="mt-1"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">API Key (optionnel)</Label>
+                        <Label className="text-xs">{t("settingsCloudinaryApiKeyLabel")}</Label>
                         <div className="relative mt-1">
                           <Input
                             type={showCloudinaryKey ? "text" : "password"}
                             value={cloudinaryForm.apiKey}
                             onChange={(e) => setCloudinaryForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                            placeholder="••••••••••••"
+                            placeholder={t("settingsCloudinaryApiKeyPlaceholder")}
                           />
                           <button
                             type="button"
@@ -2056,11 +2157,11 @@ export const SettingsView = () => {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs">Upload Preset (unsigned) *</Label>
+                        <Label className="text-xs">{t("settingsCloudinaryUploadPresetLabel")}</Label>
                         <Input
                           value={cloudinaryForm.uploadPreset}
                           onChange={(e) => setCloudinaryForm(prev => ({ ...prev, uploadPreset: e.target.value }))}
-                          placeholder="preset-name"
+                          placeholder={t("settingsCloudinaryUploadPresetPlaceholder")}
                           className="mt-1"
                         />
                       </div>
@@ -2076,7 +2177,7 @@ export const SettingsView = () => {
                         ) : (
                           <Check className="w-4 h-4 mr-2" />
                         )}
-                        Sauvegarder
+                        {t("settingsSave")}
                       </Button>
                     </div>
                   )}
@@ -2084,7 +2185,7 @@ export const SettingsView = () => {
               </SettingsCard>
 
               {/* YouTube API */}
-              <SettingsCard title="YouTube API" icon={Youtube}>
+              <SettingsCard title={t("settingsCardYouTubeApi")} icon={Youtube}>
                 <div className="space-y-4">
                   {youtubeApiKey && !showYouTubeConfig ? (
                     // Affichage compact quand la clé est configurée
@@ -2092,10 +2193,10 @@ export const SettingsView = () => {
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                         <p className="text-sm text-green-400 flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4" />
-                          Clé API YouTube configurée
+                          {t("settingsYouTubeKeyConfigured")}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          La recherche YouTube est activée
+                          {t("settingsYouTubeSearchEnabled")}
                         </p>
                       </div>
                       <Button
@@ -2105,7 +2206,7 @@ export const SettingsView = () => {
                         onClick={() => setShowYouTubeConfig(true)}
                       >
                         <Youtube className="w-4 h-4 mr-2" />
-                        Modifier la clé API
+                        {t("settingsYouTubeEditKey")}
                       </Button>
                     </div>
                   ) : (
@@ -2114,10 +2215,10 @@ export const SettingsView = () => {
                       <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                         <p className="text-sm text-red-400 flex items-center gap-2">
                           <Info className="w-4 h-4" />
-                          Gratuit - 10 000 requêtes/jour
+                          {t("settingsYouTubeFreeQuota")}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Requis pour la recherche YouTube dans Nexus
+                          {t("settingsYouTubeRequired")}
                         </p>
                       </div>
 
@@ -2127,16 +2228,16 @@ export const SettingsView = () => {
                       <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                         <p className="text-sm text-green-400 flex items-center gap-2">
                           <Check className="w-4 h-4" />
-                          Clé API configurée
+                          {t("settingsYouTubeKeyConfiguredShort")}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          La recherche YouTube est activée
+                          {t("settingsYouTubeSearchEnabled")}
                         </p>
                       </div>
                     )}
                     
                     <div>
-                      <Label className="text-xs">Clé API YouTube Data v3 *</Label>
+                      <Label className="text-xs">{t("settingsYouTubeKeyLabel")}</Label>
                       <div className="relative mt-1">
                         <Input
                           type={showYouTubeKey ? "text" : "password"}
@@ -2145,7 +2246,7 @@ export const SettingsView = () => {
                             setYoutubeApiKey(e.target.value);
                             setYoutubeTestResult(null); // Réinitialiser le résultat du test
                           }}
-                          placeholder="AIzaSy..."
+                          placeholder={t("settingsYouTubeKeyPlaceholder")}
                           className="font-mono text-sm"
                         />
                         <button
@@ -2157,14 +2258,14 @@ export const SettingsView = () => {
                         </button>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1.5">
-                        Obtenez votre clé sur{" "}
+                        {t("settingsYouTubeGetKeyIntro")}{" "}
                         <a
                           href="https://console.cloud.google.com/apis/credentials"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline inline-flex items-center gap-1"
                         >
-                          Google Cloud Console
+                          {t("settingsYouTubeGoogleConsole")}
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </p>
@@ -2192,12 +2293,12 @@ export const SettingsView = () => {
                       )}
                     </div>
                     <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                      <p className="text-xs font-medium mb-2">Instructions :</p>
+                      <p className="text-xs font-medium mb-2">{t("settingsYouTubeInstructionsTitle")}</p>
                       <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                        <li>Créez un projet sur Google Cloud</li>
-                        <li>Activez l'API YouTube Data v3</li>
-                        <li>Créez une clé API</li>
-                        <li>Collez-la ci-dessus</li>
+                        <li>{t("settingsYouTubeInstructionsStep1")}</li>
+                        <li>{t("settingsYouTubeInstructionsStep2")}</li>
+                        <li>{t("settingsYouTubeInstructionsStep3")}</li>
+                        <li>{t("settingsYouTubeInstructionsStep4")}</li>
                       </ol>
                     </div>
                     <div className="flex gap-2">
@@ -2213,7 +2314,7 @@ export const SettingsView = () => {
                         ) : (
                           <Zap className="w-4 h-4 mr-2" />
                         )}
-                        Tester
+                        {t("settingsTest")}
                       </Button>
                       <Button 
                         variant="default" 
@@ -2227,7 +2328,7 @@ export const SettingsView = () => {
                         ) : (
                           <Check className="w-4 h-4 mr-2" />
                         )}
-                        Sauvegarder
+                        {t("settingsSave")}
                       </Button>
                     </div>
                     
@@ -2251,11 +2352,11 @@ export const SettingsView = () => {
                               }
                               setYoutubeTestResult(null);
                               setShowYouTubeConfig(true);
-                              notifySuccess("Clé API YouTube supprimée");
+                              notifySuccess(t("settingsYouTubeKeyRemoved"));
                             }}
                           >
                             <X className="w-4 h-4 mr-2" />
-                            Supprimer la clé
+                            {t("settingsYouTubeRemoveKey")}
                           </Button>
                         )}
                       </div>
@@ -2265,15 +2366,15 @@ export const SettingsView = () => {
               </SettingsCard>
 
               {/* Bunny Storage - Pro Only */}
-              <SettingsCard title="Bunny Storage" icon={Zap}>
+              <SettingsCard title={t("settingsCardBunnyStorage")} icon={Zap}>
                 <div className="space-y-4">
                   <div className="p-3 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
                     <p className="text-sm text-yellow-400 flex items-center gap-2">
                       <Crown className="w-4 h-4" />
-                      Exclusif aux utilisateurs Pro
+                      {t("settingsBunnyProOnly")}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      CDN ultra-rapide avec stockage illimité
+                      {t("settingsBunnySubtitle")}
                     </p>
                   </div>
 
@@ -2291,20 +2392,20 @@ export const SettingsView = () => {
                         <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                           <p className="text-sm text-green-400 flex items-center gap-2">
                             <Check className="w-4 h-4" />
-                            Bunny Storage configuré et actif
+                            {t("settingsBunnyConfigured")}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Vos uploads utilisent automatiquement Bunny CDN
+                            {t("settingsBunnyConfiguredHint")}
                           </p>
                         </div>
                       ) : (
                         <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                           <p className="text-sm text-yellow-400 flex items-center gap-2">
                             <AlertCircle className="w-4 h-4" />
-                            Configuration serveur manquante
+                            {t("settingsBunnyMissingServerConfig")}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {bunnyStatus?.message || 'Contactez l\'administrateur pour configurer BUNNY_STORAGE_NAME et BUNNY_API_KEY'}
+                            {bunnyStatus?.message || t("settingsBunnyMissingServerConfigHint")}
                           </p>
                         </div>
                       )}
@@ -2312,19 +2413,19 @@ export const SettingsView = () => {
                       <div className="space-y-2 text-xs text-muted-foreground">
                         <div className="flex items-center gap-2">
                           <Check className="w-3 h-3 text-green-500" />
-                          Upload jusqu'à 500MB par fichier
+                          {t("settingsBunnyFeatureUploadLimit")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Check className="w-3 h-3 text-green-500" />
-                          CDN mondial pour lecture ultra-rapide
+                          {t("settingsBunnyFeatureGlobalCdn")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Check className="w-3 h-3 text-green-500" />
-                          Stockage illimité
+                          {t("settingsBunnyFeatureUnlimited")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Check className="w-3 h-3 text-green-500" />
-                          Streaming optimisé audio/vidéo
+                          {t("settingsBunnyFeatureOptimizedStreaming")}
                         </div>
                       </div>
                     </div>
@@ -2332,7 +2433,7 @@ export const SettingsView = () => {
                     <div className="space-y-3">
                       <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
                         <p className="text-sm text-muted-foreground">
-                          Passez au plan Pro pour accéder à Bunny Storage
+                          {t("settingsBunnyUpgradeHint")}
                         </p>
                       </div>
                       <Button 
@@ -2343,7 +2444,7 @@ export const SettingsView = () => {
                         disabled={!stripeInitialized || !nexusAuthenticated}
                       >
                         <Crown className="w-4 h-4 mr-2" />
-                        Passer au Pro
+                        {t("settingsUpgradeToPro")}
                       </Button>
                     </div>
                   )}
@@ -2351,17 +2452,17 @@ export const SettingsView = () => {
               </SettingsCard>
 
               {/* Nexus Server with Firebase Auth */}
-              <SettingsCard title="Serveur NEXUS" icon={Shield}>
+              <SettingsCard title={t("settingsCardNexusServer")} icon={Shield}>
                 <ConfigAlert configured={!!authService.getGoogleClientIdSync()} service="Google OAuth" />
                 
                 <div className="space-y-4">
                   <div className="p-3 rounded-lg bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
                     <p className="text-sm text-primary flex items-center gap-2">
                       <Sparkles className="w-4 h-4" />
-                      Stockage illimité à vie
+                      {t("settingsNexusUnlimitedStorage")}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Disponible avec le plan Pro
+                      {t("settingsNexusProOnly")}
                     </p>
                   </div>
 
@@ -2382,7 +2483,7 @@ export const SettingsView = () => {
                             "inline-block px-2 py-0.5 rounded text-xs mt-1",
                             nexusIsPro ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                           )}>
-                            {nexusIsPro ? "Pro" : "Gratuit"}
+                            {nexusIsPro ? t("settingsPlanPro") : t("settingsPlanFree")}
                           </span>
                         </div>
                       </div>
@@ -2390,13 +2491,13 @@ export const SettingsView = () => {
                       {nexusIsPro ? (
                         <Button variant="outline" size="sm" className="w-full" onClick={handleManageBilling} disabled={!stripeInitialized}>
                           <CreditCard className="w-4 h-4 mr-2" />
-                          Gérer l'abonnement
+                          {t("settingsManageSubscription")}
                         </Button>
                       ) : (
                         <Button variant="default" size="sm" className="w-full" onClick={handleUpgradeToPro} disabled={!stripeInitialized}>
                           <Sparkles className="w-4 h-4 mr-2" />
                           <span className="inline-flex items-center gap-1">
-                            Passer au Pro €9.99/mois
+                            {t("settingsUpgradeToProPrice")}
                             <Crown className="w-4 h-4" />
                           </span>
                         </Button>
@@ -2408,7 +2509,7 @@ export const SettingsView = () => {
                         ) : (
                           <LogOut className="w-4 h-4 mr-2" />
                         )}
-                        Se déconnecter
+                        {t("settingsLogout")}
                       </Button>
                     </div>
                   ) : (
@@ -2417,7 +2518,7 @@ export const SettingsView = () => {
                         <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-3">
                           <User className="w-8 h-8 text-muted-foreground" />
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4">Connectez-vous pour synchroniser</p>
+                        <p className="text-sm text-muted-foreground mb-4">{t("settingsSignInToSync")}</p>
                         
                         <Button 
                           variant="default" 
@@ -2436,19 +2537,19 @@ export const SettingsView = () => {
                               <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                             </svg>
                           )}
-                          Continuer avec Google
+                          {t("settingsContinueWithGoogle")}
                         </Button>
                       </div>
 
                       <div className="border-t border-border/30 pt-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium">Plan Pro</span>
-                          <span className="text-xs text-primary">€9.99/mois</span>
+                          <span className="text-sm font-medium">{t("settingsPlanPro")}</span>
+                          <span className="text-xs text-primary">{t("settingsPlanProPrice")}</span>
                         </div>
                         <ul className="space-y-1.5 text-xs text-muted-foreground">
-                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Stockage illimité</li>
-                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Sync multi-appareils</li>
-                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> Support prioritaire</li>
+                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> {t("settingsPlanFeatureUnlimitedStorage")}</li>
+                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> {t("settingsPlanFeatureMultiDeviceSync")}</li>
+                          <li className="flex items-center gap-2"><Check className="w-3 h-3 text-green-500" /> {t("settingsPlanFeaturePrioritySupport")}</li>
                         </ul>
                       </div>
                     </div>
@@ -2457,42 +2558,42 @@ export const SettingsView = () => {
               </SettingsCard>
 
               {/* Firebase Sync Status */}
-              <SettingsCard title="Synchronisation Firebase" icon={Cloud} className="lg:col-span-2">
+              <SettingsCard title={t("settingsCardFirebaseSync")} icon={Cloud} className="lg:col-span-2">
                 <div className="space-y-4">
                   <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-secondary/5 border border-primary/10">
                     <p className="text-sm text-muted-foreground mb-4">
-                      Synchronisation automatique de vos données (favoris, historique, playlists, paramètres) avec Firebase Cloud.
+                      {t("settingsFirebaseSyncDescription")}
                     </p>
                     <SyncStatusIndicator collapsed={false} className="w-full" />
                   </div>
                   
                   {/* Détails du processus */}
                   <div className="p-4 rounded-lg bg-muted/20 space-y-3">
-                    <h4 className="text-sm font-medium text-foreground">Processus de synchronisation</h4>
+                    <h4 className="text-sm font-medium text-foreground">{t("settingsFirebaseSyncProcessTitle")}</h4>
                     <div className="space-y-2 text-xs text-muted-foreground">
                       <div className="flex items-start gap-2">
                         <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
                         <div>
-                          <span className="font-medium text-foreground">Direction:</span> Local → Firebase (backup mode)
-                          <p className="text-[11px] mt-0.5">Vos données locales sont sauvegardées automatiquement toutes les heures</p>
+                          <span className="font-medium text-foreground">{t("settingsFirebaseSyncDirectionLabel")}</span> {t("settingsFirebaseSyncDirectionValue")}
+                          <p className="text-[11px] mt-0.5">{t("settingsFirebaseSyncDirectionHint")}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
                         <div>
-                          <span className="font-medium text-foreground">Données synchronisées:</span> Settings, Favoris, Historique, Playlists, Thème, Volume, Equalizer
+                          <span className="font-medium text-foreground">{t("settingsFirebaseSyncDataLabel")}</span> {t("settingsFirebaseSyncDataValue")}
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
                         <div>
-                          <span className="font-medium text-foreground">Vérification:</span> Comparaison automatique Local vs Firebase après chaque sync
+                          <span className="font-medium text-foreground">{t("settingsFirebaseSyncCheckLabel")}</span> {t("settingsFirebaseSyncCheckValue")}
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <div className="w-1 h-1 rounded-full bg-primary/60 mt-1.5" />
                         <div>
-                          <span className="font-medium text-foreground">Logs détaillés:</span> Consultez la console pour voir toutes les données synchronisées
+                          <span className="font-medium text-foreground">{t("settingsFirebaseSyncLogsLabel")}</span> {t("settingsFirebaseSyncLogsValue")}
                         </div>
                       </div>
                     </div>
@@ -2502,16 +2603,22 @@ export const SettingsView = () => {
                   <div className="flex items-center justify-between text-sm px-2 py-1.5 rounded-lg bg-muted/20">
                     <div className="flex items-center gap-4">
                       <span className="text-muted-foreground">
-                        <span className="font-mono text-foreground">{syncStatus.tracksUploaded}</span> fichiers uploadés
+                        <span className="font-mono text-foreground">{syncStatus.tracksUploaded}</span> {t("settingsFirebaseSyncFilesUploaded")}
                       </span>
                       <span className="text-muted-foreground">•</span>
                       <span className="text-muted-foreground">
-                        <span className="font-mono text-foreground">{Math.round((nexusUser?.storageUsed || 0) / (1024 * 1024))} Mo</span> utilisés
+                        <span className="font-mono text-foreground">
+                          {Math.round((nexusUser?.storageUsed || 0) / (1024 * 1024))} {t("settingsUnitMB")}
+                        </span> {t("settingsFirebaseSyncUsed")}
                       </span>
                     </div>
                     {syncStatus.lastSyncAt && (
                       <span className="text-xs text-muted-foreground">
-                        Dernière sync: {new Date(syncStatus.lastSyncAt).toLocaleTimeString()}
+                        {t("settingsFirebaseSyncLastSync", {
+                          time: new Date(syncStatus.lastSyncAt).toLocaleTimeString(
+                            locale === "fr" ? "fr-FR" : "en-US"
+                          ),
+                        })}
                       </span>
                     )}
                   </div>
@@ -2519,7 +2626,7 @@ export const SettingsView = () => {
                   {isUploading && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Upload en cours...</span>
+                        <span className="text-muted-foreground">{t("settingsFirebaseSyncUploading")}</span>
                         <span className="text-primary font-mono">{overallProgress}%</span>
                       </div>
                       <Progress value={overallProgress} className="h-1.5" />
@@ -2541,7 +2648,7 @@ export const SettingsView = () => {
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-bold flex items-center gap-2">
                         <Crown className="w-5 h-5 text-primary" />
-                        Votre plan
+                        {t("settingsSubscriptionYourPlan")}
                       </h3>
                       <Button
                         variant="ghost"
@@ -2564,21 +2671,21 @@ export const SettingsView = () => {
                                 });
                                 
                                 if (syncResponse.ok) {
-                                  toast.success('Synchronisé avec Stripe');
+                                  toast.success(t("settingsSubscriptionSyncSuccess"));
                                   await fbService.refreshProfile();
                                   const status = await stripeService.getSubscriptionStatus();
                                   setSubscriptionStatus(status);
                                 } else {
                                   const error = await syncResponse.json();
-                                  toast.error('Erreur de sync', {
-                                    description: error.error || 'Impossible de synchroniser',
+                                  toast.error(t("settingsSubscriptionSyncError"), {
+                                    description: error.error || t("settingsSubscriptionSyncErrorDescription"),
                                   });
                                 }
                               }
                             }
                           } catch (error) {
                             console.error('Erreur sync:', error);
-                            toast.error('Erreur de synchronisation');
+                            toast.error(t("settingsSubscriptionSyncFailure"));
                           } finally {
                             setSubscriptionLoading(false);
                           }
@@ -2587,7 +2694,7 @@ export const SettingsView = () => {
                         className="gap-1.5"
                       >
                         <RefreshCw className={cn("w-3.5 h-3.5", subscriptionLoading && "animate-spin")} />
-                        <span className="text-xs">Sync</span>
+                        <span className="text-xs">{t("settingsSubscriptionSync")}</span>
                       </Button>
                     </div>
 
@@ -2609,16 +2716,16 @@ export const SettingsView = () => {
                             {subscriptionStatus.isActive && subscriptionStatus.plan === "pro" ? (
                               <>
                                 <Crown className="w-4 h-4" />
-                                Plan Pro
+                                {t("settingsPlanPro")}
                               </>
                             ) : (
-                              "Plan Gratuit"
+                              t("settingsPlanFree")
                             )}
                           </div>
                           
                           <div className="mt-4 space-y-2">
                             <div className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/30">
-                              <span className="text-muted-foreground">Statut</span>
+                              <span className="text-muted-foreground">{t("settingsSubscriptionStatusLabel")}</span>
                               <span className={cn(
                                 "font-medium flex items-center gap-1.5",
                                 subscriptionStatus.status === "active" ? "text-green-500" :
@@ -2633,11 +2740,15 @@ export const SettingsView = () => {
                                   subscriptionStatus.status === "past_due" ? "bg-yellow-500" :
                                   "bg-muted-foreground"
                                 )} />
-                                {subscriptionStatus.status === "active" ? "Actif" :
-                                 subscriptionStatus.status === "canceled" ? "Annulé" :
-                                 subscriptionStatus.status === "past_due" ? "En retard" :
-                                 subscriptionStatus.status === "trialing" ? "Essai" :
-                                 subscriptionStatus.status}
+                                {subscriptionStatus.status === "active"
+                                  ? t("settingsSubscriptionStatusActive")
+                                  : subscriptionStatus.status === "canceled"
+                                    ? t("settingsSubscriptionStatusCanceled")
+                                    : subscriptionStatus.status === "past_due"
+                                      ? t("settingsSubscriptionStatusPastDue")
+                                      : subscriptionStatus.status === "trialing"
+                                        ? t("settingsSubscriptionStatusTrialing")
+                                        : subscriptionStatus.status}
                               </span>
                             </div>
                             
@@ -2646,21 +2757,29 @@ export const SettingsView = () => {
                                 <div className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/30">
                                   <span className="text-muted-foreground flex items-center gap-1.5">
                                     <Calendar className="w-3.5 h-3.5" />
-                                    Renouvellement
+                                    {t("settingsSubscriptionRenewal")}
                                   </span>
                                   <span className="font-medium text-xs">
-                                    {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("fr-FR", {
+                                    {new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString(
+                                      locale === "fr" ? "fr-FR" : "en-US",
+                                      {
                                       day: "2-digit",
                                       month: "short",
                                       year: "numeric"
-                                    })}
+                                      }
+                                    )}
                                   </span>
                                 </div>
                                 
                                 <div className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-primary/5">
-                                  <span className="text-muted-foreground">Jours restants</span>
+                                  <span className="text-muted-foreground">{t("settingsSubscriptionDaysLeft")}</span>
                                   <span className="font-bold text-primary">
-                                    {Math.ceil((new Date(subscriptionStatus.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} jours
+                                    {t("settingsSubscriptionDaysValue", {
+                                      count: Math.ceil(
+                                        (new Date(subscriptionStatus.currentPeriodEnd).getTime() - Date.now()) /
+                                          (1000 * 60 * 60 * 24)
+                                      ),
+                                    })}
                                   </span>
                                 </div>
                               </>
@@ -2669,7 +2788,7 @@ export const SettingsView = () => {
                             {subscriptionStatus.cancelAtPeriodEnd && (
                               <div className="flex items-center gap-2 text-xs text-yellow-600 bg-yellow-500/10 p-3 rounded-lg border border-yellow-500/20 mt-3">
                                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                <span>Annulation programmée en fin de période</span>
+                                <span>{t("settingsSubscriptionCancelAtPeriodEnd")}</span>
                               </div>
                             )}
                           </div>
@@ -2684,7 +2803,7 @@ export const SettingsView = () => {
                             disabled={subscriptionLoading}
                           >
                             <CreditCard className="w-4 h-4 mr-2" />
-                            Gérer la facturation
+                            {t("settingsSubscriptionManageBilling")}
                           </Button>
                         )}
                       </>
@@ -2692,8 +2811,8 @@ export const SettingsView = () => {
                       <div className="text-center py-8">
                         <p className="text-sm text-muted-foreground">
                           {nexusAuthenticated
-                            ? "Chargement..."
-                            : "Connectez-vous pour voir votre plan"}
+                            ? t("settingsLoading")
+                            : t("settingsSubscriptionSignInToSeePlan")}
                         </p>
                       </div>
                     )}
@@ -2706,9 +2825,9 @@ export const SettingsView = () => {
                 {!nexusAuthenticated ? (
                   <div className="md:col-span-2 rounded-xl border border-border/50 bg-card/50 p-8 text-center">
                     <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
-                    <h3 className="text-lg font-bold mb-2">Débloquez le Plan Pro</h3>
+                    <h3 className="text-lg font-bold mb-2">{t("settingsSubscriptionUnlockProTitle")}</h3>
                     <p className="text-sm text-muted-foreground mb-6">
-                      Connectez-vous pour accéder aux plans Pro et profiter de toutes les fonctionnalités
+                      {t("settingsSubscriptionUnlockProDescription")}
                     </p>
                     <Button
                       variant="default"
@@ -2718,15 +2837,15 @@ export const SettingsView = () => {
                       className="gap-2"
                     >
                       <User className="w-4 h-4" />
-                      Se connecter
+                      {t("settingsSignIn")}
                     </Button>
                   </div>
                 ) : !stripeInitialized || !API_BASE_URL ? (
                   <div className="md:col-span-2 rounded-xl border border-border/50 bg-card/50 p-8 text-center">
                     <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
-                    <h3 className="text-lg font-bold mb-2">Configuration requise</h3>
+                    <h3 className="text-lg font-bold mb-2">{t("settingsSubscriptionConfigRequired")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {!stripeInitialized ? "Stripe n'est pas configuré" : "API Backend non configurée"}
+                      {!stripeInitialized ? t("settingsStripeNotConfigured") : t("settingsBackendNotConfigured")}
                     </p>
                   </div>
                 ) : (
@@ -2738,29 +2857,29 @@ export const SettingsView = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <Crown className="w-5 h-5 text-primary" />
-                              <h3 className="text-lg font-bold">Pro Mensuel</h3>
+                              <h3 className="text-lg font-bold">{t("settingsSubscriptionPlanMonthly")}</h3>
                             </div>
-                            <p className="text-xs text-muted-foreground">Facturation mensuelle</p>
+                            <p className="text-xs text-muted-foreground">{t("settingsSubscriptionMonthlyBilling")}</p>
                           </div>
                         </div>
                         
                         <div className="py-4">
-                          <div className="text-4xl font-bold text-primary">9,99€</div>
-                          <p className="text-xs text-muted-foreground mt-1">par mois</p>
+                          <div className="text-4xl font-bold text-primary">{t("settingsSubscriptionMonthlyPrice")}</div>
+                          <p className="text-xs text-muted-foreground mt-1">{t("settingsSubscriptionPerMonth")}</p>
                         </div>
                         
                         <ul className="space-y-2 text-xs">
                           <li className="flex items-center gap-2 text-muted-foreground">
                             <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                            Stockage illimité
+                            {t("settingsPlanFeatureUnlimitedStorage")}
                           </li>
                           <li className="flex items-center gap-2 text-muted-foreground">
                             <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                            Sync automatique
+                            {t("settingsPlanFeatureAutoSync")}
                           </li>
                           <li className="flex items-center gap-2 text-muted-foreground">
                             <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                            Support prioritaire
+                            {t("settingsPlanFeaturePrioritySupport")}
                           </li>
                         </ul>
                         
@@ -2772,8 +2891,8 @@ export const SettingsView = () => {
                           disabled={subscriptionLoading || (subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd)}
                         >
                           {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
-                            ? "Plan actuel"
-                            : "Choisir ce plan"}
+                            ? t("settingsPlanCurrent")
+                            : t("settingsPlanChoose")}
                         </Button>
                       </div>
                     </div>
@@ -2782,7 +2901,7 @@ export const SettingsView = () => {
                     <div className="rounded-xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 to-secondary/5 overflow-hidden hover:shadow-xl transition-shadow relative">
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
                         <span className="inline-block px-4 py-1 text-xs font-bold bg-gradient-to-r from-primary to-secondary text-white rounded-full shadow-lg">
-                          ⭐ ÉCONOMISEZ 20%
+                          {t("settingsSubscriptionSave20")}
                         </span>
                       </div>
                       <div className="p-6 space-y-4 mt-2">
@@ -2790,30 +2909,30 @@ export const SettingsView = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <Crown className="w-5 h-5 text-primary" />
-                              <h3 className="text-lg font-bold">Pro Annuel</h3>
+                              <h3 className="text-lg font-bold">{t("settingsSubscriptionPlanYearly")}</h3>
                             </div>
-                            <p className="text-xs text-muted-foreground">Facturation annuelle</p>
+                            <p className="text-xs text-muted-foreground">{t("settingsSubscriptionYearlyBilling")}</p>
                           </div>
                         </div>
                         
                         <div className="py-4">
-                          <div className="text-4xl font-bold text-primary">95,90€</div>
-                          <p className="text-xs text-muted-foreground line-through opacity-60 mt-1">119,88€</p>
-                          <p className="text-xs font-medium text-primary mt-1">Soit 7,99€/mois</p>
+                          <div className="text-4xl font-bold text-primary">{t("settingsSubscriptionYearlyPrice")}</div>
+                          <p className="text-xs text-muted-foreground line-through opacity-60 mt-1">{t("settingsSubscriptionYearlyOldPrice")}</p>
+                          <p className="text-xs font-medium text-primary mt-1">{t("settingsSubscriptionYearlyMonthlyEquivalent")}</p>
                         </div>
                         
                         <ul className="space-y-2 text-xs">
                           <li className="flex items-center gap-2 text-muted-foreground">
                             <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                            Tous les avantages Pro
+                            {t("settingsSubscriptionAllProBenefits")}
                           </li>
                           <li className="flex items-center gap-2 text-muted-foreground">
                             <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                            <span className="font-medium text-primary">-20% d'économie</span>
+                            <span className="font-medium text-primary">{t("settingsSubscriptionYearlySave")}</span>
                           </li>
                           <li className="flex items-center gap-2 text-muted-foreground">
                             <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                            Accès anticipé aux nouveautés
+                            {t("settingsSubscriptionEarlyAccess")}
                           </li>
                         </ul>
                         
@@ -2826,8 +2945,8 @@ export const SettingsView = () => {
                         >
                           <Sparkles className="w-4 h-4 mr-2" />
                           {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
-                            ? "Plan actuel"
-                            : "Choisir l'annuel"}
+                            ? t("settingsPlanCurrent")
+                            : t("settingsSubscriptionChooseYearly")}
                         </Button>
                       </div>
                     </div>
@@ -2838,7 +2957,7 @@ export const SettingsView = () => {
 
             {/* Comparaison des plans */}
             <div className="mt-6">
-              <SettingsCard title="Comparez nos offres" icon={Sparkles} className="col-span-full">
+              <SettingsCard title={t("settingsCardCompareOffers")} icon={Sparkles} className="col-span-full">
                 <div className="space-y-6">
                   {/* En-tête de comparaison */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -2848,9 +2967,9 @@ export const SettingsView = () => {
                     {/* Colonne Gratuit */}
                     <div className="text-center">
                       <div className="p-4 rounded-t-xl bg-gradient-to-b from-muted/50 to-muted/20 border border-border/50">
-                        <h3 className="text-lg font-bold">Gratuit</h3>
-                        <p className="text-2xl font-bold mt-2">0€</p>
-                        <p className="text-xs text-muted-foreground">Pour toujours</p>
+                        <h3 className="text-lg font-bold">{t("settingsPlanFree")}</h3>
+                        <p className="text-2xl font-bold mt-2">{t("settingsSubscriptionFreePrice")}</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsSubscriptionForever")}</p>
                       </div>
                     </div>
                     
@@ -2859,10 +2978,10 @@ export const SettingsView = () => {
                       <div className="p-4 rounded-t-xl bg-gradient-to-b from-primary/20 to-primary/5 border-2 border-primary/30">
                         <div className="flex items-center justify-center gap-2 mb-1">
                           <Crown className="w-4 h-4 text-primary" />
-                          <h3 className="text-lg font-bold text-primary">Pro Mensuel</h3>
+                          <h3 className="text-lg font-bold text-primary">{t("settingsSubscriptionPlanMonthly")}</h3>
                         </div>
-                        <p className="text-2xl font-bold mt-2">9,99€</p>
-                        <p className="text-xs text-muted-foreground">Par mois</p>
+                        <p className="text-2xl font-bold mt-2">{t("settingsSubscriptionMonthlyPrice")}</p>
+                        <p className="text-xs text-muted-foreground">{t("settingsSubscriptionPerMonth")}</p>
                       </div>
                     </div>
                     
@@ -2870,19 +2989,19 @@ export const SettingsView = () => {
                     <div className="text-center relative">
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
                         <span className="inline-block px-3 py-1 text-xs font-bold bg-gradient-to-r from-primary to-secondary text-white rounded-full shadow-lg">
-                          ⭐ MEILLEURE OFFRE
+                          {t("settingsSubscriptionBestDeal")}
                         </span>
                       </div>
                       <div className="p-4 rounded-t-xl bg-gradient-to-b from-primary/30 to-primary/10 border-2 border-primary/50">
                         <div className="flex items-center justify-center gap-2 mb-1">
                           <Crown className="w-4 h-4 text-primary" />
-                          <h3 className="text-lg font-bold text-primary">Pro Annuel</h3>
+                          <h3 className="text-lg font-bold text-primary">{t("settingsSubscriptionPlanYearly")}</h3>
                         </div>
                         <div className="mt-2">
-                          <p className="text-2xl font-bold">95,90€</p>
-                          <p className="text-xs text-muted-foreground line-through opacity-60">119,88€</p>
+                          <p className="text-2xl font-bold">{t("settingsSubscriptionYearlyPrice")}</p>
+                          <p className="text-xs text-muted-foreground line-through opacity-60">{t("settingsSubscriptionYearlyOldPrice")}</p>
                         </div>
-                        <p className="text-xs font-medium text-primary mt-1">-20% d'économie</p>
+                        <p className="text-xs font-medium text-primary mt-1">{t("settingsSubscriptionYearlySave")}</p>
                       </div>
                     </div>
                   </div>
@@ -2891,126 +3010,126 @@ export const SettingsView = () => {
                   <div className="space-y-1">
                     {/* Catégorie: Stockage & Sync */}
                     <div className="pt-4 pb-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Stockage & Synchronisation</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">{t("settingsComparisonStorageTitle")}</h4>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Stockage cloud</div>
-                      <div className="text-center text-sm text-muted-foreground">500 Mo</div>
-                      <div className="text-center text-sm font-medium text-primary">Illimité ✨</div>
-                      <div className="text-center text-sm font-medium text-primary">Illimité ✨</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonCloudStorage")}</div>
+                      <div className="text-center text-sm text-muted-foreground">{t("settingsComparisonCloudStorageFree")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonCloudStoragePro")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonCloudStoragePro")}</div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Synchronisation automatique</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonAutoSync")}</div>
                       <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Sauvegarde Firebase</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonFirebaseBackup")}</div>
                       <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Upload de médias</div>
-                      <div className="text-center text-sm text-muted-foreground">50 fichiers max</div>
-                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
-                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonMediaUploads")}</div>
+                      <div className="text-center text-sm text-muted-foreground">{t("settingsComparisonMediaUploadsFree")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonUnlimited")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonUnlimited")}</div>
                     </div>
 
                     {/* Catégorie: Fonctionnalités */}
                     <div className="pt-4 pb-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Fonctionnalités</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">{t("settingsComparisonFeaturesTitle")}</h4>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Bibliothèque musicale locale</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonLocalLibrary")}</div>
                       <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Streaming YouTube</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonYouTubeStreaming")}</div>
                       <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Playlists personnalisées</div>
-                      <div className="text-center text-sm text-muted-foreground">10 max</div>
-                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
-                      <div className="text-center text-sm font-medium text-primary">Illimité</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonCustomPlaylists")}</div>
+                      <div className="text-center text-sm text-muted-foreground">{t("settingsComparisonCustomPlaylistsFree")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonUnlimited")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonUnlimited")}</div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Equalizer avancé</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonAdvancedEqualizer")}</div>
                       <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Visualiseur audio</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonAudioVisualizer")}</div>
                       <div className="text-center"><Check className="w-5 h-5 text-green-500 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Mode Karaoke</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonKaraoke")}</div>
                       <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Téléchargement offline</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonOfflineDownload")}</div>
                       <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Analyse de vibes musicales</div>
-                      <div className="text-center text-sm text-muted-foreground">Limité</div>
-                      <div className="text-center text-sm font-medium text-primary">Complet ✨</div>
-                      <div className="text-center text-sm font-medium text-primary">Complet ✨</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonAudioVibes")}</div>
+                      <div className="text-center text-sm text-muted-foreground">{t("settingsComparisonAudioVibesFree")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonAudioVibesPro")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonAudioVibesPro")}</div>
                     </div>
 
                     {/* Catégorie: Support & Accès */}
                     <div className="pt-4 pb-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Support & Accès anticipé</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">{t("settingsComparisonSupportTitle")}</h4>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Support technique</div>
-                      <div className="text-center text-sm text-muted-foreground">Standard</div>
-                      <div className="text-center text-sm font-medium text-primary">Prioritaire ⚡</div>
-                      <div className="text-center text-sm font-medium text-primary">Prioritaire ⚡</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonSupport")}</div>
+                      <div className="text-center text-sm text-muted-foreground">{t("settingsComparisonSupportFree")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonSupportPro")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonSupportPro")}</div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Mises à jour</div>
-                      <div className="text-center text-sm text-muted-foreground">Normales</div>
-                      <div className="text-center text-sm font-medium text-primary">Accès anticipé 🚀</div>
-                      <div className="text-center text-sm font-medium text-primary">Accès anticipé 🚀</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonUpdates")}</div>
+                      <div className="text-center text-sm text-muted-foreground">{t("settingsComparisonUpdatesFree")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonUpdatesPro")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonUpdatesPro")}</div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Badge exclusif</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonExclusiveBadge")}</div>
                       <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
-                      <div className="text-center text-sm font-medium text-primary">👑 Pro</div>
-                      <div className="text-center text-sm font-medium text-primary">👑 Pro</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonExclusiveBadgePro")}</div>
+                      <div className="text-center text-sm font-medium text-primary">{t("settingsComparisonExclusiveBadgePro")}</div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-border/30">
-                      <div className="text-sm font-medium">Nouvelle fonctionnalités Beta</div>
+                      <div className="text-sm font-medium">{t("settingsComparisonBetaFeatures")}</div>
                       <div className="text-center"><X className="w-4 h-4 text-muted-foreground/50 mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
                       <div className="text-center"><Check className="w-5 h-5 text-primary mx-auto" /></div>
@@ -3024,7 +3143,7 @@ export const SettingsView = () => {
                     
                     <div className="text-center">
                       <Button variant="outline" size="lg" className="w-full" disabled>
-                        Plan actuel
+                        {t("settingsPlanCurrent")}
                       </Button>
                     </div>
                     <div className="text-center">
@@ -3037,8 +3156,8 @@ export const SettingsView = () => {
                       >
                         <Crown className="w-4 h-4 mr-2" />
                         {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
-                          ? "Plan actuel"
-                          : "Passer au Pro"}
+                          ? t("settingsPlanCurrent")
+                          : t("settingsUpgradeToPro")}
                       </Button>
                     </div>
                     <div className="text-center">
@@ -3051,8 +3170,8 @@ export const SettingsView = () => {
                       >
                         <Sparkles className="w-4 h-4 mr-2" />
                         {subscriptionStatus?.plan === "pro" && !subscriptionStatus?.cancelAtPeriodEnd
-                          ? "Plan actuel"
-                          : "Choisir l'annuel"}
+                          ? t("settingsPlanCurrent")
+                          : t("settingsSubscriptionChooseYearly")}
                       </Button>
                     </div>
                   </div>
@@ -3060,7 +3179,7 @@ export const SettingsView = () => {
                   {/* Note de bas de page */}
                   <div className="pt-4 text-center border-t border-border/30">
                     <p className="text-xs text-muted-foreground">
-                      💳 Tous les paiements sont sécurisés par Stripe • 🔒 Résiliable à tout moment • ✨ Garantie satisfait ou remboursé 30 jours
+                      {t("settingsSubscriptionFooterNote")}
                     </p>
                   </div>
                 </div>
@@ -3071,7 +3190,7 @@ export const SettingsView = () => {
           {/* Account Tab */}
           <TabsContent value="account" className="mt-6 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SettingsCard title="Profil" icon={User}>
+              <SettingsCard title={t("settingsCardProfile")} icon={User}>
                 {nexusAuthenticated && nexusUser ? (
                   <div className="space-y-4">
                     <div className="text-center py-4">
@@ -3089,7 +3208,7 @@ export const SettingsView = () => {
                           "inline-block px-3 py-1 rounded-full text-sm",
                           nexusIsPro ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                         )}>
-                          {nexusIsPro ? "Plan Pro" : "Plan Gratuit"}
+                          {nexusIsPro ? t("settingsPlanPro") : t("settingsPlanFree")}
                         </span>
                       </div>
                     </div>
@@ -3099,7 +3218,7 @@ export const SettingsView = () => {
                       ) : (
                         <LogOut className="w-4 h-4 mr-2" />
                       )}
-                      Se déconnecter
+                      {t("settingsLogout")}
                     </Button>
                   </div>
                 ) : (
@@ -3107,8 +3226,8 @@ export const SettingsView = () => {
                     <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
                       <User className="w-10 h-10 text-muted-foreground" />
                     </div>
-                    <p className="text-lg font-medium">Utilisateur local</p>
-                    <p className="text-sm text-muted-foreground">Mode hors ligne</p>
+                    <p className="text-lg font-medium">{t("settingsLocalUser")}</p>
+                    <p className="text-sm text-muted-foreground">{t("settingsOfflineMode")}</p>
                     <Button 
                       variant="default" 
                       size="sm" 
@@ -3126,40 +3245,40 @@ export const SettingsView = () => {
                           <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                         </svg>
                       )}
-                      Créer un compte
+                      {t("settingsCreateAccount")}
                     </Button>
                   </div>
                 )}
               </SettingsCard>
 
-              <SettingsCard title="À propos" icon={Info}>
+              <SettingsCard title={t("settingsCardAbout")} icon={Info}>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Version</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsAboutVersion")}</span>
                     <span className="text-sm font-mono">1.0.0</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Build</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsAboutBuild")}</span>
                     <span className="text-sm font-mono">2024.12.08</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Mode</span>
-                    <span className="text-sm">{isElectron ? "Desktop" : "Web"}</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsAboutMode")}</span>
+                    <span className="text-sm">{isElectron ? t("settingsAboutModeDesktop") : t("settingsAboutModeWeb")}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Firebase</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsAboutFirebase")}</span>
                     <span className={cn("text-sm", authService.getGoogleClientIdSync() ? "text-green-500" : "text-yellow-500")}>
-                      {authService.getGoogleClientIdSync() ? "Configuré" : "Non configuré"}
+                      {authService.getGoogleClientIdSync() ? t("settingsConfigured") : t("settingsNotConfigured")}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Stripe</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsAboutStripe")}</span>
                     <span className={cn("text-sm", stripeInitialized ? "text-green-500" : "text-yellow-500")}>
-                      {stripeInitialized ? "Connecté" : "Non configuré"}
+                      {stripeInitialized ? t("settingsConnected") : t("settingsNotConfigured")}
                     </span>
                   </div>
                   <div className="flex items-center justify-between group">
-                    <span className="text-sm text-muted-foreground">Redis Cache (L3)</span>
+                    <span className="text-sm text-muted-foreground">{t("settingsAboutRedisCache")}</span>
                     <div className="flex items-center gap-2">
                       {redisChecking ? (
                         <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
@@ -3169,8 +3288,8 @@ export const SettingsView = () => {
                           redisConnected === null ? "text-muted-foreground" :
                           redisConnected ? "text-green-500" : "text-yellow-500"
                         )}>
-                          {redisConnected === null ? "Vérification..." :
-                           redisConnected ? "Connecté" : "Non configuré"}
+                          {redisConnected === null ? t("settingsChecking") :
+                           redisConnected ? t("settingsConnected") : t("settingsNotConfigured")}
                         </span>
                       )}
                       <Button
@@ -3182,10 +3301,10 @@ export const SettingsView = () => {
                           try {
                             const isConnected = await redisCache.isConnected();
                             setRedisConnected(isConnected);
-                            toast.success(isConnected ? "Redis connecté" : "Redis non configuré");
+                            toast.success(isConnected ? t("settingsRedisConnected") : t("settingsRedisNotConfigured"));
                           } catch (error) {
                             setRedisConnected(false);
-                            toast.error("Erreur de connexion Redis");
+                            toast.error(t("settingsRedisConnectionError"));
                           } finally {
                             setRedisChecking(false);
                           }
@@ -3196,9 +3315,9 @@ export const SettingsView = () => {
                     </div>
                   </div>
                   <div className="pt-3 flex gap-2 flex-wrap">
-                    <Button variant="outline" size="sm" onClick={() => notifySuccess("Vous êtes à jour !")}>
+                    <Button variant="outline" size="sm" onClick={() => notifySuccess(t("settingsAppUpToDate"))}>
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Mises à jour
+                      {t("settingsCheckUpdates")}
                     </Button>
                     <Button 
                       variant="destructive" 
@@ -3212,14 +3331,14 @@ export const SettingsView = () => {
                       ) : (
                         <Zap className="w-4 h-4" />
                       )}
-                      Nettoyer les orphelins
+                      {t("settingsCleanupOrphans")}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => window.open("https://github.com/nexus-audio", "_blank")}>
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      GitHub
+                      {t("settingsOpenGithub")}
                     </Button>
                     <CoachmarkTrigger variant="ghost" size="sm" showIcon>
-                      Recommencer le coachmark
+                      {t("settingsRestartCoachmark")}
                     </CoachmarkTrigger>
                   </div>
                 </div>

@@ -42,6 +42,7 @@ import { useQueue } from "@/hooks/useQueue";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useI18n } from "@/i18n";
 import { useTheme } from "@/hooks/useTheme";
 import { getAudioSrc } from "@/lib/audio";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ const DEBUG_SIDEBAR_COUNTS = process.env.NEXT_PUBLIC_DEBUG_SIDEBAR === 'true';
 export const DesktopApp = () => {
   // Initialize theme hook to ensure theme is loaded and applied on mount
   useTheme();
+  const { t } = useI18n();
   const { tracks: libraryTracks, loading: libraryLoading, scanning, scanProgress } = useLibrary();
   
   // État pour stocker les tracks YouTube chargés dynamiquement
@@ -1232,19 +1234,19 @@ export const DesktopApp = () => {
     setCurrentIndex(0);
     setIsPlaying(true);
     setIsShuffle(true);
-    const message = `Lecture aléatoire de "${playlist.name}"`;
+    const message = t("toastShufflePlaylist", { name: playlist.name });
     toast.success(message);
     notifySuccess(message);
-  }, [playlists, allTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError]);
+  }, [playlists, allTracks, setQueue, setCurrentIndex, setIsShuffle, notifySuccess, notifyError, t]);
 
   // Handler pour supprimer un track de la file par son ID
   const handleRemoveFromQueue = useCallback((trackId: string) => {
     const index = tracks.findIndex(t => t.id === trackId);
     if (index !== -1 && index > currentTrackIndex) {
       removeFromQueue(index);
-      toast.success('Retiré de la file d\'attente');
+      toast.success(t("toastQueueRemoved"));
     }
-  }, [tracks, currentTrackIndex, removeFromQueue]);
+  }, [tracks, currentTrackIndex, removeFromQueue, t]);
 
   // Handlers for PlaylistView - play/shuffle tracks by IDs
   // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
@@ -1255,7 +1257,7 @@ export const DesktopApp = () => {
       .filter((t): t is Track => t !== undefined);
 
     if (tracksToPlay.length === 0) {
-      const errorMsg = 'Aucun titre trouvé';
+      const errorMsg = t("errorNoTracksFound");
       toast.error(errorMsg);
       notifyError(errorMsg);
       return;
@@ -1265,10 +1267,13 @@ export const DesktopApp = () => {
     setQueue(tracksToPlay);
     setCurrentIndex(0);
     setIsPlaying(true);
-    const message = `Lecture de ${tracksToPlay.length} titre${tracksToPlay.length > 1 ? 's' : ''}`;
+    const message = t("toastPlayTracksCount", {
+      count: tracksToPlay.length,
+      suffix: tracksToPlay.length > 1 ? "s" : "",
+    });
     toast.success(message);
     notifySuccess(message);
-  }, [allTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError]);
+  }, [allTracks, setQueue, setCurrentIndex, setIsPlaying, notifySuccess, notifyError, t]);
 
   // Lecture d'une liste de tracks (remplace entièrement la file)
   // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
@@ -1276,8 +1281,8 @@ export const DesktopApp = () => {
   const handlePlayTrackList = useCallback((trackList: Track[], startIndex: number = 0) => {
     const validTracks = trackList.filter(Boolean);
     if (validTracks.length === 0) {
-      toast.error('Aucun titre trouvé');
-      notifyError('Aucun titre trouvé');
+      toast.error(t("errorNoTracksFound"));
+      notifyError(t("errorNoTracksFound"));
       return;
     }
 
@@ -1287,16 +1292,19 @@ export const DesktopApp = () => {
     setCurrentIndex(clampedIndex);
     setIsPlaying(true);
     setIsShuffle(false);
-    const message = `Lecture de ${validTracks.length} titre${validTracks.length > 1 ? 's' : ''}`;
+    const message = t("toastPlayTracksCount", {
+      count: validTracks.length,
+      suffix: validTracks.length > 1 ? "s" : "",
+    });
     toast.success(message);
     notifySuccess(message);
-  }, [setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess]);
+  }, [setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifyError, notifySuccess, t]);
 
   // Action manuelle pour vider la file
   const handleClearQueue = useCallback(() => {
     clearQueue();
-    toast.success('File vidée');
-  }, [clearQueue]);
+    toast.success(t("toastQueueCleared"));
+  }, [clearQueue, t]);
 
   // IMPORTANT: Cette fonction remplace UNIQUEMENT la file d'attente (UI)
   // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
@@ -1306,7 +1314,7 @@ export const DesktopApp = () => {
       .filter((t): t is Track => t !== undefined);
 
     if (tracksToPlay.length === 0) {
-      const errorMsg = 'Aucun titre trouvé';
+      const errorMsg = t("errorNoTracksFound");
       toast.error(errorMsg);
       notifyError(errorMsg);
       return;
@@ -1320,10 +1328,13 @@ export const DesktopApp = () => {
     setCurrentIndex(0);
     setIsPlaying(true);
     setIsShuffle(true);
-    const message = `Lecture aléatoire de ${shuffled.length} titre${shuffled.length > 1 ? 's' : ''}`;
+    const message = t("toastShuffleTracksCount", {
+      count: shuffled.length,
+      suffix: shuffled.length > 1 ? "s" : "",
+    });
     toast.success(message);
     notifySuccess(message);
-  }, [allTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError]);
+  }, [allTracks, setQueue, setCurrentIndex, setIsPlaying, setIsShuffle, notifySuccess, notifyError, t]);
 
   // Handler pour ouvrir une playlist dans PlaylistView
   const handleOpenPlaylist = useCallback((playlistId: string) => {
@@ -1607,9 +1618,9 @@ export const DesktopApp = () => {
                 // Créer le Track object exactement comme les tracks locaux du système
                 return {
                   id,
-                  title: title || 'Unknown Track',
-                  artist: artist || 'Unknown Artist',
-                  album: 'Local Files',
+                  title: title || t("defaultUnknownTrack"),
+                  artist: artist || t("defaultUnknownArtist"),
+                  album: t("defaultLocalFiles"),
                   duration: Math.round(duration), // Durée en secondes
                   coverUrl: '', // Les fichiers locaux utilisent la cover par défaut
                   mediaSource: 'local' as const,
@@ -1632,19 +1643,19 @@ export const DesktopApp = () => {
               }
               
               // Toast de succès
-              toast.success(`${newTracks.length} fichier(s) ajouté(s) à la file`);
+              toast.success(t("toastFilesAddedToQueue", { count: newTracks.length }));
               console.log('[DesktopApp] Local tracks loaded:', newTracks);
             }
           } catch (parseErr) {
             console.error('[DesktopApp] Error processing files:', parseErr);
-            toast.error('Erreur lors du traitement des fichiers');
+            toast.error(t("errorProcessFiles"));
           }
         };
         
         input.click();
       } catch (err) {
         console.error('[DesktopApp] Error opening files:', err);
-        toast.error('Erreur lors de l\'ouverture des fichiers');
+        toast.error(t("errorOpenFiles"));
       }
     };
     window.addEventListener('nexus-open-files', handleOpenFilesEvent);
@@ -1653,10 +1664,10 @@ export const DesktopApp = () => {
     const handleOpenFoldersEvent = async () => {
       try {
         console.log('[DesktopApp] Folder opening not available in browser mode');
-        toast.info('Fonction disponible uniquement en mode desktop');
+        toast.info(t("infoDesktopOnly"));
       } catch (err) {
         console.error('[DesktopApp] Error opening folders:', err);
-        toast.error('Erreur lors de l\'ouverture des dossiers');
+        toast.error(t("errorOpenFolders"));
       }
     };
     window.addEventListener('nexus-open-folders', handleOpenFoldersEvent);
@@ -1665,10 +1676,10 @@ export const DesktopApp = () => {
     const handleImportEvent = async () => {
       try {
         // This should trigger a full library scan from local files
-        toast.success('Importation de la bibliothèque en cours...');
+        toast.success(t("toastImportLibraryInProgress"));
       } catch (err) {
         console.error('[DesktopApp] Error importing library:', err);
-        toast.error('Erreur lors de l\'importation de la bibliothèque');
+        toast.error(t("errorImportLibrary"));
       }
     };
     window.addEventListener('nexus-import-library', handleImportEvent);
@@ -1676,10 +1687,10 @@ export const DesktopApp = () => {
     // Sync now (Firebase sync)
     const handleSyncEvent = async () => {
       try {
-        toast.success('Synchronisation en cours...');
+        toast.success(t("toastSyncInProgress"));
       } catch (err) {
         console.error('[DesktopApp] Error syncing:', err);
-        toast.error('Erreur lors de la synchronisation');
+        toast.error(t("errorSync"));
       }
     };
     window.addEventListener('nexus-sync-now', handleSyncEvent);
@@ -1690,10 +1701,10 @@ export const DesktopApp = () => {
         // Clear browser storage
         localStorage.clear();
         sessionStorage.clear();
-        toast.success('Cache vidé avec succès');
+        toast.success(t("toastCacheClearedSuccess"));
       } catch (err) {
         console.error('[DesktopApp] Error clearing cache:', err);
-        toast.error('Erreur lors de la suppression du cache');
+        toast.error(t("errorClearCache"));
       }
     };
     window.addEventListener('nexus-clear-cache', handleClearCacheEvent);
@@ -1701,17 +1712,17 @@ export const DesktopApp = () => {
     // Check updates (Electron updater)
     const handleCheckUpdatesEvent = async () => {
       try {
-        toast.info('Vérification des mises à jour...');
+        toast.info(t("toastCheckUpdates"));
       } catch (err) {
         console.error('[DesktopApp] Error checking updates:', err);
-        toast.error('Erreur lors de la vérification des mises à jour');
+        toast.error(t("errorCheckUpdates"));
       }
     };
     window.addEventListener('nexus-check-updates', handleCheckUpdatesEvent);
 
     // About app
     const handleAboutEvent = () => {
-      toast.info('Nova Sound - Application musicale intelligente');
+      toast.info(t("aboutApp"));
     };
     window.addEventListener('nexus-about', handleAboutEvent);
 
@@ -1741,7 +1752,7 @@ export const DesktopApp = () => {
         window.open("https://github.com/Notho-freedom/nova-sound", "_blank");
       } catch (err) {
         console.error('[DesktopApp] Error opening documentation:', err);
-        toast.error('Impossible d\'ouvrir la documentation');
+        toast.error(t("errorOpenDocumentation"));
       }
     };
     window.addEventListener('nexus-open-documentation', handleOpenDocumentationEvent);
@@ -1766,7 +1777,7 @@ export const DesktopApp = () => {
       window.removeEventListener('nexus-nav', handleNavEvent);
       window.removeEventListener('nexus-open-documentation', handleOpenDocumentationEvent);
     };
-  }, [handlePlayPause, handlePrevious, handleNext, currentTrack, setShowInlinePlayer, setCurrentView, setIsQueueOpen, addToQueue, setCurrentIndex, queue]);
+  }, [handlePlayPause, handlePrevious, handleNext, currentTrack, setShowInlinePlayer, setCurrentView, setIsQueueOpen, addToQueue, setCurrentIndex, queue, t]);
 
   const handleOpenSettings = useCallback(() => {
     setCurrentView("settings");
@@ -1782,16 +1793,16 @@ export const DesktopApp = () => {
     setCurrentView("albums");
     // Reset albumToOpen after a short delay to allow LibraryView to process it
     setTimeout(() => setAlbumToOpen(null), 100);
-    toast.success(`Ouverture de l'album "${currentTrack.album}"`);
-  }, [currentTrack]);
+    toast.success(t("toastOpenAlbum", { name: currentTrack.album }));
+  }, [currentTrack, t]);
 
   const handleNavigateToArtist = useCallback(() => {
     if (!currentTrack) return;
     setShowInlinePlayer(false);
     setSelectedArtist(currentTrack.artist);
     setCurrentView("artist-detail");
-    toast.success(`Ouverture de la page artiste "${currentTrack.artist}"`);
-  }, [currentTrack]);
+    toast.success(t("toastOpenArtist", { name: currentTrack.artist }));
+  }, [currentTrack, t]);
 
   // Utility function to remove duplicates from track lists
   const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
@@ -2069,8 +2080,8 @@ export const DesktopApp = () => {
               if (realIndex !== -1) handleTrackSelect(realIndex);
             }}
             onPlayTrack={handlePlayTrack}
-            title="Favoris"
-            emptyMessage="Aucun favori. Cliquez sur ❤️ pour ajouter des titres."
+            title={t("viewFavoritesTitle")}
+            emptyMessage={t("favoritesEmptyMessage")}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
             onAddToPlaylist={handleAddToPlaylist}
@@ -2246,7 +2257,7 @@ export const DesktopApp = () => {
                       </div>
                       <div>
                         <p className="text-3xl font-bold">{recentTracks.length}</p>
-                        <p className="text-sm text-muted-foreground">Écoutes récentes</p>
+                        <p className="text-sm text-muted-foreground">{t("recentPlaysLabel")}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -2265,7 +2276,7 @@ export const DesktopApp = () => {
                       </div>
                       <div>
                         <p className="text-3xl font-bold">{recentlyAddedTracks.length}</p>
-                        <p className="text-sm text-muted-foreground">Ajouts récents</p>
+                        <p className="text-sm text-muted-foreground">{t("recentAddsLabel")}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -2283,15 +2294,15 @@ export const DesktopApp = () => {
                     <Input
                       value={recentSearchQuery}
                       onChange={(e) => setRecentSearchQuery(e.target.value)}
-                      placeholder="Rechercher dans vos récents..."
+                      placeholder={t("searchRecentPlaceholder")}
                       className="pl-12 h-12 bg-background/50 border-border/50 rounded-xl focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
                     />
                     {recentSearchQuery && (
                       <button
                         onClick={() => setRecentSearchQuery("")}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
-                        title="Effacer la recherche"
-                        aria-label="Effacer la recherche"
+                        title={t("clearSearch")}
+                        aria-label={t("clearSearch")}
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -2315,8 +2326,8 @@ export const DesktopApp = () => {
                       <Clock className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-xl">Écouté récemment</h2>
-                      <p className="text-sm text-muted-foreground">{visibleRecentTracks.length} pistes</p>
+                      <h2 className="font-semibold text-xl">{t("recentlyPlayedTitle")}</h2>
+                      <p className="text-sm text-muted-foreground">{t("tracksCount", { count: visibleRecentTracks.length })}</p>
                     </div>
                   </div>
                   <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
@@ -2331,7 +2342,7 @@ export const DesktopApp = () => {
                       title=""
                       showFilters={false}
                       showHistory={true}
-                      emptyMessage="Aucun historique d'écoute."
+                      emptyMessage={t("emptyHistoryMessage")}
                       onPlayNext={handlePlayNext}
                       onAddToQueue={handleAddToQueue}
                       onAddToPlaylist={handleAddToPlaylist}
@@ -2353,8 +2364,8 @@ export const DesktopApp = () => {
                       <Music className="w-5 h-5 text-emerald-400" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-xl">Récemment ajoutées</h2>
-                      <p className="text-sm text-muted-foreground">{visibleRecentlyAddedTracks.length} nouvelles pistes</p>
+                      <h2 className="font-semibold text-xl">{t("recentlyAddedTitle")}</h2>
+                      <p className="text-sm text-muted-foreground">{t("newTracksCount", { count: visibleRecentlyAddedTracks.length })}</p>
                     </div>
                   </div>
                   <div className="rounded-3xl bg-card/30 backdrop-blur-xl border border-border/30 overflow-hidden shadow-2xl">
@@ -2368,7 +2379,7 @@ export const DesktopApp = () => {
                       }}
                       title=""
                       showFilters={false}
-                      emptyMessage="Aucune musique récemment ajoutée."
+                      emptyMessage={t("emptyRecentAddedMessage")}
                       onPlayNext={handlePlayNext}
                       onAddToQueue={handleAddToQueue}
                       onAddToPlaylist={handleAddToPlaylist}
@@ -2395,9 +2406,9 @@ export const DesktopApp = () => {
                       className="absolute inset-0 rounded-3xl bg-blue-500/20 blur-xl"
                     />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">Aucun historique</h3>
+                  <h3 className="text-xl font-semibold mb-2">{t("emptyHistoryTitle")}</h3>
                   <p className="text-muted-foreground max-w-sm">
-                    Vos pistes récemment écoutées et ajoutées apparaîtront ici
+                    {t("emptyHistoryDescription")}
                   </p>
                 </motion.div>
               )}
@@ -2413,7 +2424,7 @@ export const DesktopApp = () => {
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
             onPlayTrack={handlePlayTrack}
-            title="Albums"
+            title={t("viewAlbumsTitle")}
             viewMode="albums"
             initialSelectedAlbum={albumToOpen}
             onPlayNext={handlePlayNext}
@@ -2430,7 +2441,7 @@ export const DesktopApp = () => {
             isPlaying={isPlaying}
             onTrackSelect={handleTrackSelect}
             onPlayTrack={handlePlayTrack}
-            title="Artistes"
+            title={t("viewArtistsTitle")}
             viewMode="artists"
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}

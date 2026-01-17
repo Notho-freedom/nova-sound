@@ -50,7 +50,8 @@ import { useArtistImages } from "@/hooks/useArtistImage";
 import { useArtistPlaylists } from "@/hooks/useArtistPlaylists";
 import { ContentCarousel } from "@/components/ui/ContentCarousel";
 import { FeaturedCard } from "@/components/ui/FeaturedCard";
-import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
+import { HelpIcon } from "@/components/ui/HelpButton";
+import { useI18n } from "@/i18n";
 
 interface ArtistViewProps {
   artistName: string;
@@ -73,15 +74,6 @@ const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
-};
-
-const formatDuration = (seconds: number) => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return `${hours}h ${minutes}min`;
-  }
-  return `${minutes} min`;
 };
 
 // Social icon components
@@ -136,9 +128,19 @@ export const ArtistView = memo(({
     const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro;
     const canUploadToNexus = nexusIsPro && nexusAuthenticated;
     const canUploadToLocal = nexusAuthenticated;
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<number | null>(null);
   const [showFullBio, setShowFullBio] = useState(false);
+
+  const formatDuration = useCallback((seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return t("artistDurationHoursMinutes", { hours, minutes });
+    }
+    return t("artistDurationMinutes", { minutes });
+  }, [t]);
 
   // Hooks
   const playlistsResult = usePlaylists();
@@ -247,14 +249,14 @@ export const ArtistView = memo(({
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
         <Users className="w-16 h-16 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Artiste non trouvé</h2>
+        <h2 className="text-xl font-semibold mb-2">{t("artistNotFoundTitle")}</h2>
         <p className="text-muted-foreground text-center max-w-md mb-4">
-          Aucune musique de "{artistName}" n'a été trouvée dans votre bibliothèque.
+          {t("artistNotFoundDescription", { artistName })}
         </p>
         {onBack && (
           <Button onClick={onBack} variant="outline">
             <ChevronLeft className="w-4 h-4 mr-2" />
-            Retour
+            {t("artistBack")}
           </Button>
         )}
       </div>
@@ -288,7 +290,7 @@ export const ArtistView = memo(({
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
             >
               <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-              Retour
+              {t("artistBack")}
             </motion.button>
           )}
 
@@ -327,23 +329,29 @@ export const ArtistView = memo(({
               transition={{ delay: 0.1 }}
               className="text-center md:text-left flex-1"
             >
-              <Badge variant="secondary" className="mb-2">Artiste</Badge>
+              <Badge variant="secondary" className="mb-2">{t("artistBadge")}</Badge>
               <div className="flex items-center gap-2 justify-center md:justify-start">
                 <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
                   {artistName}
                 </h1>
-                <HelpIcon description="Explorez toute la discographie, la biographie, les images et collaborations de cet artiste." />
+                <HelpIcon description={t("artistHelpDescription")} />
               </div>
 
               {/* Quick stats */}
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground mb-4">
                 <span className="flex items-center gap-1.5">
                   <Disc3 className="w-4 h-4" />
-                  {stats.totalAlbums} album{stats.totalAlbums > 1 ? "s" : ""}
+                  {t("artistStatsAlbums", {
+                    count: stats.totalAlbums,
+                    suffix: stats.totalAlbums > 1 ? "s" : "",
+                  })}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Music className="w-4 h-4" />
-                  {stats.totalTracks} titre{stats.totalTracks > 1 ? "s" : ""}
+                  {t("artistStatsTracks", {
+                    count: stats.totalTracks,
+                    suffix: stats.totalTracks > 1 ? "s" : "",
+                  })}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
@@ -372,11 +380,11 @@ export const ArtistView = memo(({
               <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                 <Button onClick={handlePlayAll} size="lg" className="gap-2">
                   <Play className="w-5 h-5 fill-current" />
-                  Lecture
+                  {t("artistActionPlay")}
                 </Button>
                 <Button onClick={handleShuffle} variant="outline" size="lg" className="gap-2">
                   <Shuffle className="w-5 h-5" />
-                  Aléatoire
+                  {t("artistActionShuffle")}
                 </Button>
                 <Button variant="ghost" size="lg" className="gap-2">
                   <Heart className="w-5 h-5" />
@@ -401,23 +409,23 @@ export const ArtistView = memo(({
                   <TabsList className="bg-background/50 backdrop-blur-sm">
                     <TabsTrigger value="overview" className="gap-2">
                       <Sparkles className="w-4 h-4" />
-                      Vue d'ensemble
+                      {t("artistTabOverview")}
                     </TabsTrigger>
                     <TabsTrigger value="discography" className="gap-2">
                       <Disc3 className="w-4 h-4" />
-                      Discographie
+                      {t("artistTabDiscography")}
                     </TabsTrigger>
                     <TabsTrigger value="about" className="gap-2">
                       <Info className="w-4 h-4" />
-                      À propos
+                      {t("artistTabAbout")}
                     </TabsTrigger>
                     <TabsTrigger value="playlists" className="gap-2">
                       <ListMusic className="w-4 h-4" />
-                      Playlists
+                      {t("artistTabPlaylists")}
                     </TabsTrigger>
                     <TabsTrigger value="gallery" className="gap-2">
                       <ImageIcon className="w-4 h-4" />
-                      Galerie
+                      {t("artistTabGallery")}
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -445,7 +453,7 @@ export const ArtistView = memo(({
             <section>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" />
-                Titres populaires
+                {t("artistPopularTracksTitle")}
               </h2>
               <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden">
                 <table className="w-full">
@@ -511,7 +519,7 @@ export const ArtistView = memo(({
                               onPlayNext={() => onPlayNext?.(track)}
                               onAddToQueue={() => onAddToQueue?.(track)}
                               onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                              onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                              onCreatePlaylist={() => createPlaylist(t("artistNewPlaylistName"), [track.id])}
                               onToggleFavorite={() => toggleFavorite(track.id)}
                               onUploadToCloudinary={cloudinaryUpload.uploadTrack ? () => cloudinaryUpload.uploadTrack(track) : undefined}
                               canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
@@ -529,8 +537,8 @@ export const ArtistView = memo(({
                               <button
                                 onClick={(e) => e.stopPropagation()}
                                 className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                                title="Plus d'options"
-                                aria-label="Plus d'options"
+                                title={t("artistMoreOptions")}
+                                aria-label={t("artistMoreOptions")}
                               >
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
@@ -548,7 +556,7 @@ export const ArtistView = memo(({
                   className="mt-3"
                   onClick={() => setActiveTab("discography")}
                 >
-                  Voir tous les titres ({artistTracks.length})
+                  {t("artistViewAllTracks", { count: artistTracks.length })}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               )}
@@ -559,15 +567,25 @@ export const ArtistView = memo(({
               <section className="overflow-hidden -mx-6">
                 <div className="px-6">
                   <ContentCarousel
-                    title="Albums"
-                    subtitle={`${albums.length} album${albums.length > 1 ? 's' : ''}`}
+                    title={t("artistAlbumsTitle")}
+                    subtitle={t("artistAlbumsCount", {
+                      count: albums.length,
+                      suffix: albums.length > 1 ? "s" : "",
+                    })}
                     icon={<Disc3 className="w-5 h-5 text-primary" />}
                   >
                     {albums.map((album) => (
                       <FeaturedCard
                         key={album.name}
                         title={album.name}
-                        subtitle={album.year ? String(album.year) : `${album.tracks.length} titres`}
+                        subtitle={
+                          album.year
+                            ? String(album.year)
+                            : t("artistTracksCount", {
+                                count: album.tracks.length,
+                                suffix: album.tracks.length > 1 ? "s" : "",
+                              })
+                        }
                         imageUrl={getCoverUrl(album.coverUrl ?? undefined)}
                         onClick={() => onAlbumClick?.(album.name, artistName)}
                         onPlay={() => {
@@ -588,8 +606,8 @@ export const ArtistView = memo(({
               <section className="overflow-hidden -mx-6">
                 <div className="px-6">
                   <ContentCarousel
-                    title="Artistes similaires"
-                    subtitle="Découvrez des artistes similaires"
+                    title={t("artistSimilarArtistsTitle")}
+                    subtitle={t("artistSimilarArtistsSubtitle")}
                     icon={<Users className="w-5 h-5 text-secondary" />}
                   >
                     {similarArtists.map((artist) => (
@@ -630,7 +648,10 @@ export const ArtistView = memo(({
                     <h3 className="text-lg font-semibold">{album.name}</h3>
                     <p className="text-sm text-muted-foreground">
                       {album.year && `${album.year} • `}
-                      {album.tracks.length} titre{album.tracks.length > 1 ? 's' : ''} •{' '}
+                      {t("artistTracksCount", {
+                        count: album.tracks.length,
+                        suffix: album.tracks.length > 1 ? "s" : "",
+                      })}{" "}•{" "}
                       {formatDuration(album.totalDuration)}
                     </p>
                   </div>
@@ -643,7 +664,7 @@ export const ArtistView = memo(({
                     }}
                   >
                     <Play className="w-4 h-4 fill-current" />
-                    Lecture
+                    {t("artistActionPlay")}
                   </Button>
                 </div>
 
@@ -698,7 +719,7 @@ export const ArtistView = memo(({
                 <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 p-6">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Info className="w-5 h-5 text-primary" />
-                    Biographie
+                    {t("artistBiographyTitle")}
                   </h3>
                   {metadataLoading ? (
                     <div className="space-y-3">
@@ -720,7 +741,7 @@ export const ArtistView = memo(({
                           className="mt-2 p-0 h-auto"
                           onClick={() => setShowFullBio(!showFullBio)}
                         >
-                          {showFullBio ? "Voir moins" : "Lire la suite"}
+                          {showFullBio ? t("artistReadLess") : t("artistReadMore")}
                         </Button>
                       )}
                       {metadata.biographyUrl && (
@@ -730,14 +751,14 @@ export const ArtistView = memo(({
                           rel="noopener noreferrer"
                           className="text-primary text-sm hover:underline inline-flex items-center gap-1 mt-2"
                         >
-                          Source: {metadata.source}
+                          {t("artistBiographySource", { source: metadata.source })}
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
                     </div>
                   ) : (
                     <p className="text-muted-foreground">
-                      Aucune biographie disponible pour cet artiste.
+                      {t("artistBiographyEmpty")}
                     </p>
                   )}
                 </div>
@@ -746,11 +767,11 @@ export const ArtistView = memo(({
               {/* Quick Info Sidebar */}
               <div className="space-y-4">
                 <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 p-6">
-                  <h3 className="text-lg font-semibold mb-4">Informations</h3>
+                  <h3 className="text-lg font-semibold mb-4">{t("artistInfoTitle")}</h3>
                   <dl className="space-y-3">
                     {metadata?.origin && (
                       <div>
-                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">Origine</dt>
+                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">{t("artistInfoOrigin")}</dt>
                         <dd className="text-sm font-medium flex items-center gap-2 mt-1">
                           <MapPin className="w-4 h-4 text-primary" />
                           {metadata.origin}
@@ -759,7 +780,7 @@ export const ArtistView = memo(({
                     )}
                     {metadata?.yearsActive && (
                       <div>
-                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">Années d'activité</dt>
+                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">{t("artistInfoYearsActive")}</dt>
                         <dd className="text-sm font-medium flex items-center gap-2 mt-1">
                           <Calendar className="w-4 h-4 text-primary" />
                           {metadata.yearsActive}
@@ -768,13 +789,13 @@ export const ArtistView = memo(({
                     )}
                     {metadata?.birthDate && (
                       <div>
-                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">Date de naissance</dt>
+                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">{t("artistInfoBirthDate")}</dt>
                         <dd className="text-sm font-medium mt-1">{metadata.birthDate}</dd>
                       </div>
                     )}
                     {metadata?.website && (
                       <div>
-                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">Site officiel</dt>
+                        <dt className="text-xs text-muted-foreground uppercase tracking-wider">{t("artistInfoWebsite")}</dt>
                         <dd className="text-sm font-medium mt-1">
                           <a
                             href={metadata.website}
@@ -782,7 +803,7 @@ export const ArtistView = memo(({
                             rel="noopener noreferrer"
                             className="text-primary hover:underline inline-flex items-center gap-1"
                           >
-                            Visiter
+                            {t("artistInfoVisit")}
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </dd>
@@ -793,18 +814,18 @@ export const ArtistView = memo(({
 
                 {/* Library Stats */}
                 <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 p-6">
-                  <h3 className="text-lg font-semibold mb-4">Dans votre bibliothèque</h3>
+                  <h3 className="text-lg font-semibold mb-4">{t("artistLibraryStatsTitle")}</h3>
                   <dl className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <dt className="text-sm text-muted-foreground">Albums</dt>
+                      <dt className="text-sm text-muted-foreground">{t("artistLibraryAlbums")}</dt>
                       <dd className="text-sm font-medium">{stats.totalAlbums}</dd>
                     </div>
                     <div className="flex justify-between items-center">
-                      <dt className="text-sm text-muted-foreground">Titres</dt>
+                      <dt className="text-sm text-muted-foreground">{t("artistLibraryTracks")}</dt>
                       <dd className="text-sm font-medium">{stats.totalTracks}</dd>
                     </div>
                     <div className="flex justify-between items-center">
-                      <dt className="text-sm text-muted-foreground">Durée totale</dt>
+                      <dt className="text-sm text-muted-foreground">{t("artistLibraryDuration")}</dt>
                       <dd className="text-sm font-medium">{formatDuration(stats.totalDuration)}</dd>
                     </div>
                   </dl>
@@ -824,7 +845,10 @@ export const ArtistView = memo(({
             ) : artistPlaylists.length > 0 ? (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground mb-4">
-                  {artistPlaylists.length} playlist{artistPlaylists.length > 1 ? 's' : ''} trouvée{artistPlaylists.length > 1 ? 's' : ''} sur YouTube
+                  {t("artistPlaylistsFound", {
+                    count: artistPlaylists.length,
+                    suffix: artistPlaylists.length > 1 ? "s" : "",
+                  })}
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -884,7 +908,12 @@ export const ArtistView = memo(({
                             {playlist.channelTitle}
                           </p>
                           <p className="text-xs text-muted-foreground/70">
-                            {playlist.itemCount > 0 ? `${playlist.itemCount} vidéos` : 'Playlist YouTube'}
+                            {playlist.itemCount > 0
+                              ? t("artistPlaylistVideosCount", {
+                                  count: playlist.itemCount,
+                                  suffix: playlist.itemCount > 1 ? "s" : "",
+                                })
+                              : t("artistPlaylistYoutubeLabel")}
                           </p>
                         </div>
 
@@ -973,8 +1002,8 @@ export const ArtistView = memo(({
                             }}
                             disabled={convertingPlaylistId === playlist.id || loadingPlaylistId === playlist.id}
                             title={playlists.find(p => p.externalId === playlist.id && p.mediaSource === 'youtube')
-                              ? 'Ouvrir la playlist'
-                              : 'Sauvegarder / Convertir en locale'}
+                              ? t("artistPlaylistOpen")
+                              : t("artistPlaylistSave")}
                           >
                             {convertingPlaylistId === playlist.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -1047,7 +1076,7 @@ export const ArtistView = memo(({
                               </div>
                             ) : (
                               <div className="p-6 text-center text-muted-foreground text-sm">
-                                Aucune vidéo trouvée dans cette playlist
+                                {t("artistPlaylistNoVideos")}
                               </div>
                             )}
                           </motion.div>
@@ -1060,9 +1089,9 @@ export const ArtistView = memo(({
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <ListMusic className="w-16 h-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Aucune playlist</h3>
+                <h3 className="text-lg font-medium mb-2">{t("artistPlaylistsEmptyTitle")}</h3>
                 <p className="text-muted-foreground text-sm max-w-md">
-                  Aucune playlist YouTube n'a été trouvée pour "{artistName}".
+                  {t("artistPlaylistsEmptyDescription", { artistName })}
                 </p>
               </div>
             )}
@@ -1088,7 +1117,7 @@ export const ArtistView = memo(({
                       whileHover={{ scale: 1.02 }}
                       onClick={() => setSelectedGalleryImage(idx)}
                       className="aspect-square rounded-xl overflow-hidden bg-muted group"
-                      title={`Image ${idx + 1}`}
+                      title={t("artistGalleryImageTitle", { index: idx + 1 })}
                     >
                       <img
                         src={image.thumbnailUrl || image.url}
@@ -1113,8 +1142,8 @@ export const ArtistView = memo(({
                       <button
                         className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors"
                         onClick={() => setSelectedGalleryImage(null)}
-                        title="Fermer"
-                        aria-label="Fermer la galerie"
+                        title={t("artistGalleryClose")}
+                        aria-label={t("artistGalleryCloseAria")}
                       >
                         <X className="w-8 h-8" />
                       </button>
@@ -1127,8 +1156,8 @@ export const ArtistView = memo(({
                             prev !== null ? (prev - 1 + galleryImages.length) % galleryImages.length : 0
                           );
                         }}
-                        title="Image précédente"
-                        aria-label="Image précédente"
+                        title={t("artistGalleryPrevious")}
+                        aria-label={t("artistGalleryPrevious")}
                       >
                         <ChevronLeft className="w-8 h-8" />
                       </button>
@@ -1141,8 +1170,8 @@ export const ArtistView = memo(({
                             prev !== null ? (prev + 1) % galleryImages.length : 0
                           );
                         }}
-                        title="Image suivante"
-                        aria-label="Image suivante"
+                        title={t("artistGalleryNext")}
+                        aria-label={t("artistGalleryNext")}
                       >
                         <ChevronRight className="w-8 h-8" />
                       </button>
@@ -1168,9 +1197,9 @@ export const ArtistView = memo(({
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Aucune image</h3>
+                <h3 className="text-lg font-medium mb-2">{t("artistGalleryEmptyTitle")}</h3>
                 <p className="text-muted-foreground text-sm max-w-md">
-                  Aucune image n'a été trouvée pour cet artiste.
+                  {t("artistGalleryEmptyDescription")}
                 </p>
               </div>
             )}

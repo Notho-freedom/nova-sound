@@ -61,6 +61,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Track } from "@/types/music";
 import type { Video } from "@/types/music";
+import { useI18n } from "@/i18n";
 
 interface UploadedFile {
   id: string;
@@ -88,6 +89,7 @@ interface ServerInfo {
 }
 
 export const CloudView = () => {
+  const { t } = useI18n();
   const { 
     nexusAuthenticated, 
     nexusIsPro, 
@@ -126,7 +128,7 @@ export const CloudView = () => {
     {
       id: "cloudinary",
       name: "Cloudinary",
-      description: "Serveur 0",
+      description: t("cloudServer0"),
       icon: Cloud,
       color: "text-purple-500",
       isPro: true,
@@ -136,7 +138,7 @@ export const CloudView = () => {
     {
       id: "bunny",
       name: "Bunny CDN",
-      description: "Serveur 1",
+      description: t("cloudServer1"),
       icon: Cloud,
       color: "text-blue-500",
       isPro: true,
@@ -146,7 +148,7 @@ export const CloudView = () => {
     {
       id: "planethoster",
       name: "PlanetHoster SFTP",
-      description: "Serveur 2",
+      description: t("cloudServer2"),
       icon: Server,
       color: "text-orange-500",
       isPro: true,
@@ -155,8 +157,8 @@ export const CloudView = () => {
     },
     {
       id: "nexus",
-      name: "Nexus Local",
-      description: "Serveur 3 - Stockage local (Free/Pro)",
+      name: t("cloudServerNexusLocal"),
+      description: t("cloudServer3Local"),
       icon: HardDrive,
       color: "text-green-500",
       isPro: false,
@@ -269,10 +271,10 @@ export const CloudView = () => {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
-    if (hours > 0) return `Il y a ${hours} heure${hours > 1 ? "s" : ""}`;
-    if (minutes > 0) return `Il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
-    return "À l'instant";
+    if (days > 0) return t("cloudTimeAgoDays", { count: days, suffix: days > 1 ? "s" : "" });
+    if (hours > 0) return t("cloudTimeAgoHours", { count: hours, suffix: hours > 1 ? "s" : "" });
+    if (minutes > 0) return t("cloudTimeAgoMinutes", { count: minutes, suffix: minutes > 1 ? "s" : "" });
+    return t("cloudTimeJustNow");
   };
 
   const getProviderIcon = (provider?: string) => {
@@ -293,15 +295,15 @@ export const CloudView = () => {
   const getProviderName = (provider?: string) => {
     switch (provider) {
       case "cloudinary":
-        return "Cloudinary (Serveur 0)";
+        return t("cloudProviderCloudinary");
       case "bunny":
-        return "Bunny CDN (Serveur 1)";
+        return t("cloudProviderBunny");
       case "planethoster":
-        return "PlanetHoster SFTP (Serveur 2)";
+        return t("cloudProviderPlanethoster");
       case "nexus":
-        return "Nexus Local";
+        return t("cloudProviderNexus");
       default:
-        return "Local";
+        return t("cloudProviderLocal");
     }
   };
 
@@ -311,7 +313,7 @@ export const CloudView = () => {
 
   const refreshUploadedFiles = async () => {
     await loadUploadedFiles();
-    toast.success("Fichiers actualisés");
+    toast.success(t("cloudToastFilesRefreshed"));
   };
 
   // Group files by provider
@@ -329,7 +331,7 @@ export const CloudView = () => {
   // Upload functions
   const handleUploadTracks = async (server: ServerType) => {
     if (selectedTracks.length === 0) {
-      toast.error("Aucune piste sélectionnée");
+      toast.error(t("cloudToastNoTracksSelected"));
       return;
     }
 
@@ -361,7 +363,7 @@ export const CloudView = () => {
 
   const handleUploadVideos = async (server: ServerType) => {
     if (selectedVideos.length === 0) {
-      toast.error("Aucune vidéo sélectionnée");
+      toast.error(t("cloudToastNoVideosSelected"));
       return;
     }
 
@@ -461,12 +463,12 @@ export const CloudView = () => {
       // Silently fail if Firebase sync is not available
     }
     
-    toast.success("Fichier supprimé de la liste");
+    toast.success(t("cloudToastFileRemoved"));
   };
 
   const copyUrl = (url: string) => {
     navigator.clipboard.writeText(url);
-    toast.success("URL copiée dans le presse-papiers");
+    toast.success(t("cloudToastUrlCopied"));
   };
 
   const openUrl = (url: string) => {
@@ -521,42 +523,42 @@ export const CloudView = () => {
   return (
     <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden">
       <PageHeader
-        title="Cloud Storage"
-        subtitle="Gérez vos fichiers uploadés sur tous les serveurs"
+        title={t("cloudTitle")}
+        subtitle={t("cloudSubtitle")}
         rightContent={
           <div className="flex items-center gap-2">
             <HelpButton
-              title="Cloud Storage"
-              description="Uploader et gérez vos fichiers audio et vidéo sur plusieurs serveurs cloud. Synchronisez vos fichiers avec le cloud pour y accéder de n'importe où."
+              title={t("cloudHelpTitle")}
+              description={t("cloudHelpDescription")}
               size="icon-sm"
             />
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Upload className="w-4 h-4" />
-                  Uploader
+                  {t("cloudUploadButton")}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Uploader des fichiers</DialogTitle>
+                  <DialogTitle>{t("cloudUploadDialogTitle")}</DialogTitle>
                   <DialogDescription>
-                    Sélectionnez le type de fichier et le serveur de destination
+                    {t("cloudUploadDialogDescription")}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Type de fichier</Label>
+                    <Label>{t("cloudUploadFileTypeLabel")}</Label>
                     <Tabs value={uploadType} onValueChange={(v) => setUploadType(v as "audio" | "video")}>
                       <TabsList>
-                        <TabsTrigger value="audio">Audio</TabsTrigger>
-                        <TabsTrigger value="video">Vidéo</TabsTrigger>
+                        <TabsTrigger value="audio">{t("cloudUploadAudioTab")}</TabsTrigger>
+                        <TabsTrigger value="video">{t("cloudUploadVideoTab")}</TabsTrigger>
                       </TabsList>
                     </Tabs>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Serveur de destination</Label>
+                    <Label>{t("cloudUploadServerLabel")}</Label>
                     <div className="grid grid-cols-2 gap-2">
                       {servers.filter(s => s.configured).map((server) => (
                         <Button
@@ -574,7 +576,7 @@ export const CloudView = () => {
 
                   <div className="space-y-2">
                     <Label>
-                      {uploadType === "audio" ? "Pistes audio" : "Vidéos"} à uploader
+                      {uploadType === "audio" ? t("cloudUploadAudioLabel") : t("cloudUploadVideoLabel")}
                     </Label>
                     <ScrollArea className="h-64 border rounded-lg p-2">
                       {uploadType === "audio" ? (
@@ -639,7 +641,7 @@ export const CloudView = () => {
 
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                      Annuler
+                      {t("cloudCancel")}
                     </Button>
                     <Button
                       onClick={() => {
@@ -654,7 +656,7 @@ export const CloudView = () => {
                       }
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Uploader ({uploadType === "audio" ? selectedTracks.length : selectedVideos.length})
+                      {t("cloudUploadCount", { count: uploadType === "audio" ? selectedTracks.length : selectedVideos.length })}
                     </Button>
                   </div>
                 </div>
@@ -736,7 +738,7 @@ export const CloudView = () => {
                   {!server.configured && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <AlertCircle className="w-4 h-4" />
-                      <span>{server.isPro ? "Plan Pro requis" : "Non configuré"}</span>
+                      <span>{server.isPro ? t("cloudServerProRequired") : t("cloudServerNotConfigured")}</span>
                     </div>
                   )}
                 </div>
@@ -744,7 +746,7 @@ export const CloudView = () => {
                 {isUploading && (
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Upload en cours...</span>
+                      <span className="text-sm text-muted-foreground">{t("cloudUploading")}</span>
                       <span className="text-sm font-medium">{Math.round(uploadProgress)}%</span>
                     </div>
                     <Progress value={uploadProgress} className="h-2" />
@@ -763,18 +765,18 @@ export const CloudView = () => {
                     <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4 mx-auto">
                       <server.icon className={cn("w-10 h-10", server.color)} />
                     </div>
-                    <h3 className="text-lg font-medium mb-2">Aucun fichier sur {server.name}</h3>
+                    <h3 className="text-lg font-medium mb-2">{t("cloudNoFilesTitle", { server: server.name })}</h3>
                     <p className="text-muted-foreground text-sm mb-4">
                       {server.configured
-                        ? "Commencez par uploader des fichiers vers ce serveur."
+                        ? t("cloudNoFilesStartUpload")
                         : server.isPro
-                        ? "Passez au plan Pro pour utiliser ce serveur."
-                        : "Configurez ce serveur dans les paramètres."}
+                        ? t("cloudNoFilesProRequired")
+                        : t("cloudNoFilesConfigure")}
                     </p>
                     {server.configured && (
                       <Button onClick={() => setUploadDialogOpen(true)}>
                         <Upload className="w-4 h-4 mr-2" />
-                        Uploader des fichiers
+                        {t("cloudUploadFilesButton")}
                       </Button>
                     )}
                   </div>
@@ -787,19 +789,19 @@ export const CloudView = () => {
                         <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md">
                           <tr className="border-b border-border/30">
                             <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
-                              Fichier
+                              {t("cloudTableFile")}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                              Type
+                              {t("cloudTableType")}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                              Taille
+                              {t("cloudTableSize")}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                              Uploadé
+                              {t("cloudTableUploaded")}
                             </th>
                             <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
-                              Actions
+                              {t("cloudTableActions")}
                             </th>
                           </tr>
                         </thead>
@@ -860,7 +862,7 @@ export const CloudView = () => {
                                           }}
                                         >
                                           <Download className="w-4 h-4 mr-2" />
-                                          Télécharger
+                                          {t("cloudDownload")}
                                         </Button>
                                         <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
@@ -877,13 +879,13 @@ export const CloudView = () => {
                                               onClick={() => openUrl(file.url!)}
                                             >
                                               <ExternalLink className="w-4 h-4 mr-2" />
-                                              Ouvrir dans un nouvel onglet
+                                              {t("cloudOpenInNewTab")}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                               onClick={() => copyUrl(file.url!)}
                                             >
                                               <Copy className="w-4 h-4 mr-2" />
-                                              Copier l'URL
+                                              {t("cloudCopyUrl")}
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem
@@ -891,7 +893,7 @@ export const CloudView = () => {
                                               className="text-destructive"
                                             >
                                               <Trash2 className="w-4 h-4 mr-2" />
-                                              Supprimer de la liste
+                                              {t("cloudDeleteFromList")}
                                             </DropdownMenuItem>
                                           </DropdownMenuContent>
                                         </DropdownMenu>

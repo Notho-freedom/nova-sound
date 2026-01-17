@@ -54,6 +54,7 @@ import { useLibraryWorker } from "@/hooks/useLibraryWorker";
 import { fetchYouTubeChannelPlaylists, fetchYouTubePlaylistVideos } from "@/lib/youtube-playlists";
 import { extractYouTubeChannelId } from "@/lib/youtube";
 import { youtubeSuggestionsToTracks } from "@/lib/youtube-artist-search";
+import { useI18n, type Messages } from "@/i18n";
 
 interface LibraryViewProps {
   tracks: Track[];
@@ -116,50 +117,55 @@ const AlbumCard = memo(({
   album: { name: string; artist: string; coverUrl?: string | null; tracks: Track[]; year?: number | null };
   onSelect: () => void;
   onPlay: () => void;
-}) => (
-  <div
-    className="group relative cursor-pointer transition-transform duration-200 hover:scale-[1.02]"
-    onClick={onSelect}
-  >
-    <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 shadow-lg group-hover:shadow-xl transition-all duration-300">
-      {album.coverUrl ? (
-        <img
-          src={getCoverUrl(album.coverUrl)}
-          alt={album.name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          loading="lazy"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Disc3 className="w-12 h-12 text-primary/40" />
-        </div>
-      )}
+}) => {
+  const { t } = useI18n();
+  const tracksLabel = album.tracks.length === 1 ? t("labelTrack") : t("labelTracks");
+
+  return (
+    <div
+      className="group relative cursor-pointer transition-transform duration-200 hover:scale-[1.02]"
+      onClick={onSelect}
+    >
+      <div className="aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 shadow-lg group-hover:shadow-xl transition-all duration-300">
+        {album.coverUrl ? (
+          <img
+            src={getCoverUrl(album.coverUrl)}
+            alt={album.name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Disc3 className="w-12 h-12 text-primary/40" />
+          </div>
+        )}
+        
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+        
+        {/* Play button - simplified without heavy animations */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 hover:scale-110"
+        >
+          <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
+        </button>
+      </div>
       
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-      
-      {/* Play button - simplified without heavy animations */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onPlay();
-        }}
-        className="absolute bottom-3 right-3 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 hover:scale-110"
-      >
-        <Play className="w-5 h-5 text-primary-foreground fill-current ml-0.5" />
-      </button>
+      <div className="mt-3 px-1">
+        <h3 className="font-medium text-sm truncate text-foreground group-hover:text-primary transition-colors">
+          {album.name}
+        </h3>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">
+          {album.artist} • {album.tracks.length} {tracksLabel}
+        </p>
+      </div>
     </div>
-    
-    <div className="mt-3 px-1">
-      <h3 className="font-medium text-sm truncate text-foreground group-hover:text-primary transition-colors">
-        {album.name}
-      </h3>
-      <p className="text-xs text-muted-foreground truncate mt-0.5">
-        {album.artist} • {album.tracks.length} titres
-      </p>
-    </div>
-  </div>
-));
+  );
+});
 AlbumCard.displayName = "AlbumCard";
 
 // Modern Artist Card Component - optimized with minimal animations
@@ -175,11 +181,14 @@ const ArtistCard = memo(({
   delay?: number; // Kept for backwards compatibility but ignored
   variant?: "default" | "featured" | "compact";
 }) => {
+  const { t } = useI18n();
   const coverUrl = artist.tracks[0]?.coverUrl;
   const totalDuration = artist.tracks.reduce((sum, t) => sum + t.duration, 0);
   const hours = Math.floor(totalDuration / 3600);
   const mins = Math.floor((totalDuration % 3600) / 60);
   const durationText = hours > 0 ? `${hours}h ${mins}min` : `${mins} min`;
+  const albumLabel = artist.albums.size === 1 ? t("labelAlbum") : t("labelAlbums");
+  const trackLabel = artist.tracks.length === 1 ? t("labelTrack") : t("labelTracks");
   
   // Featured variant - larger card for top artists (simplified)
   if (variant === "featured") {
@@ -207,7 +216,7 @@ const ArtistCard = memo(({
               {artist.name}
             </h3>
             <p className="text-white/70 text-sm mb-3">
-              {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titres
+              {artist.albums.size} {albumLabel} • {artist.tracks.length} {trackLabel}
             </p>
             <button
               className="w-12 h-12 rounded-full bg-primary shadow-xl shadow-primary/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110"
@@ -239,7 +248,7 @@ const ArtistCard = memo(({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">{artist.name}</h3>
-          <p className="text-xs text-muted-foreground">{artist.tracks.length} titres</p>
+          <p className="text-xs text-muted-foreground">{artist.tracks.length} {trackLabel}</p>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
@@ -297,7 +306,7 @@ const ArtistCard = memo(({
           {artist.name}
         </h3>
         <p className="text-xs text-muted-foreground mt-1">
-          {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""} • {artist.tracks.length} titres
+          {artist.albums.size} {albumLabel} • {artist.tracks.length} {trackLabel}
         </p>
       </div>
     </div>
@@ -337,22 +346,30 @@ export const LibraryView = memo(({
   onPlayNext,
   onAddToQueue,
   onAddToPlaylist,
-  title = "Bibliothèque",
+  title,
   showFilters = true,
   viewMode = "tracks",
-  emptyMessage = "Aucun titre trouvé",
+  emptyMessage,
   showHistory = false,
   initialSelectedAlbum,
   loading = false,
   onNavigateToArtist,
   onNavigateToAlbum,
 }: LibraryViewProps) => {
+  const { t } = useI18n();
   const [displayMode, setDisplayMode] = useState<DisplayMode>("list");
   const [sortMode, setSortMode] = useState<SortMode>("title");
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const currentTrackRef = useRef<HTMLTableRowElement>(null);
+  const resolvedTitle = title ?? t("viewLibraryTitle");
+  const resolvedEmptyMessage = emptyMessage ?? t("libraryEmptyMessage");
+  const formatCountLabel = useCallback(
+    (count: number, singularKey: keyof Messages, pluralKey: keyof Messages) =>
+      `${count} ${t(count === 1 ? singularKey : pluralKey)}`,
+    [t]
+  );
   
   // Albums view state
   const [albumsViewMode, setAlbumsViewMode] = useState<"grid" | "list">("grid");
@@ -473,12 +490,12 @@ export const LibraryView = memo(({
       <PageContainer>
         <EmptyState
           icon={<Library className="w-10 h-10 text-primary" />}
-          title={emptyMessage}
+          title={resolvedEmptyMessage}
           description={
-            viewMode === "tracks" ? "Ajoutez des fichiers audio pour voir votre bibliothèque." :
-            viewMode === "albums" ? "Les albums apparaîtront ici une fois la musique ajoutée." :
-            viewMode === "artists" ? "Les artistes apparaîtront ici une fois la musique ajoutée." :
-            "Les dossiers scannés apparaîtront ici."
+            viewMode === "tracks" ? t("libraryEmptyTracksDescription") :
+            viewMode === "albums" ? t("libraryEmptyAlbumsDescription") :
+            viewMode === "artists" ? t("libraryEmptyArtistsDescription") :
+            t("libraryEmptyFoldersDescription")
           }
         />
       </PageContainer>
@@ -519,7 +536,7 @@ export const LibraryView = memo(({
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
             >
               <ChevronRight className="w-4 h-4 rotate-180 transition-transform group-hover:-translate-x-1" />
-              Retour aux albums
+              {t("libraryBackToAlbums")}
             </motion.button>
 
             {/* Album Header */}
@@ -542,12 +559,12 @@ export const LibraryView = memo(({
                 transition={{ delay: 0.1 }}
                 className="text-center md:text-left flex-1"
               >
-                <Badge variant="secondary" className="mb-2">Album</Badge>
+                <Badge variant="secondary" className="mb-2">{t("labelAlbum")}</Badge>
                 <div className="flex items-center gap-2 justify-center md:justify-start">
                   <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
                     {album.name}
                   </h1>
-                  <HelpIcon description="Écoutez tous les titres de cet album, créez des playlists ou explorez l'artiste." />
+                  <HelpIcon description={t("libraryHelpAlbumDescription")} />
                 </div>
 
                 {/* Artist link */}
@@ -565,7 +582,7 @@ export const LibraryView = memo(({
                   )}
                   <span className="flex items-center gap-1.5">
                     <Music className="w-4 h-4" />
-                    {album.tracks.length} titre{album.tracks.length > 1 ? "s" : ""}
+                    {formatCountLabel(album.tracks.length, "labelTrack", "labelTracks")}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4" />
@@ -589,7 +606,7 @@ export const LibraryView = memo(({
                     className="gap-2"
                   >
                     <Play className="w-5 h-5 fill-current" />
-                    Lecture
+                    {t("libraryActionPlay")}
                   </Button>
                   <Button
                     variant="outline"
@@ -606,7 +623,7 @@ export const LibraryView = memo(({
                     }}
                   >
                     <Shuffle className="w-5 h-5" />
-                    Aléatoire
+                    {t("libraryActionShuffle")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -638,7 +655,7 @@ export const LibraryView = memo(({
           >
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Disc3 className="w-5 h-5 text-primary" />
-              Pistes
+              {t("labelTracks")}
             </h2>
             <GlassCard className="overflow-hidden">
               <div className="overflow-y-auto max-h-[calc(100vh-450px)]">
@@ -646,8 +663,8 @@ export const LibraryView = memo(({
                   <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur-md">
                     <tr className="border-b border-border/30">
                       <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                      <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">Titre</th>
-                      <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">Durée</th>
+                      <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">{t("libraryColumnTitle")}</th>
+                      <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">{t("libraryColumnDuration")}</th>
                       <th className="px-4 py-3 w-12"></th>
                     </tr>
                   </thead>
@@ -775,7 +792,7 @@ export const LibraryView = memo(({
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <ChevronRight className="w-4 h-4 rotate-180 transition-transform group-hover:-translate-x-1" />
-            Retour aux artistes
+            {t("libraryBackToArtists")}
           </motion.button>
 
           {/* Artist Header */}
@@ -795,17 +812,17 @@ export const LibraryView = memo(({
             </motion.div>
             
             <div className="text-center md:text-left">
-              <Badge variant="secondary" className="mb-2">Artiste</Badge>
+              <Badge variant="secondary" className="mb-2">{t("labelArtist")}</Badge>
               <h1 className="font-display text-4xl font-bold mb-4">{artist.name}</h1>
               
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground mb-4">
                 <span className="flex items-center gap-1">
                   <Disc3 className="w-4 h-4" />
-                  {artist.albums.size} album{artist.albums.size > 1 ? "s" : ""}
+                  {formatCountLabel(artist.albums.size, "labelAlbum", "labelAlbums")}
                 </span>
                 <span className="flex items-center gap-1">
                   <Music className="w-4 h-4" />
-                  {artist.tracks.length} titres
+                  {formatCountLabel(artist.tracks.length, "labelTrack", "labelTracks")}
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
@@ -820,7 +837,7 @@ export const LibraryView = memo(({
                   if (idx !== -1) onTrackSelect(idx);
                 }} className="gap-2">
                   <Play className="w-4 h-4 fill-current" />
-                  Lecture
+                  {t("libraryActionPlay")}
                 </Button>
                 <Button variant="outline" className="gap-2" onClick={() => {
                   const shuffled = [...artist.tracks].sort(() => Math.random() - 0.5);
@@ -828,7 +845,7 @@ export const LibraryView = memo(({
                   if (idx !== -1) onTrackSelect(idx);
                 }}>
                   <Shuffle className="w-4 h-4" />
-                  Aléatoire
+                  {t("libraryActionShuffle")}
                 </Button>
               </div>
             </div>
@@ -839,7 +856,7 @@ export const LibraryView = memo(({
             <section>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <Disc3 className="w-5 h-5 text-primary" />
-                Albums
+                {t("labelAlbums")}
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {artistAlbums.map((album, idx) => (
@@ -865,7 +882,7 @@ export const LibraryView = memo(({
                       )}
                     </div>
                     <p className="mt-2 text-sm font-medium truncate">{album.name}</p>
-                    <p className="text-xs text-muted-foreground">{album.tracks.length} titres</p>
+                    <p className="text-xs text-muted-foreground">{formatCountLabel(album.tracks.length, "labelTrack", "labelTracks")}</p>
                   </motion.div>
                 ))}
               </div>
@@ -876,7 +893,7 @@ export const LibraryView = memo(({
           <section>
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <Music className="w-5 h-5 text-primary" />
-              Tous les titres
+              {t("libraryAllTracksTitle")}
             </h2>
             <GlassCard>
               <TrackListView
@@ -942,7 +959,7 @@ export const LibraryView = memo(({
                     <Disc3 className="w-6 h-6 text-white" />
                   </div>
                   <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-                    Discographie
+                    {t("libraryDiscographyLabel")}
                   </span>
                 </motion.div>
                 <motion.h1
@@ -951,7 +968,7 @@ export const LibraryView = memo(({
                   transition={{ delay: 0.1 }}
                   className="font-display text-5xl md:text-6xl font-bold"
                 >
-                  {title}
+                  {resolvedTitle}
                 </motion.h1>
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
@@ -959,7 +976,7 @@ export const LibraryView = memo(({
                   transition={{ delay: 0.2 }}
                   className="text-muted-foreground mt-2 text-lg"
                 >
-                  {filteredAndSortedAlbums.length} album{filteredAndSortedAlbums.length > 1 ? "s" : ""} • {artists.length} artistes • {tracks.length} titres
+                  {formatCountLabel(filteredAndSortedAlbums.length, "labelAlbum", "labelAlbums")} • {formatCountLabel(artists.length, "labelArtist", "labelArtists")} • {formatCountLabel(tracks.length, "labelTrack", "labelTracks")}
                 </motion.p>
               </div>
 
@@ -971,11 +988,11 @@ export const LibraryView = memo(({
               >
                 <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
                   <Play className="w-5 h-5 fill-current" />
-                  Tout lire
+                  {t("libraryActionPlayAll")}
                 </Button>
                 <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
                   <Shuffle className="w-5 h-5" />
-                  Aléatoire
+                  {t("libraryActionShuffleAll")}
                 </Button>
               </motion.div>
             </div>
@@ -989,7 +1006,7 @@ export const LibraryView = memo(({
               >
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-amber-400" />
-                  Albums populaires
+                  {t("libraryFeaturedAlbumsTitle")}
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {featuredAlbums.map((album, idx) => (
@@ -1041,15 +1058,15 @@ export const LibraryView = memo(({
                 <Input
                   value={albumsSearchQuery}
                   onChange={(e) => setAlbumsSearchQuery(e.target.value)}
-                  placeholder="Rechercher un album..."
+                  placeholder={t("librarySearchAlbumsPlaceholder")}
                   className="pl-10 bg-background/50 border-border/50"
                 />
                 {albumsSearchQuery && (
                   <button
                     onClick={() => setAlbumsSearchQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    title="Effacer la recherche"
-                    aria-label="Effacer la recherche"
+                    title={t("libraryRemoveSearch")}
+                    aria-label={t("libraryRemoveSearch")}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1060,10 +1077,10 @@ export const LibraryView = memo(({
             <Select value={albumsFilterArtist || "__all__"} onValueChange={(v) => setAlbumsFilterArtist(v === "__all__" ? null : v)}>
               <SelectTrigger className="w-[180px] bg-background/50">
                 <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Artiste" />
+                <SelectValue placeholder={t("libraryAlbumFilterPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Tous les artistes</SelectItem>
+                <SelectItem value="__all__">{t("libraryAllArtistsOption")}</SelectItem>
                 {uniqueAlbumArtists.map((artist) => (
                   <SelectItem key={artist} value={artist}>{artist}</SelectItem>
                 ))}
@@ -1072,13 +1089,13 @@ export const LibraryView = memo(({
 
             <Select value={albumsSortBy} onValueChange={(v) => setAlbumsSortBy(v as typeof albumsSortBy)}>
               <SelectTrigger className="w-[140px] bg-background/50">
-                <SelectValue placeholder="Trier par" />
+                <SelectValue placeholder={t("librarySortByPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="name">Nom</SelectItem>
-                <SelectItem value="artist">Artiste</SelectItem>
-                <SelectItem value="year">Année</SelectItem>
-                <SelectItem value="tracks">Titres</SelectItem>
+                <SelectItem value="name">{t("librarySortName")}</SelectItem>
+                <SelectItem value="artist">{t("librarySortArtist")}</SelectItem>
+                <SelectItem value="year">{t("librarySortYear")}</SelectItem>
+                <SelectItem value="tracks">{t("librarySortTracks")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -1120,16 +1137,16 @@ export const LibraryView = memo(({
             >
               {albumsSearchQuery && (
                 <Badge variant="secondary" className="gap-1 px-3 py-1">
-                  Recherche: {albumsSearchQuery}
-                  <button onClick={() => setAlbumsSearchQuery("")} className="ml-1 hover:text-destructive" title="Supprimer le filtre" aria-label="Supprimer le filtre de recherche">
+                  {t("libraryFilterSearchLabel", { query: albumsSearchQuery })}
+                  <button onClick={() => setAlbumsSearchQuery("")} className="ml-1 hover:text-destructive" title={t("libraryRemoveFilter")} aria-label={t("libraryRemoveFilter")}>
                     <X className="w-3 h-3" />
                   </button>
                 </Badge>
               )}
               {albumsFilterArtist && (
                 <Badge variant="secondary" className="gap-1 px-3 py-1">
-                  Artiste: {albumsFilterArtist}
-                  <button onClick={() => setAlbumsFilterArtist(null)} className="ml-1 hover:text-destructive" title="Supprimer le filtre" aria-label="Supprimer le filtre artiste">
+                  {t("libraryFilterArtistLabel", { artist: albumsFilterArtist })}
+                  <button onClick={() => setAlbumsFilterArtist(null)} className="ml-1 hover:text-destructive" title={t("libraryRemoveFilter")} aria-label={t("libraryRemoveFilter")}>
                     <X className="w-3 h-3" />
                   </button>
                 </Badge>
@@ -1144,7 +1161,7 @@ export const LibraryView = memo(({
             transition={{ delay: 0.6 }}
           >
             <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              Tous les albums
+              {t("libraryAllAlbumsTitle")}
               <span className="text-sm font-normal text-muted-foreground">
                 ({albumsSearchQuery || albumsFilterArtist ? filteredAndSortedAlbums.length : remainingAlbums.length})
               </span>
@@ -1182,11 +1199,11 @@ export const LibraryView = memo(({
               <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
                 <Disc3 className="w-10 h-10 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium mb-2">Aucun album trouvé</h3>
+              <h3 className="text-lg font-medium mb-2">{t("libraryEmptyAlbumsTitle")}</h3>
               <p className="text-muted-foreground text-sm max-w-md">
                 {albumsSearchQuery || albumsFilterArtist
-                  ? "Essayez de modifier vos termes de recherche"
-                  : "Ajoutez de la musique à votre bibliothèque pour voir vos albums"}
+                  ? t("libraryEmptyTrySearch")
+                  : t("libraryEmptyAddAlbums")}
               </p>
             </motion.div>
           )}
@@ -1227,7 +1244,7 @@ export const LibraryView = memo(({
                     <User className="w-6 h-6 text-white" />
                   </div>
                   <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
-                    Collection
+                    {t("libraryCollectionLabel")}
                   </span>
                 </motion.div>
                 <motion.h1
@@ -1236,7 +1253,7 @@ export const LibraryView = memo(({
                   transition={{ delay: 0.1 }}
                   className="font-display text-5xl md:text-6xl font-bold bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text"
                 >
-                  {title}
+                  {resolvedTitle}
                 </motion.h1>
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
@@ -1244,7 +1261,7 @@ export const LibraryView = memo(({
                   transition={{ delay: 0.2 }}
                   className="text-muted-foreground mt-2 text-lg"
                 >
-                  {filteredAndSortedArtists.length} artiste{filteredAndSortedArtists.length > 1 ? "s" : ""} • {albums.length} albums • {tracks.length} titres
+                  {formatCountLabel(filteredAndSortedArtists.length, "labelArtist", "labelArtists")} • {formatCountLabel(albums.length, "labelAlbum", "labelAlbums")} • {formatCountLabel(tracks.length, "labelTrack", "labelTracks")}
                 </motion.p>
               </div>
 
@@ -1257,11 +1274,11 @@ export const LibraryView = memo(({
               >
                 <Button onClick={handlePlayAll} size="lg" className="gap-2 shadow-lg shadow-primary/30">
                   <Play className="w-5 h-5 fill-current" />
-                  Tout lire
+                  {t("libraryActionPlayAll")}
                 </Button>
                 <Button onClick={handleShuffleAll} variant="outline" size="lg" className="gap-2 backdrop-blur-sm">
                   <Shuffle className="w-5 h-5" />
-                  Aléatoire
+                  {t("libraryActionShuffleAll")}
                 </Button>
               </motion.div>
             </div>
@@ -1275,7 +1292,7 @@ export const LibraryView = memo(({
               >
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-amber-400" />
-                  Artistes vedettes
+                  {t("libraryFeaturedArtistsTitle")}
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {topArtists.map((artist, idx) => (
@@ -1319,15 +1336,15 @@ export const LibraryView = memo(({
                 <Input
                   value={artistsSearchQuery}
                   onChange={(e) => setArtistsSearchQuery(e.target.value)}
-                  placeholder="Rechercher un artiste..."
+                  placeholder={t("librarySearchArtistsPlaceholder")}
                   className="pl-10 bg-background/50 border-border/50"
                 />
                 {artistsSearchQuery && (
                   <button
                     onClick={() => setArtistsSearchQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    title="Effacer la recherche"
-                    aria-label="Effacer la recherche"
+                    title={t("libraryRemoveSearch")}
+                    aria-label={t("libraryRemoveSearch")}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1337,12 +1354,12 @@ export const LibraryView = memo(({
 
             <Select value={artistsSortBy} onValueChange={(v) => setArtistsSortBy(v as typeof artistsSortBy)}>
               <SelectTrigger className="w-[140px] bg-background/50">
-                <SelectValue placeholder="Trier par" />
+                <SelectValue placeholder={t("librarySortByPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="name">Nom</SelectItem>
-                <SelectItem value="albums">Albums</SelectItem>
-                <SelectItem value="tracks">Titres</SelectItem>
+                <SelectItem value="name">{t("librarySortName")}</SelectItem>
+                <SelectItem value="albums">{t("librarySortAlbums")}</SelectItem>
+                <SelectItem value="tracks">{t("librarySortTracks")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -1382,7 +1399,7 @@ export const LibraryView = memo(({
             transition={{ delay: 0.6 }}
           >
             <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              Tous les artistes
+              {t("libraryAllArtistsTitle")}
               <span className="text-sm font-normal text-muted-foreground">
                 ({artistsSearchQuery ? filteredAndSortedArtists.length : remainingArtists.length})
               </span>
@@ -1458,11 +1475,11 @@ export const LibraryView = memo(({
               <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
                 <User className="w-10 h-10 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium mb-2">Aucun artiste trouvé</h3>
+              <h3 className="text-lg font-medium mb-2">{t("libraryEmptyArtistsTitle")}</h3>
               <p className="text-muted-foreground text-sm max-w-md">
                 {artistsSearchQuery 
-                  ? "Essayez de modifier vos termes de recherche" 
-                  : "Ajoutez de la musique à votre bibliothèque pour voir vos artistes"}
+                  ? t("libraryEmptyTrySearch")
+                  : t("libraryEmptyAddArtists")}
               </p>
             </motion.div>
           )}
@@ -1523,15 +1540,15 @@ export const LibraryView = memo(({
                       <FolderOpen className="w-7 h-7 text-white" />
                     </motion.div>
                     <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30">
-                      <span className="text-xs font-medium text-amber-400 uppercase tracking-wider">Sources Locales</span>
+                      <span className="text-xs font-medium text-amber-400 uppercase tracking-wider">{t("libraryLocalSources")}</span>
                     </div>
                   </div>
                   
                   <h1 className="font-display text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-foreground via-foreground to-amber-300 bg-clip-text text-transparent">
-                    {title}
+                    {resolvedTitle}
                   </h1>
                   <p className="text-muted-foreground text-lg">
-                    Explorez votre collection musicale locale
+                    {t("libraryLocalSubtitle")}
                   </p>
                 </div>
               </motion.div>
@@ -1545,7 +1562,7 @@ export const LibraryView = memo(({
               >
                 <FolderOpen className="w-8 h-8 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
                 <p className="text-3xl font-bold">{folders.length}</p>
-                <p className="text-xs text-muted-foreground">Dossiers</p>
+                <p className="text-xs text-muted-foreground">{t("labelFolders")}</p>
               </motion.div>
 
               <motion.div
@@ -1556,7 +1573,7 @@ export const LibraryView = memo(({
               >
                 <Music className="w-8 h-8 text-orange-400 mb-2 group-hover:scale-110 transition-transform" />
                 <p className="text-3xl font-bold">{totalFolderTracks}</p>
-                <p className="text-xs text-muted-foreground">Titres</p>
+                <p className="text-xs text-muted-foreground">{t("labelTracks")}</p>
               </motion.div>
             </div>
 
@@ -1573,7 +1590,7 @@ export const LibraryView = memo(({
                 className="gap-3 px-8 h-14 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-xl shadow-amber-500/30 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-amber-500/40"
               >
                 <Play className="w-6 h-6 fill-current" />
-                <span className="font-semibold">Tout lire</span>
+                <span className="font-semibold">{t("libraryActionPlayAll")}</span>
               </Button>
               <Button 
                 onClick={handleShuffleAll} 
@@ -1582,7 +1599,7 @@ export const LibraryView = memo(({
                 className="gap-3 px-8 h-14 rounded-2xl border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all hover:scale-105"
               >
                 <Shuffle className="w-5 h-5" />
-                <span className="font-semibold">Aléatoire</span>
+                <span className="font-semibold">{t("libraryActionShuffleAll")}</span>
               </Button>
               <div className="ml-auto text-sm text-muted-foreground">
                 <Clock className="w-4 h-4 inline mr-1" />
@@ -1648,7 +1665,7 @@ export const LibraryView = memo(({
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className="text-2xl font-bold text-amber-400">{folder.tracks.length}</p>
-                          <p className="text-xs text-muted-foreground">titres</p>
+                          <p className="text-xs text-muted-foreground">{t("labelTracks")}</p>
                         </div>
                         <motion.div
                           animate={{ rotate: selectedFolder === folder.path ? 90 : 0 }}
@@ -1721,9 +1738,9 @@ export const LibraryView = memo(({
                   className="absolute inset-0 rounded-3xl bg-amber-500/20 blur-xl"
                 />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Aucun dossier</h3>
+              <h3 className="text-xl font-semibold mb-2">{t("libraryEmptyFoldersTitle")}</h3>
               <p className="text-muted-foreground max-w-sm">
-                Ajoutez des dossiers contenant votre musique pour les voir apparaître ici
+                {t("libraryEmptyFoldersAddDescription")}
               </p>
             </motion.div>
           )}
@@ -1865,19 +1882,19 @@ export const LibraryView = memo(({
                 </motion.div>
                 <div>
                   <div className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 inline-block mb-1">
-                    <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">Bibliothèque</span>
+                    <span className="text-xs font-medium text-emerald-400 uppercase tracking-wider">{t("libraryHeroTag")}</span>
                   </div>
                 </div>
               </div>
               
               <h1 className="font-display text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-foreground via-foreground to-emerald-300 bg-clip-text text-transparent">
-                {title}
+                {resolvedTitle}
               </h1>
               <p className="text-muted-foreground text-lg mb-6 flex items-center gap-2">
-                Votre collection musicale complète
+                {t("librarySubtitle")}
                 <HelpIcon
-                  title="Bibliothèque"
-                  description="Organisez votre collection avec différents modes de vue. Triez par titre, artiste ou album. Écoutez aléatoirement ou créez des playlists."
+                  title={t("libraryHelpTitle")}
+                  description={t("libraryHelpDescription")}
                 />
               </p>
               
@@ -1889,7 +1906,7 @@ export const LibraryView = memo(({
                   className="gap-3 px-8 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-xl shadow-emerald-500/30 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-emerald-500/40"
                 >
                   <Play className="w-6 h-6 fill-current" />
-                  <span className="font-semibold">Tout lire</span>
+                  <span className="font-semibold">{t("libraryActionPlayAll")}</span>
                 </Button>
                 <Button 
                   onClick={handleShuffleAll} 
@@ -1898,7 +1915,7 @@ export const LibraryView = memo(({
                   className="gap-3 px-8 h-14 rounded-2xl border-emerald-500/30 hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all hover:scale-105"
                 >
                   <Shuffle className="w-5 h-5" />
-                  <span className="font-semibold">Aléatoire</span>
+                  <span className="font-semibold">{t("libraryActionShuffleAll")}</span>
                 </Button>
               </div>
             </div>
@@ -1916,7 +1933,7 @@ export const LibraryView = memo(({
               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <Music className="w-10 h-10 text-emerald-400 mb-3" />
               <p className="text-4xl font-bold">{tracks.length.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Titres</p>
+              <p className="text-sm text-muted-foreground">{t("labelTracks")}</p>
             </motion.div>
 
             <motion.div
@@ -1929,7 +1946,7 @@ export const LibraryView = memo(({
               <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <Disc3 className="w-10 h-10 text-purple-400 mb-3" />
               <p className="text-4xl font-bold">{albums.length.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Albums</p>
+              <p className="text-sm text-muted-foreground">{t("labelAlbums")}</p>
             </motion.div>
 
             <motion.div
@@ -1942,7 +1959,7 @@ export const LibraryView = memo(({
               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <User className="w-10 h-10 text-blue-400 mb-3" />
               <p className="text-4xl font-bold">{artists.length.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Artistes</p>
+              <p className="text-sm text-muted-foreground">{t("labelArtists")}</p>
             </motion.div>
 
             <motion.div
@@ -1955,7 +1972,7 @@ export const LibraryView = memo(({
               <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <Clock className="w-10 h-10 text-orange-400 mb-3" />
               <p className="text-4xl font-bold">{formatDuration(totalDuration)}</p>
-              <p className="text-sm text-muted-foreground">Durée totale</p>
+              <p className="text-sm text-muted-foreground">{t("libraryTotalDuration")}</p>
             </motion.div>
           </div>
         </div>
@@ -1975,15 +1992,15 @@ export const LibraryView = memo(({
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher dans votre bibliothèque..."
+                placeholder={t("librarySearchLibraryPlaceholder")}
                 className="pl-12 h-12 bg-background/50 border-border/50 rounded-xl focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
-                  title="Effacer la recherche"
-                  aria-label="Effacer la recherche"
+                  title={t("libraryRemoveSearch")}
+                  aria-label={t("libraryRemoveSearch")}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1994,14 +2011,14 @@ export const LibraryView = memo(({
           {/* Sort Select */}
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
             <SelectTrigger className="w-[160px] h-12 bg-background/50 border-border/50 rounded-xl">
-              <SelectValue placeholder="Trier par" />
+              <SelectValue placeholder={t("librarySortByPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="title">Titre</SelectItem>
-              <SelectItem value="artist">Artiste</SelectItem>
-              <SelectItem value="album">Album</SelectItem>
-              <SelectItem value="duration">Durée</SelectItem>
-              <SelectItem value="date">Date d'ajout</SelectItem>
+              <SelectItem value="title">{t("librarySortTitle")}</SelectItem>
+              <SelectItem value="artist">{t("librarySortArtist")}</SelectItem>
+              <SelectItem value="album">{t("labelAlbum")}</SelectItem>
+              <SelectItem value="duration">{t("librarySortDuration")}</SelectItem>
+              <SelectItem value="date">{t("librarySortDate")}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -2045,8 +2062,8 @@ export const LibraryView = memo(({
               <button 
                 onClick={() => setSearchQuery("")} 
                 className="ml-1 hover:text-white transition-colors"
-                title="Supprimer le filtre" 
-                aria-label="Supprimer le filtre de recherche"
+                title={t("libraryRemoveFilter")}
+                aria-label={t("libraryRemoveFilter")}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -2141,11 +2158,11 @@ export const LibraryView = memo(({
                 className="absolute inset-0 rounded-3xl bg-emerald-500/20 blur-xl"
               />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Aucun titre trouvé</h3>
+            <h3 className="text-xl font-semibold mb-2">{t("libraryEmptyTracksTitle")}</h3>
             <p className="text-muted-foreground max-w-sm">
               {searchQuery
-                ? "Essayez de modifier vos termes de recherche"
-                : "Ajoutez de la musique à votre bibliothèque"}
+                ? t("libraryEmptyTrySearch")
+                : t("libraryEmptyAddTracks")}
             </p>
           </motion.div>
         )}

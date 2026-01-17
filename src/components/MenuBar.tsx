@@ -23,6 +23,7 @@ import {
   Crown,
   HelpCircle,
 } from "lucide-react";
+import { useI18n } from "@/i18n";
 
 interface MenuBarProps {
   onOpenSettings?: () => void;
@@ -30,6 +31,7 @@ interface MenuBarProps {
 }
 
 export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
+  const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const hideMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -176,11 +178,11 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <button
             className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all"
-            aria-label="Menu Musique - Lecture, pistes, playlists"
+            aria-label={t("menuMusicAria")}
             aria-expanded={openMenu === "musique"}
             aria-haspopup="true"
           >
-            Musique
+            {t("menuMusic")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -191,20 +193,20 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={handlePlayToggle}>
             <PlayCircle className="w-3.5 h-3.5" />
-            Lecture / Pause
+            {t("menuActionPlayPause")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handlePreviousTrack}>
             <ArrowLeft className="w-3.5 h-3.5" />
-            Piste précédente
+            {t("menuActionPrevTrack")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleNextTrack}>
             <ArrowRight className="w-3.5 h-3.5" />
-            Piste suivante
+            {t("menuActionNextTrack")}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-white/[0.06]" />
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleNewPlaylist}>
             <FileText className="w-3.5 h-3.5" />
-            Nouvelle playlist
+            {t("menuActionNewPlaylist")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -218,7 +220,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
           onKeyDown={handleMenuKeyDown}
         >
           <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all">
-            Bibliothèque
+            {t("menuLibrary")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -229,29 +231,29 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleOpenFiles}>
             <FileText className="w-3.5 h-3.5" />
-            Ouvrir des fichiers…
+            {t("menuActionOpenFiles")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleOpenFolders}>
             <FolderOpen className="w-3.5 h-3.5" />
-            Ouvrir des dossiers…
+            {t("menuActionOpenFolders")}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-white/[0.06]" />
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleImportLibrary}>
             <FileText className="w-3.5 h-3.5" />
-            Importer la bibliothèque
+            {t("menuActionImportLibrary")}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-white/[0.06]" />
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleNavigateHome}>
             <Compass className="w-3.5 h-3.5" />
-            Accueil
+            {t("menuActionNavigateHome")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleNavigateLibrary}>
             <Compass className="w-3.5 h-3.5" />
-            Bibliothèque
+            {t("menuActionNavigateLibrary")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleNavigateSearch}>
             <Search className="w-3.5 h-3.5" />
-            Rechercher
+            {t("menuActionNavigateSearch")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -265,7 +267,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
           onKeyDown={handleMenuKeyDown}
         >
           <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all">
-            Cloud
+            {t("menuCloud")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -276,11 +278,11 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleSyncNow}>
             <RefreshCw className="w-3.5 h-3.5" />
-            Synchroniser maintenant
+            {t("menuActionSyncNow")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleClearCache}>
             <RefreshCw className="w-3.5 h-3.5" />
-            Nettoyer le cache
+            {t("menuActionClearCache")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -294,7 +296,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
           onKeyDown={handleMenuKeyDown}
         >
           <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all">
-            Lecture
+            {t("menuPlayback")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -305,15 +307,15 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleToggleMiniPlayer}>
             <Eye className="w-3.5 h-3.5" />
-            Basculer mini lecteur
+            {t("menuActionToggleMiniPlayer")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleOpenNowPlaying}>
             <PlayCircle className="w-3.5 h-3.5" />
-            En cours de lecture
+            {t("menuActionNowPlaying")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleOpenQueue}>
             <Play className="w-3.5 h-3.5" />
-            File d'attente
+            {t("menuActionQueue")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -327,7 +329,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
           onKeyDown={handleMenuKeyDown}
         >
           <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all">
-            Affichage
+            {t("menuDisplay")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -338,7 +340,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleToggleSidebar}>
             <Eye className="w-3.5 h-3.5" />
-            Basculer la sidebar
+            {t("menuActionToggleSidebar")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -352,7 +354,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
           onKeyDown={handleMenuKeyDown}
         >
           <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all">
-            Compte
+            {t("menuAccount")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -363,11 +365,11 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={() => { onOpenSettings?.(); setOpenMenu(null); }}>
             <Settings className="w-3.5 h-3.5" />
-            Paramètres
+            {t("menuActionSettings")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleOpenSubscription}>
             <Crown className="w-3.5 h-3.5" />
-            Abonnement
+            {t("menuActionSubscription")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -381,7 +383,7 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
           onKeyDown={handleMenuKeyDown}
         >
           <button className="px-2 py-1 rounded-md text-[12px] text-muted-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-all">
-            Aide
+            {t("menuHelp")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -392,16 +394,16 @@ export function MenuBar({ onOpenSettings, onOpenSearchPage }: MenuBarProps) {
         >
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleOpenDocumentation}>
             <HelpCircle className="w-3.5 h-3.5" />
-            Documentation & code source
+            {t("menuActionDocumentationSource")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleCheckUpdates}>
             <HelpCircle className="w-3.5 h-3.5" />
-            Rechercher des mises à jour
+            {t("menuActionCheckUpdates")}
           </DropdownMenuItem>
           <DropdownMenuSeparator className="bg-white/[0.06]" />
           <DropdownMenuItem className="gap-2 text-xs" onClick={handleAbout}>
             <HelpCircle className="w-3.5 h-3.5" />
-            À propos de NEXUS
+            {t("menuActionAbout")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -51,6 +51,7 @@ import { PageContainer, PageHero, EmptyState, GlassCard } from "@/components/ui/
 import { SearchBar, FilterChip, ViewToggle, Toolbar } from "@/components/ui/SearchFilter";
 import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { usePlaylistWorker } from "@/hooks/usePlaylistWorker";
+import { useI18n } from "@/i18n";
 
 interface PlaylistViewProps {
   tracks: Track[];
@@ -130,6 +131,7 @@ const PlaylistCard = memo(({
   onUpload?: () => void;
   cacheVersion?: number;
 }) => {
+  const { t } = useI18n();
   const playlistTracks = useMemo(() => 
     playlist.trackIds
       .map((id) => getTrackFromAllOrCache(tracks, id))
@@ -178,8 +180,8 @@ const PlaylistCard = memo(({
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
           <div className="absolute inset-x-4 top-4 flex items-center justify-between text-white/85 text-[11px] font-semibold tracking-[0.14em] uppercase">
-            <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20">Playlist</span>
-            <span className="px-2 py-1 rounded-full bg-black/35 backdrop-blur border border-white/20">{playlistTracks.length} titres</span>
+            <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20">{t("playlistLabel")}</span>
+            <span className="px-2 py-1 rounded-full bg-black/35 backdrop-blur border border-white/20">{playlistTracks.length} {playlistTracks.length === 1 ? t("labelTrack") : t("labelTracks")}</span>
           </div>
 
           <h3 className="absolute left-4 right-4 bottom-16 text-lg font-display font-bold text-white drop-shadow-sm line-clamp-2">
@@ -193,7 +195,7 @@ const PlaylistCard = memo(({
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/12 border border-white/20">
               <Shuffle className="w-3 h-3" />
-              Mix prêt
+              {t("playlistMixReady")}
             </span>
           </div>
 

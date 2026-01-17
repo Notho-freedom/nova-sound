@@ -8,26 +8,24 @@ import { ThemeProvider } from "next-themes";
 import { useEffect, useState } from "react";
 import { FirebaseProvider } from "@/components/FirebaseProvider";
 import { ProUploadCtaModal } from "@/components/ProUploadCtaModal";
+import { I18nProvider, useI18n } from "@/i18n";
 import "./globals.css";
 
 const queryClient = new QueryClient();
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function LayoutContent({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
+  const { locale, t } = useI18n();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
-        <title>NEXUS Audio System | Futuristic Music Player</title>
-        <meta name="description" content="Experience music like never before with NEXUS - a futuristic audio player designed for those who seek something extraordinary and unique." />
+        <title>{t("appTitle")}</title>
+        <meta name="description" content={t("appDescription")} />
         {/* Apply theme immediately before React mounts to prevent flash */}
         <script
           dangerouslySetInnerHTML={{
@@ -75,6 +73,18 @@ export default function RootLayout({
         )}
       </body>
     </html>
+  );
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <I18nProvider>
+      <LayoutContent>{children}</LayoutContent>
+    </I18nProvider>
   );
 }
 

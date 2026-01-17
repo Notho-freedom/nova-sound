@@ -43,6 +43,7 @@ import { GenreExploreSection } from "@/components/GenreExploreSection"
 import { motion, AnimatePresence } from "framer-motion"
 import { ContentCarousel } from "@/components/ui/ContentCarousel"
 import { FeaturedCard } from "@/components/ui/FeaturedCard"
+import { useI18n } from "@/i18n"
 
 interface SearchViewProps {
   tracks: Track[];
@@ -213,32 +214,36 @@ const HistoryChip = memo(({
   term: string
   onSelect: () => void
   onRemove: () => void
-}) => (
-  <motion.div
-    whileHover={{ scale: 1.02 }}
-    whileTap={{ scale: 0.98 }}
-    className={cn(
-      "group flex items-center gap-2 px-4 py-2 rounded-full",
-      "bg-muted/50 hover:bg-muted border border-border/50 hover:border-primary/30",
-      "transition-all duration-300 cursor-pointer",
-    )}
-  >
-    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-    <span onClick={onSelect} className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-      {term}
-    </span>
-    <button
-      onClick={(e) => {
-        e.stopPropagation()
-        onRemove()
-      }}
-      className="opacity-0 group-hover:opacity-100 p-0.5 rounded-full hover:bg-background/50 transition-all"
-      title="Supprimer de l'historique"
+}) => {
+  const { t } = useI18n()
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className={cn(
+        "group flex items-center gap-2 px-4 py-2 rounded-full",
+        "bg-muted/50 hover:bg-muted border border-border/50 hover:border-primary/30",
+        "transition-all duration-300 cursor-pointer",
+      )}
     >
-      <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-    </button>
-  </motion.div>
-))
+      <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+      <span onClick={onSelect} className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+        {term}
+      </span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded-full hover:bg-background/50 transition-all"
+        title={t("searchRemoveHistory")}
+      >
+        <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+      </button>
+    </motion.div>
+  )
+})
 
 HistoryChip.displayName = "HistoryChip"
 
@@ -306,7 +311,7 @@ export const SearchView = ({
         setSearchHistory(cleaned)
       } catch {
         setSearchHistory([])
-      }
+      const { t } = useI18n()
     }
   }, [])
 
@@ -491,17 +496,17 @@ export const SearchView = ({
               <div className="flex items-center justify-center gap-2 mb-3">
                 <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
                   <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                    Recherche
+                    {t("searchTitle")}
                   </span>
                 </h1>
                 <HelpButton
-                  title="Recherche"
-                  description="Recherchez des titres, des artistes ou des albums dans votre bibliothèque. Vous pouvez aussi découvrir des pistes sur YouTube. Utilisez votre historique de recherche pour un accès rapide."
+                  title={t("searchHelpTitle")}
+                  description={t("searchHelpDescription")}
                   size="icon-sm"
                 />
               </div>
               <p className="text-muted-foreground text-lg">
-                Explorez votre bibliothèque et découvrez de nouvelles pistes
+                {t("searchSubtitle")}
               </p>
             </motion.div>
 
@@ -534,7 +539,7 @@ export const SearchView = ({
                     data-coachmark="search-input"
                     ref={inputRef}
                     type="text"
-                    placeholder="Artistes, titres ou albums..."
+                    placeholder={t("searchPlaceholder")}
                     value={query}
                     onChange={(e) => {
                       const value = e.target.value
@@ -575,7 +580,7 @@ export const SearchView = ({
                       "hover:bg-white/10 transition-all duration-200",
                       "text-muted-foreground hover:text-foreground",
                     )}
-                    title="Effacer la recherche"
+                    title={t("searchClear")}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -644,7 +649,7 @@ export const SearchView = ({
                   <section>
                     <div className="flex items-center gap-2 mb-4">
                       <User className="w-5 h-5 text-primary" />
-                      <h2 className="font-display text-lg font-semibold">Artistes</h2>
+                      <h2 className="font-display text-lg font-semibold">{t("searchArtistsLabel")}</h2>
                     </div>
                     <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                       {searchResults.artists.map((artist) => (
@@ -673,7 +678,7 @@ export const SearchView = ({
                           </div>
                           <div className="text-center">
                             <p className="text-sm font-medium truncate max-w-[100px]">{artist.name}</p>
-                            <p className="text-xs text-muted-foreground">{artist.count} titres</p>
+                            <p className="text-xs text-muted-foreground">{artist.count} {artist.count === 1 ? t("labelTrack") : t("labelTracks")}</p>
                           </div>
                         </button>
                       ))}
@@ -698,7 +703,7 @@ export const SearchView = ({
                   <section>
                     <div className="flex items-center gap-2 mb-4">
                       <Disc3 className="w-5 h-5 text-primary" />
-                      <h2 className="font-display text-lg font-semibold">Albums</h2>
+                      <h2 className="font-display text-lg font-semibold">{t("searchAlbumsLabel")}</h2>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                       {searchResults.albums.map((album) => (
@@ -734,7 +739,7 @@ export const SearchView = ({
                   <div className="flex items-center gap-2 mb-4">
                     <Music className="w-5 h-5 text-primary" />
                     <h2 className="font-display text-lg font-semibold">
-                      Titres
+                      {t("searchTracksLabel")}
                       <span className="ml-2 text-sm text-muted-foreground font-normal">
                         ({searchResults.tracks.length})
                       </span>
@@ -758,7 +763,7 @@ export const SearchView = ({
                       <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
                         <Search className="w-10 h-10 text-muted-foreground/50" />
                       </div>
-                      <p className="text-lg font-medium mb-1">Aucun résultat</p>
+                      <p className="text-lg font-medium mb-1">{t("searchNoResultsTitle")}</p>
                       <p className="text-muted-foreground text-sm">Essayez avec d'autres mots-clés</p>
                     </div>
                   ) : (
@@ -851,7 +856,7 @@ export const SearchView = ({
                   >
                     <div className="flex items-center gap-2 mb-4">
                       <TrendingUp className="w-5 h-5 text-emerald-400" />
-                      <h2 className="font-display text-lg font-semibold">Vos artistes les plus écoutés</h2>
+                      <h2 className="font-display text-lg font-semibold">{t("searchTopArtistsTitle")}</h2>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                       {dynamicData.topArtists.map((artist, idx) => (
@@ -878,7 +883,7 @@ export const SearchView = ({
                             <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
                               {artist.name}
                             </p>
-                            <p className="text-xs text-muted-foreground">{artist.playCount} écoutes</p>
+                            <p className="text-xs text-muted-foreground">{t("searchPlayCountLabel", { count: artist.playCount })}</p>
                           </div>
                         </motion.button>
                       ))}
@@ -937,7 +942,7 @@ export const SearchView = ({
                   transition={{ delay: 0.3 }}
                 >
                   <GenreExploreSection
-                    title={dynamicData.genres.length > 0 ? "Vos genres" : "Explorer par genre"}
+                    title={dynamicData.genres.length > 0 ? t("searchGenresTitle") : t("searchGenresExploreTitle")}
                     subtitle={`${browseCategories.length} genres disponibles`}
                     genres={browseCategories.map((cat) => ({
                       name: cat.name,

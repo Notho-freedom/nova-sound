@@ -21,6 +21,7 @@ import { useGenres, formatGenreName } from "@/hooks/useGenres";
 import { Button } from "@/components/ui/button";
 import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
 import { motion } from "framer-motion";
+import { useI18n } from "@/i18n";
 
 // UI Components
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -73,15 +74,6 @@ const formatTime = (seconds: number) => {
 };
 
 
-// Greeting based on time of day
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 6) return "Bonne nuit";
-  if (hour < 12) return "Bonjour";
-  if (hour < 18) return "Bon après-midi";
-  return "Bonsoir";
-};
-
 export const HomeView = memo(({
   tracks,
   currentTrackIndex,
@@ -105,6 +97,7 @@ export const HomeView = memo(({
   onPlayTrackList,
   loading = false,
 }: HomeViewProps) => {
+  const { t } = useI18n();
   // Hooks
   const playlistsResult = usePlaylists();
   const playlists = playlistsResult?.playlists ?? [];
@@ -118,6 +111,7 @@ export const HomeView = memo(({
   const { stats } = useListeningStats(tracks, history);
   const { genres, getTracksByGenre } = useGenres(tracks);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+  const isDayMix = new Date().getHours() < 18;
   
   const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
@@ -162,6 +156,14 @@ export const HomeView = memo(({
 
   const quickPlayItems = computed?.quickPlayItems ?? [];
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 6) return t("homeGreetingNight");
+    if (hour < 12) return t("homeGreetingMorning");
+    if (hour < 18) return t("homeGreetingAfternoon");
+    return t("homeGreetingEvening");
+  };
+
   // Loading skeleton
   if (loading) {
     return <HomeViewSkeleton />;
@@ -200,8 +202,8 @@ export const HomeView = memo(({
               {getGreeting()}{userName ? `, ${userName}` : ""}
             </h2>
             <HelpButton
-              title="Bienvenue"
-              description="Cliquez sur les titres pour les écouter. Utilisez le carrousel du haut pour explorer vos artistes et albums récents. Les recommandations sont basées sur votre historique d'écoute."
+              title={t("homeWelcomeTitle")}
+              description={t("homeWelcomeDescription")}
               size="icon-sm"
             />
           </div>
@@ -236,38 +238,38 @@ export const HomeView = memo(({
             transition={{ delay: 0.3 }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Vos statistiques</h3>
+              <h3 className="text-lg font-semibold">{t("homeStatsTitle")}</h3>
               <HelpIcon
-                title="Statistiques"
-                description="Suivez vos habitudes d'écoute : temps total écouté, nombre de pistes, écoutes cumulées et diversité artistique."
+                title={t("homeStatsHelpTitle")}
+                description={t("homeStatsHelpDescription")}
               />
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
-                label="Temps d'écoute"
+                label={t("homeStatsListeningTime")}
                 value={formatDuration(stats.weeklyListeningTime)}
                 icon={<Timer className="w-5 h-5" />}
-                subtitle="Cette semaine"
+                subtitle={t("homeStatsThisWeek")}
                 trend={stats.weeklyListeningTime > stats.dailyListeningTime * 7 * 0.8 ? "up" : "neutral"}
               />
               <StatCard
-                label="Pistes"
+                label={t("homeStatsTracks")}
                 value={stats.totalTracks.toLocaleString()}
                 icon={<Music className="w-5 h-5" />}
-                subtitle="Dans votre bibliothèque"
+                subtitle={t("homeStatsInLibrary")}
               />
               <StatCard
-                label="Écoutes"
+                label={t("homeStatsPlays")}
                 value={stats.totalPlays.toLocaleString()}
                 icon={<Headphones className="w-5 h-5" />}
-                subtitle="Total"
+                subtitle={t("homeStatsTotal")}
                 trend="up"
               />
               <StatCard
-                label="Artistes"
+                label={t("homeStatsArtists")}
                 value={stats.topArtists.length.toLocaleString()}
                 icon={<Users className="w-5 h-5" />}
-                subtitle="Différents"
+                subtitle={t("homeStatsDifferent")}
               />
             </div>
           </motion.div>
@@ -278,15 +280,15 @@ export const HomeView = memo(({
       {recentArtists.length > 0 && (
         <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Artistes récents</h3>
+            <h3 className="text-lg font-semibold">{t("homeRecentArtistsTitle")}</h3>
             <HelpIcon
-              title="Artistes récents"
-              description="Découvrez les artistes que vous écoutez le plus en ce moment. Cliquez sur un artiste pour filtrer vos titres."
+              title={t("homeRecentArtistsHelpTitle")}
+              description={t("homeRecentArtistsHelpDescription")}
             />
           </div>
           <ContentCarousel
             title=""
-            subtitle="Vos artistes écoutés récemment"
+            subtitle={t("homeRecentArtistsSubtitle")}
             icon={<Users className="w-5 h-5 text-primary" />}
           >
             {recentArtists.map((artist, idx) => (
@@ -327,7 +329,7 @@ export const HomeView = memo(({
       {selectedGenre && selectedGenreTracks.length > 0 && (
         <section className="px-6">
           <SectionHeader
-            title={`Genre : ${formatGenreName(selectedGenre)}`}
+            title={t("homeGenreTitle", { genre: formatGenreName(selectedGenre) })}
             icon={<Disc className="w-5 h-5 text-secondary" />}
             count={selectedGenreTracks.length}
             action={
@@ -338,11 +340,11 @@ export const HomeView = memo(({
                     variant="secondary"
                     onClick={() => onFilterByGenre(selectedGenre)}
                   >
-                    Voir dans la recherche
+                    {t("homeGenreViewInSearch")}
                   </Button>
                 )}
                 <Button size="sm" variant="ghost" onClick={() => setSelectedGenre(null)}>
-                  Fermer
+                  {t("homeClose")}
                 </Button>
               </div>
             }
@@ -352,10 +354,10 @@ export const HomeView = memo(({
               <table className="w-full table-fixed">
                 <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur-md">
                   <tr className="border-b border-border/30">
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-[45%]">Titre</th>
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell w-[35%]">Album</th>
-                    <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground w-[80px]">Durée</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">{t("homeTableIndex")}</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-[45%]">{t("libraryColumnTitle")}</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell w-[35%]">{t("labelAlbum")}</th>
+                    <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground w-[80px]">{t("libraryColumnDuration")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -422,8 +424,8 @@ export const HomeView = memo(({
       {displayRecent.length > 0 && (
         <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <ContentCarousel
-            title={recentTracks.length > 0 ? "Écouté récemment" : "À découvrir"}
-            subtitle={`${displayRecent.length} titres`}
+            title={recentTracks.length > 0 ? t("homeRecentlyPlayed") : t("homeDiscover")}
+            subtitle={t("homeTracksCount", { count: displayRecent.length })}
             icon={<Clock className="w-5 h-5 text-accent" />}
           >
             {displayRecent.map((track, idx) => {
@@ -440,7 +442,7 @@ export const HomeView = memo(({
                   onPlayNext={() => onPlayNext?.(track)}
                   onAddToQueue={() => onAddToQueue?.(track)}
                   onAddToPlaylist={(playlistId) => onAddToPlaylist?.(playlistId, track)}
-                  onCreatePlaylist={() => createPlaylist("Nouvelle playlist", [track.id])}
+                  onCreatePlaylist={() => createPlaylist(t("homeNewPlaylistName"), [track.id])}
                   onToggleFavorite={() => toggleFavorite(track.id)}
                   onUploadToCloudinary={() => uploadTrack?.(track)}
                   canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
@@ -478,8 +480,8 @@ export const HomeView = memo(({
       {newTracks.length > 0 && (
         <section className="pl-6 pr-6 overflow-hidden max-w-full">
           <ContentCarousel
-            title="Nouveautés"
-            subtitle="Récemment ajouté à votre bibliothèque"
+            title={t("homeNewInLibrary")}
+            subtitle={t("homeNewInLibrarySubtitle")}
             icon={<Star className="w-5 h-5 text-yellow-500" />}
           >
             {newTracks.map((track, idx) => {
@@ -492,7 +494,7 @@ export const HomeView = memo(({
                   title={track.title}
                   subtitle={track.artist}
                   imageUrl={getCoverUrl(track.coverUrl)}
-                  badge="NEW"
+                  badge={t("homeNewBadge")}
                   badgeColor="bg-yellow-500"
                   isPlaying={isPlaying}
                   isCurrent={isCurrent}
@@ -511,7 +513,7 @@ export const HomeView = memo(({
       {displayFavorites.length > 0 && (
         <section className="px-6">
           <SectionHeader
-            title="Vos favoris"
+            title={t("homeFavoritesTitle")}
             icon={<Heart className="w-5 h-5 text-red-500" />}
             count={favoriteTracks.length}
             action={onPlayTrackList ? (
@@ -522,7 +524,7 @@ export const HomeView = memo(({
                 className="gap-2"
               >
                 <Play className="w-4 h-4" />
-                Lecture
+                {t("homePlay")}
               </Button>
             ) : null}
           />
@@ -531,10 +533,10 @@ export const HomeView = memo(({
               <table className="w-full table-fixed">
                 <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur-md">
                   <tr className="border-b border-border/30">
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-[45%]">Titre</th>
-                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell w-[35%]">Album</th>
-                    <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground w-[80px]">Durée</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-12">{t("homeTableIndex")}</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground w-[45%]">{t("libraryColumnTitle")}</th>
+                    <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell w-[35%]">{t("labelAlbum")}</th>
+                    <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground w-[80px]">{t("libraryColumnDuration")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -601,16 +603,16 @@ export const HomeView = memo(({
       {(playlistSelections.discoveries.length > 0 || playlistSelections.similar.length > 0 || playlistSelections.mix.length > 0) && (
         <section className="px-6">
           <SectionHeader
-            title="Pour vous"
+            title={t("homeForYouTitle")}
             icon={<Sparkles className="w-5 h-5 text-amber-500" />}
-            subtitle="Playlists personnalisées basées sur vos goûts"
+            subtitle={t("homeForYouSubtitle")}
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {playlistSelections.discoveries.length > 0 && (
               <PlaylistCard
-                title="Découvertes"
-                subtitle={`${playlistSelections.discoveries.length} perles cachées`}
-                description="Explorations musicales"
+                title={t("homeDiscoveriesTitle")}
+                subtitle={t("homeDiscoveriesSubtitle", { count: playlistSelections.discoveries.length })}
+                description={t("homeDiscoveriesDescription")}
                 tracks={playlistSelections.discoveries}
                 gradient="from-violet-600/90 via-purple-600/80 to-indigo-700/90"
                 icon={<Zap className="w-4 h-4 text-cyan-400" />}
@@ -623,9 +625,9 @@ export const HomeView = memo(({
             
             {playlistSelections.similar.length > 0 && (
               <PlaylistCard
-                title="Similaires"
-                subtitle={`${playlistSelections.similar.length} titres qui vous ressemblent`}
-                description="Basé sur vos goûts"
+                title={t("homeSimilarTitle")}
+                subtitle={t("homeSimilarSubtitle", { count: playlistSelections.similar.length })}
+                description={t("homeSimilarDescription")}
                 tracks={playlistSelections.similar}
                 gradient="from-rose-500/90 via-pink-600/80 to-fuchsia-700/90"
                 icon={<Heart className="w-4 h-4 text-red-300 fill-red-300" />}
@@ -638,17 +640,20 @@ export const HomeView = memo(({
             
             {playlistSelections.mix.length > 0 && (
               <PlaylistCard
-                title={new Date().getHours() < 18 ? "Energy Mix" : "Chill Session"}
-                subtitle={`${playlistSelections.mix.length} titres pour ${new Date().getHours() < 18 ? "vous booster" : "vous détendre"}`}
-                description={new Date().getHours() < 18 ? "⚡ Énergisant" : "🌙 Apaisant"}
+                title={isDayMix ? t("homeMixEnergyTitle") : t("homeMixChillTitle")}
+                subtitle={t("homeMixSubtitle", {
+                  count: playlistSelections.mix.length,
+                  mood: isDayMix ? t("homeMixEnergyMood") : t("homeMixChillMood"),
+                })}
+                description={isDayMix ? t("homeMixEnergyDescription") : t("homeMixChillDescription")}
                 tracks={playlistSelections.mix}
-                gradient={new Date().getHours() < 18 
+                gradient={isDayMix 
                   ? "from-amber-500/90 via-orange-600/80 to-red-600/90"
                   : "from-indigo-600/90 via-blue-700/80 to-cyan-800/90"
                 }
                 icon={<TrendingUp className={cn(
                   "w-4 h-4",
-                  new Date().getHours() < 18 ? "text-yellow-300" : "text-cyan-300"
+                  isDayMix ? "text-yellow-300" : "text-cyan-300"
                 )} />}
                 onClick={() => {
                   const idx = tracks.findIndex(t => t.id === playlistSelections.mix[0]?.id);
@@ -671,9 +676,9 @@ export const HomeView = memo(({
           >
             <Library className="w-12 h-12 text-primary" />
           </motion.div>
-          <h3 className="text-xl font-display font-bold mb-2">Bibliothèque vide</h3>
+          <h3 className="text-xl font-display font-bold mb-2">{t("homeEmptyLibraryTitle")}</h3>
           <p className="text-muted-foreground text-sm max-w-md">
-            Ajoutez des dossiers de musique dans les paramètres pour commencer à écouter.
+            {t("homeEmptyLibraryDescription")}
           </p>
         </div>
       )}

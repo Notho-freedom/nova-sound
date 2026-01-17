@@ -37,6 +37,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileTableSkeleton } from "@/components/ui/skeletons";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { getUploadedFiles, getCachedUploads, invalidateUploadsCache, updateUploadsCache } from "@/data/uploads.session";
+import { useI18n } from "@/i18n";
 
 interface DownloadItem {
   id: string;
@@ -63,6 +64,7 @@ interface UploadedFile {
 const DOWNLOADS_STORAGE_KEY = "nexus-downloads";
 
 export const DownloadsView = () => {
+  const { t } = useI18n();
   const { nexusAuthenticated, nexusUser } = useCloudSync();
   
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
@@ -190,7 +192,7 @@ export const DownloadsView = () => {
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
+    const sizes = [t("downloadsSizeBytes"), t("downloadsSizeKB"), t("downloadsSizeMB"), t("downloadsSizeGB")];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
   };
@@ -202,10 +204,10 @@ export const DownloadsView = () => {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
-    if (hours > 0) return `Il y a ${hours} heure${hours > 1 ? "s" : ""}`;
-    if (minutes > 0) return `Il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
-    return "À l'instant";
+    if (days > 0) return t("downloadsTimeDays", { count: days, suffix: days > 1 ? "s" : "" });
+    if (hours > 0) return t("downloadsTimeHours", { count: hours, suffix: hours > 1 ? "s" : "" });
+    if (minutes > 0) return t("downloadsTimeMinutes", { count: minutes, suffix: minutes > 1 ? "s" : "" });
+    return t("downloadsTimeJustNow");
   };
 
   const startDownload = async (url: string, filename: string) => {
@@ -288,7 +290,7 @@ export const DownloadsView = () => {
         )
       );
 
-      toast.success(`Téléchargement terminé: ${filename}`);
+      toast.success(t("downloadsToastCompleted", { name: filename }));
     } catch (error) {
       console.error("Download failed:", error);
       setDownloads((prev) =>
@@ -297,12 +299,12 @@ export const DownloadsView = () => {
             ? {
                 ...d,
                 status: "failed",
-                error: error instanceof Error ? error.message : "Erreur inconnue",
+                error: error instanceof Error ? error.message : t("downloadsErrorUnknown"),
               }
             : d
         )
       );
-      toast.error(`Échec du téléchargement: ${filename}`);
+      toast.error(t("downloadsToastFailed", { name: filename }));
     }
   };
 
@@ -310,7 +312,7 @@ export const DownloadsView = () => {
     setDownloads((prev) =>
       prev.map((d) => (d.id === id && d.status === "downloading" ? { ...d, status: "paused" } : d))
     );
-    toast.info("Téléchargement mis en pause");
+    toast.info(t("downloadsToastPaused"));
   };
 
   const resumeDownload = async (id: string) => {
@@ -321,22 +323,22 @@ export const DownloadsView = () => {
     setDownloads((prev) =>
       prev.map((d) => (d.id === id ? { ...d, status: "downloading" } : d))
     );
-    toast.info("Reprise du téléchargement");
+    toast.info(t("downloadsToastResumed"));
   };
 
   const cancelDownload = (id: string) => {
     setDownloads((prev) => prev.filter((d) => d.id !== id));
-    toast.info("Téléchargement annulé");
+    toast.info(t("downloadsToastCanceled"));
   };
 
   const removeDownload = (id: string) => {
     setDownloads((prev) => prev.filter((d) => d.id !== id));
-    toast.success("Téléchargement supprimé");
+    toast.success(t("downloadsToastRemoved"));
   };
 
   const clearCompleted = () => {
     setDownloads((prev) => prev.filter((d) => d.status !== "completed"));
-    toast.success("Téléchargements terminés supprimés");
+    toast.success(t("downloadsToastClearCompleted"));
   };
 
   const getProviderIcon = (provider?: string) => {
@@ -357,15 +359,15 @@ export const DownloadsView = () => {
   const getProviderName = (provider?: string) => {
     switch (provider) {
       case "cloudinary":
-        return "Cloudinary (Serveur 0)";
+        return t("cloudProviderCloudinary");
       case "bunny":
-        return "Bunny CDN (Serveur 1)";
+        return t("cloudProviderBunny");
       case "planethoster":
-        return "PlanetHoster SFTP (Serveur 2)";
+        return t("cloudProviderPlanethoster");
       case "nexus":
-        return "Nexus Local";
+        return t("cloudProviderNexus");
       default:
-        return "Local";
+        return t("cloudProviderLocal");
     }
   };
 
@@ -375,7 +377,7 @@ export const DownloadsView = () => {
 
   const refreshUploadedFiles = async () => {
     await loadUploadedFiles();
-      toast.success("Fichiers uploadés actualisés");
+    toast.success(t("downloadsToastUploadsRefreshed"));
   };
 
   // Group uploaded files by provider
@@ -408,16 +410,16 @@ export const DownloadsView = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="font-display text-3xl font-bold text-foreground">
-            Téléchargements
+            {t("downloadsTitle")}
           </h1>
           <HelpButton
-            title="Téléchargements"
-            description="Téléchargez vos fichiers depuis le cloud ou uploadez-les. Suivez la progression et gérez vos fichiers dans différents onglets."
+            title={t("downloadsTitle")}
+            description={t("downloadsHelpDescription")}
             size="icon-sm"
           />
         </div>
         <p className="text-muted-foreground">
-          Gérez vos téléchargements et fichiers uploadés.
+          {t("downloadsSubtitle")}
         </p>
       </div>
 
@@ -426,11 +428,11 @@ export const DownloadsView = () => {
         <TabsList className="mb-6 bg-muted/30">
           <TabsTrigger value="downloads" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
             <Download className="w-4 h-4" />
-          Téléchargements ({downloads.length})
+            {t("downloadsTabDownloads", { count: downloads.length })}
           </TabsTrigger>
           <TabsTrigger value="uploaded" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
             <Cloud className="w-4 h-4" />
-          Fichiers Uploadés ({uploadedFiles.length})
+            {t("downloadsTabUploaded", { count: uploadedFiles.length })}
           </TabsTrigger>
         </TabsList>
 
@@ -442,7 +444,7 @@ export const DownloadsView = () => {
         <div className="mb-4 flex justify-end">
           <Button variant="outline" size="sm" onClick={clearCompleted}>
             <Trash2 className="w-4 h-4 mr-2" />
-            Supprimer les terminés
+            {t("downloadsClearCompleted")}
           </Button>
         </div>
       )}
@@ -451,7 +453,7 @@ export const DownloadsView = () => {
       {activeDownloads.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
-            En cours ({activeDownloads.length})
+            {t("downloadsSectionActive", { count: activeDownloads.length })}
           </h2>
           <div className="space-y-2">
             {activeDownloads.map((download) => (
@@ -516,7 +518,7 @@ export const DownloadsView = () => {
       {completedDownloads.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
-            Terminés ({completedDownloads.length})
+            {t("downloadsSectionCompleted", { count: completedDownloads.length })}
           </h2>
           <div className="space-y-2">
             {completedDownloads.map((download) => (
@@ -537,7 +539,7 @@ export const DownloadsView = () => {
                       <span className="text-xs text-muted-foreground">
                         {download.completedAt
                           ? formatDuration(download.completedAt)
-                          : "Terminé"}
+                          : t("downloadsCompletedLabel")}
                       </span>
                       {download.size > 0 && (
                         <>
@@ -565,7 +567,7 @@ export const DownloadsView = () => {
                         }}
                       >
                         <Download className="w-4 h-4 mr-2" />
-                        Télécharger à nouveau
+                        {t("downloadsActionDownloadAgain")}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -573,7 +575,7 @@ export const DownloadsView = () => {
                         className="text-destructive"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
-                        Supprimer
+                        {t("downloadsActionRemove")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -588,7 +590,7 @@ export const DownloadsView = () => {
       {failedDownloads.length > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-display uppercase tracking-widest text-muted-foreground mb-3">
-            Échecs ({failedDownloads.length})
+            {t("downloadsSectionFailed", { count: failedDownloads.length })}
           </h2>
           <div className="space-y-2">
             {failedDownloads.map((download) => (
@@ -605,7 +607,7 @@ export const DownloadsView = () => {
                       {download.filename}
                     </p>
                     <p className="text-xs text-destructive mt-1">
-                      {download.error || "Erreur inconnue"}
+                      {download.error || t("downloadsErrorUnknown")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -618,7 +620,7 @@ export const DownloadsView = () => {
                           }}
                     >
                           <Download className="w-4 h-4 mr-2" />
-                      Réessayer
+                          {t("downloadsActionRetry")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -642,10 +644,9 @@ export const DownloadsView = () => {
                 <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4 mx-auto">
                   <Download className="w-10 h-10 text-muted-foreground" />
                   </div>
-                <h3 className="text-lg font-medium mb-2">Aucun téléchargement</h3>
+                <h3 className="text-lg font-medium mb-2">{t("downloadsEmptyTitle")}</h3>
                 <p className="text-muted-foreground text-sm">
-                  Vos téléchargements de fichiers apparaîtront ici. Utilisez le menu contextuel
-                  sur les fichiers pour les télécharger.
+                  {t("downloadsEmptyDescription")}
                     </p>
                   </div>
             </div>
@@ -656,7 +657,7 @@ export const DownloadsView = () => {
         {/* Uploaded Files Tab Content */}
         <TabsContent value="uploaded" className="flex-1 flex flex-col overflow-hidden mt-0">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Fichiers Uploadés</h2>
+            <h2 className="text-lg font-semibold">{t("downloadsUploadedTitle")}</h2>
                   <Button
               variant="outline"
                     size="sm"
@@ -664,7 +665,7 @@ export const DownloadsView = () => {
               disabled={loadingUploaded}
                   >
               <RefreshCw className={cn("w-4 h-4 mr-2", loadingUploaded && "opacity-50")} />
-              {loadingUploaded ? "Actualisation..." : "Actualiser"}
+              {loadingUploaded ? t("downloadsRefreshing") : t("downloadsRefresh")}
                   </Button>
                 </div>
 
@@ -678,9 +679,9 @@ export const DownloadsView = () => {
                 <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mb-4 mx-auto">
                   <Cloud className="w-10 h-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium mb-2">Aucun fichier uploadé</h3>
+                <h3 className="text-lg font-medium mb-2">{t("downloadsUploadedEmptyTitle")}</h3>
                 <p className="text-muted-foreground text-sm">
-                  Les fichiers que vous uploadez sur les serveurs apparaîtront ici, classés par source.
+                  {t("downloadsUploadedEmptyDescription")}
                 </p>
               </div>
             </div>
@@ -699,19 +700,19 @@ export const DownloadsView = () => {
                     <thead className="sticky top-0 z-10 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
                       <tr className="border-b border-border/30">
                         <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground">
-                          Fichier
+                          {t("cloudTableFile")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                          Type
+                          {t("cloudTableType")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                          Taille
+                          {t("cloudTableSize")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-display uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                          Uploadé
+                          {t("cloudTableUploaded")}
                         </th>
                         <th className="px-4 py-3 text-right text-xs font-display uppercase tracking-widest text-muted-foreground">
-                          Actions
+                          {t("cloudTableActions")}
                         </th>
                       </tr>
                     </thead>
@@ -771,7 +772,7 @@ export const DownloadsView = () => {
                                     }}
                                 >
                                   <Download className="w-4 h-4 mr-2" />
-                                  Télécharger
+                                  {t("downloadsActionDownload")}
                                 </Button>
                               )}
                               <DropdownMenu>
@@ -796,7 +797,7 @@ export const DownloadsView = () => {
                                         }}
                                       >
                                         <Download className="w-4 h-4 mr-2" />
-                                        Télécharger directement
+                                        {t("downloadsActionDownloadDirect")}
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                     </>
@@ -825,12 +826,12 @@ export const DownloadsView = () => {
                                         // Silently fail if Firebase sync is not available
                                       }
                                       
-                                      toast.success("Fichier supprimé de la liste");
+                                      toast.success(t("downloadsToastFileRemoved"));
                                     }}
                                     className="text-destructive"
                                   >
                                     <Trash2 className="w-4 h-4 mr-2" />
-                                    Supprimer de la liste
+                                    {t("downloadsActionRemoveFromList")}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
