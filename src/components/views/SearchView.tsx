@@ -294,6 +294,8 @@ export const SearchView = ({
     error: youtubeError,
   } = useYouTubeSearch()
 
+  const { t } = useI18n()
+
   // Load search history from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("nexus-search-history")
@@ -311,7 +313,7 @@ export const SearchView = ({
         setSearchHistory(cleaned)
       } catch {
         setSearchHistory([])
-      const { t } = useI18n()
+      }
     }
   }, [])
 
