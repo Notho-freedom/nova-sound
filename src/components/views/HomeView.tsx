@@ -168,7 +168,7 @@ export const HomeView = memo(({
   }
 
   return (
-    <div className="pb-8 space-y-10 animate-fade-in overflow-hidden w-full contain-inline-size">
+    <div className="h-full min-h-0 w-full pb-8 space-y-10 animate-fade-in overflow-hidden contain-inline-size">
       {/* Hero Section with Carousel */}
       {heroSlides.length > 0 && (
         <section className="px-6">

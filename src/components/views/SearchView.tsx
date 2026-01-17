@@ -478,9 +478,9 @@ export const SearchView = ({
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="h-full flex flex-col"
+        className="h-full min-h-0 w-full flex flex-col"
       >
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="px-6 py-6 space-y-8">
             {/* Search Header - Enhanced */}
             <motion.div
@@ -897,7 +897,7 @@ export const SearchView = ({
                       <Clock className="w-5 h-5 text-cyan-400" />
                       <h2 className="font-display text-lg font-semibold">Récemment ajoutés</h2>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                       {dynamicData.recentTracks.map((track, idx) => {
                         const trackIndex = tracks.findIndex((t) => t.id === track.id)
                         return (
@@ -907,7 +907,7 @@ export const SearchView = ({
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.04 }}
                             onClick={() => trackIndex !== -1 && onTrackSelect(trackIndex)}
-                            className="group text-left rounded-xl overflow-hidden bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.03]"
+                            className="group text-left rounded-xl overflow-hidden bg-white/5 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02]"
                           >
                             <div className="relative aspect-square overflow-hidden">
                               <img
@@ -919,7 +919,7 @@ export const SearchView = ({
                                 <Play className="w-8 h-8 text-white fill-current drop-shadow-lg" />
                               </div>
                             </div>
-                            <div className="p-3">
+                            <div className="p-2">
                               <p className="text-sm font-medium truncate">{track.title}</p>
                               <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                             </div>

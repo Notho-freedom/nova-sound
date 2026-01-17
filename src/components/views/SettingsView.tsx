@@ -1218,7 +1218,7 @@ export const SettingsView = () => {
   }
 
   return (
-    <div className="h-full overflow-hidden flex flex-col animate-in fade-in duration-200">
+    <div className="h-full min-h-0 w-full overflow-hidden flex flex-col animate-in fade-in duration-200">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
         <div className="px-6 py-4">

@@ -14,7 +14,7 @@ export const PageContainer = memo(({ children, className }: PageContainerProps) 
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     transition={{ duration: 0.3 }}
-    className={cn("min-h-full", className)}
+    className={cn("h-full min-h-0 w-full overflow-x-hidden", className)}
   >
     {children}
   </motion.div>

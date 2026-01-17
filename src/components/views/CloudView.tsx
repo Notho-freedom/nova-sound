@@ -519,7 +519,7 @@ export const CloudView = () => {
   };
 
   return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden">
       <PageHeader
         title="Cloud Storage"
         subtitle="Gérez vos fichiers uploadés sur tous les serveurs"

@@ -262,7 +262,7 @@ export const ArtistView = memo(({
   }
 
   return (
-    <div className="pb-8 overflow-hidden">
+    <div className="h-full min-h-0 w-full pb-8 overflow-hidden">
       {/* Hero Section */}
       <div className="relative">
         {/* Background gradient with image */}

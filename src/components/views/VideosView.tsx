@@ -437,7 +437,7 @@ export const VideosView = memo(() => {
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col animate-in fade-in duration-300 overflow-hidden">
+    <div className="absolute inset-0 flex flex-col min-h-0 w-full animate-in fade-in duration-300 overflow-hidden">
       {/* Navigation Tabs */}
       <div className="flex-shrink-0 px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-card/40 backdrop-blur-2xl border border-border/30 shadow-xl">

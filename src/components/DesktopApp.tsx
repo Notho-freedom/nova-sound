@@ -2694,7 +2694,7 @@ export const DesktopApp = () => {
             {noTracksMessage}
             
             <div className={cn(
-              "flex-1 transition-all duration-300 relative",
+              "flex-1 min-h-0 min-w-0 transition-all duration-300 relative",
                     (isQueueOpen || isLyricsOpen || isNotificationsOpen || isArtistInfoOpen) && "mr-80", // isKaraokeOpen retiré
               showInlinePlayer && "flex items-center justify-center",
               currentView === "videos" && "overflow-hidden"
@@ -2709,8 +2709,8 @@ export const DesktopApp = () => {
                     {currentViewContent}
                   </div>
                 ) : (
-                  <ScrollArea className="h-full w-full">
-                    <div className="animate-in fade-in duration-200">
+                  <ScrollArea className="h-full w-full min-h-0">
+                    <div className="animate-in fade-in duration-200 min-h-0 w-full">
                       {currentViewContent}
                     </div>
                   </ScrollArea>

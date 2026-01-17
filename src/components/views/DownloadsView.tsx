@@ -404,7 +404,7 @@ export const DownloadsView = () => {
   const failedDownloads = downloads.filter((d) => d.status === "failed");
 
   return (
-    <div className="p-6 h-full flex flex-col">
+    <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="font-display text-3xl font-bold text-foreground">

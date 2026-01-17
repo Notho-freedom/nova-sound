@@ -94,12 +94,12 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 
     const columnsTemplate = useMemo(() => {
       const cols: string[] = [];
-      cols.push(showTrackNumber ? "48px" : "16px");
-      cols.push("minmax(140px, 1fr)");
-      if (showAlbum) cols.push("minmax(140px, 1fr)");
-      if (showHistory) cols.push("minmax(120px, 160px)");
-      cols.push("72px");
-      cols.push("48px");
+      cols.push(showTrackNumber ? "40px" : "12px");
+      cols.push("minmax(0, 2fr)");
+      if (showAlbum) cols.push("minmax(0, 1fr)");
+      if (showHistory) cols.push("minmax(0, 1fr)");
+      cols.push("64px");
+      cols.push("40px");
       return cols.join(" ");
     }, [showTrackNumber, showAlbum, showHistory]);
 
@@ -247,7 +247,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
                           e.stopPropagation();
                           data.onPlayTrack ? data.onPlayTrack(track) : data.onTrackSelect(actualIndex);
                         }}
-                        className="text-sm font-medium truncate text-left hover:underline focus-visible:outline-none"
+                        className="text-sm font-medium truncate text-left hover:underline focus-visible:outline-none max-w-xs"
                       >
                         {track.title}
                       </button>

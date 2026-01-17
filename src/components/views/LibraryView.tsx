@@ -496,7 +496,7 @@ export const LibraryView = memo(({
     const durationText = hours > 0 ? `${hours}h ${minutes}min` : `${minutes} min`;
 
     return (
-      <div className="pb-8 overflow-hidden">
+      <div className="h-full min-h-0 w-full pb-8 overflow-hidden">
         {/* Hero Section with Background */}
         <div className="relative">
           {/* Background gradient with album cover */}
@@ -923,7 +923,7 @@ export const LibraryView = memo(({
     );
 
     return (
-      <div className="min-h-full pb-8">
+      <div className="h-full min-h-0 w-full pb-8">
         {/* Hero Section */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-purple-500/10 to-pink-500/20" />
@@ -1206,7 +1206,7 @@ export const LibraryView = memo(({
     );
 
     return (
-      <div className="min-h-full pb-8">
+      <div className="h-full min-h-0 w-full pb-8">
         {/* Hero Section with gradient background */}
         <div className="relative overflow-hidden">
           {/* Animated gradient background */}
@@ -1477,7 +1477,7 @@ export const LibraryView = memo(({
     const totalDur = folders.reduce((acc, f) => acc + f.tracks.reduce((a, t) => a + t.duration, 0), 0);
 
     return (
-      <div className="min-h-full pb-8 relative">
+      <div className="h-full min-h-0 w-full pb-8 relative">
         {/* Animated Background Orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
