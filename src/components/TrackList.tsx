@@ -30,8 +30,9 @@ interface TrackListProps {
   uploadTrackToBunny?: (track: Track) => void;
   getBunnyTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToBunny?: boolean;
-  uploadTrackToNexus?: (track: Track) => void;
+  uploadTrackToNexus?: (track: Track, target?: "planethoster" | "local") => void;
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+  canUploadToLocal?: boolean;
   canUploadToNexus?: boolean;
   isUploaded?: (trackId: string) => boolean;
   getUploadedProvider?: (trackId: string) => "cloudinary" | "nexus" | "bunny" | "planethoster" | null;
@@ -63,6 +64,7 @@ export const TrackList = memo(({
   canUploadToBunny = false,
   uploadTrackToNexus,
   getNexusTrackProgress,
+  canUploadToLocal = false,
   canUploadToNexus = false,
   isUploaded,
   getUploadedProvider,
@@ -87,9 +89,12 @@ export const TrackList = memo(({
           onUploadToBunny={() => uploadTrackToBunny?.(track)}
           canUploadToBunny={canUploadToBunny && !!track.filePath}
           isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
-          onUploadToNexus={() => uploadTrackToNexus?.(track)}
+          onUploadToNexus={() => uploadTrackToNexus?.(track, 'planethoster')}
           canUploadToNexus={canUploadToNexus && !!track.filePath}
           isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+          onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
+          canUploadToLocal={canUploadToLocal && !!track.filePath}
+          isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
         >
           <div
             onClick={() => onTrackSelect(index)}

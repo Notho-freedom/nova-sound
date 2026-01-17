@@ -2005,10 +2005,11 @@ export const SettingsView = () => {
                   <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <p className="text-sm text-blue-400 flex items-center gap-2">
                       <Info className="w-4 h-4" />
-                      Gratuit - 25 Go de stockage
+                      Cloud public (Serveur 0)
+                      <Crown className="w-3.5 h-3.5 text-amber-400" />
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Configurez vos propres credentials Cloudinary
+                      Les utilisateurs Free utilisent le stockage local (25 Go)
                     </p>
                   </div>
                   
@@ -2394,7 +2395,10 @@ export const SettingsView = () => {
                       ) : (
                         <Button variant="default" size="sm" className="w-full" onClick={handleUpgradeToPro} disabled={!stripeInitialized}>
                           <Sparkles className="w-4 h-4 mr-2" />
-                          Passer au Pro - €9.99/mois
+                          <span className="inline-flex items-center gap-1">
+                            Passer au Pro €9.99/mois
+                            <Crown className="w-4 h-4" />
+                          </span>
                         </Button>
                       )}
 

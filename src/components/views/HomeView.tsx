@@ -119,9 +119,10 @@ export const HomeView = memo(({
   const { genres, getTracksByGenre } = useGenres(tracks);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   
-  const canUploadToCloudinary = cloudinaryConfigured;
+  const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
+  const canUploadToLocal = nexusAuthenticated;
   
   const currentTrack = currentTrackIndex >= 0 ? tracks[currentTrackIndex] : null;
   const userName = nexusUser?.displayName || nexusUser?.email?.split("@")[0] || "";
@@ -447,9 +448,12 @@ export const HomeView = memo(({
                   onUploadToBunny={() => uploadTrackToBunny?.(track)}
                   canUploadToBunny={canUploadToBunny && !!track.filePath}
                   isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
-                  onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                  onUploadToNexus={() => uploadTrackToNexus?.(track, 'planethoster')}
                   canUploadToNexus={canUploadToNexus && !!track.filePath}
                   isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                  onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
+                  canUploadToLocal={canUploadToLocal && !!track.filePath}
+                  isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                 >
                   <FeaturedCard
                     title={track.title}

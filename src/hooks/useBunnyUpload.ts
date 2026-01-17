@@ -3,6 +3,7 @@ import { notificationService } from '@/services/notification-service';
 import { authService } from '@/services/auth';
 import { stripeService } from '@/services/stripe';
 import { toast } from 'sonner';
+import { openProUploadCta } from '@/lib/pro-upload-cta';
 import type { Track } from '@/types/music';
 
 export interface BunnyUploadProgress {
@@ -79,6 +80,9 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
 
     // Bunny is only for Pro users (serveur 1)
     if (!isPro) {
+      openProUploadCta({ server: 'bunny' });
+      openProUploadCta({ server: 'bunny' });
+      openProUploadCta({ server: 'bunny' });
       toast.error('Plan Pro requis', {
         description: 'Passez au plan Pro pour utiliser Bunny Storage (serveur 1). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });

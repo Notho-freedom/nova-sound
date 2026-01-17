@@ -273,9 +273,10 @@ export const SearchView = ({
   const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload()
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync()
   const { isUploaded, getUploadedProvider } = useUploadedStatus()
-  const canUploadToCloudinary = cloudinaryConfigured
+  const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro
   const canUploadToBunny = nexusIsPro && nexusAuthenticated
   const canUploadToNexus = nexusIsPro && nexusAuthenticated
+  const canUploadToLocal = nexusAuthenticated
 
   // Play history hook
   const { history } = usePlayHistory()
@@ -808,9 +809,12 @@ export const SearchView = ({
                             onUploadToBunny={() => uploadTrackToBunny?.(track)}
                             canUploadToBunny={canUploadToBunny && !!track.filePath && !isYouTubeTrack}
                             isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === "uploading"}
-                            onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                            onUploadToNexus={() => uploadTrackToNexus?.(track, 'planethoster')}
                             canUploadToNexus={canUploadToNexus && !!track.filePath && !isYouTubeTrack}
                             isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === "uploading"}
+                            onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
+                            canUploadToLocal={canUploadToLocal && !!track.filePath && !isYouTubeTrack}
+                            isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === "uploading"}
                           >
                             <SearchTrackItem
                               track={track}

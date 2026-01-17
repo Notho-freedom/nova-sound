@@ -133,8 +133,9 @@ export const ArtistView = memo(({
     const nexusUpload = useNexusUpload();
     const { isUploaded, getUploadedProvider } = useUploadedStatus();
     const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated } = useCloudSync();
-    const canUploadToCloudinary = cloudinaryConfigured;
+    const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro;
     const canUploadToNexus = nexusIsPro && nexusAuthenticated;
+    const canUploadToLocal = nexusAuthenticated;
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<number | null>(null);
   const [showFullBio, setShowFullBio] = useState(false);
@@ -515,9 +516,12 @@ export const ArtistView = memo(({
                               onUploadToCloudinary={cloudinaryUpload.uploadTrack ? () => cloudinaryUpload.uploadTrack(track) : undefined}
                               canUploadToCloudinary={canUploadToCloudinary && !!track.filePath}
                               isUploading={cloudinaryUpload.getTrackProgress(track.id)?.status === 'uploading'}
-                              onUploadToNexus={nexusUpload.uploadTrack ? () => nexusUpload.uploadTrack(track) : undefined}
+                              onUploadToNexus={nexusUpload.uploadTrack ? () => nexusUpload.uploadTrack(track, 'planethoster') : undefined}
                               canUploadToNexus={canUploadToNexus && !!track.filePath}
                               isUploadingToNexus={nexusUpload.getTrackProgress(track.id)?.status === 'uploading'}
+                              onUploadToLocal={nexusUpload.uploadTrack ? () => nexusUpload.uploadTrack(track, 'local') : undefined}
+                              canUploadToLocal={canUploadToLocal && !!track.filePath}
+                              isUploadingToLocal={nexusUpload.getTrackProgress(track.id)?.status === 'uploading'}
                               isUploaded={isUploaded(track.id)}
                               getUploadedProvider={getUploadedProvider}
                             >

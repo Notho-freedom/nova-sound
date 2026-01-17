@@ -34,8 +34,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     uploadTrackToBunny?: (track: Track) => void;
     getBunnyTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
     canUploadToBunny?: boolean;
-    uploadTrackToNexus?: (track: Track) => void;
+    uploadTrackToNexus?: (track: Track, target?: "planethoster" | "local") => void;
     getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+    canUploadToLocal?: boolean;
     canUploadToNexus?: boolean;
     showHistory?: boolean;
     showAlbum?: boolean;
@@ -69,6 +70,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     canUploadToBunny = false,
     uploadTrackToNexus,
     getNexusTrackProgress,
+    canUploadToLocal = false,
     canUploadToNexus = false,
     showHistory = false,
     showAlbum = true,
@@ -121,6 +123,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       canUploadToBunny,
       uploadTrackToNexus,
       getNexusTrackProgress,
+      canUploadToLocal,
       canUploadToNexus,
       showHistory,
       showAlbum,
@@ -153,6 +156,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
       canUploadToBunny,
       uploadTrackToNexus,
       getNexusTrackProgress,
+      canUploadToLocal,
       canUploadToNexus,
       showHistory,
       showAlbum,
@@ -191,9 +195,12 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
           onUploadToBunny={() => data.uploadTrackToBunny?.(track)}
           canUploadToBunny={data.canUploadToBunny && !!track.filePath}
           isUploadingToBunny={data.getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
-          onUploadToNexus={() => data.uploadTrackToNexus?.(track)}
+          onUploadToNexus={() => data.uploadTrackToNexus?.(track, 'planethoster')}
           canUploadToNexus={data.canUploadToNexus && !!track.filePath}
           isUploadingToNexus={data.getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+          onUploadToLocal={() => data.uploadTrackToNexus?.(track, 'local')}
+          canUploadToLocal={data.canUploadToLocal && !!track.filePath}
+          isUploadingToLocal={data.getNexusTrackProgress?.(track.id)?.status === 'uploading'}
           onRemoveFromPlaylist={data.showRemoveFromPlaylist ? () => data.onRemoveFromPlaylist?.(track) : undefined}
         >
           <div

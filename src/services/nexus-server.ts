@@ -89,7 +89,8 @@ class NexusServerService {
   async uploadFile(
     file: Blob,
     fileName: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    target: 'planethoster' | 'local' = 'planethoster'
   ): Promise<UploadResult> {
     console.log("Upload file: Getting access token...");
     
@@ -122,7 +123,7 @@ class NexusServerService {
     // Check if user is pro for unlimited storage
     const userProfile = authService.getUserProfile();
     if (!authService.isPro() && userProfile) {
-      const storageLimit = 1024 * 1024 * 1024; // 1GB for free users
+      const storageLimit = 25 * 1024 * 1024 * 1024; // 25GB for free users (local only)
       if (userProfile.storageUsed + file.size > storageLimit) {
         throw new Error("Limite de stockage atteinte. Passez au Pro pour un stockage illimité.");
       }
@@ -280,7 +281,8 @@ class NexusServerService {
         reject(new Error("Upload aborted"));
       });
 
-      xhr.open("POST", `${API_BASE_URL}/api/storage/upload`);
+      const targetParam = target === 'local' ? '?target=local' : '';
+      xhr.open("POST", `${API_BASE_URL}/api/storage/upload${targetParam}`);
       xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
       xhr.send(formData);
     });

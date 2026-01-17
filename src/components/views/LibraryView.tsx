@@ -379,9 +379,10 @@ export const LibraryView = memo(({
   const playlists = playlistsResult?.playlists ?? [];
   const createPlaylist = playlistsResult?.createPlaylist ?? (async () => null);
   
-  const canUploadToCloudinary = cloudinaryConfigured;
+  const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
+  const canUploadToLocal = nexusAuthenticated;
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -714,9 +715,12 @@ export const LibraryView = memo(({
                               onUploadToBunny={() => uploadTrackToBunny?.(track)}
                               canUploadToBunny={canUploadToBunny && !!track.filePath}
                               isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === 'uploading'}
-                              onUploadToNexus={() => uploadTrackToNexus?.(track)}
+                              onUploadToNexus={() => uploadTrackToNexus?.(track, 'planethoster')}
                               canUploadToNexus={canUploadToNexus && !!track.filePath}
                               isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
+                              onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
+                              canUploadToLocal={canUploadToLocal && !!track.filePath}
+                              isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === 'uploading'}
                             >
                               <button
                                 onClick={(e) => e.stopPropagation()}
@@ -889,6 +893,7 @@ export const LibraryView = memo(({
                 uploadTrack={uploadTrack}
                 getTrackProgress={(id) => getTrackProgress(id) ?? null}
                 canUploadToCloudinary={canUploadToCloudinary}
+                canUploadToLocal={canUploadToLocal}
                 uploadTrackToBunny={uploadTrackToBunny}
                 getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
                 canUploadToBunny={canUploadToBunny}
@@ -1678,6 +1683,7 @@ export const LibraryView = memo(({
                             uploadTrack={uploadTrack}
                             getTrackProgress={(id) => getTrackProgress(id) ?? null}
                             canUploadToCloudinary={canUploadToCloudinary}
+                            canUploadToLocal={canUploadToLocal}
                             uploadTrackToBunny={uploadTrackToBunny}
                             getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
                             canUploadToBunny={canUploadToBunny}
@@ -2067,6 +2073,7 @@ export const LibraryView = memo(({
                 uploadTrack={uploadTrack}
                 getTrackProgress={(id) => getTrackProgress(id) ?? null}
                 canUploadToCloudinary={canUploadToCloudinary}
+                canUploadToLocal={canUploadToLocal}
                 uploadTrackToBunny={uploadTrackToBunny}
                 getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
                 canUploadToBunny={canUploadToBunny}
@@ -2092,6 +2099,7 @@ export const LibraryView = memo(({
                 uploadTrack={uploadTrack}
                 getTrackProgress={(id) => getTrackProgress(id) ?? null}
                 canUploadToCloudinary={canUploadToCloudinary}
+                canUploadToLocal={canUploadToLocal}
                 uploadTrackToBunny={uploadTrackToBunny}
                 getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
                 canUploadToBunny={canUploadToBunny}

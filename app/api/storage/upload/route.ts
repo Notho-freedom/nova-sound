@@ -1,16 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readdir, stat } from 'fs/promises';
 import path from 'path';
 import { verifyAuthAndPro } from '~/lib/stripe-utils';
 import { uploadToBunny, isBunnyConfigured } from '~/lib/bunny';
 import { uploadToPlanetHoster, isPlanetHosterConfigured } from '~/lib/planethoster-sftp';
-import { uploadToCloudinary, isCloudinaryConfigured } from '~/lib/cloudinary-server';
 import { createErrorResponse, ErrorCodes } from '~/lib/validation';
 import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
 
 const STORAGE_DIR = process.env.STORAGE_DIR || path.join(process.cwd(), 'storage');
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for free users
 const MAX_FILE_SIZE_PRO = 500 * 1024 * 1024; // 500MB for Pro users
+const MAX_LOCAL_STORAGE_FREE = 25 * 1024 * 1024 * 1024; // 25GB for free users
+
+async function getDirectorySize(dirPath: string): Promise<number> {
+  try {
+    const entries = await readdir(dirPath, { withFileTypes: true });
+    let total = 0;
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        total += await getDirectorySize(fullPath);
+      } else {
+        const fileStat = await stat(fullPath);
+        total += fileStat.size;
+      }
+    }
+    return total;
+  } catch (error) {
+    return 0;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,8 +99,10 @@ export async function POST(request: NextRequest) {
     const fileId = uniqueSuffix;
     const fileExtension = path.extname(file.name);
 
-    // Pro users: upload to cloud storage (Bunny or PlanetHoster)
-    if (auth.isPro) {
+    const target = request.nextUrl.searchParams.get('target');
+
+    // Pro users: upload to cloud storage (Bunny or PlanetHoster), unless target=local
+    if (auth.isPro && target !== 'local') {
       console.log(`[Upload] Pro user ${auth.userId} uploading file: ${file.name} (${file.size} bytes)`);
       
       let lastError: Error | null = null;
@@ -170,41 +191,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Free users: upload to Cloudinary (serveur 0)
-    console.log(`[Upload] Free user ${auth.userId} uploading file: ${file.name} (${file.size} bytes)`);
-    
-    if (isCloudinaryConfigured()) {
-      try {
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-        const contentType = file.type || 'application/octet-stream';
-        const fileName = `${fileId}${fileExtension}`;
-        const publicId = `nexus/free/${auth.userId}/${fileId}`;
-        
-        console.log(`[Upload] Uploading to Cloudinary (serveur 0): ${publicId} (${contentType})`);
-        const result = await uploadToCloudinary(buffer, fileName, contentType, publicId);
-        console.log(`[Upload] ✅ Cloudinary upload successful (serveur 0): ${result.secure_url}`);
+    // Free users (and Pro target=local): use local storage
+    console.log(`[Upload] Local upload for user ${auth.userId}: ${file.name} (${file.size} bytes)`);
 
-        return NextResponse.json({
-          id: fileId,
-          url: result.secure_url,
-          size: file.size,
-          filename: file.name,
-          provider: 'cloudinary',
-          server: 0, // Serveur 0
-        });
-      } catch (cloudinaryError: any) {
-        console.error('[Upload] ❌ Cloudinary upload failed:', cloudinaryError.message || cloudinaryError);
-        // Fallback to local storage if Cloudinary fails
-        console.log('[Upload] Falling back to local storage...');
-      }
-    } else {
-      console.warn('[Upload] ⚠️ Cloudinary not configured for Free user, using local storage fallback');
-    }
-
-    // Fallback: use local storage if Cloudinary is not configured or upload failed
     const userDir = path.join(STORAGE_DIR, 'users', auth.userId);
     await mkdir(userDir, { recursive: true });
+
+    if (!auth.isPro) {
+      const currentSize = await getDirectorySize(userDir);
+      if (currentSize + file.size > MAX_LOCAL_STORAGE_FREE) {
+        return createErrorResponse(
+          ErrorCodes.VALIDATION_ERROR,
+          `Limite de stockage local atteinte (25GB). Passez au plan Pro pour débloquer les serveurs cloud.`,
+          400,
+          {
+            maxSize: MAX_LOCAL_STORAGE_FREE,
+            currentSize,
+            fileSize: file.size,
+            isPro: false,
+          }
+        );
+      }
+    }
 
     const fileName = fileId + fileExtension;
     const filePath = path.join(userDir, fileName);

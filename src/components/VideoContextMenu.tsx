@@ -35,8 +35,10 @@ import {
   RotateCcw,
   Subtitles,
   Volume2,
+  Crown,
 } from "lucide-react";
 import type { Video } from "@/types/music";
+import { openProUploadCta } from "@/lib/pro-upload-cta";
 
 interface VideoContextMenuProps {
   video: Video;
@@ -239,12 +241,12 @@ export const VideoContextMenu = ({
         <ContextMenuSeparator />
 
         {/* Cloud Upload */}
-        {(canUploadToCloudinary || canUploadToBunny || canUploadToNexus) && (
+        {(onUploadToCloudinary || onUploadToBunny || onUploadToNexus) && (
           <>
             <ContextMenuSeparator />
-            {canUploadToCloudinary && (
+            {onUploadToCloudinary && (
               <ContextMenuItem
-                onClick={onUploadToCloudinary}
+                onClick={canUploadToCloudinary ? onUploadToCloudinary : () => openProUploadCta({ server: "cloudinary" })}
                 disabled={isUploadingToCloudinary}
               >
                 {isUploadingToCloudinary ? (
@@ -255,14 +257,15 @@ export const VideoContextMenu = ({
                 ) : (
                   <>
                     <Cloud className="w-4 h-4 mr-2 text-purple-500" />
-                    Uploader vers Cloudinary (Free)
+                    Uploader vers Cloudinary (Serveur 0)
+                    <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
                   </>
                 )}
               </ContextMenuItem>
             )}
-            {canUploadToBunny && (
+            {onUploadToBunny && (
               <ContextMenuItem
-                onClick={onUploadToBunny}
+                onClick={canUploadToBunny ? onUploadToBunny : () => openProUploadCta({ server: "bunny" })}
                 disabled={isUploadingToBunny}
               >
                 {isUploadingToBunny ? (
@@ -273,14 +276,15 @@ export const VideoContextMenu = ({
                 ) : (
                   <>
                     <Zap className="w-4 h-4 mr-2 text-blue-500" />
-                    Uploader vers Bunny (Pro)
+                    Uploader vers Bunny (Serveur 1)
+                    <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
                   </>
                 )}
               </ContextMenuItem>
             )}
-            {canUploadToNexus && (
+            {onUploadToNexus && (
               <ContextMenuItem
-                onClick={onUploadToNexus}
+                onClick={canUploadToNexus ? onUploadToNexus : () => openProUploadCta({ server: "planethoster" })}
                 disabled={isUploadingToNexus}
               >
                 {isUploadingToNexus ? (
@@ -291,7 +295,8 @@ export const VideoContextMenu = ({
                 ) : (
                   <>
                     <Server className="w-4 h-4 mr-2 text-green-500" />
-                    Uploader vers Nexus (Pro)
+                    Uploader vers PlanetHoster (Serveur 2)
+                    <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
                   </>
                 )}
               </ContextMenuItem>

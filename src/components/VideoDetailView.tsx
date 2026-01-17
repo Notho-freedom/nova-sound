@@ -20,6 +20,7 @@ import {
   Subtitles,
   Volume2,
   VolumeX,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -396,7 +397,8 @@ export const VideoDetailView = ({
                     disabled={isUploadingToCloudinary}
                   >
                     <Cloud className="w-4 h-4" />
-                    {isUploadingToCloudinary ? "Upload..." : "Cloudinary"}
+                    {isUploadingToCloudinary ? "Upload..." : "Cloudinary (Serveur 0)"}
+                    {!isUploadingToCloudinary && <Crown className="w-3.5 h-3.5 text-amber-400" />}
                   </Button>
                 )}
                 {canUploadToNexus && (
@@ -407,7 +409,8 @@ export const VideoDetailView = ({
                     disabled={isUploadingToNexus}
                   >
                     <Upload className="w-4 h-4" />
-                    {isUploadingToNexus ? "Upload..." : "Nexus Pro"}
+                    {isUploadingToNexus ? "Upload..." : "PlanetHoster (Serveur 2)"}
+                    {!isUploadingToNexus && <Crown className="w-3.5 h-3.5 text-amber-400" />}
                   </Button>
                 )}
               </div>

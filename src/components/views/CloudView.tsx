@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Copy,
   Eye,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
@@ -125,17 +126,17 @@ export const CloudView = () => {
     {
       id: "cloudinary",
       name: "Cloudinary",
-      description: "Serveur 0 - Gratuit pour tous les utilisateurs",
+      description: "Serveur 0",
       icon: Cloud,
       color: "text-purple-500",
-      isPro: false,
+      isPro: true,
       serverNumber: 0,
       configured: cloudinaryConfigured,
     },
     {
       id: "bunny",
       name: "Bunny CDN",
-      description: "Serveur 1 - Pro uniquement",
+      description: "Serveur 1",
       icon: Cloud,
       color: "text-blue-500",
       isPro: true,
@@ -145,7 +146,7 @@ export const CloudView = () => {
     {
       id: "planethoster",
       name: "PlanetHoster SFTP",
-      description: "Serveur 2 - Pro uniquement",
+      description: "Serveur 2",
       icon: Server,
       color: "text-orange-500",
       isPro: true,
@@ -155,7 +156,7 @@ export const CloudView = () => {
     {
       id: "nexus",
       name: "Nexus Local",
-      description: "Stockage local sur serveur Nexus",
+      description: "Serveur 3 - Stockage local (Free/Pro)",
       icon: HardDrive,
       color: "text-green-500",
       isPro: false,
@@ -292,16 +293,20 @@ export const CloudView = () => {
   const getProviderName = (provider?: string) => {
     switch (provider) {
       case "cloudinary":
-        return "Cloudinary (Free - Serveur 0)";
+        return "Cloudinary (Serveur 0)";
       case "bunny":
-        return "Bunny CDN (Pro - Serveur 1)";
+        return "Bunny CDN (Serveur 1)";
       case "planethoster":
-        return "PlanetHoster SFTP (Pro - Serveur 2)";
+        return "PlanetHoster SFTP (Serveur 2)";
       case "nexus":
         return "Nexus Local";
       default:
         return "Local";
     }
+  };
+
+  const isProProvider = (provider?: string) => {
+    return provider === "cloudinary" || provider === "bunny" || provider === "planethoster";
   };
 
   const refreshUploadedFiles = async () => {
@@ -338,11 +343,11 @@ export const CloudView = () => {
             await uploadTrackToBunny(track);
             break;
           case "nexus":
-            await uploadTrackToNexus(track);
+            await uploadTrackToNexus(track, "local");
             break;
           case "planethoster":
             // PlanetHoster uses the same endpoint as Nexus
-            await uploadTrackToNexus(track);
+            await uploadTrackToNexus(track, "planethoster");
             break;
         }
       }
@@ -370,11 +375,11 @@ export const CloudView = () => {
             await uploadVideoToBunny(video);
             break;
           case "nexus":
-            await uploadVideoToNexus(video);
+            await uploadVideoToNexus(video, "local");
             break;
           case "planethoster":
             // PlanetHoster uses the same endpoint as Nexus
-            await uploadVideoToNexus(video);
+            await uploadVideoToNexus(video, "planethoster");
             break;
         }
       }
@@ -680,6 +685,7 @@ export const CloudView = () => {
               >
                 <server.icon className={cn("w-4 h-4", server.color)} />
                 <span>{server.name}</span>
+                {server.isPro && <Crown className="w-3.5 h-3.5 text-amber-400" />}
                 {stats.fileCount > 0 && (
                   <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
                     {stats.fileCount}
@@ -712,7 +718,10 @@ export const CloudView = () => {
                       <server.icon className={cn("w-6 h-6", server.color)} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">{server.name}</h3>
+                      <h3 className="font-semibold text-lg flex items-center gap-2">
+                        {server.name}
+                        {server.isPro && <Crown className="w-4 h-4 text-amber-400" />}
+                      </h3>
                       <p className="text-sm text-muted-foreground">{server.description}</p>
                       <div className="flex items-center gap-4 mt-2 text-sm">
                         <span className="text-muted-foreground">
@@ -813,8 +822,11 @@ export const CloudView = () => {
                                       </p>
                                       <div className="flex items-center gap-2 mt-1">
                                         {getProviderIcon(file.cloudProvider)}
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className="text-xs text-muted-foreground inline-flex items-center">
                                           {getProviderName(file.cloudProvider)}
+                                          {isProProvider(file.cloudProvider) && (
+                                            <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
+                                          )}
                                         </span>
                                       </div>
                                     </div>

@@ -17,6 +17,7 @@ import {
   Server,
   HardDrive,
   RefreshCw,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpButton, HelpIcon } from "@/components/ui/HelpButton";
@@ -356,16 +357,20 @@ export const DownloadsView = () => {
   const getProviderName = (provider?: string) => {
     switch (provider) {
       case "cloudinary":
-        return "Cloudinary (Free - Serveur 0)";
+        return "Cloudinary (Serveur 0)";
       case "bunny":
-        return "Bunny CDN (Pro - Serveur 1)";
+        return "Bunny CDN (Serveur 1)";
       case "planethoster":
-        return "PlanetHoster SFTP (Pro - Serveur 2)";
+        return "PlanetHoster SFTP (Serveur 2)";
       case "nexus":
         return "Nexus Local";
       default:
         return "Local";
     }
+  };
+
+  const isProProvider = (provider?: string) => {
+    return provider === "cloudinary" || provider === "bunny" || provider === "planethoster";
   };
 
   const refreshUploadedFiles = async () => {
@@ -389,7 +394,7 @@ export const DownloadsView = () => {
     count: filesByProvider[key].length
   })));
 
-  // Provider order: Free users (Cloudinary - serveur 0), Pro users (Bunny - serveur 1, PlanetHoster - serveur 2)
+  // Provider order: Pro users (Cloudinary - serveur 0, Bunny - serveur 1, PlanetHoster - serveur 2), Free users (Local)
   const providerOrder = ["cloudinary", "bunny", "planethoster", "nexus", "local"];
 
   const activeDownloads = downloads.filter(
@@ -729,9 +734,12 @@ export const DownloadsView = () => {
                               </p>
                               <div className="flex items-center gap-2 mt-1">
                                     {getProviderIcon(file.cloudProvider)}
-                                <span className="text-xs text-muted-foreground">
-                                      {getProviderName(file.cloudProvider)}
-                                </span>
+                                  <span className="text-xs text-muted-foreground inline-flex items-center">
+                                    {getProviderName(file.cloudProvider)}
+                                    {isProProvider(file.cloudProvider) && (
+                                      <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
+                                    )}
+                                  </span>
                               </div>
                             </div>
                               </div>
@@ -861,7 +869,13 @@ export const DownloadsView = () => {
                         className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
                       >
                         {getProviderIcon(provider as any)}
-                        {getProviderName(provider as any)} ({files.length})
+                        <span className="inline-flex items-center">
+                          {getProviderName(provider as any)}
+                          {isProProvider(provider as any) && (
+                            <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
+                          )}
+                        </span>
+                        ({files.length})
                       </TabsTrigger>
                 );
               })}

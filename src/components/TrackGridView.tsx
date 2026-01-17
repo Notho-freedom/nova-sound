@@ -34,8 +34,9 @@ interface TrackGridViewProps {
   uploadTrackToBunny?: (track: Track) => void;
   getBunnyTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
   canUploadToBunny?: boolean;
-  uploadTrackToNexus?: (track: Track) => void;
+  uploadTrackToNexus?: (track: Track, target?: "planethoster" | "local") => void;
   getNexusTrackProgress?: (trackId: string) => { status: string; progress: number } | null;
+  canUploadToLocal?: boolean;
   canUploadToNexus?: boolean;
   columns?: number;
   isUploaded?: (trackId: string) => boolean;
@@ -65,6 +66,7 @@ export const TrackGridView = memo(({
   canUploadToBunny = false,
   uploadTrackToNexus,
   getNexusTrackProgress,
+  canUploadToLocal = false,
   canUploadToNexus = false,
   columns = 5,
   isUploaded,
@@ -111,6 +113,7 @@ export const TrackGridView = memo(({
     canUploadToBunny,
     uploadTrackToNexus,
     getNexusTrackProgress,
+    canUploadToLocal,
     canUploadToNexus,
     isUploaded,
     getUploadedProvider,
@@ -139,6 +142,7 @@ export const TrackGridView = memo(({
     canUploadToBunny,
     uploadTrackToNexus,
     getNexusTrackProgress,
+    canUploadToLocal,
     canUploadToNexus,
     isUploaded,
     getUploadedProvider,
@@ -186,9 +190,12 @@ export const TrackGridView = memo(({
           onUploadToBunny={() => data.uploadTrackToBunny?.(track)}
           canUploadToBunny={data.canUploadToBunny && !!track.filePath}
           isUploadingToBunny={data.getBunnyTrackProgress?.(track.id)?.status === "uploading"}
-          onUploadToNexus={() => data.uploadTrackToNexus?.(track)}
+          onUploadToNexus={() => data.uploadTrackToNexus?.(track, 'planethoster')}
           canUploadToNexus={data.canUploadToNexus && !!track.filePath}
           isUploadingToNexus={data.getNexusTrackProgress?.(track.id)?.status === "uploading"}
+          onUploadToLocal={() => data.uploadTrackToNexus?.(track, 'local')}
+          canUploadToLocal={data.canUploadToLocal && !!track.filePath}
+          isUploadingToLocal={data.getNexusTrackProgress?.(track.id)?.status === "uploading"}
         >
           <Tooltip>
             <TooltipTrigger asChild>
@@ -265,9 +272,12 @@ export const TrackGridView = memo(({
               onUploadToBunny={() => uploadTrackToBunny?.(track)}
               canUploadToBunny={canUploadToBunny && !!track.filePath}
               isUploadingToBunny={getBunnyTrackProgress?.(track.id)?.status === "uploading"}
-              onUploadToNexus={() => uploadTrackToNexus?.(track)}
+              onUploadToNexus={() => uploadTrackToNexus?.(track, 'planethoster')}
               canUploadToNexus={canUploadToNexus && !!track.filePath}
               isUploadingToNexus={getNexusTrackProgress?.(track.id)?.status === "uploading"}
+              onUploadToLocal={() => uploadTrackToNexus?.(track, 'local')}
+              canUploadToLocal={canUploadToLocal && !!track.filePath}
+              isUploadingToLocal={getNexusTrackProgress?.(track.id)?.status === "uploading"}
             >
               <Tooltip>
                 <TooltipTrigger asChild>

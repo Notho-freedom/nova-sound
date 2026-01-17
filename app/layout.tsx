@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useEffect, useState } from "react";
 import { FirebaseProvider } from "@/components/FirebaseProvider";
+import { ProUploadCtaModal } from "@/components/ProUploadCtaModal";
 import "./globals.css";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ export default function RootLayout({
                 <TooltipProvider>
                   <Toaster />
                   <Sonner />
+                  <ProUploadCtaModal />
                   {children}
                 </TooltipProvider>
               </FirebaseProvider>

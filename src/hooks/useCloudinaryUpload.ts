@@ -1,8 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { cloudinaryService, UploadProgress } from '@/services/cloudinary';
 import { useCloudSync } from './useCloudSync';
+import { authService } from '@/services/auth';
+import { stripeService } from '@/services/stripe';
 import { Track } from '@/types/music';
 import { toast } from 'sonner';
+import { openProUploadCta } from '@/lib/pro-upload-cta';
 
 interface UseCloudinaryUploadReturn {
   uploadTrack: (track: Track) => Promise<void>;
@@ -39,6 +42,49 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
 
   // Upload a track to Cloudinary
   const uploadTrack = useCallback(async (track: Track) => {
+    let isAuthenticated = false;
+    let isPro = false;
+
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        isAuthenticated = true;
+        isPro = firebaseService.isPro();
+      }
+    } catch (error) {
+      // Firebase not available
+    }
+
+    if (!isAuthenticated) {
+      isAuthenticated = authService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
+      isPro = authService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
+    }
+
+    if (!isAuthenticated) {
+      toast.error('Authentification requise', {
+        description: 'Connectez-vous pour uploader vers Cloudinary.',
+      });
+      return;
+    }
+
+    if (!isPro) {
+      openProUploadCta({ server: 'cloudinary' });
+      toast.error('Plan Pro requis', {
+        description: 'Le serveur Cloudinary est réservé aux utilisateurs Pro.',
+      });
+      return;
+    }
+
     if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
         description: 'Configurez Cloudinary dans les paramètres pour uploader vos fichiers.',
@@ -132,6 +178,49 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
 
   // Upload an entire album (all tracks without duplicates)
   const uploadAlbum = useCallback(async (tracks: Track[]) => {
+    let isAuthenticated = false;
+    let isPro = false;
+
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        isAuthenticated = true;
+        isPro = firebaseService.isPro();
+      }
+    } catch (error) {
+      // Firebase not available
+    }
+
+    if (!isAuthenticated) {
+      isAuthenticated = authService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
+      isPro = authService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
+    }
+
+    if (!isAuthenticated) {
+      toast.error('Authentification requise', {
+        description: 'Connectez-vous pour uploader vers Cloudinary.',
+      });
+      return;
+    }
+
+    if (!isPro) {
+      openProUploadCta({ server: 'cloudinary' });
+      toast.error('Plan Pro requis', {
+        description: 'Le serveur Cloudinary est réservé aux utilisateurs Pro.',
+      });
+      return;
+    }
+
     if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
         description: 'Configurez Cloudinary dans les paramètres pour uploader vos fichiers.',
@@ -175,6 +264,49 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
 
   // Upload an entire playlist (all tracks without duplicates)
   const uploadPlaylist = useCallback(async (tracks: Track[]) => {
+    let isAuthenticated = false;
+    let isPro = false;
+
+    try {
+      const { firebaseService } = await import('@/services/firebase');
+      if (firebaseService.isInitialized() && firebaseService.getCurrentUser()) {
+        isAuthenticated = true;
+        isPro = firebaseService.isPro();
+      }
+    } catch (error) {
+      // Firebase not available
+    }
+
+    if (!isAuthenticated) {
+      isAuthenticated = authService.isAuthenticated();
+    }
+    if (isAuthenticated && !isPro) {
+      isPro = authService.isPro();
+    }
+    if (isAuthenticated && !isPro) {
+      try {
+        const status = await stripeService.getSubscriptionStatus();
+        isPro = status.isActive && status.plan === 'pro';
+      } catch (error) {
+        console.error('Failed to check Stripe subscription status:', error);
+      }
+    }
+
+    if (!isAuthenticated) {
+      toast.error('Authentification requise', {
+        description: 'Connectez-vous pour uploader vers Cloudinary.',
+      });
+      return;
+    }
+
+    if (!isPro) {
+      openProUploadCta({ server: 'cloudinary' });
+      toast.error('Plan Pro requis', {
+        description: 'Le serveur Cloudinary est réservé aux utilisateurs Pro.',
+      });
+      return;
+    }
+
     if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
         description: 'Configurez Cloudinary dans les paramètres pour uploader vos fichiers.',

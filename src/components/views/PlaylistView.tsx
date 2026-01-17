@@ -347,9 +347,10 @@ export const PlaylistView = memo(({
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
   const { isFavorite: isPlaylistFavorite, toggleFavorite: togglePlaylistFavorite } = usePlaylistFavorites();
   
-  const canUploadToCloudinary = cloudinaryConfigured;
+  const canUploadToCloudinary = cloudinaryConfigured && nexusIsPro;
   const canUploadToBunny = nexusIsPro && nexusAuthenticated;
   const canUploadToNexus = nexusIsPro && nexusAuthenticated;
+  const canUploadToLocal = nexusAuthenticated;
   
   // Table state
   const [tableSearchQuery, setTableSearchQuery] = useState("");
@@ -1050,6 +1051,7 @@ export const PlaylistView = memo(({
                       uploadTrack={uploadTrack}
                       getTrackProgress={(id) => getTrackProgress(id) ?? null}
                       canUploadToCloudinary={canUploadToCloudinary}
+                      canUploadToLocal={canUploadToLocal}
                       uploadTrackToBunny={uploadTrackToBunny}
                       getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
                       canUploadToBunny={canUploadToBunny}
@@ -1077,6 +1079,7 @@ export const PlaylistView = memo(({
                       uploadTrack={uploadTrack}
                       getTrackProgress={(id) => getTrackProgress(id) ?? null}
                       canUploadToCloudinary={canUploadToCloudinary}
+                      canUploadToLocal={canUploadToLocal}
                       uploadTrackToBunny={uploadTrackToBunny}
                       getBunnyTrackProgress={(id) => getBunnyTrackProgress(id) ?? null}
                       canUploadToBunny={canUploadToBunny}

@@ -24,8 +24,11 @@ import {
   CloudOff,
   Zap,
   Server,
+  HardDrive,
+  Crown,
 } from "lucide-react";
 import { Track, Playlist } from "@/types/music";
+import { openProUploadCta } from "@/lib/pro-upload-cta";
 
 interface TrackContextMenuProps {
   track: Track;
@@ -52,6 +55,9 @@ interface TrackContextMenuProps {
   onUploadToNexus?: () => void;
   canUploadToNexus?: boolean;
   isUploadingToNexus?: boolean;
+  onUploadToLocal?: () => void;
+  canUploadToLocal?: boolean;
+  isUploadingToLocal?: boolean;
   // New optional upload state helpers
   // Accept either a boolean (already-evaluated) or a function that can be called with a trackId
   isUploaded?: boolean | ((trackId: string) => boolean);
@@ -83,6 +89,9 @@ export const TrackContextMenu = ({
   onUploadToNexus,
   canUploadToNexus = false,
   isUploadingToNexus = false,
+  onUploadToLocal,
+  canUploadToLocal = false,
+  isUploadingToLocal = false,
   isUploaded,
   getUploadedProvider,
 }: TrackContextMenuProps) => {
@@ -178,7 +187,7 @@ export const TrackContextMenu = ({
           </ContextMenuItem>
         )}
 
-        {(onUploadToCloudinary || onUploadToBunny || onUploadToNexus) ? (
+        {onUploadToCloudinary || onUploadToBunny || onUploadToNexus || onUploadToLocal ? (
           <>
             <ContextMenuSeparator />
             <ContextMenuSub>
@@ -189,8 +198,8 @@ export const TrackContextMenu = ({
               <ContextMenuSubContent className="w-56">
                 {onUploadToCloudinary && (
                   <ContextMenuItem 
-                    onClick={onUploadToCloudinary}
-                    disabled={isUploading || !canUploadToCloudinary}
+                    onClick={canUploadToCloudinary ? onUploadToCloudinary : () => openProUploadCta({ server: "cloudinary" })}
+                    disabled={isUploading}
                   >
                     {isUploading ? (
                       <>
@@ -200,15 +209,16 @@ export const TrackContextMenu = ({
                     ) : (
                       <>
                         <Cloud className="w-4 h-4 mr-2" />
-                        Cloudinary (Serveur 0) — cloud public
+                        Cloudinary (Serveur 0)
+                        <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
                       </>
                     )}
                   </ContextMenuItem>
                 )}
                 {onUploadToBunny && (
                   <ContextMenuItem 
-                    onClick={onUploadToBunny}
-                    disabled={isUploadingToBunny || !canUploadToBunny}
+                    onClick={canUploadToBunny ? onUploadToBunny : () => openProUploadCta({ server: "bunny" })}
+                    disabled={isUploadingToBunny}
                   >
                     {isUploadingToBunny ? (
                       <>
@@ -218,7 +228,8 @@ export const TrackContextMenu = ({
                     ) : (
                       <>
                         <Zap className="w-4 h-4 mr-2" />
-                        Bunny (Serveur 1) — CDN rapide
+                        Bunny (Serveur 1)
+                        <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
                       </>
                     )}
                   </ContextMenuItem>
@@ -226,8 +237,8 @@ export const TrackContextMenu = ({
                 {onUploadToNexus && (
                   <>
                     <ContextMenuItem 
-                      onClick={onUploadToNexus}
-                      disabled={isUploadingToNexus || !canUploadToNexus}
+                      onClick={canUploadToNexus ? onUploadToNexus : () => openProUploadCta({ server: "planethoster" })}
+                      disabled={isUploadingToNexus}
                     >
                       {isUploadingToNexus ? (
                         <>
@@ -237,27 +248,30 @@ export const TrackContextMenu = ({
                       ) : (
                         <>
                           <Server className="w-4 h-4 mr-2" />
-                          PlanetHoster (Serveur 2) — SFTP privé
-                        </>
-                      )}
-                    </ContextMenuItem>
-                    <ContextMenuItem 
-                      onClick={onUploadToNexus}
-                      disabled={isUploadingToNexus || !canUploadToNexus}
-                    >
-                      {isUploadingToNexus ? (
-                        <>
-                          <Server className="w-4 h-4 mr-2 animate-pulse" />
-                          Upload vers Nexus...
-                        </>
-                      ) : (
-                        <>
-                          <Server className="w-4 h-4 mr-2" />
-                          Nexus Local (Serveur 3) — stockage local
+                          PlanetHoster (Serveur 2)
+                          <Crown className="w-3.5 h-3.5 ml-1 text-amber-400" />
                         </>
                       )}
                     </ContextMenuItem>
                   </>
+                )}
+                {onUploadToLocal && (
+                  <ContextMenuItem 
+                    onClick={onUploadToLocal}
+                    disabled={isUploadingToLocal || !canUploadToLocal}
+                  >
+                    {isUploadingToLocal ? (
+                      <>
+                        <HardDrive className="w-4 h-4 mr-2 animate-pulse" />
+                        Upload local...
+                      </>
+                    ) : (
+                      <>
+                        <HardDrive className="w-4 h-4 mr-2" />
+                        Local (Serveur 3) — stockage local
+                      </>
+                    )}
+                  </ContextMenuItem>
                 )}
               </ContextMenuSubContent>
             </ContextMenuSub>

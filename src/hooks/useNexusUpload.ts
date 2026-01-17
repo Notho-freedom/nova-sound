@@ -4,6 +4,7 @@ import { authService } from '@/services/auth';
 import { stripeService } from '@/services/stripe';
 import { notificationService } from '@/services/notification-service';
 import { toast } from 'sonner';
+import { openProUploadCta } from '@/lib/pro-upload-cta';
 import type { Track } from '@/types/music';
 import { getUserStorageKey, getCurrentUserId } from '@/lib/storage-utils';
 
@@ -70,7 +71,7 @@ export interface NexusUploadProgress {
 }
 
 interface UseNexusUploadReturn {
-  uploadTrack: (track: Track) => Promise<void>;
+  uploadTrack: (track: Track, target?: 'planethoster' | 'local') => Promise<void>;
   uploadAlbum: (tracks: Track[]) => Promise<void>;
   uploadPlaylist: (tracks: Track[]) => Promise<void>;
   uploadProgress: Map<string, NexusUploadProgress>;
@@ -95,7 +96,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
 
   const isUploading = Array.from(uploadProgress.values()).some(p => p.status === 'uploading');
 
-  const uploadTrack = useCallback(async (track: Track) => {
+  const uploadTrack = useCallback(async (track: Track, target: 'planethoster' | 'local' = 'planethoster') => {
     // Check if user is authenticated and Pro
     // Try Firebase first
     let isAuthenticated = false;
@@ -135,10 +136,11 @@ export function useNexusUpload(): UseNexusUploadReturn {
       return;
     }
 
-    // Nexus/PlanetHoster is only for Pro users (serveur 2)
-    if (!isPro) {
+    // PlanetHoster (serveur 2) est Pro uniquement — Local autorisé en Free
+    if (!isPro && target !== 'local') {
+      openProUploadCta({ server: 'planethoster' });
       toast.error('Plan Pro requis', {
-        description: 'Passez au plan Pro pour utiliser PlanetHoster/Nexus (serveur 2). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
+        description: 'Passez au plan Pro pour utiliser PlanetHoster (serveur 2).',
       });
       return;
     }
@@ -202,6 +204,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
       }
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const targetParam = target === 'local' ? '?target=local' : '';
 
       // Use streaming upload for large files (> 100MB)
       if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
@@ -209,7 +212,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
         
         const result = await window.electronAPI.uploadToNexus({
           filePath: track.filePath!,
-          apiUrl: `${API_BASE_URL}/api/storage/upload`,
+          apiUrl: `${API_BASE_URL}/api/storage/upload${targetParam}`,
           accessToken,
           fileName,
           onProgress: (progressValue) => {
@@ -367,7 +370,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
           }
           return updated;
         });
-      });
+      }, target);
 
       // Mark as completed
       setUploadProgress(prev => {
@@ -468,6 +471,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
     }
     
     if (!isAuthenticated || !isPro) {
+      openProUploadCta({ server: 'planethoster' });
       toast.error('Plan Pro requis', {
         description: 'Passez au plan Pro pour utiliser PlanetHoster/Nexus (serveur 2). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
@@ -541,6 +545,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
     }
     
     if (!isAuthenticated || !isPro) {
+      openProUploadCta({ server: 'planethoster' });
       toast.error('Plan Pro requis', {
         description: 'Passez au plan Pro pour utiliser PlanetHoster/Nexus (serveur 2). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });

@@ -4,6 +4,7 @@ import { authService } from '@/services/auth';
 import { useCloudSync } from './useCloudSync';
 import type { Video } from '@/types/music';
 import { toast } from 'sonner';
+import { openProUploadCta } from '@/lib/pro-upload-cta';
 
 // Video MIME types
 const VIDEO_MIME_TYPES: Record<string, string> = {
@@ -48,7 +49,7 @@ interface UseVideoUploadReturn {
   getBunnyProgress: (videoId: string) => VideoUploadProgress | null;
   
   // Nexus
-  uploadVideoToNexus: (video: Video) => Promise<void>;
+  uploadVideoToNexus: (video: Video, target?: "planethoster" | "local") => Promise<void>;
   uploadMultipleToNexus: (videos: Video[]) => Promise<void>;
   nexusProgress: Map<string, VideoUploadProgress>;
   isUploadingToNexus: boolean;
@@ -104,9 +105,17 @@ export function useVideoUpload(): UseVideoUploadReturn {
 
   // Upload video to Cloudinary
   const uploadVideoToCloudinary = useCallback(async (video: Video) => {
-    if (!cloudinaryConfigured && !nexusIsPro) {
+    if (!nexusIsPro || !nexusAuthenticated) {
+      openProUploadCta({ server: 'cloudinary' });
+      toast.error('Plan Pro requis', {
+        description: 'Cloudinary est réservé aux comptes Pro.',
+      });
+      return;
+    }
+
+    if (!cloudinaryConfigured) {
       toast.error('Cloudinary non configuré', {
-        description: 'Configurez Cloudinary dans les paramètres ou passez au plan Pro.',
+        description: 'Configurez Cloudinary dans les paramètres pour l’upload vidéo.',
       });
       return;
     }
@@ -296,11 +305,12 @@ export function useVideoUpload(): UseVideoUploadReturn {
     } finally {
       setIsUploadingToCloudinary(false);
     }
-  }, [cloudinaryConfigured, nexusIsPro, cloudinaryProgress, getMimeType, updateCloudinaryProgress]);
+  }, [cloudinaryConfigured, nexusIsPro, nexusAuthenticated, cloudinaryProgress, getMimeType, updateCloudinaryProgress]);
 
   // Upload video to Bunny
   const uploadVideoToBunny = useCallback(async (video: Video) => {
     if (!nexusIsPro || !nexusAuthenticated) {
+      openProUploadCta({ server: 'bunny' });
       toast.error('Plan Pro requis', {
         description: 'Passez au plan Pro pour utiliser Bunny Storage (serveur 1). Les utilisateurs Free utilisent Cloudinary (serveur 0).',
       });
@@ -533,10 +543,17 @@ export function useVideoUpload(): UseVideoUploadReturn {
   }, [nexusIsPro, nexusAuthenticated, bunnyProgress, getMimeType, updateBunnyProgress]);
 
   // Upload video to Nexus
-  const uploadVideoToNexus = useCallback(async (video: Video) => {
-    if (!nexusIsPro || !nexusAuthenticated) {
-      toast.error('Nexus Pro requis', {
-        description: 'Passez au plan Pro et connectez-vous à Nexus pour utiliser cette fonctionnalité.',
+  const uploadVideoToNexus = useCallback(async (video: Video, target: "planethoster" | "local" = "planethoster") => {
+    if (!nexusAuthenticated) {
+      toast.error('Authentification requise', {
+        description: 'Connectez-vous pour uploader vers Nexus.',
+      });
+      return;
+    }
+    if (!nexusIsPro && target !== 'local') {
+      openProUploadCta({ server: 'planethoster' });
+      toast.error('Plan Pro requis', {
+        description: 'Passez au plan Pro pour utiliser PlanetHoster (serveur 2).',
       });
       return;
     }
@@ -607,6 +624,7 @@ export function useVideoUpload(): UseVideoUploadReturn {
       }
 
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const targetParam = target === 'local' ? '?target=local' : '';
 
       // Use streaming upload for large files (> 100MB)
       if (fileSizeMB > FILE_SIZE_LIMIT_MB && window.electronAPI.uploadToNexus) {
@@ -614,7 +632,7 @@ export function useVideoUpload(): UseVideoUploadReturn {
         
         const result = await window.electronAPI.uploadToNexus({
           filePath: video.filePath,
-          apiUrl: `${API_BASE_URL}/api/storage/upload`,
+          apiUrl: `${API_BASE_URL}/api/storage/upload${targetParam}`,
           accessToken,
           fileName,
           onProgress: (progressValue) => {
