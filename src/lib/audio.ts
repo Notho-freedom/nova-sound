@@ -1,4 +1,5 @@
 import { DEFAULT_COVER } from "@/data/tracks";
+import { isElectron } from "@/lib/electron-detector";
 
 /**
  * Get album cover URL with fallback to default
@@ -39,14 +40,21 @@ export function getAudioSrc(filePath?: string): string | null {
   
   // Check if already using local-audio protocol
   if (filePath.startsWith('local-audio://')) {
-    return filePath;
+    return isElectron() ? filePath : null;
   }
   
   // Local file path - convert to local-audio:// URL for Electron
   // This uses our custom protocol registered in main.ts
+  if (!isElectron()) {
+    return null;
+  }
   const normalizedPath = filePath.replace(/\\/g, '/');
   // Encode the path but keep slashes to preserve absolute paths
   const encodedPath = encodeURI(normalizedPath);
+  // On Windows, ensure the drive letter stays in the path (not host)
+  if (/^[A-Za-z]:/.test(normalizedPath)) {
+    return `local-audio:///${encodedPath}`;
+  }
   return `local-audio://${encodedPath}`;
 }
 
@@ -70,14 +78,21 @@ export function getVideoSrc(filePath?: string): string | null {
   
   // Check if already using local-video protocol
   if (filePath.startsWith('local-video://')) {
-    return filePath;
+    return isElectron() ? filePath : null;
   }
   
   // Local file path - convert to local-video:// URL for Electron
   // This uses our custom protocol registered in main.ts
+  if (!isElectron()) {
+    return null;
+  }
   const normalizedPath = filePath.replace(/\\/g, '/');
   const encodedPath = encodeURIComponent(normalizedPath);
   
+  if (/^[A-Za-z]:/.test(normalizedPath)) {
+    return `local-video:///${encodedPath}`;
+  }
+
   return `local-video://${encodedPath}`;
 }
 

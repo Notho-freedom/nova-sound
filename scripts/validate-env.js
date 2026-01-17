@@ -232,6 +232,58 @@ const envDefinitions = {
       },
     ],
   },
+  // Observability
+  observability: {
+    required: [],
+    optional: [
+      {
+        key: 'SENTRY_DSN',
+        description: 'Sentry DSN (server/electron)',
+        validate: (val) => !val || val.startsWith('https://'),
+      },
+      {
+        key: 'NEXT_PUBLIC_SENTRY_DSN',
+        description: 'Sentry DSN (client)',
+        validate: (val) => !val || val.startsWith('https://'),
+      },
+    ],
+  },
+  // Search (Meilisearch)
+  search: {
+    required: [],
+    optional: [
+      {
+        key: 'MEILI_HOST',
+        description: 'Meilisearch Host URL',
+        validate: (val) => !val || val.startsWith('http'),
+      },
+      {
+        key: 'MEILISEARCH_HOST',
+        description: 'Meilisearch Host URL (alias)',
+        validate: (val) => !val || val.startsWith('http'),
+      },
+      {
+        key: 'MEILI_API_KEY',
+        description: 'Meilisearch API Key',
+        validate: (val) => !val || val.length > 10,
+      },
+      {
+        key: 'MEILISEARCH_API_KEY',
+        description: 'Meilisearch API Key (alias)',
+        validate: (val) => !val || val.length > 10,
+      },
+      {
+        key: 'MEILI_INDEX_PREFIX',
+        description: 'Meilisearch Index Prefix',
+        validate: (val) => !val || val.length > 0,
+      },
+      {
+        key: 'MEILISEARCH_INDEX_PREFIX',
+        description: 'Meilisearch Index Prefix (alias)',
+        validate: (val) => !val || val.length > 0,
+      },
+    ],
+  },
 };
 
 function validateVariable(def, checkAll = false) {
@@ -318,6 +370,8 @@ function main() {
     { def: envDefinitions.stripe, name: '💳 Stripe' },
     { def: envDefinitions.storage, name: '📦 Storage Providers' },
     { def: envDefinitions.urls, name: '🌐 URLs' },
+    { def: envDefinitions.observability, name: '📈 Observability' },
+    { def: envDefinitions.search, name: '🔎 Search (Meilisearch)' },
   ];
 
   let totalRequiredIssues = 0;

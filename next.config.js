@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -39,7 +41,45 @@ const nextConfig = {
   serverExternalPackages: ['electron', 'ssh2', 'ssh2-sftp-client'],
   // Configuration Turbopack (vide pour permettre webpack)
   turbopack: {},
+  async headers() {
+    const ContentSecurityPolicy = `
+      default-src 'self';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+      object-src 'none';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.youtube.com https://s.ytimg.com;
+      script-src-elem 'self' 'unsafe-inline' https://js.stripe.com https://www.youtube.com https://s.ytimg.com;
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https:;
+      font-src 'self' data: https:;
+      media-src 'self' blob: data: https: http: local-audio: local-video: local-image:;
+      connect-src 'self' https: wss: https://api.stripe.com;
+      frame-src 'self' https://js.stripe.com https://hooks.stripe.com;
+      worker-src 'self' blob:;
+    `;
+
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'Content-Security-Policy', value: ContentSecurityPolicy.replace(/\s{2,}/g, ' ').trim() },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        ],
+      },
+    ];
+  },
 };
 
-export default nextConfig;
+const sentryWebpackPluginOptions = {
+  silent: true,
+};
+
+export default withSentryConfig(nextConfig, sentryWebpackPluginOptions, {
+  hideSourceMaps: true,
+  disableLogger: true,
+});
 

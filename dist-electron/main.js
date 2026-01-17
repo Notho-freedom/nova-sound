@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import { createServer } from 'http';
+import * as Sentry from '@sentry/electron/main';
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
 import { initVideoScanner } from './services/video-scanner.js';
@@ -60,6 +61,14 @@ let stripeWindow = null;
 let oauthCallbackServer = null;
 const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 const isDev = !app.isPackaged;
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: isDev ? 'development' : 'production',
+        enabled: !isDev,
+        tracesSampleRate: 0.1,
+    });
+}
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
     'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'opus', 'wma', 'aiff', 'mp2', 'mp1',
@@ -74,6 +83,75 @@ const VIDEO_EXTENSIONS = [
     'amv', 'drc', 'gifv', 'mxf', 'roq', 'nsv', 'yuv', 'viv', 'svi', 'mng', 'qt'
 ];
 const MEDIA_EXTENSIONS = [...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS];
+function getSecureStorePath() {
+    return path.join(app.getPath('userData'), 'secure-store.json');
+}
+const SECURE_STORE_MAX_KEY_LENGTH = 128;
+function readSecureStore() {
+    try {
+        const secureStorePath = getSecureStorePath();
+        if (!fs.existsSync(secureStorePath))
+            return {};
+        const raw = fs.readFileSync(secureStorePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (!parsed?.data)
+            return {};
+        if (parsed.encrypted && safeStorage.isEncryptionAvailable()) {
+            const decrypted = safeStorage.decryptString(Buffer.from(parsed.data, 'base64'));
+            return JSON.parse(decrypted);
+        }
+        return JSON.parse(parsed.data);
+    }
+    catch (error) {
+        console.warn('[SecureStore] Failed to read secure store:', error);
+        return {};
+    }
+}
+function writeSecureStore(store) {
+    try {
+        const serialized = JSON.stringify(store);
+        const secureStorePath = getSecureStorePath();
+        if (safeStorage.isEncryptionAvailable()) {
+            const encrypted = safeStorage.encryptString(serialized);
+            const payload = {
+                encrypted: true,
+                data: encrypted.toString('base64'),
+            };
+            fs.writeFileSync(secureStorePath, JSON.stringify(payload));
+            return;
+        }
+        const payload = {
+            encrypted: false,
+            data: serialized,
+        };
+        fs.writeFileSync(secureStorePath, JSON.stringify(payload));
+    }
+    catch (error) {
+        console.warn('[SecureStore] Failed to write secure store:', error);
+    }
+}
+function isSafeExternalUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string')
+        return false;
+    try {
+        const parsed = new URL(rawUrl);
+        const protocol = parsed.protocol.toLowerCase();
+        if (protocol === 'mailto:')
+            return true;
+        if (protocol !== 'https:' && protocol !== 'http:')
+            return false;
+        // Allow http only for localhost (OAuth callback)
+        if (protocol === 'http:') {
+            const host = parsed.hostname.toLowerCase();
+            return host === 'localhost' || host === '127.0.0.1';
+        }
+        // https is allowed
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 function loadSecondaryWindowState(key, defaults) {
     try {
         const raw = fs.readFileSync(secondaryWindowStatePath, 'utf-8');
@@ -172,7 +250,12 @@ function createSecondaryWindow(title, key, overrides = {}) {
         }
     });
     window.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
+        if (isSafeExternalUrl(url)) {
+            shell.openExternal(url);
+        }
+        else {
+            console.warn('[Security] Blocked external URL:', url);
+        }
         return { action: 'deny' };
     });
     window.webContents.on('did-start-loading', () => {
@@ -549,9 +632,47 @@ ipcMain.handle('window:isMaximized', () => {
     return mainWindow?.isMaximized() || false;
 });
 ipcMain.handle('window:openExternal', (_event, url) => {
-    if (url) {
+    if (url && isSafeExternalUrl(url)) {
         shell.openExternal(url);
     }
+    else if (url) {
+        console.warn('[Security] Blocked external URL:', url);
+    }
+});
+// Secure storage handlers (encrypted at rest)
+ipcMain.handle('secureStore:get', (_event, key) => {
+    if (!key || typeof key !== 'string' || key.length > SECURE_STORE_MAX_KEY_LENGTH) {
+        return null;
+    }
+    const store = readSecureStore();
+    return store[key] ?? null;
+});
+ipcMain.handle('secureStore:set', (_event, key, value) => {
+    if (!key || typeof key !== 'string' || key.length > SECURE_STORE_MAX_KEY_LENGTH) {
+        return false;
+    }
+    if (typeof value !== 'string') {
+        return false;
+    }
+    const store = readSecureStore();
+    store[key] = value;
+    writeSecureStore(store);
+    return true;
+});
+ipcMain.handle('secureStore:delete', (_event, key) => {
+    if (!key || typeof key !== 'string' || key.length > SECURE_STORE_MAX_KEY_LENGTH) {
+        return false;
+    }
+    const store = readSecureStore();
+    if (key in store) {
+        delete store[key];
+        writeSecureStore(store);
+    }
+    return true;
+});
+ipcMain.handle('secureStore:clear', () => {
+    writeSecureStore({});
+    return true;
 });
 // OAuth handlers for desktop app authentication
 ipcMain.handle('oauth:openWindow', async (_event, url) => {
@@ -1070,6 +1191,8 @@ function registerLocalAudioProtocol() {
             if (process.platform === 'win32') {
                 // Handle Windows paths that might have forward slashes
                 filePath = filePath.replace(/\//g, '\\');
+                // Restore drive letter if it was parsed as host (e.g., C\Users -> C:\Users)
+                filePath = filePath.replace(/^([A-Za-z])\\/, '$1:\\');
             }
             // Check if file exists
             if (!fs.existsSync(filePath)) {
@@ -1125,6 +1248,8 @@ function registerLocalVideoProtocol() {
             if (process.platform === 'win32') {
                 // Handle Windows paths that might have forward slashes
                 filePath = filePath.replace(/\//g, '\\');
+                // Restore drive letter if it was parsed as host (e.g., C\Users -> C:\Users)
+                filePath = filePath.replace(/^([A-Za-z])\\/, '$1:\\');
             }
             // Check if file exists
             if (!fs.existsSync(filePath)) {

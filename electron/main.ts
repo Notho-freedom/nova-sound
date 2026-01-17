@@ -6,6 +6,7 @@ import { createReadStream } from 'fs';
 import { Readable } from 'stream';
 import { createServer, Server } from 'http';
 import { AddressInfo } from 'net';
+import * as Sentry from '@sentry/electron/main';
 
 // Import services
 import { initAudioScanner } from './services/audio-scanner.js';
@@ -74,6 +75,15 @@ let oauthCallbackServer: Server | null = null;
 const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 
 const isDev = !app.isPackaged;
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: isDev ? 'development' : 'production',
+    enabled: !isDev,
+    tracesSampleRate: 0.1,
+  });
+}
 
 // Supported media file extensions
 const AUDIO_EXTENSIONS = [
@@ -1306,6 +1316,8 @@ function registerLocalAudioProtocol() {
       if (process.platform === 'win32') {
         // Handle Windows paths that might have forward slashes
         filePath = filePath.replace(/\//g, '\\');
+        // Restore drive letter if it was parsed as host (e.g., C\Users -> C:\Users)
+        filePath = filePath.replace(/^([A-Za-z])\\/, '$1:\\');
       }
       
       // Check if file exists
@@ -1366,6 +1378,8 @@ function registerLocalVideoProtocol() {
       if (process.platform === 'win32') {
         // Handle Windows paths that might have forward slashes
         filePath = filePath.replace(/\//g, '\\');
+        // Restore drive letter if it was parsed as host (e.g., C\Users -> C:\Users)
+        filePath = filePath.replace(/^([A-Za-z])\\/, '$1:\\');
       }
       
       // Check if file exists
