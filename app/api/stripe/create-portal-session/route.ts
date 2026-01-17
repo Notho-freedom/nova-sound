@@ -12,24 +12,33 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
       apiVersion: '2025-11-17.clover',
     })
   : null;
+import { startRequestSpan } from '~/lib/observability';
+import { recordError, recordRequest } from '~/lib/metrics';
 
 export async function POST(request: NextRequest) {
+  const span = startRequestSpan(request, 'stripe.createPortalSession');
   try {
     const auth = await verifyAuth(request);
     if (!auth) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.AUTHENTICATION_ERROR,
         'User not authenticated',
         401
       );
+      recordRequest('/stripe/create-portal-session', 'POST', 401);
+      span.end(401);
+      return response;
     }
 
     if (!stripe) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.EXTERNAL_SERVICE_ERROR,
         'Stripe is not configured. Please set STRIPE_SECRET_KEY in .env',
         503
       );
+      recordRequest('/stripe/create-portal-session', 'POST', 503);
+      span.end(503);
+      return response;
     }
 
     const body = await request.json();
@@ -37,12 +46,15 @@ export async function POST(request: NextRequest) {
     // Validate request body
     const validation = validateRequest(stripePortalSchema, body);
     if (isValidationError(validation)) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         validation.error.code,
         validation.error.message,
         400,
         validation.error.details
       );
+      recordRequest('/stripe/create-portal-session', 'POST', 400);
+      span.end(400);
+      return response;
     }
 
     const { returnUrl } = validation.data;
@@ -104,7 +116,10 @@ export async function POST(request: NextRequest) {
         return_url: returnUrl || `${FRONTEND_URL}/settings`,
       });
 
-      return NextResponse.json({ url: session.url });
+      const response = NextResponse.json({ url: session.url });
+      recordRequest('/stripe/create-portal-session', 'POST', 200);
+      span.end(200);
+      return response;
     } catch (portalError: unknown) {
       const stripeError = portalError as { type?: string; message?: string; code?: string };
       console.error('Stripe portal session creation error:', {
@@ -116,12 +131,15 @@ export async function POST(request: NextRequest) {
       
       // Check if it's a configuration error
       if (stripeError.type === 'invalid_request_error' && stripeError.message?.includes('portal')) {
-        return createErrorResponse(
+        const response = createErrorResponse(
           ErrorCodes.EXTERNAL_SERVICE_ERROR,
           'Stripe Billing Portal is not configured. Please configure it in your Stripe Dashboard: Settings > Billing > Customer portal',
           400,
           { stripeError: stripeError.message }
         );
+        recordRequest('/stripe/create-portal-session', 'POST', 400);
+        span.end(400);
+        return response;
       }
       
       throw portalError; // Re-throw to be caught by outer catch
@@ -133,12 +151,16 @@ export async function POST(request: NextRequest) {
       type: err.type,
       code: err.code,
     });
-    return createErrorResponse(
+    const response = createErrorResponse(
       ErrorCodes.INTERNAL_ERROR,
       err.message || 'Failed to create portal session. Please try again later.',
       500,
       process.env.NODE_ENV === 'development' ? { originalError: err.message, type: err.type } : undefined
     );
+    recordError('/stripe/create-portal-session');
+    recordRequest('/stripe/create-portal-session', 'POST', 500);
+    span.error(500, error);
+    return response;
   }
 }
 

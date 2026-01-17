@@ -126,6 +126,88 @@ paths:
             filename: "song.mp3"
             provider: "bunny"
 
+  /storage/upload-bunny:
+    post:
+      tags:
+        - Storage
+      summary: Upload a file to Bunny
+      description: |
+        Upload a file to Bunny Storage (Pro only).
+
+        **File size limit:** 500MB
+      operationId: uploadFileBunny
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /storage/upload-planethoster:
+    post:
+      tags:
+        - Storage
+      summary: Upload a file to PlanetHoster
+      description: |
+        Upload a file to PlanetHoster SFTP (Pro only).
+
+        **File size limit:** 500MB
+      operationId: uploadFilePlanetHoster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /storage/files:
     get:
       tags:

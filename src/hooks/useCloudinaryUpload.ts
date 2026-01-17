@@ -6,6 +6,7 @@ import { stripeService } from '@/services/stripe';
 import { Track } from '@/types/music';
 import { toast } from 'sonner';
 import { openProUploadCta } from '@/lib/pro-upload-cta';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 interface UseCloudinaryUploadReturn {
   uploadTrack: (track: Track) => Promise<void>;
@@ -42,6 +43,12 @@ export function useCloudinaryUpload(): UseCloudinaryUploadReturn {
 
   // Upload a track to Cloudinary
   const uploadTrack = useCallback(async (track: Track) => {
+    if (!isFeatureEnabled('cloudinaryUpload')) {
+      toast.error('Fonction désactivée', {
+        description: 'L\'upload Cloudinary est temporairement désactivé.',
+      });
+      return;
+    }
     let isAuthenticated = false;
     let isPro = false;
 

@@ -6,6 +6,7 @@
 
 import { authService } from './auth';
 import { stripeService } from './stripe';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 export type AIFeatureLevel = 'free' | 'pro' | 'none';
 
@@ -23,6 +24,17 @@ export interface AIFeatureFlags {
  * Vérifie si l'utilisateur a accès aux fonctionnalités IA Pro
  */
 export async function checkAIFeatures(): Promise<AIFeatureFlags> {
+  if (!isFeatureEnabled('aiFeatures')) {
+    return {
+      canUseAdvancedAI: false,
+      canUseTranscription: false,
+      canUseSentimentAnalysis: false,
+      canUseSpeakerDiarization: false,
+      canUseChapters: false,
+      canUseToxicityDetection: false,
+      level: 'none',
+    };
+  }
   // Vérifier d'abord le service auth local
   const localUser = authService.getCurrentUser();
   const isLocalPro = localUser?.plan === 'pro' && localUser?.subscriptionStatus === 'active';

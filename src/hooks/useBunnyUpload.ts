@@ -5,6 +5,7 @@ import { stripeService } from '@/services/stripe';
 import { toast } from 'sonner';
 import { openProUploadCta } from '@/lib/pro-upload-cta';
 import type { Track } from '@/types/music';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 export interface BunnyUploadProgress {
   trackId: string;
@@ -42,6 +43,12 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
   const isUploading = Array.from(uploadProgress.values()).some(p => p.status === 'uploading');
 
   const uploadTrack = useCallback(async (track: Track) => {
+    if (!isFeatureEnabled('bunnyUpload')) {
+      toast.error('Fonction désactivée', {
+        description: 'L\'upload Bunny est temporairement désactivé.',
+      });
+      return;
+    }
     // Check if user is authenticated and Pro
     let isAuthenticated = false;
     let isPro = false;

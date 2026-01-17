@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { openProUploadCta } from '@/lib/pro-upload-cta';
 import type { Track } from '@/types/music';
 import { getUserStorageKey, getCurrentUserId } from '@/lib/storage-utils';
+import { isFeatureEnabled } from '@/lib/feature-flags';
 
 const UPLOADED_MEDIA_KEY = 'nexus-uploaded-media';
 
@@ -97,6 +98,12 @@ export function useNexusUpload(): UseNexusUploadReturn {
   const isUploading = Array.from(uploadProgress.values()).some(p => p.status === 'uploading');
 
   const uploadTrack = useCallback(async (track: Track, target: 'planethoster' | 'local' = 'planethoster') => {
+    if (target === 'planethoster' && !isFeatureEnabled('planethosterUpload')) {
+      toast.error('Fonction désactivée', {
+        description: 'L\'upload PlanetHoster est temporairement désactivé.',
+      });
+      return;
+    }
     // Check if user is authenticated and Pro
     // Try Firebase first
     let isAuthenticated = false;

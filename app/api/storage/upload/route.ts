@@ -4,8 +4,11 @@ import path from 'path';
 import { verifyAuthAndPro } from '~/lib/stripe-utils';
 import { uploadToBunny, isBunnyConfigured } from '~/lib/bunny';
 import { uploadToPlanetHoster, isPlanetHosterConfigured } from '~/lib/planethoster-sftp';
-import { createErrorResponse, ErrorCodes } from '~/lib/validation';
+import { createErrorResponse, ErrorCodes, fileUploadSchema, validateRequest, isValidationError } from '~/lib/validation';
 import { rateLimiters, getClientIdentifier } from '~/lib/rate-limit';
+import { startRequestSpan } from '~/lib/observability';
+import { recordError, recordRequest } from '~/lib/metrics';
+import { isFeatureEnabledServer } from '@/lib/feature-flags';
 
 const STORAGE_DIR = process.env.STORAGE_DIR || path.join(process.cwd(), 'storage');
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for free users
@@ -32,12 +35,13 @@ async function getDirectorySize(dirPath: string): Promise<number> {
 }
 
 export async function POST(request: NextRequest) {
+  const span = startRequestSpan(request, 'storage.upload');
   try {
     // Rate limiting
     const clientId = getClientIdentifier(request);
     const rateLimit = await rateLimiters.upload(clientId, false);
     if (!rateLimit.allowed) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.RATE_LIMIT_EXCEEDED,
         rateLimit.message || 'Upload limit exceeded',
         429,
@@ -45,26 +49,48 @@ export async function POST(request: NextRequest) {
           resetTime: new Date(rateLimit.resetTime).toISOString(),
         }
       );
+      recordRequest('/storage/upload', 'POST', 429);
+      span.end(429);
+      return response;
     }
 
     const auth = await verifyAuthAndPro(request);
     if (!auth) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.AUTHENTICATION_ERROR,
         'User not authenticated',
         401
       );
+      recordRequest('/storage/upload', 'POST', 401);
+      span.end(401);
+      return response;
     }
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.VALIDATION_ERROR,
         'No file uploaded. Please provide a file in the request.',
         400
       );
+      recordRequest('/storage/upload', 'POST', 400);
+      span.end(400);
+      return response;
+    }
+
+    const fileValidation = validateRequest(fileUploadSchema, { file });
+    if (isValidationError(fileValidation)) {
+      const response = createErrorResponse(
+        fileValidation.error.code,
+        fileValidation.error.message,
+        400,
+        fileValidation.error.details
+      );
+      recordRequest('/storage/upload', 'POST', 400);
+      span.end(400);
+      return response;
     }
 
     // Validate file type (optional - can be made stricter)
@@ -74,16 +100,19 @@ export async function POST(request: NextRequest) {
       'image/jpeg', 'image/png', 'image/gif', 'image/webp',
     ];
     if (file.type && !allowedTypes.includes(file.type) && !file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.VALIDATION_ERROR,
         `File type not allowed: ${file.type}. Allowed types: audio, video, image files.`,
         400
       );
+      recordRequest('/storage/upload', 'POST', 400);
+      span.end(400);
+      return response;
     }
 
     const maxSize = auth.isPro ? MAX_FILE_SIZE_PRO : MAX_FILE_SIZE;
     if (file.size > maxSize) {
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.VALIDATION_ERROR,
         `File too large. Maximum size is ${maxSize / 1024 / 1024}MB${auth.isPro ? '' : '. Upgrade to Pro for 500MB limit.'}`,
         400,
@@ -93,6 +122,9 @@ export async function POST(request: NextRequest) {
           isPro: auth.isPro,
         }
       );
+      recordRequest('/storage/upload', 'POST', 400);
+      span.end(400);
+      return response;
     }
 
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -100,6 +132,17 @@ export async function POST(request: NextRequest) {
     const fileExtension = path.extname(file.name);
 
     const target = request.nextUrl.searchParams.get('target');
+
+    if (target !== 'local' && !isFeatureEnabledServer('cloudUpload')) {
+      const response = createErrorResponse(
+        ErrorCodes.FEATURE_DISABLED,
+        'Cloud uploads are temporarily disabled.',
+        503
+      );
+      recordRequest('/storage/upload', 'POST', 503);
+      span.end(503);
+      return response;
+    }
 
     // Pro users: upload to cloud storage (Bunny or PlanetHoster), unless target=local
     if (auth.isPro && target !== 'local') {
@@ -123,7 +166,7 @@ export async function POST(request: NextRequest) {
           const result = await uploadToBunny(bunnyPath, buffer, contentType);
           console.log(`[Upload] ✅ Bunny upload successful (serveur 1): ${result.url}`);
 
-          return NextResponse.json({
+          const response = NextResponse.json({
             id: fileId,
             url: result.url,
             size: file.size,
@@ -131,6 +174,9 @@ export async function POST(request: NextRequest) {
             provider: 'bunny',
             server: 1, // Serveur 1
           });
+          recordRequest('/storage/upload', 'POST', 200);
+          span.end(200);
+          return response;
         } catch (bunnyError: any) {
           console.error('[Upload] ❌ Bunny upload failed (serveur 1):', bunnyError.message || bunnyError);
           lastError = bunnyError instanceof Error ? bunnyError : new Error(bunnyError.message || 'Bunny upload failed');
@@ -156,13 +202,16 @@ export async function POST(request: NextRequest) {
 
           // For PlanetHoster, the URL is already a secure proxy URL
           // No need to modify it - it's generated in uploadToPlanetHoster
-          return NextResponse.json({
+          const response = NextResponse.json({
             id: fileId,
             url: result.url, // Already a secure proxy URL
             size: file.size,
             filename: file.name,
             provider: 'planethoster',
           });
+          recordRequest('/storage/upload', 'POST', 200);
+          span.end(200);
+          return response;
         } catch (planethosterError: any) {
           console.error('[Upload] ❌ PlanetHoster upload failed:', planethosterError.message || planethosterError);
           lastError = planethosterError instanceof Error ? planethosterError : new Error(planethosterError.message || 'PlanetHoster upload failed');
@@ -178,7 +227,7 @@ export async function POST(request: NextRequest) {
         : 'Aucun service de stockage cloud configuré. Veuillez configurer Bunny Storage ou PlanetHoster pour les utilisateurs Pro.';
       
       console.error(`[Upload] ❌ Pro user upload failed: ${errorMessage}`);
-      return createErrorResponse(
+      const response = createErrorResponse(
         ErrorCodes.INTERNAL_ERROR,
         errorMessage,
         500,
@@ -189,6 +238,9 @@ export async function POST(request: NextRequest) {
           lastError: lastError?.message,
         }
       );
+      recordRequest('/storage/upload', 'POST', 500);
+      span.end(500);
+      return response;
     }
 
     // Free users (and Pro target=local): use local storage
@@ -200,7 +252,7 @@ export async function POST(request: NextRequest) {
     if (!auth.isPro) {
       const currentSize = await getDirectorySize(userDir);
       if (currentSize + file.size > MAX_LOCAL_STORAGE_FREE) {
-        return createErrorResponse(
+        const response = createErrorResponse(
           ErrorCodes.VALIDATION_ERROR,
           `Limite de stockage local atteinte (25GB). Passez au plan Pro pour débloquer les serveurs cloud.`,
           400,
@@ -211,6 +263,9 @@ export async function POST(request: NextRequest) {
             isPro: false,
           }
         );
+        recordRequest('/storage/upload', 'POST', 400);
+        span.end(400);
+        return response;
       }
     }
 
@@ -223,32 +278,42 @@ export async function POST(request: NextRequest) {
 
     const fileUrl = `/api/storage/download/${fileId}`;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       id: fileId,
       url: fileUrl,
       size: file.size,
       filename: file.name,
       provider: 'local',
     });
+    recordRequest('/storage/upload', 'POST', 200);
+    span.end(200);
+    return response;
   } catch (error: unknown) {
     console.error('Error uploading file:', error);
     const err = error as { message?: string; code?: string };
     
     // Check if it's a known error type
     if (err.code === 'VALIDATION_ERROR' || err.code === 'AUTHENTICATION_ERROR') {
-      return createErrorResponse(
+      const response = createErrorResponse(
         err.code,
         err.message || 'Upload failed',
         400
       );
+      recordRequest('/storage/upload', 'POST', 400);
+      span.end(400);
+      return response;
     }
     
-    return createErrorResponse(
+    const response = createErrorResponse(
       ErrorCodes.INTERNAL_ERROR,
       err.message || 'Failed to upload file. Please try again later.',
       500,
       process.env.NODE_ENV === 'development' ? { originalError: err.message } : undefined
     );
+    recordError('/storage/upload');
+    recordRequest('/storage/upload', 'POST', 500);
+    span.error(500, error);
+    return response;
   }
 }
 
