@@ -171,6 +171,12 @@ export interface ElectronAPI {
   onStripeCheckoutSuccess?: (callback: (data: { sessionId: string; url?: string }) => void) => () => void;
   onStripeCheckoutCanceled?: (callback: () => void) => () => void;
 
+  // Secure storage (encrypted)
+  secureStoreGet?: (key: string) => Promise<string | null>;
+  secureStoreSet?: (key: string, value: string) => Promise<boolean>;
+  secureStoreDelete?: (key: string) => Promise<boolean>;
+  secureStoreClear?: () => Promise<boolean>;
+
   // Library tools
   analyzeQuality: () => Promise<QualityAnalysis>;
   detectDuplicates: () => Promise<DuplicateGroup[]>;

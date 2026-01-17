@@ -65,6 +65,11 @@ class AuthService {
   constructor() {
     // Load persisted data (only for manual OAuth users, not Firebase anonymous)
     this.loadFromStorage();
+    if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreGet) {
+      this.loadFromSecureStore().catch((error) => {
+        console.warn("Failed to load secure store:", error);
+      });
+    }
     
     // Preload Google Client ID from API (non-blocking)
     if (typeof window !== 'undefined') {
@@ -154,6 +159,10 @@ class AuthService {
 
   // Load data from localStorage
   private loadFromStorage(): void {
+    if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreGet) {
+      // Prefer secure store in Electron (async load handled separately)
+      return;
+    }
     // Only access localStorage on client side
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
@@ -181,6 +190,16 @@ class AuthService {
 
   // Save data to localStorage
   private saveToStorage(): void {
+    if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreSet) {
+      this.saveToSecureStore();
+      // Avoid leaving stale data in localStorage
+      try {
+        localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
+        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKENS);
+        localStorage.removeItem(STORAGE_KEYS.GOOGLE_CLIENT_ID);
+      } catch {}
+      return;
+    }
     // Only access localStorage on client side
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
@@ -200,18 +219,99 @@ class AuthService {
 
   // Clear storage
   private clearStorage(): void {
+    if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreDelete) {
+      this.clearSecureStore();
+    }
+
     // Only access localStorage on client side
     if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
-    
+
     localStorage.removeItem(STORAGE_KEYS.USER_PROFILE);
     localStorage.removeItem(STORAGE_KEYS.AUTH_TOKENS);
+    localStorage.removeItem(STORAGE_KEYS.GOOGLE_CLIENT_ID);
+  }
+
+  // Load data from secure store (Electron only)
+  private async loadFromSecureStore(): Promise<void> {
+    if (typeof window === 'undefined' || !window.electronAPI?.secureStoreGet) {
+      return;
+    }
+
+    try {
+      const [profileStr, tokensStr, googleClientId] = await Promise.all([
+        window.electronAPI.secureStoreGet(STORAGE_KEYS.USER_PROFILE),
+        window.electronAPI.secureStoreGet(STORAGE_KEYS.AUTH_TOKENS),
+        window.electronAPI.secureStoreGet(STORAGE_KEYS.GOOGLE_CLIENT_ID),
+      ]);
+
+      if (profileStr) {
+        this.currentUser = JSON.parse(profileStr);
+      }
+
+      if (tokensStr) {
+        this.authTokens = JSON.parse(tokensStr);
+      }
+
+      if (googleClientId) {
+        this.googleClientId = googleClientId;
+      }
+    } catch (error) {
+      console.warn("Error loading from secure store:", error);
+    }
+  }
+
+  // Save data to secure store (Electron only)
+  private async saveToSecureStore(): Promise<void> {
+    if (typeof window === 'undefined' || !window.electronAPI?.secureStoreSet) {
+      return;
+    }
+
+    try {
+      if (this.currentUser) {
+        await window.electronAPI.secureStoreSet(STORAGE_KEYS.USER_PROFILE, JSON.stringify(this.currentUser));
+      } else {
+        await window.electronAPI.secureStoreDelete?.(STORAGE_KEYS.USER_PROFILE);
+      }
+
+      if (this.authTokens) {
+        await window.electronAPI.secureStoreSet(STORAGE_KEYS.AUTH_TOKENS, JSON.stringify(this.authTokens));
+      } else {
+        await window.electronAPI.secureStoreDelete?.(STORAGE_KEYS.AUTH_TOKENS);
+      }
+
+      if (this.googleClientId) {
+        await window.electronAPI.secureStoreSet(STORAGE_KEYS.GOOGLE_CLIENT_ID, this.googleClientId);
+      }
+    } catch (error) {
+      console.warn("Error saving to secure store:", error);
+    }
+  }
+
+  private async clearSecureStore(): Promise<void> {
+    if (typeof window === 'undefined' || !window.electronAPI?.secureStoreDelete) {
+      return;
+    }
+
+    try {
+      await Promise.all([
+        window.electronAPI.secureStoreDelete(STORAGE_KEYS.USER_PROFILE),
+        window.electronAPI.secureStoreDelete(STORAGE_KEYS.AUTH_TOKENS),
+        window.electronAPI.secureStoreDelete(STORAGE_KEYS.GOOGLE_CLIENT_ID),
+      ]);
+    } catch (error) {
+      console.warn("Error clearing secure store:", error);
+    }
   }
 
   // Set Google OAuth Client ID
   setGoogleClientId(clientId: string): void {
     this.googleClientId = clientId;
+    if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreSet) {
+      this.saveToSecureStore();
+      return;
+    }
     // Only access localStorage on client side
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
@@ -239,8 +339,9 @@ class AuthService {
         const clientId = config.googleClientId || null;
         if (clientId) {
           this.googleClientId = clientId;
-          // Save to localStorage
-          if (typeof window !== 'undefined' && window.localStorage) {
+          if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreSet) {
+            this.saveToSecureStore();
+          } else if (typeof window !== 'undefined' && window.localStorage) {
             localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, clientId);
           }
           console.log("Google OAuth Client ID loaded from API route");
@@ -258,7 +359,9 @@ class AuthService {
     
     if (envClientId) {
       this.googleClientId = envClientId;
-      if (typeof window !== 'undefined' && window.localStorage) {
+      if (typeof window !== 'undefined' && isElectron() && window.electronAPI?.secureStoreSet) {
+        this.saveToSecureStore();
+      } else if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem(STORAGE_KEYS.GOOGLE_CLIENT_ID, envClientId);
       }
       return envClientId;

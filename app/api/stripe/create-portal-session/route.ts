@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyAuth } from '../../auth/middleware';
+import { getFirebaseAdmin } from '~/lib/firebaseAdmin';
 import { validateRequest, createErrorResponse, ErrorCodes, stripePortalSchema, isValidationError } from '~/lib/validation';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -46,17 +47,34 @@ export async function POST(request: NextRequest) {
 
     const { returnUrl } = validation.data;
 
-    // Find customer by metadata
+    // Find customer by stored stripeCustomerId in Firestore (preferred)
     let customer = null;
-    
-    // Try to find existing customer
-    const customers = await stripe.customers.list({
-      limit: 100,
-    });
 
-    customer = customers.data.find(
-      (c) => c.metadata?.userId === auth.userId
-    );
+    try {
+      const admin = getFirebaseAdmin();
+      const userDoc = await admin.firestore().collection('users').doc(auth.userId).get();
+      const stripeCustomerId = userDoc.exists ? userDoc.data()?.stripeCustomerId : null;
+
+      if (stripeCustomerId) {
+        customer = await stripe.customers.retrieve(stripeCustomerId);
+        if ((customer as Stripe.DeletedCustomer).deleted) {
+          customer = null;
+        }
+      }
+    } catch (firestoreError) {
+      console.warn('Failed to fetch stripeCustomerId from Firestore, falling back to metadata search:', firestoreError);
+    }
+
+    // Fallback: find customer by metadata (legacy)
+    if (!customer) {
+      const customers = await stripe.customers.list({
+        limit: 100,
+      });
+
+      customer = customers.data.find(
+        (c) => c.metadata?.userId === auth.userId
+      ) || null;
+    }
 
     // If customer doesn't exist, create one
     if (!customer) {
@@ -67,12 +85,22 @@ export async function POST(request: NextRequest) {
         },
       });
       console.log('Created new Stripe customer for user:', auth.userId);
+
+      // Persist stripeCustomerId for future lookups
+      try {
+        const admin = getFirebaseAdmin();
+        await admin.firestore().collection('users').doc(auth.userId).set({
+          stripeCustomerId: customer.id,
+        }, { merge: true });
+      } catch (persistError) {
+        console.warn('Failed to persist stripeCustomerId to Firestore:', persistError);
+      }
     }
 
     // Create portal session
     try {
       const session = await stripe.billingPortal.sessions.create({
-        customer: customer.id,
+        customer: (customer as Stripe.Customer).id,
         return_url: returnUrl || `${FRONTEND_URL}/settings`,
       });
 

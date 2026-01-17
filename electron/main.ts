@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, type BrowserWindowConstructorOptions, type BrowserWindow as ElectronBrowserWindow, type Rectangle } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage, type BrowserWindowConstructorOptions, type BrowserWindow as ElectronBrowserWindow, type Rectangle } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -91,6 +91,77 @@ const VIDEO_EXTENSIONS = [
 ];
 
 const MEDIA_EXTENSIONS = [...AUDIO_EXTENSIONS, ...VIDEO_EXTENSIONS];
+
+function getSecureStorePath(): string {
+  return path.join(app.getPath('userData'), 'secure-store.json');
+}
+const SECURE_STORE_MAX_KEY_LENGTH = 128;
+
+function readSecureStore(): Record<string, string> {
+  try {
+    const secureStorePath = getSecureStorePath();
+    if (!fs.existsSync(secureStorePath)) return {};
+    const raw = fs.readFileSync(secureStorePath, 'utf-8');
+    const parsed = JSON.parse(raw) as { encrypted?: boolean; data?: string };
+    if (!parsed?.data) return {};
+
+    if (parsed.encrypted && safeStorage.isEncryptionAvailable()) {
+      const decrypted = safeStorage.decryptString(Buffer.from(parsed.data, 'base64'));
+      return JSON.parse(decrypted) as Record<string, string>;
+    }
+
+    return JSON.parse(parsed.data) as Record<string, string>;
+  } catch (error) {
+    console.warn('[SecureStore] Failed to read secure store:', error);
+    return {};
+  }
+}
+
+function writeSecureStore(store: Record<string, string>): void {
+  try {
+    const serialized = JSON.stringify(store);
+    const secureStorePath = getSecureStorePath();
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(serialized);
+      const payload = {
+        encrypted: true,
+        data: encrypted.toString('base64'),
+      };
+      fs.writeFileSync(secureStorePath, JSON.stringify(payload));
+      return;
+    }
+
+    const payload = {
+      encrypted: false,
+      data: serialized,
+    };
+    fs.writeFileSync(secureStorePath, JSON.stringify(payload));
+  } catch (error) {
+    console.warn('[SecureStore] Failed to write secure store:', error);
+  }
+}
+
+function isSafeExternalUrl(rawUrl: string): boolean {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  try {
+    const parsed = new URL(rawUrl);
+    const protocol = parsed.protocol.toLowerCase();
+
+    if (protocol === 'mailto:') return true;
+    if (protocol !== 'https:' && protocol !== 'http:') return false;
+
+    // Allow http only for localhost (OAuth callback)
+    if (protocol === 'http:') {
+      const host = parsed.hostname.toLowerCase();
+      return host === 'localhost' || host === '127.0.0.1';
+    }
+
+    // https is allowed
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 type SecondaryWindowKey = 'oauth' | 'stripe';
 
@@ -200,7 +271,11 @@ function createSecondaryWindow(
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url);
+    } else {
+      console.warn('[Security] Blocked external URL:', url);
+    }
     return { action: 'deny' };
   });
 
@@ -615,9 +690,50 @@ ipcMain.handle('window:isMaximized', () => {
 });
 
 ipcMain.handle('window:openExternal', (_event, url: string) => {
-  if (url) {
+  if (url && isSafeExternalUrl(url)) {
     shell.openExternal(url);
+  } else if (url) {
+    console.warn('[Security] Blocked external URL:', url);
   }
+});
+
+// Secure storage handlers (encrypted at rest)
+ipcMain.handle('secureStore:get', (_event, key: string) => {
+  if (!key || typeof key !== 'string' || key.length > SECURE_STORE_MAX_KEY_LENGTH) {
+    return null;
+  }
+  const store = readSecureStore();
+  return store[key] ?? null;
+});
+
+ipcMain.handle('secureStore:set', (_event, key: string, value: string) => {
+  if (!key || typeof key !== 'string' || key.length > SECURE_STORE_MAX_KEY_LENGTH) {
+    return false;
+  }
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const store = readSecureStore();
+  store[key] = value;
+  writeSecureStore(store);
+  return true;
+});
+
+ipcMain.handle('secureStore:delete', (_event, key: string) => {
+  if (!key || typeof key !== 'string' || key.length > SECURE_STORE_MAX_KEY_LENGTH) {
+    return false;
+  }
+  const store = readSecureStore();
+  if (key in store) {
+    delete store[key];
+    writeSecureStore(store);
+  }
+  return true;
+});
+
+ipcMain.handle('secureStore:clear', () => {
+  writeSecureStore({});
+  return true;
 });
 
 // OAuth handlers for desktop app authentication

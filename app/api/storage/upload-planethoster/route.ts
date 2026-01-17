@@ -60,6 +60,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate file type (optional - can be made stricter)
+    const allowedTypes = [
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/flac', 'audio/aac', 'audio/ogg',
+      'video/mp4', 'video/avi', 'video/mkv', 'video/webm',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    ];
+    if (file.type && !allowedTypes.includes(file.type) && !file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+      return createErrorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        `File type not allowed: ${file.type}. Allowed types: audio, video, image files.`,
+        400
+      );
+    }
+
     if (file.size > MAX_FILE_SIZE) {
       return createErrorResponse(
         ErrorCodes.VALIDATION_ERROR,

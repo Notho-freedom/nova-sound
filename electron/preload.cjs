@@ -18,6 +18,12 @@ try {
   // Stripe - open window in app
   openStripeWindow: (url) => ipcRenderer.invoke('stripe:openWindow', url),
 
+  // Secure storage (encrypted)
+  secureStoreGet: (key) => ipcRenderer.invoke('secureStore:get', key),
+  secureStoreSet: (key, value) => ipcRenderer.invoke('secureStore:set', key, value),
+  secureStoreDelete: (key) => ipcRenderer.invoke('secureStore:delete', key),
+  secureStoreClear: () => ipcRenderer.invoke('secureStore:clear'),
+
   // File dialogs
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   openFile: (filters) =>
