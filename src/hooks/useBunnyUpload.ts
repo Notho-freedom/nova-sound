@@ -194,8 +194,8 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
             const saved = localStorage.getItem(storageKey);
             const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
             
-            uploadedMedia.push({
-              id: result.id || track.id,
+                  uploadedMedia.push({
+                    id: track.id,
               name: fileName,
               uploadedAt: new Date().toISOString(),
               cloudProvider: 'bunny',
@@ -363,14 +363,14 @@ export function useBunnyUpload(): UseBunnyUploadReturn {
                   const uploadedMedia: Array<{ id: string; name: string; uploadedAt: string; cloudProvider?: 'cloudinary' | 'nexus' | 'bunny' | 'planethoster'; url?: string; size?: number }> = saved ? JSON.parse(saved) : [];
                   
                   const newEntry = {
-                    id: result.id,
+                    id: track.id,
                     name: fileName,
                     uploadedAt: new Date().toISOString(),
                     cloudProvider: 'bunny' as const,
                     url: result.url,
                     size: result.size || blob.size,
                   };
-                  const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== result.id)].slice(0, 100);
+                  const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== track.id)].slice(0, 100);
                   localStorage.setItem(storageKey, JSON.stringify(updated));
                   firebaseSyncService.queueSync('uploadedMedia', updated);
                   

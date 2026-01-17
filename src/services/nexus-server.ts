@@ -90,7 +90,8 @@ class NexusServerService {
     file: Blob,
     fileName: string,
     onProgress?: (progress: number) => void,
-    target: 'planethoster' | 'local' = 'planethoster'
+    target: 'planethoster' | 'local' = 'planethoster',
+    trackId?: string
   ): Promise<UploadResult> {
     console.log("Upload file: Getting access token...");
     
@@ -173,14 +174,14 @@ class NexusServerService {
                 console.log(`[NexusServer] Upload successful - Provider: ${provider}, Server: ${result.server || 'N/A'}`);
                 
                 const newEntry = {
-                  id: result.id,
+                  id: trackId || result.id,
                   name: fileName,
                   uploadedAt: new Date().toISOString(),
                   cloudProvider: provider,
                   url: result.url,
                   size: result.size || file.size,
                 };
-                const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== result.id)].slice(0, 100); // Keep last 100
+                const updated = [newEntry, ...uploadedMedia.filter(m => m.id !== (trackId || result.id))].slice(0, 100); // Keep last 100
                 localStorage.setItem(storageKey, JSON.stringify(updated));
                 firebaseSyncService.queueSync('uploadedMedia', updated);
                 
@@ -223,8 +224,6 @@ class NexusServerService {
                 ? errorResponse.error 
                 : errorResponse.error.message || errorMessage;
             }
-            
-            // Detect specific error types and provide user-friendly messages
             const errorText = (errorMessage + ' ' + (errorDetails || '')).toLowerCase();
             
             if (errorText.includes('timeout') || errorText.includes('timed out') || errorText.includes('handshake')) {

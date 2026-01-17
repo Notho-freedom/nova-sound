@@ -583,7 +583,7 @@ export const CloudView = () => {
                             <div
                               key={track.id}
                               className={cn(
-                                "flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer",
+                                "flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer min-w-0",
                                 selectedTracks.some(t => t.id === track.id) && "bg-primary/10"
                               )}
                               onClick={() => {
@@ -601,7 +601,7 @@ export const CloudView = () => {
                                 className="rounded"
                               />
                               <Music className="w-4 h-4" />
-                              <span className="flex-1 truncate">{track.title}</span>
+                              <span className="flex-1 min-w-0 truncate max-w-lg">{track.title}</span>
                             </div>
                           ))}
                         </div>
@@ -629,7 +629,7 @@ export const CloudView = () => {
                                 className="rounded"
                               />
                               <VideoIcon className="w-4 h-4" />
-                              <span className="flex-1 truncate">{video.title}</span>
+                              <span className="flex-1 min-w-0 truncate max-w-xs">{video.title}</span>
                             </div>
                           ))}
                         </div>

@@ -257,7 +257,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
 
         // Save to localStorage
         await saveUploadedFile({
-          id: result.id || track.id,
+          id: track.id,
           name: fileName,
           uploadedAt: new Date().toISOString(),
           cloudProvider: 'nexus',
@@ -377,7 +377,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
           }
           return updated;
         });
-      }, target);
+      }, target, track.id);
 
       // Mark as completed
       setUploadProgress(prev => {
@@ -395,7 +395,7 @@ export function useNexusUpload(): UseNexusUploadReturn {
 
       // Save to localStorage
       await saveUploadedFile({
-        id: uploadResult?.id || track.id,
+        id: track.id,
         name: fileName,
         uploadedAt: new Date().toISOString(),
         cloudProvider: 'nexus',
