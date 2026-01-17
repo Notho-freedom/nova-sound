@@ -75,15 +75,32 @@ const TitleBarComponent = ({
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle")
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [isSyncPopoverOpen, setIsSyncPopoverOpen] = useState(false)
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    const handleSyncStart = () => setSyncStatus("syncing")
+    const clearSyncTimeout = () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current)
+        syncTimeoutRef.current = null
+      }
+    }
+
+    const handleSyncStart = () => {
+      setSyncStatus("syncing")
+      clearSyncTimeout()
+      syncTimeoutRef.current = setTimeout(() => {
+        setSyncStatus("error")
+        setTimeout(() => setSyncStatus("idle"), 5000)
+      }, 20000)
+    }
     const handleSyncComplete = () => {
+      clearSyncTimeout()
       setSyncStatus("synced")
       setLastSyncTime(new Date())
       setTimeout(() => setSyncStatus("idle"), 3000)
     }
     const handleSyncError = () => {
+      clearSyncTimeout()
       setSyncStatus("error")
       setTimeout(() => setSyncStatus("idle"), 5000)
     }
@@ -96,6 +113,7 @@ const TitleBarComponent = ({
       window.removeEventListener("nexus-sync-start", handleSyncStart)
       window.removeEventListener("nexus-sync-complete", handleSyncComplete)
       window.removeEventListener("nexus-sync-error", handleSyncError)
+      clearSyncTimeout()
     }
   }, [])
 

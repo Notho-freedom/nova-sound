@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,6 +18,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -128,11 +129,24 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     initializeAuth();
 
     // Listen to sync events
+    const clearSyncTimeout = () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = null;
+      }
+    };
+
     const handleSyncStart = () => {
       setSyncStatus("syncing");
+      clearSyncTimeout();
+      syncTimeoutRef.current = setTimeout(() => {
+        setSyncStatus("error");
+        setTimeout(() => setSyncStatus("idle"), 5000);
+      }, 20000);
     };
 
     const handleSyncComplete = () => {
+      clearSyncTimeout();
       setSyncStatus("synced");
       setLastSyncTime(new Date());
       // Reset to idle after 3 seconds
@@ -140,6 +154,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
     };
 
     const handleSyncError = () => {
+      clearSyncTimeout();
       setSyncStatus("error");
       // Reset to idle after 5 seconds
       setTimeout(() => setSyncStatus("idle"), 5000);
@@ -184,6 +199,7 @@ export const SyncStatusIndicator = ({ collapsed, className }: SyncStatusIndicato
       window.removeEventListener("nexus-sync-start", handleSyncStart);
       window.removeEventListener("nexus-sync-complete", handleSyncComplete);
       window.removeEventListener("nexus-sync-error", handleSyncError);
+      clearSyncTimeout();
       if (authUnsubscribe) {
         authUnsubscribe();
       }
