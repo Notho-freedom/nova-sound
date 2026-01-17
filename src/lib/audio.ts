@@ -45,8 +45,8 @@ export function getAudioSrc(filePath?: string): string | null {
   // Local file path - convert to local-audio:// URL for Electron
   // This uses our custom protocol registered in main.ts
   const normalizedPath = filePath.replace(/\\/g, '/');
-  // Encode the path to handle special characters, spaces, plus signs, etc.
-  const encodedPath = encodeURIComponent(normalizedPath);
+  // Encode the path but keep slashes to preserve absolute paths
+  const encodedPath = encodeURI(normalizedPath);
   return `local-audio://${encodedPath}`;
 }
 
