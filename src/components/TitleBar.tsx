@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Settings, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, Play, Music, Cloud, Copy } from "lucide-react"
+import { Minus, Square, X, Settings, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, Play, Music, Cloud, Copy, Plus, FileText, FolderOpen } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -16,13 +16,13 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { useCloudSync } from "@/hooks/useCloudSync"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
+import { useI18n } from "@/i18n"
 import { firebaseService } from "@/services/firebase"
 import { firebaseSyncService } from "@/services/firebase-sync"
 import { getElectronAPI, isElectron } from "@/lib/electron-detector"
 import { youtubeVideoToTrack } from "@/lib/youtube-to-track"
 import { cn } from "@/lib/utils"
 import type { Track } from "@/types/music"
-import { MenuBar } from "@/components/MenuBar"
 
 interface TitleBarProps {
   title?: string
@@ -60,10 +60,12 @@ const TitleBarComponent = ({
   const [isMaximized, setIsMaximized] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const [isFilesMenuOpen, setIsFilesMenuOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSearchedRef = useRef<string>("")
   const electronEnv = isElectron()
   const electronAPI = getElectronAPI()
+  const { t } = useI18n()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
   const { results: ytResults, search: searchYouTube, loading: ytLoading } = useYouTubeSearch()
   const [quickResults, setQuickResults] = useState<Track[]>([])
@@ -221,6 +223,16 @@ const TitleBarComponent = ({
     await nexusLogout()
   }
 
+  const handleOpenFiles = () => {
+    window.dispatchEvent(new CustomEvent("nexus-open-files", { detail: { multiple: true } }))
+    setIsFilesMenuOpen(false)
+  }
+
+  const handleOpenFolders = () => {
+    window.dispatchEvent(new CustomEvent("nexus-open-folders", { detail: { multiple: true } }))
+    setIsFilesMenuOpen(false)
+  }
+
   const handleMinimize = async () => {
     if (electronAPI) await electronAPI.minimize()
   }
@@ -279,12 +291,6 @@ const TitleBarComponent = ({
               )}
             </div>
           </div>
-
-          {/* Menubar (Nexus app style) + Navigation buttons + Search bar together */}
-          <MenuBar 
-            onOpenSettings={onOpenSettings}
-            onOpenSearchPage={onOpenSearchPage}
-          />
 
           {/* Navigation buttons + Search bar together */}
           <div
@@ -506,6 +512,30 @@ const TitleBarComponent = ({
               )}
             </div>
           )}
+
+          {/* Files & Folders Button */}
+          <DropdownMenu open={isFilesMenuOpen} onOpenChange={setIsFilesMenuOpen}>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08] transition-all">
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Ouvrir fichiers/dossiers</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-max">
+              <DropdownMenuItem onClick={handleOpenFiles}>
+                <FileText className="w-4 h-4 mr-2" />
+                <span>{t("menuActionOpenFiles")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleOpenFolders}>
+                <FolderOpen className="w-4 h-4 mr-2" />
+                <span>{t("menuActionOpenFolders")}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           </div>
 
