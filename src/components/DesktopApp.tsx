@@ -10,6 +10,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { ArtistInfoPanel } from "./ArtistInfoPanel";
+import { PlayQueueChoiceDialog } from "./PlayQueueChoiceDialog";
 // import { KaraokePanel } from "./KaraokePanel"; // DÉSACTIVÉ - Système karaoke désactivé
 import { UpdateNotification } from "./UpdateNotification";
 import { lazy, Suspense } from "react";
@@ -39,6 +40,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useQueue } from "@/hooks/useQueue";
+import { useFileProcessing } from "@/hooks/useFileProcessing";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -253,6 +255,9 @@ export const DesktopApp = () => {
     isShuffled: queueIsShuffled,
   } = useQueue(libraryTracks);
 
+  // File processing with async worker
+  const { processFiles } = useFileProcessing();
+
   // Si la file restaurée correspond exactement à toute la bibliothèque (héritage de l'ancien autofill), on la vide
   useEffect(() => {
     if (!libraryTracks.length || !queue.tracks.length) return;
@@ -339,6 +344,9 @@ export const DesktopApp = () => {
   const [playlistToOpen, setPlaylistToOpen] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [recentSearchQuery, setRecentSearchQuery] = useState<string>("");
+  const [isPlayQueueDialogOpen, setIsPlayQueueDialogOpen] = useState(false);
+  const [pendingFilesToProcess, setPendingFilesToProcess] = useState<File[]>([]);
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
 
   // Restore sidebar collapsed state
@@ -1572,80 +1580,10 @@ export const DesktopApp = () => {
           console.log('[DesktopApp] Files selected:', files.length);
           
           try {
-            // Convertir les fichiers en Track objects avec extraction de métadonnées
-            const newTracks: Track[] = await Promise.all(
-              files.map(async (file, index) => {
-                // Extraire le nom du fichier sans extension
-                const fileName = file.name.replace(/\.[^/.]+$/, "");
-                const [title, artist] = fileName.includes('-') 
-                  ? fileName.split('-').map(s => s.trim())
-                  : [fileName, 'Unknown Artist'];
-                
-                // Créer une URL blob pour le fichier
-                const fileUrl = URL.createObjectURL(file);
-                
-                // Générer un ID stable basé sur le nom et la taille du fichier
-                // (similaire à comment les systèmes gèrent les fichiers locaux)
-                const idBase = `${file.name}-${file.size}-${file.lastModified}`;
-                const id = `local-${btoa(idBase).replace(/[^a-z0-9]/gi, '').substring(0, 20)}`;
-                
-                // Extraire les métadonnées du fichier audio
-                let duration = 0;
-                try {
-                  // Créer un audio element temporaire pour extraire la durée
-                  const audioElement = new Audio();
-                  duration = await new Promise<number>((resolve) => {
-                    const timeout = setTimeout(() => {
-                      audioElement.pause();
-                      resolve(0); // Fallback à 0 si non trouvé
-                    }, 5000); // Max 5 secondes pour extraire la durée
-                    
-                    audioElement.onloadedmetadata = () => {
-                      clearTimeout(timeout);
-                      const dur = audioElement.duration || 0;
-                      audioElement.pause();
-                      resolve(isFinite(dur) ? dur : 0);
-                    };
-                    
-                    audioElement.src = fileUrl;
-                    audioElement.load();
-                  });
-                } catch (err) {
-                  console.warn('[DesktopApp] Could not extract duration:', err);
-                  duration = 0;
-                }
-                
-                // Créer le Track object exactement comme les tracks locaux du système
-                return {
-                  id,
-                  title: title || t("defaultUnknownTrack"),
-                  artist: artist || t("defaultUnknownArtist"),
-                  album: t("defaultLocalFiles"),
-                  duration: Math.round(duration), // Durée en secondes
-                  coverUrl: '', // Les fichiers locaux utilisent la cover par défaut
-                  mediaSource: 'local' as const,
-                  filePath: fileUrl, // Blob URL (géré par getAudioSrc)
-                  addedAt: new Date().toISOString(),
-                  format: file.type || file.name.split('.').pop() || 'unknown',
-                } as Track;
-              })
-            );
+            // Stocker les fichiers et ouvrir le dialog
+            setPendingFilesToProcess(files);
+            setIsPlayQueueDialogOpen(true);
             
-            // Ajouter les tracks à la queue
-            if (newTracks.length > 0) {
-              // Ajouter à la queue existante
-              addToQueue(newTracks);
-              
-              // Jouer le premier fichier ajouté
-              const startIndex = queue.tracks.length - newTracks.length;
-              if (startIndex >= 0) {
-                setCurrentIndex(startIndex);
-              }
-              
-              // Toast de succès
-              toast.success(t("toastFilesAddedToQueue", { count: newTracks.length }));
-              console.log('[DesktopApp] Local tracks loaded:', newTracks);
-            }
           } catch (parseErr) {
             console.error('[DesktopApp] Error processing files:', parseErr);
             toast.error(t("errorProcessFiles"));
@@ -1803,6 +1741,70 @@ export const DesktopApp = () => {
     setCurrentView("artist-detail");
     toast.success(t("toastOpenArtist", { name: currentTrack.artist }));
   }, [currentTrack, t]);
+
+  // Handler pour traiter les fichiers et les ajouter à la queue
+  const handleProcessAndPlayFilesNow = useCallback(async () => {
+    if (pendingFilesToProcess.length === 0) return;
+
+    setIsProcessingFiles(true);
+    try {
+      console.log('[DesktopApp] Processing files with worker...');
+      
+      // Utiliser le worker pour traiter les fichiers
+      const newTracks = await processFiles(pendingFilesToProcess);
+      
+      if (newTracks.length > 0) {
+        // Ajouter à la queue
+        addToQueue(newTracks);
+        
+        // Pointer l'index sur le premier des nouveaux fichiers
+        const newIndex = queue.tracks.length - newTracks.length;
+        if (newIndex >= 0) {
+          setCurrentIndex(newIndex);
+        }
+        
+        // Toast de succès
+        toast.success(t("toastFilesAddedToQueue", { count: newTracks.length }));
+        console.log('[DesktopApp] Files processed and queued:', newTracks.length);
+      }
+    } catch (err) {
+      console.error('[DesktopApp] Error processing files:', err);
+      toast.error(t("errorProcessFiles"));
+    } finally {
+      setIsProcessingFiles(false);
+      setPendingFilesToProcess([]);
+      setIsPlayQueueDialogOpen(false);
+    }
+  }, [pendingFilesToProcess, processFiles, addToQueue, queue.tracks.length, setCurrentIndex, t]);
+
+  // Handler pour ajouter les fichiers à la queue sans les jouer
+  const handleAddFilesToQueue = useCallback(async () => {
+    if (pendingFilesToProcess.length === 0) return;
+
+    setIsProcessingFiles(true);
+    try {
+      console.log('[DesktopApp] Processing files with worker for queue...');
+      
+      // Utiliser le worker pour traiter les fichiers
+      const newTracks = await processFiles(pendingFilesToProcess);
+      
+      if (newTracks.length > 0) {
+        // Ajouter à la fin de la queue
+        addToQueue(newTracks);
+        
+        // Toast de succès
+        toast.success(t("toastFilesAddedToQueue", { count: newTracks.length }));
+        console.log('[DesktopApp] Files processed and added to queue:', newTracks.length);
+      }
+    } catch (err) {
+      console.error('[DesktopApp] Error processing files:', err);
+      toast.error(t("errorProcessFiles"));
+    } finally {
+      setIsProcessingFiles(false);
+      setPendingFilesToProcess([]);
+      setIsPlayQueueDialogOpen(false);
+    }
+  }, [pendingFilesToProcess, processFiles, addToQueue, t]);
 
   // Utility function to remove duplicates from track lists
   const getUniqueTracks = useCallback((trackList: Track[]): Track[] => {
@@ -3040,8 +3042,19 @@ export const DesktopApp = () => {
             />
           </div>
         )}
+
+        {/* Play/Queue Choice Dialog for File Selection */}
+        <PlayQueueChoiceDialog
+          open={isPlayQueueDialogOpen}
+          onOpenChange={setIsPlayQueueDialogOpen}
+          onPlayNow={handleProcessAndPlayFilesNow}
+          onAddToQueue={handleAddFilesToQueue}
+          fileCount={pendingFilesToProcess.length}
+          isProcessing={isProcessingFiles}
+        />
       </div>
     </TooltipProvider>
     </CoachmarkProvider>
   );
 };
+

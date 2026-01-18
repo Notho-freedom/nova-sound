@@ -150,7 +150,7 @@ export const NowPlayingBar = ({
         </div>
 
         {/* Main Content */}
-        <div className="relative px-4 py-3">
+        <div className="relative px-4 py-3 mt-2">
           <div className="flex items-center gap-4">
             {/* Left: Track Info */}
             <div className="flex items-center gap-4 min-w-0 w-[280px] flex-shrink-0">
