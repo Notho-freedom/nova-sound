@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -61,6 +62,17 @@ let stripeWindow = null;
 let oauthCallbackServer = null;
 const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 const isDev = !app.isPackaged;
+// Shell-only mode: Electron as a lightweight OS bridge (no local services/scanners).
+// Default: enabled in development unless ELECTRON_SHELL_ONLY explicitly set to "false".
+const isShellOnly = (() => {
+    const env = process.env.ELECTRON_SHELL_ONLY?.toLowerCase();
+    if (env === 'false' || env === '0')
+        return false;
+    if (env === 'true' || env === '1')
+        return true;
+    return isDev; // default to shell-only for dev, full mode when packaged
+})();
+const shouldInitLocalServices = !isShellOnly;
 if (process.env.SENTRY_DSN) {
     Sentry.init({
         dsn: process.env.SENTRY_DSN,
@@ -447,8 +459,13 @@ function createWindow() {
             preload: finalPreloadPath,
             nodeIntegration: false,
             contextIsolation: true,
-            sandbox: false,
-            webSecurity: false, // Allow loading local files
+            sandbox: true,
+            webSecurity: true,
+            allowRunningInsecureContent: false,
+            devTools: isDev,
+            spellcheck: false,
+            autoplayPolicy: 'document-user-activation-required',
+            disableBlinkFeatures: 'Auxclick',
         },
     });
     // Log when preload is loaded and verify electronAPI injection
@@ -548,7 +565,12 @@ function createWindow() {
     });
     // Handle external links
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
+        if (isSafeExternalUrl(url)) {
+            shell.openExternal(url);
+        }
+        else {
+            console.warn('[Security] Blocked external URL:', url);
+        }
         return { action: 'deny' };
     });
 }
@@ -612,6 +634,80 @@ async function initServices() {
     // Note: IPC handlers are registered synchronously in init functions
     // If handlers are missing, it's likely due to an error during service initialization
     // which would have been logged above
+}
+async function initBinaryAutoUpdater() {
+    if (isDev || cliOptions.dev) {
+        console.log('🧪 Dev mode: skipping native auto-updater');
+        return;
+    }
+    if (process.platform !== 'win32') {
+        console.log(`ℹ️ Native auto-updater enabled only on Windows (detected ${process.platform})`);
+        return;
+    }
+    const feedUrl = (process.env.ELECTRON_UPDATER_URL || process.env.UPDATE_BASE_URL || '').trim().replace(/\/+$/, '');
+    if (feedUrl) {
+        try {
+            autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl, channel: 'latest' });
+        }
+        catch (error) {
+            console.warn('⚠️ Failed to set auto-update feed URL:', error);
+        }
+    }
+    else {
+        console.log('ℹ️ No ELECTRON_UPDATER_URL provided; relying on bundled app-update.yml if present');
+    }
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoRunAppAfterInstall = true;
+    const notifyRenderer = (info, downloaded) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            const stringNotes = typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined;
+            const aggregatedNotes = Array.isArray(info.releaseNotes)
+                ? info.releaseNotes
+                    .map((note) => {
+                    if (typeof note === 'string')
+                        return note;
+                    if (note && typeof note.note === 'string')
+                        return note.note;
+                    return null;
+                })
+                    .filter(Boolean)
+                    .join('\n')
+                : stringNotes;
+            mainWindow.webContents.send('update:available', {
+                version: info.version,
+                changelog: aggregatedNotes,
+                buildDate: info.releaseDate,
+                downloaded,
+                source: 'binary',
+            });
+        }
+    };
+    autoUpdater.on('update-available', (info) => {
+        console.log(`🔄 Update available: ${info.version}`);
+        notifyRenderer(info, false);
+    });
+    autoUpdater.on('update-downloaded', (info) => {
+        console.log(`✅ Update downloaded: ${info.version}`);
+        notifyRenderer(info, true);
+        setTimeout(() => {
+            try {
+                autoUpdater.quitAndInstall(false, true);
+            }
+            catch (error) {
+                console.warn('⚠️ Failed to install update:', error);
+            }
+        }, 1200);
+    });
+    autoUpdater.on('error', (error) => {
+        console.warn('⚠️ Auto-updater error:', error);
+    });
+    try {
+        await autoUpdater.checkForUpdates();
+    }
+    catch (error) {
+        console.warn('⚠️ Auto-updater check failed:', error);
+    }
 }
 // Window control handlers
 ipcMain.handle('window:minimize', () => {
@@ -1656,20 +1752,36 @@ function cleanupOAuthServer() {
 app.whenReady().then(async () => {
     // Register OAuth callback server for desktop app authentication
     registerOAuthCallbackServer();
-    // Register custom protocols
-    registerLocalAudioProtocol();
-    registerLocalVideoProtocol();
-    registerLocalImageProtocol();
+    // Register custom protocols only when local services are enabled
+    if (shouldInitLocalServices) {
+        registerLocalAudioProtocol();
+        registerLocalVideoProtocol();
+        registerLocalImageProtocol();
+    }
     // Create window ASAP for faster dev startup
     createWindow();
-    // Initialize storage and services
+    // Kick off native auto-updates for packaged Windows builds
+    initBinaryAutoUpdater().catch((error) => {
+        console.warn('⚠️ Failed to start native auto-updater:', error);
+    });
+    // Always initialize storage (lightweight) but gate heavy services
     if (isDev || cliOptions.dev) {
         storage.init().catch((error) => console.error('❌ Failed to initialize storage:', error));
-        initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
+        if (shouldInitLocalServices) {
+            initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
+        }
+        else {
+            console.log('🪶 Shell-only mode: skipping local services init');
+        }
     }
     else {
         await storage.init();
-        await initServices();
+        if (shouldInitLocalServices) {
+            await initServices();
+        }
+        else {
+            console.log('🪶 Shell-only mode: skipping local services init');
+        }
     }
     // Handle pending OAuth callback if window was not ready
     if (app.pendingOAuthCallback) {
@@ -1706,46 +1818,51 @@ app.whenReady().then(async () => {
         console.log('✅ [CLI] All pending files opened successfully');
         console.log('═══════════════════════════════════════════════════════════');
     }
-    // Handle CLI options for reset and cache clearing
-    if (cliOptions.reset) {
-        await storage.resetSettings();
-        console.log('Settings reset to defaults');
-    }
-    if (cliOptions.clearCache) {
-        // Clear cache logic would go here
-        console.log('Cache cleared');
-    }
-    // Handle music directories from CLI
-    if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
+    if (shouldInitLocalServices) {
+        // Handle CLI options for reset and cache clearing
+        if (cliOptions.reset) {
+            await storage.resetSettings();
+            console.log('Settings reset to defaults');
+        }
+        if (cliOptions.clearCache) {
+            // Clear cache logic would go here
+            console.log('Cache cleared');
+        }
+        // Handle music directories from CLI
+        if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
+            const settings = await storage.getSettings();
+            const newDirs = cliOptions.musicDir.filter(dir => !settings.musicDirectories.includes(dir));
+            if (newDirs.length > 0) {
+                await storage.updateSettings({
+                    musicDirectories: [...settings.musicDirectories, ...newDirs]
+                });
+                console.log(`Added music directories: ${newDirs.join(', ')}`);
+            }
+        }
+        // Auto-scan on startup (respect CLI scanMode)
         const settings = await storage.getSettings();
-        const newDirs = cliOptions.musicDir.filter(dir => !settings.musicDirectories.includes(dir));
-        if (newDirs.length > 0) {
-            await storage.updateSettings({
-                musicDirectories: [...settings.musicDirectories, ...newDirs]
-            });
-            console.log(`Added music directories: ${newDirs.join(', ')}`);
+        let shouldAutoScan = false;
+        if (cliOptions.scanMode === 'auto') {
+            // Explicitly enabled via --auto-scan
+            shouldAutoScan = true;
+        }
+        else if (cliOptions.scanMode === 'disabled') {
+            // Explicitly disabled via --no-scan
+            shouldAutoScan = false;
+        }
+        else {
+            // Default behavior: use settings
+            shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
+        }
+        if (shouldAutoScan) {
+            // Trigger a scan after window is ready
+            setTimeout(() => {
+                mainWindow?.webContents.send('library:auto-scan-start');
+            }, 2000);
         }
     }
-    // Auto-scan on startup (respect CLI scanMode)
-    const settings = await storage.getSettings();
-    let shouldAutoScan = false;
-    if (cliOptions.scanMode === 'auto') {
-        // Explicitly enabled via --auto-scan
-        shouldAutoScan = true;
-    }
-    else if (cliOptions.scanMode === 'disabled') {
-        // Explicitly disabled via --no-scan
-        shouldAutoScan = false;
-    }
     else {
-        // Default behavior: use settings
-        shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
-    }
-    if (shouldAutoScan) {
-        // Trigger a scan after window is ready
-        setTimeout(() => {
-            mainWindow?.webContents.send('library:auto-scan-start');
-        }, 2000);
+        console.log('🪶 Shell-only mode: skipped local storage settings and auto-scan');
     }
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

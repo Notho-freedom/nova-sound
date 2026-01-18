@@ -730,7 +730,7 @@ async function initBinaryAutoUpdater() {
       const stringNotes = typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined;
       const aggregatedNotes = Array.isArray(info.releaseNotes)
         ? info.releaseNotes
-            .map((note) => {
+            .map((note: any) => {
               if (typeof note === 'string') return note;
               if (note && typeof note.note === 'string') return note.note;
               return null;
@@ -749,12 +749,12 @@ async function initBinaryAutoUpdater() {
     }
   };
 
-  autoUpdater.on('update-available', (info) => {
+  autoUpdater.on('update-available', (info: UpdateInfo) => {
     console.log(`🔄 Update available: ${info.version}`);
     notifyRenderer(info, false);
   });
 
-  autoUpdater.on('update-downloaded', (info) => {
+  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     console.log(`✅ Update downloaded: ${info.version}`);
     notifyRenderer(info, true);
     setTimeout(() => {
@@ -766,7 +766,7 @@ async function initBinaryAutoUpdater() {
     }, 1200);
   });
 
-  autoUpdater.on('error', (error) => {
+  autoUpdater.on('error', (error: Error) => {
     console.warn('⚠️ Auto-updater error:', error);
   });
 

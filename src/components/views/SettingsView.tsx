@@ -67,6 +67,8 @@ import { redisCache } from "@/services/redis-cache";
 import { CoachmarkTrigger } from "@/features/coachmarks";
 import { useI18n } from "@/i18n";
 
+import { APP_VERSION, getBuildInfo } from "@/lib/version";
+
 // Next.js: Use NEXT_PUBLIC_ prefix for client-side env vars
 const API_BASE_URL = typeof window !== 'undefined' 
   ? (process.env.NEXT_PUBLIC_API_URL || "") 
@@ -494,6 +496,8 @@ export const SettingsView = () => {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [redisConnected, setRedisConnected] = useState<boolean | null>(null);
   const [redisChecking, setRedisChecking] = useState(false);
+    const [buildInfo, setBuildInfo] = useState({ version: APP_VERSION, buildDate: 'Loading...', buildNumber: 0, changelog: null });
+
   // Initialize settings with current theme from useTheme hook
   const [settings, setSettings] = useState<Partial<Settings>>(() => {
     const savedTheme = typeof window !== 'undefined' 
@@ -539,6 +543,7 @@ export const SettingsView = () => {
 
   // Debug: Log scanning state changes
   useEffect(() => {
+      getBuildInfo().then(setBuildInfo).catch(console.error);
     console.log('🔍 [SettingsView] Scanning state:', { scanning, scanProgress });
   }, [scanning, scanProgress]);
 
@@ -3279,11 +3284,11 @@ export const SettingsView = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t("settingsAboutVersion")}</span>
-                    <span className="text-sm font-mono">1.0.0</span>
+                    <span className="text-sm font-mono">{buildInfo.version}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t("settingsAboutBuild")}</span>
-                    <span className="text-sm font-mono">2024.12.08</span>
+                    <span className="text-sm font-mono">{buildInfo.buildDate}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t("settingsAboutMode")}</span>
