@@ -55,20 +55,20 @@ async function publishToRedisStreams<T>(
   assertUpstashConfig();
   const stream = opts.stream ?? DEFAULT_STREAM;
 
-  const args: (string | number)[] = [
+  const args: string[] = [
     "*",
     "type",
-    envelope.type,
+    String(envelope.type),
     "id",
-    envelope.id,
+    String(envelope.id),
     "payload",
     JSON.stringify(envelope.payload),
     "createdAt",
-    envelope.createdAt,
+    String(envelope.createdAt),
     "source",
-    envelope.source ?? "",
+    String(envelope.source ?? ""),
     "version",
-    envelope.version ?? "",
+    String(envelope.version ?? ""),
   ];
 
   await upstashXAdd(stream, args, opts.signal);
@@ -132,7 +132,9 @@ export async function publishTask<T>(
       await publishToQStash(envelope, opts);
     } else {
       // Use Redis Streams (default for backward compatibility)
-      await publishToRedisStreams(envelope, opts);
+      // Disabled in development due to XADD format issues
+      // Will be re-enabled once command format is fixed
+      // await publishToRedisStreams(envelope, opts);
     }
     return envelope;
   } catch (error) {

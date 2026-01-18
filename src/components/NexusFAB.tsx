@@ -10,7 +10,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { NexusAssistant } from "@/components/NexusAssistant";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +105,10 @@ export function NexusFAB({ className }: NexusFABProps) {
       {/* Dialog with assistant */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-3xl h-[80vh] p-0 gap-0">
+          <DialogTitle className="sr-only">Nexus AI Assistant</DialogTitle>
+          <DialogDescription className="sr-only">
+            AI-powered assistant to help you with Nova Sound features and questions
+          </DialogDescription>
           <NexusAssistant onClose={() => setIsOpen(false)} />
         </DialogContent>
       </Dialog>

@@ -21,13 +21,16 @@ async function upstashFetch<T>(path: string, args: (string | number)[], signal?:
   const url = `${endpoint!.replace(/\/$/, "")}/${path.replace(/^\//, "")}`
 
   try {
+    // Convert all args to strings for Upstash REST API
+    const stringArgs = args.map(arg => String(arg))
+    
     const res = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(args),
+      body: JSON.stringify(stringArgs),
       cache: "no-store",
       signal,
     })
@@ -50,7 +53,9 @@ async function upstashFetch<T>(path: string, args: (string | number)[], signal?:
 
 /** XADD helper (streams). */
 export async function upstashXAdd(stream: string, args: (string | number)[], signal?: AbortSignal) {
-  return upstashFetch<string>(`xadd/${stream}`, args, signal)
+  // For XADD with REST API: /xadd/{stream} with args array (no stream name in args)
+  // Args format: ["*", "field1", "value1", "field2", "value2", ...]
+  return upstashFetch<string>(`xadd/${encodeURIComponent(stream)}`, args, signal)
 }
 
 /** XGROUP CREATE helper. */
