@@ -139,6 +139,12 @@ export function useYouTubePlayer(videoId?: string, options?: UseYouTubePlayerOpt
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const elementIdRef = useRef(`youtube-player-${Date.now()}-${Math.random()}`);
 
+  const getSafeOrigin = () => {
+    if (typeof window === 'undefined') return null;
+    const { origin, protocol } = window.location;
+    if (origin === 'null' || protocol === 'file:') return null;
+    return origin;
+  };
   // Charger l'API YouTube IFrame
   useEffect(() => {
     // Vérifier si l'API est déjà chargée
@@ -269,6 +275,7 @@ export function useYouTubePlayer(videoId?: string, options?: UseYouTubePlayerOpt
     }
     
     try {
+      const safeOrigin = getSafeOrigin();
       const player = new window.YT.Player(elementId, {
         height: '100%',
         width: '100%',
@@ -280,7 +287,7 @@ export function useYouTubePlayer(videoId?: string, options?: UseYouTubePlayerOpt
           playsinline: 1,
           // Paramètres supplémentaires pour Electron
           enablejsapi: 1,
-          origin: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+          ...(safeOrigin ? { origin: safeOrigin } : {}),
           // Désactiver certaines fonctionnalités qui causent des erreurs dans Electron
           iv_load_policy: 3, // Masquer les annotations
           fs: 0, // Désactiver le plein écran natif (on utilise notre propre implémentation)

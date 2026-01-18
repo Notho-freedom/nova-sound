@@ -51,11 +51,11 @@ const nextConfig = {
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.youtube.com https://s.ytimg.com;
       script-src-elem 'self' 'unsafe-inline' https://js.stripe.com https://www.youtube.com https://s.ytimg.com;
       style-src 'self' 'unsafe-inline';
-      img-src 'self' data: blob: https:;
+      img-src 'self' data: blob: https: local-image:;
       font-src 'self' data: https:;
       media-src 'self' blob: data: https: http: local-audio: local-video: local-image:;
       connect-src 'self' https: wss: https://api.stripe.com;
-      frame-src 'self' https://js.stripe.com https://hooks.stripe.com;
+      frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://www.youtube.com https://www.youtube-nocookie.com;
       worker-src 'self' blob:;
     `;
 

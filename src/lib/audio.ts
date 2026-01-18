@@ -8,6 +8,12 @@ export function getCoverUrl(coverUrl?: string): string {
   if (!coverUrl || coverUrl === '') {
     return DEFAULT_COVER;
   }
+  if (isElectron() && coverUrl.startsWith('file://')) {
+    const rawPath = coverUrl.replace(/^file:\/\//, '');
+    const decodedPath = decodeURIComponent(rawPath);
+    const normalizedPath = decodedPath.startsWith('/') ? decodedPath.slice(1) : decodedPath;
+    return `local-image://${encodeURIComponent(normalizedPath)}`;
+  }
   return coverUrl;
 }
 

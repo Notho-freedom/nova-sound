@@ -216,12 +216,18 @@ class YouTubePlayerService {
     start?: number;
     controls?: boolean;
   } = {}): string {
+    const safeOrigin = typeof window !== 'undefined'
+      && window.location.origin !== 'null'
+      && window.location.protocol !== 'file:'
+      ? window.location.origin
+      : null;
     const params = new URLSearchParams({
       enablejsapi: '1',
-      origin: window.location.origin,
       rel: '0',
       modestbranding: '1',
     });
+
+    if (safeOrigin) params.set('origin', safeOrigin);
 
     if (options.autoplay) params.set('autoplay', '1');
     if (options.start) params.set('start', options.start.toString());

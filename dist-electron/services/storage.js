@@ -232,8 +232,8 @@ class Storage {
         const filename = `${hash}.${ext}`;
         const artworkPath = path.join(ARTWORK_DIR, filename);
         await fs.writeFile(artworkPath, artwork.data);
-        // Return file:// URL for Electron
-        return `file://${artworkPath.replace(/\\/g, '/')}`;
+        // Return local-image:// URL for custom protocol (works better with CSP)
+        return `local-image://${encodeURIComponent(artworkPath)}`;
     }
     // Video Thumbnails
     async saveThumbnail(thumbnailData, sourceFilePath) {
