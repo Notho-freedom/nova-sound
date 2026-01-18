@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Track } from "@/types/music";
 
 interface Genre {
@@ -14,7 +14,7 @@ interface UseGenresReturn {
   detectGenre: (track: Track) => string;
 }
 
-// Keywords to detect genres from track metadata
+// Keywords to detect genres from track metadata (copied to worker)
 const genreKeywords: Record<string, string[]> = {
   pop: ["pop", "top 40", "chart", "mainstream"],
   rock: ["rock", "alternative", "indie rock", "grunge", "punk"],
@@ -85,12 +85,15 @@ const artistGenreMap: Record<string, string> = {
 };
 
 export function useGenres(tracks: Track[]): UseGenresReturn {
-  // Detect genre for a single track
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [genresMap, setGenresMap] = useState<Map<string, Genre>>(new Map());
+  const workerRef = useRef<Worker | null>(null);
+  const requestIdRef = useRef(0);
+
+  // Detect genre for a single track (for main thread when needed)
   const detectGenre = (track: Track): string => {
-    // Check if track has genre metadata
     const trackGenre = (track as any).genre?.toLowerCase();
     if (trackGenre) {
-      // Try to match with our categories
       for (const [genre, keywords] of Object.entries(genreKeywords)) {
         if (keywords.some((kw) => trackGenre.includes(kw))) {
           return genre;
@@ -99,7 +102,6 @@ export function useGenres(tracks: Track[]): UseGenresReturn {
       return trackGenre;
     }
 
-    // Try to detect from artist name
     const artistLower = track.artist.toLowerCase();
     for (const [artist, genre] of Object.entries(artistGenreMap)) {
       if (artistLower.includes(artist)) {
@@ -107,7 +109,6 @@ export function useGenres(tracks: Track[]): UseGenresReturn {
       }
     }
 
-    // Try to detect from album/title
     const searchText = `${track.title} ${track.album || ""}`.toLowerCase();
     for (const [genre, keywords] of Object.entries(genreKeywords)) {
       if (keywords.some((kw) => searchText.includes(kw))) {
@@ -115,7 +116,6 @@ export function useGenres(tracks: Track[]): UseGenresReturn {
       }
     }
 
-    // Default based on common patterns
     if (track.title.match(/remix|mix|edit/i)) {
       return "electronic";
     }
@@ -129,37 +129,6 @@ export function useGenres(tracks: Track[]): UseGenresReturn {
     return "other";
   };
 
-  // Group tracks by genre
-  const genres = useMemo<Genre[]>(() => {
-    const genreMap = new Map<string, Genre>();
-
-    tracks.forEach((track) => {
-      const genreName = detectGenre(track);
-      
-      const existing = genreMap.get(genreName) || {
-        name: genreName,
-        trackCount: 0,
-        trackIds: [],
-        sampleCoverUrl: undefined,
-      };
-
-      existing.trackCount++;
-      existing.trackIds.push(track.id);
-      
-      // Use first available cover as sample
-      if (!existing.sampleCoverUrl && track.coverUrl) {
-        existing.sampleCoverUrl = track.coverUrl;
-      }
-
-      genreMap.set(genreName, existing);
-    });
-
-    // Sort by track count and filter out "other" if it has few tracks
-    return Array.from(genreMap.values())
-      .filter((g) => g.name !== "other" || g.trackCount > 5)
-      .sort((a, b) => b.trackCount - a.trackCount);
-  }, [tracks]);
-
   // Get tracks for a specific genre
   const getTracksByGenre = (genreName: string): Track[] => {
     const genre = genres.find((g) => g.name === genreName);
@@ -170,6 +139,45 @@ export function useGenres(tracks: Track[]): UseGenresReturn {
       .map((id) => trackMap.get(id))
       .filter(Boolean) as Track[];
   };
+
+  useEffect(() => {
+    const isBrowser = typeof window !== 'undefined';
+    if (!isBrowser) return;
+
+    const worker = new Worker(new URL('../workers/stats-worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+
+    worker.onmessage = (event: MessageEvent<{ id: number; genres?: Genre[] }>) => {
+      if (event.data.id !== requestIdRef.current) return;
+      if (event.data.genres) {
+        setGenres(event.data.genres);
+        const map = new Map(event.data.genres.map(g => [g.name, g]));
+        setGenresMap(map);
+      }
+    };
+
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tracks.length === 0) {
+      setGenres([]);
+      setGenresMap(new Map());
+      return;
+    }
+
+    if (workerRef.current) {
+      const id = ++requestIdRef.current;
+      workerRef.current.postMessage({
+        id,
+        action: 'genres',
+        tracks,
+      });
+    }
+  }, [tracks]);
 
   return { genres, getTracksByGenre, detectGenre };
 }

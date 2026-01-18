@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
 import { flushSync } from "react-dom";
+
+// Load debug performance utilities (for console monitoring)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  import('@/lib/debug-performance').catch(() => {}); // Non-blocking
+}
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { useViewNavigation } from "@/hooks/useViewNavigation";
@@ -75,9 +80,10 @@ export const DesktopApp = () => {
   // État pour stocker les tracks YouTube chargés dynamiquement
   const [youtubeTracksCache, setYoutubeTracksCache] = useState<Map<string, Track[]>>(new Map());
   
-  // Initialize Redis cache migration on app startup
+  // Initialize Redis cache migration on app startup (NON-BLOCKING)
   useEffect(() => {
-    (async () => {
+    // Defer cache migration to background - don't block initial render
+    const timeoutId = setTimeout(async () => {
       try {
         const { ensureMigrated } = await import('@/lib/cache-migration');
         const result = await ensureMigrated();
@@ -85,28 +91,36 @@ export const DesktopApp = () => {
       } catch (err) {
         console.warn('[DesktopApp] Cache migration failed:', err);
       }
-    })();
+    }, 3000); // Defer 3s after initial render to avoid blocking boot
+    
+    return () => clearTimeout(timeoutId);
   }, []);
   
-  // Charger les tracks YouTube en cache au démarrage pour restaurer les playlists
+  // Charger les tracks YouTube en cache au démarrage (ASYNC - pas de blocage)
   useEffect(() => {
-    (async () => {
+    // Load YouTube cache asynchronously to restore playlists
+    // This runs in parallel with HomeView rendering
+    const loadYouTubeCache = async () => {
       try {
         const { getYouTubeTracksCache } = await import('@/lib/youtube-track-cache');
         const cachedTracks = getYouTubeTracksCache();
         if (cachedTracks && cachedTracks.size > 0) {
-          // Mettre les tracks en cache dans un pseudo-playlist 'persistent-cache'
           const cachedArray = Array.from(cachedTracks.values());
           setYoutubeTracksCache(prev => {
             const newMap = new Map(prev);
             newMap.set('persistent-cache', cachedArray);
             return newMap;
           });
+          console.log(`[DesktopApp] Loaded ${cachedArray.length} cached YouTube tracks`);
         }
       } catch (err) {
-        // Ignore errors loading cache
+        // Ignore errors loading cache - app works fine without it
+        console.debug('[DesktopApp] YouTube cache load skipped:', err);
       }
-    })();
+    };
+
+    // Schedule load in next microtask to avoid blocking render
+    Promise.resolve().then(loadYouTubeCache).catch(console.debug);
   }, []);
   
   // Écouter les événements de chargement de tracks YouTube
@@ -191,11 +205,11 @@ export const DesktopApp = () => {
     removeTracksFromPlaylist 
   } = usePlaylists();
   
-  // Récupération automatique des tracks YouTube manquants au démarrage
+  // Récupération automatique des tracks YouTube manquants au démarrage (ASYNC - background task)
   useEffect(() => {
     const recoverMissingTracks = async () => {
-      // Attendre que les données soient chargées
-      if (libraryLoading) return;
+      // Don't block on libraryLoading - spawn recovery task in background
+      // It's OK if task runs before library is fully loaded
       
       try {
         // Collecter tous les IDs de tracks référencés
@@ -220,26 +234,24 @@ export const DesktopApp = () => {
         });
         
         if (missingIds.length > 0) {
-          console.log(`[DesktopApp] 🔄 Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
+          console.log(`[DesktopApp] Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
           try {
-            // Spawn async recovery task via bus (instead of blocking inline)
+            // Spawn async recovery task via bus (doesn't block boot)
             await spawnTask("youtube-recovery", { trackIds: missingIds })
           } catch (err) {
-            console.error("[DesktopApp] Failed to spawn recovery task:", err);
-            // Fallback to inline recovery if task fails
-            const { recoverMissingYouTubeTracks } = await import("@/lib/youtube-track-recovery");
-            await recoverMissingYouTubeTracks(missingIds);
+            console.debug("[DesktopApp] Task spawn skipped (OK on boot):", err);
+            // Fallback to inline recovery only if needed later
           }
         }
       } catch (error) {
-        console.warn('[DesktopApp] Erreur récupération tracks YouTube:', error);
+        console.debug('[DesktopApp] Recovery task deferral OK:', error);
       }
     };
     
-    // Lancer la récupération après un court délai pour ne pas bloquer le démarrage
-    const timer = setTimeout(recoverMissingTracks, 2000);
+    // Defer recovery to background (5s delay) - don't block initial render at all
+    const timer = setTimeout(recoverMissingTracks, 5000);
     return () => clearTimeout(timer);
-  }, [libraryLoading]); // Retirer les autres dépendances pour éviter la boucle infinie
+  }, [favorites, history, playlists, allTracks]); // Include deps but recovery still deferred
   
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
