@@ -56,7 +56,7 @@ export async function upstashXAdd(stream: string, args: (string | number)[], sig
 /** XGROUP CREATE helper. */
 export async function upstashXGroupCreate(stream: string, group: string, start: string = "$", signal?: AbortSignal) {
   // XGROUP CREATE <stream> <group> <id> MKSTREAM
-  return upstashFetch<string>("xgroup", ["CREATE", stream, group, start, "MKSTREAM"], signal)
+  return upstashFetch<string>("xgroup/create", [stream, group, start, "MKSTREAM"], signal)
 }
 
 export type XReadGroupResult = Array<
