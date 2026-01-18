@@ -49,11 +49,27 @@ export const queues = {
   },
 
   /**
-   * Blocking pop (for workers)
+   * Blocking pop (for workers) - Simulated with polling for REST API
    */
   async bpop<T>(queueName: string, timeout: number = 0): Promise<T | null> {
-    const result = await redis.brpop(`queue:${queueName}`, timeout);
-    return result ? (JSON.parse(result[1] as string) as T) : null;
+    // REST API doesn't support true blocking, use polling instead
+    const startTime = Date.now();
+    const pollInterval = 100; // ms
+    
+    while (true) {
+      const result = await redis.rpop(`queue:${queueName}`);
+      if (result) {
+        return JSON.parse(result as string) as T;
+      }
+      
+      // Check timeout
+      if (timeout > 0 && Date.now() - startTime > timeout * 1000) {
+        return null;
+      }
+      
+      // Wait before polling again
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
   },
 };
 

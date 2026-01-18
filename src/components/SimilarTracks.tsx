@@ -104,7 +104,7 @@ export function SimilarTracks({
               {/* Cover */}
               <div className="relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden bg-muted">
                 <img
-                  src={getCoverUrl(track)}
+                  src={getCoverUrl(track.coverUrl || "")}
                   alt={track.title}
                   className="w-full h-full object-cover"
                   onError={(e) => {

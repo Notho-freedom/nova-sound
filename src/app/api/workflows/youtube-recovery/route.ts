@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     await redis.set(
       `workflow:youtube-recovery:${workflowId}`,
       JSON.stringify(state),
-      86400 // 24 hours
+      { ex: 86400 } // 24 hours
     );
 
     // Start workflow steps with QStash

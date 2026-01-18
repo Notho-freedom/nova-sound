@@ -34,7 +34,7 @@ interface Message {
   timestamp: Date;
 }
 
-interface SkyOSAssistantProps {
+interface NexusAssistantProps {
   className?: string;
   onClose?: () => void;
 }

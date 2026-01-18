@@ -32,7 +32,14 @@ export const vector = process.env.UPSTASH_VECTOR_REST_URL &&
 
 export const vectorConfig = {
   enabled: !!vector,
-  embeddingModel: "jina-embeddings-I (free tier)
+  embeddingModel: "jina-embeddings-v3",
+  dimension: 1024,
+  topK: 5,
+  maxChunkSize: 500,
+};
+
+/**
+ * Generate embeddings for text using Jina AI
  * 
  * Free tier: 1M tokens/month
  * https://jina.ai/embeddings/
@@ -68,11 +75,15 @@ export async function generateEmbeddings(
     };
 
     const embeddings = data.data.map((d) => d.embedding);
-    return Array.isArray(text) ? embeddings : embeddings[0]
+    return Array.isArray(text) ? embeddings : embeddings[0];
+  } catch (error) {
+    console.error("[Vector] Embeddings error:", error);
+    throw error;
+  }
+}
 
-    if (!response.ok) {
-      throw new Error(`Embeddings failed: ${response.statusText}`);
-    }s with metadata
+/**
+ * Upsert vectors with metadata
  * 
  * Usage:
  *   await upsertVectors([
@@ -105,17 +116,16 @@ export async function upsertVectors(
       }))
     );
 
-    console.log(`[Vector] Upserted ${items.length} vectors
-            metadata,
-          },
-        ],
-      }),
-    });
+    console.log(`[Vector] Upserted ${items.length} vectors`);
+  } catch (error) {
+    console.error("[Vector] Upsert error:", error);
+    throw error;
+  }
+}
 
-    if (!response.ok) {
-      throw new Error(`Upsert failed: ${response.statusText}`);
-    }
- 
+/**
+ * Query vectors for similarity search
+ * 
  * Usage:
  *   const results = await queryVectors("energetic rock song", 5);
  *   results.forEach(r => console.log(r.id, r.score));
@@ -156,18 +166,19 @@ export async function queryVectors(
     });
 
     return results.map((r) => ({
-      id: r.id,
+      id: String(r.id),
       score: r.score,
       metadata: r.metadata as VectorMetadata,
       vector: r.vector,
-    }))
-        includeMetadata: true,
-      }),
-    });
+    }));
+  } catch (error) {
+    console.error("[Vector] Query error:", error);
+    throw error;
+  }
+}
 
-    if (!response.ok) {
-      throw new Error(`Query failed: ${response.statusText}`);
-   Delete vectors by IDs
+/**
+ * Delete vectors by IDs
  */
 export async function deleteVectors(ids: string[]): Promise<void> {
   if (!vector) {
@@ -183,7 +194,9 @@ export async function deleteVectors(ids: string[]): Promise<void> {
     throw error;
   }
 }
-Chunk text into smaller pieces for embedding
+
+/**
+ * Chunk text into smaller pieces for embedding
  * 
  * Usage:
  *   const chunks = chunkText(longText, 500);
@@ -260,7 +273,18 @@ export async function getVectorStats(): Promise<{
     console.error("[Vector] Stats error:", error);
     throw error;
   }
-}   const prompt = `Context: ${context.map(c => c.content).join('\n')}\nQuestion: ...`;
+}
+
+/**
+ * RAG (Retrieval Augmented Generation) - Retrieve context
+ * 
+ * Usage:
+ *   const context = await ragRetrieve("How does authentication work?", 5);
+ *   const llmPrompt = `
+ *     Context: ${context.map(c => c.content).join('\n')}
+ *     Question: How does authentication work?
+ *   `;
+ *   const answer = await llm.generate(llmPrompt);
  */
 export async function ragRetrieve(
   userQuery: string,
@@ -284,18 +308,7 @@ export async function ragRetrieve(
     content: (result.metadata?.content as string) || "",
     source: (result.metadata?.source as string) || "",
     score: result.score,
-    metadata: result.metadatae context + Generate response
- */
-export async function ragRetrieve(
-  userQuery: string,
-  topK: number = 5
-): Promise<Array<{ content: string; source: string; score: number }>> {
-  const results = await queryVectors(userQuery, topK);
-
-  return results.map((result) => ({
-    content: result.metadata?.content as string,
-    source: result.metadata?.source as string,
-    score: result.score,
+    metadata: result.metadata,
   }));
 }
 

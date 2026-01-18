@@ -52,10 +52,13 @@ export async function publishMessage<T extends Record<string, any>>(
   try {
     const result = await qstash.publish({
       url: callbackUrl,
-      body: payload,
+      body: JSON.stringify(payload),
       delay: options?.delay,
       retries: options?.retries ?? 3,
-      headers: options?.headers,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
     });
 
     console.log("[QStash] Message published:", result);
@@ -88,7 +91,10 @@ export async function scheduleCronJob<T extends Record<string, any>>(
     const result = await qstash.publish({
       url: callbackUrl,
       cron: cronExpression,
-      body: payload || {},
+      body: JSON.stringify(payload || {}),
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
 
     console.log("[QStash] Cron job scheduled:", result);

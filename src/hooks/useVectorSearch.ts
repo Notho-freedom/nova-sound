@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import {
-  searchTracksSemantically,
+  searchTracksSemanticSearch,
   isVectorSearchAvailable,
   type VectorSearchResult,
 } from "@/services/vector-search";

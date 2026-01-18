@@ -2,6 +2,7 @@
  * Nexus FAB (Floating Action Button)
  *
  * Button to open the Nexus assistant
+ */
 
 "use client";
 

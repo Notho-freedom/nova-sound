@@ -57,7 +57,6 @@ export async function checkRecoveryProgress(workflowId: string) {
     // @ts-expect-error - Dynamic status shape
     console.log(`✅ Recovered ${status.state.recoveredTracks} tracks`);
   } else {
-    // @ts-expect-error - Dynamic status shape
     console.log(`⏳ Progress: ${status.progress}%`);
   }
 
