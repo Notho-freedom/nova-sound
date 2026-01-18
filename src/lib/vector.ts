@@ -6,7 +6,7 @@
  * Use cases:
  *   - Search tracks by description ("energetic rock song")
  *   - Find similar tracks by vibe
- *   - AI context retrieval for SkyOS assistant
+ *   - AI context retrieval for Nexus assistant
  *   - Content recommendations
  *   - Duplicate detection (semantic)
  * 

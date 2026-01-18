@@ -1,7 +1,7 @@
 /**
  * Vector RAG API
  * 
- * Retrieval Augmented Generation for SkyOS assistant
+ * Retrieval Augmented Generation for Nexus assistant
  * 
  * POST /api/vector/rag
  * Body: {

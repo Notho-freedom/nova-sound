@@ -18,6 +18,7 @@ import { ArtistInfoPanel } from "./ArtistInfoPanel";
 import { PlayQueueChoiceDialog } from "./PlayQueueChoiceDialog";
 // import { KaraokePanel } from "./KaraokePanel"; // DÉSACTIVÉ - Système karaoke désactivé
 import { UpdateNotification } from "./UpdateNotification";
+import { NexusFAB } from "./NexusFAB";
 import { lazy, Suspense } from "react";
 
 // Lazy load ALL heavy view components for better initial load
@@ -2052,6 +2053,8 @@ export const DesktopApp = () => {
           isInline={true}
           isFavorite={currentTrack ? isFavorite(currentTrack.id) : false}
           onToggleFavorite={handleToggleFavorite}
+          onPlayTrack={handlePlayTrack}
+          onAddToQueue={handleAddToQueue}
         />
       );
     }
@@ -2707,6 +2710,8 @@ export const DesktopApp = () => {
             onClose={() => setIsFullscreen(false)}
             isFavorite={isFavorite(currentTrack.id)}
             onToggleFavorite={handleToggleFavorite}
+            onPlayTrack={handlePlayTrack}
+            onAddToQueue={handleAddToQueue}
             youtubePlayerRef={youtubePlayerRef}
           />
         )}
@@ -3103,6 +3108,9 @@ export const DesktopApp = () => {
           fileCount={pendingFilesToProcess.length}
           isProcessing={isProcessingFiles}
         />
+
+        {/* Nexus Assistant FAB */}
+        <NexusFAB />
       </div>
     </TooltipProvider>
     </CoachmarkProvider>

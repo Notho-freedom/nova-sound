@@ -82,15 +82,15 @@ export async function indexAppDocumentation() {
 }
 
 /**
- * Example 4: RAG for SkyOS assistant
+ * Example 4: RAG for Nexus assistant
  */
-export async function askSkyOS(userQuestion: string) {
+export async function askNexus(userQuestion: string) {
   // Get context from vector search
   const context = await vectorHelpers.getRAGContext(userQuestion, 5);
   
   // Build prompt for LLM
   const prompt = `
-You are SkyOS, the Nova Sound AI assistant.
+You are Nexus, the Nova Sound AI assistant.
 Use the following context to answer the user's question.
 
 Context:

@@ -9,7 +9,7 @@
  *   // Search tracks by description
  *   const results = await vectorHelpers.searchTracks("energetic rock song");
  * 
- *   // RAG for SkyOS assistant
+ *   // RAG for Nexus assistant
  *   const context = await vectorHelpers.getRAGContext("How do I add tracks?");
  */
 
@@ -165,7 +165,7 @@ export async function indexDocumentation(
 }
 
 /**
- * Get RAG context for SkyOS assistant
+ * Get RAG context for Nexus assistant
  * 
  * Usage:
  *   const context = await getRAGContext("How do I add tracks?");
