@@ -63,17 +63,6 @@ let stripeWindow = null;
 let oauthCallbackServer = null;
 const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 const isDev = !app.isPackaged;
-// Shell-only mode: Electron as a lightweight OS bridge (no local services/scanners).
-// Default: enabled in development unless ELECTRON_SHELL_ONLY explicitly set to "false".
-const isShellOnly = (() => {
-    const env = process.env.ELECTRON_SHELL_ONLY?.toLowerCase();
-    if (env === 'false' || env === '0')
-        return false;
-    if (env === 'true' || env === '1')
-        return true;
-    return isDev; // default to shell-only for dev, full mode when packaged
-})();
-const shouldInitLocalServices = !isShellOnly;
 if (process.env.SENTRY_DSN) {
     Sentry.init({
         dsn: process.env.SENTRY_DSN,
@@ -1753,36 +1742,24 @@ function cleanupOAuthServer() {
 app.whenReady().then(async () => {
     // Register OAuth callback server for desktop app authentication
     registerOAuthCallbackServer();
-    // Register custom protocols only when local services are enabled
-    if (shouldInitLocalServices) {
-        registerLocalAudioProtocol();
-        registerLocalVideoProtocol();
-        registerLocalImageProtocol();
-    }
+    // Register custom protocols
+    registerLocalAudioProtocol();
+    registerLocalVideoProtocol();
+    registerLocalImageProtocol();
     // Create window ASAP for faster dev startup
     createWindow();
     // Kick off native auto-updates for packaged Windows builds
     initBinaryAutoUpdater().catch((error) => {
         console.warn('⚠️ Failed to start native auto-updater:', error);
     });
-    // Always initialize storage (lightweight) but gate heavy services
+    // Initialize storage and services
     if (isDev || cliOptions.dev) {
         storage.init().catch((error) => console.error('❌ Failed to initialize storage:', error));
-        if (shouldInitLocalServices) {
-            initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
-        }
-        else {
-            console.log('🪶 Shell-only mode: skipping local services init');
-        }
+        initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
     }
     else {
         await storage.init();
-        if (shouldInitLocalServices) {
-            await initServices();
-        }
-        else {
-            console.log('🪶 Shell-only mode: skipping local services init');
-        }
+        await initServices();
     }
     // Handle pending OAuth callback if window was not ready
     if (app.pendingOAuthCallback) {
@@ -1819,51 +1796,46 @@ app.whenReady().then(async () => {
         console.log('✅ [CLI] All pending files opened successfully');
         console.log('═══════════════════════════════════════════════════════════');
     }
-    if (shouldInitLocalServices) {
-        // Handle CLI options for reset and cache clearing
-        if (cliOptions.reset) {
-            await storage.resetSettings();
-            console.log('Settings reset to defaults');
-        }
-        if (cliOptions.clearCache) {
-            // Clear cache logic would go here
-            console.log('Cache cleared');
-        }
-        // Handle music directories from CLI
-        if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
-            const settings = await storage.getSettings();
-            const newDirs = cliOptions.musicDir.filter(dir => !settings.musicDirectories.includes(dir));
-            if (newDirs.length > 0) {
-                await storage.updateSettings({
-                    musicDirectories: [...settings.musicDirectories, ...newDirs]
-                });
-                console.log(`Added music directories: ${newDirs.join(', ')}`);
-            }
-        }
-        // Auto-scan on startup (respect CLI scanMode)
+    // Handle CLI options for reset and cache clearing
+    if (cliOptions.reset) {
+        await storage.resetSettings();
+        console.log('Settings reset to defaults');
+    }
+    if (cliOptions.clearCache) {
+        // Clear cache logic would go here
+        console.log('Cache cleared');
+    }
+    // Handle music directories from CLI
+    if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
         const settings = await storage.getSettings();
-        let shouldAutoScan = false;
-        if (cliOptions.scanMode === 'auto') {
-            // Explicitly enabled via --auto-scan
-            shouldAutoScan = true;
-        }
-        else if (cliOptions.scanMode === 'disabled') {
-            // Explicitly disabled via --no-scan
-            shouldAutoScan = false;
-        }
-        else {
-            // Default behavior: use settings
-            shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
-        }
-        if (shouldAutoScan) {
-            // Trigger a scan after window is ready
-            setTimeout(() => {
-                mainWindow?.webContents.send('library:auto-scan-start');
-            }, 2000);
+        const newDirs = cliOptions.musicDir.filter(dir => !settings.musicDirectories.includes(dir));
+        if (newDirs.length > 0) {
+            await storage.updateSettings({
+                musicDirectories: [...settings.musicDirectories, ...newDirs]
+            });
+            console.log(`Added music directories: ${newDirs.join(', ')}`);
         }
     }
+    // Auto-scan on startup (respect CLI scanMode)
+    const settings = await storage.getSettings();
+    let shouldAutoScan = false;
+    if (cliOptions.scanMode === 'auto') {
+        // Explicitly enabled via --auto-scan
+        shouldAutoScan = true;
+    }
+    else if (cliOptions.scanMode === 'disabled') {
+        // Explicitly disabled via --no-scan
+        shouldAutoScan = false;
+    }
     else {
-        console.log('🪶 Shell-only mode: skipped local storage settings and auto-scan');
+        // Default behavior: use settings
+        shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
+    }
+    if (shouldAutoScan) {
+        // Trigger a scan after window is ready
+        setTimeout(() => {
+            mainWindow?.webContents.send('library:auto-scan-start');
+        }, 2000);
     }
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

@@ -1996,29 +1996,27 @@ app.whenReady().then(async () => {
       console.log(`Added music directories: ${newDirs.join(', ')}`);
     }
   }
-    // Auto-scan on startup (respect CLI scanMode)
-    const settings = await storage.getSettings();
-    let shouldAutoScan = false;
-    
-    if (cliOptions.scanMode === 'auto') {
-      // Explicitly enabled via --auto-scan
-      shouldAutoScan = true;
-    } else if (cliOptions.scanMode === 'disabled') {
-      // Explicitly disabled via --no-scan
-      shouldAutoScan = false;
-    } else {
-      // Default behavior: use settings
-      shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
-    }
-    
-    if (shouldAutoScan) {
-      // Trigger a scan after window is ready
-      setTimeout(() => {
-        mainWindow?.webContents.send('library:auto-scan-start');
-      }, 2000);
-    }
+
+  // Auto-scan on startup (respect CLI scanMode)
+  const settings = await storage.getSettings();
+  let shouldAutoScan = false;
+  
+  if (cliOptions.scanMode === 'auto') {
+    // Explicitly enabled via --auto-scan
+    shouldAutoScan = true;
+  } else if (cliOptions.scanMode === 'disabled') {
+    // Explicitly disabled via --no-scan
+    shouldAutoScan = false;
   } else {
-    console.log('🪶 Shell-only mode: skipped local storage settings and auto-scan');
+    // Default behavior: use settings
+    shouldAutoScan = settings.autoScanOnStartup && settings.musicDirectories.length > 0;
+  }
+  
+  if (shouldAutoScan) {
+    // Trigger a scan after window is ready
+    setTimeout(() => {
+      mainWindow?.webContents.send('library:auto-scan-start');
+    }, 2000);
   }
 
   app.on('activate', () => {
