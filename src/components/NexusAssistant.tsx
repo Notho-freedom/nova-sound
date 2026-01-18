@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { getRAGContext, type RAGResponse } from "@/services/vector-search";
+import { generateAssistantResponse, type GroqMessage } from "@/lib/groq";
 
 interface Message {
   id: string;
@@ -89,20 +90,47 @@ export function NexusAssistant({ className, onClose }: NexusAssistantProps) {
     setLoading(true);
 
     try {
-      // Get RAG context
-      const ragResponse = await getRAGContext(messageText);
+      // Try RAG first
+      let ragResponse: RAGResponse | null = null;
+      let ragContext = "";
+      let ragSources: RAGResponse["sources"] = [];
 
-      if (!ragResponse) {
-        throw new Error("Impossible d'obtenir le contexte");
+      try {
+        ragResponse = await getRAGContext(messageText);
+        if (ragResponse) {
+          ragContext = ragResponse.context;
+          ragSources = ragResponse.sources;
+        }
+      } catch (ragError) {
+        console.warn("[Nexus] RAG search failed, will use Groq fallback:", ragError);
       }
 
-      // Simulate AI response (in production, send to actual LLM)
-      // For now, just show the context
+      // Convert conversation history for Groq
+      const groqMessages: GroqMessage[] = messages
+        .filter((m) => m.role !== "system")
+        .map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }));
+
+      // Get response from Groq (with RAG context if available)
+      let assistantResponse: string;
+      try {
+        assistantResponse = await generateAssistantResponse(
+          messageText,
+          ragContext || undefined,
+          groqMessages
+        );
+      } catch (groqError) {
+        console.error("[Nexus] Groq fallback failed:", groqError);
+        throw groqError;
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Voici ce que j'ai trouvé concernant votre question :\n\n${ragResponse.context}\n\n💡 Ces informations proviennent de la documentation de Nova Sound.`,
-        sources: ragResponse.sources,
+        content: assistantResponse,
+        sources: ragSources && ragSources.length > 0 ? ragSources : undefined,
         timestamp: new Date(),
       };
 
@@ -114,7 +142,7 @@ export function NexusAssistant({ className, onClose }: NexusAssistantProps) {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content:
-          "😔 Désolé, je n'ai pas pu trouver de réponse à votre question. Essayez de reformuler ou consultez la documentation.",
+          "😔 Désolé, je n'ai pas pu générer une réponse pour le moment. Essayez de reformuler ou vérifiez votre connexion Internet.",
         timestamp: new Date(),
       };
 
