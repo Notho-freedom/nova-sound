@@ -3,8 +3,10 @@ import os from "node:os"
 import process from "node:process"
 import * as Sentry from "@sentry/node"
 
-import { upstashXAck, upstashXGroupCreate, upstashXReadGroup, type XReadGroupResult } from "@/lib/upstash"
+import { upstashXAdd, upstashXAck, upstashXGroupCreate, upstashXReadGroup, type XReadGroupResult } from "@/lib/upstash"
 import { getTaskSnapshot, saveTaskSnapshot, type TaskSnapshot } from "@/lib/task-store"
+import { publishTaskProgress } from "@/lib/task-progress"
+import { TASK_HANDLERS, defaultHandler, type TaskHandler } from "./task-handlers"
 
 const STREAM = process.env.TASK_STREAM ?? "events"
 const GROUP = process.env.TASK_GROUP ?? "ghost-workers"
@@ -12,6 +14,11 @@ const CONSUMER = process.env.TASK_CONSUMER ?? `worker-${os.hostname()}-${process
 const BATCH_SIZE = Number(process.env.TASK_BATCH_SIZE ?? 10)
 const BLOCK_MS = Number(process.env.TASK_BLOCK_MS ?? 20000)
 const REVALIDATE_WEBHOOK = process.env.TASK_REVALIDATE_WEBHOOK
+
+// Retry configuration
+const MAX_RETRIES = Number(process.env.TASK_MAX_RETRIES ?? 3)
+const INITIAL_BACKOFF_MS = Number(process.env.TASK_INITIAL_BACKOFF_MS ?? 1000)
+const DLQ_STREAM = process.env.TASK_DLQ_STREAM ?? "events-dlq"
 
 // Init Sentry for the worker runtime (no-op if DSN absent)
 if (process.env.SENTRY_DSN) {
@@ -39,17 +46,8 @@ type ParsedEntry = {
   fields: Record<string, string>
 }
 
-type TaskHandler = (payload: any, meta: { id: string; type: string; source?: string; version?: string }) => Promise<any>
-
-// Register handlers per task type (extend in future sprints)
-const handlers: Record<string, TaskHandler> = {
-  // Example: "open-files": async (payload) => { ... }
-}
-
-const defaultHandler: TaskHandler = async (payload, meta) => {
-  // Placeholder handler; extend with real work per task type
-  return { ok: true, receivedType: meta.type, receivedPayload: payload }
-}
+// Handlers are imported from task-handlers.ts
+// Use handler registry or defaultHandler
 
 function parseFields(fields: Array<string | number>): Record<string, string> {
   const obj: Record<string, string> = {}
@@ -108,6 +106,29 @@ async function ensureGroup() {
   }
 }
 
+function exponentialBackoff(attempt: number): number {
+  return INITIAL_BACKOFF_MS * Math.pow(2, attempt)
+}
+
+async function sendToDLQ(entry: ParsedEntry, reason: string, attempt: number) {
+  try {
+    const dlqEntry = {
+      ...entry.fields,
+      dlq_reason: reason,
+      dlq_attempt: attempt,
+      dlq_timestamp: Date.now(),
+    }
+    const args: (string | number)[] = [
+      "*",
+      ...Object.entries(dlqEntry).flatMap(([k, v]) => [k, String(v)]),
+    ]
+    await upstashXAdd(DLQ_STREAM, args)
+    warn(`Entry sent to DLQ: ${entry.entryId} (reason: ${reason})`)
+  } catch (err) {
+    errorLog(`Failed to send entry to DLQ:`, err)
+  }
+}
+
 async function handleEntry(entry: ParsedEntry) {
   const { entryId, fields } = entry
   const taskId = fields.id ?? entryId
@@ -129,20 +150,46 @@ async function handleEntry(entry: ParsedEntry) {
 
   // Mark as processing
   await saveTaskSnapshot({ ...base, status: "processing", updatedAt: now })
+  await publishTaskProgress({
+    taskId,
+    status: "processing",
+    progress: 0,
+    updatedAt: now,
+  })
 
-  try {
-    const handler = handlers[type] ?? defaultHandler
-    const result = await handler(payload, { id: taskId, type, source: base.source, version: base.version })
+  let lastError: any = null
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const handler = TASK_HANDLERS[type] ?? defaultHandler
+      const result = await handler(payload, { id: taskId, type, source: base.source, version: base.version })
 
-    await saveTaskSnapshot({
-      ...base,
-      status: "done",
-      updatedAt: Date.now(),
-      result,
-      payload: base.payload ?? payload,
-    })
-  } catch (err: any) {
-    const message = String(err?.message ?? err ?? "Unknown error")
+      await saveTaskSnapshot({
+        ...base,
+        status: "done",
+        updatedAt: Date.now(),
+        result,
+        payload: base.payload ?? payload,
+      })
+      await publishTaskProgress({
+        taskId,
+        status: "done",
+        progress: 100,
+        updatedAt: Date.now(),
+      })
+      break // Success
+    } catch (err: any) {
+      lastError = err
+      if (attempt < MAX_RETRIES) {
+        const backoffMs = exponentialBackoff(attempt)
+        warn(`Handler error (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${backoffMs}ms:`, err)
+        await new Promise(resolve => setTimeout(resolve, backoffMs))
+      }
+    }
+  }
+
+  // If all retries failed, mark as failed and send to DLQ
+  if (lastError) {
+    const message = String(lastError?.message ?? lastError ?? "Unknown error")
     await saveTaskSnapshot({
       ...base,
       status: "failed",
@@ -150,12 +197,20 @@ async function handleEntry(entry: ParsedEntry) {
       error: message.slice(0, 500),
       payload: base.payload ?? payload,
     })
-    Sentry.captureException(err)
-    throw err
-  } finally {
-    await upstashXAck(STREAM, GROUP, [entryId])
-    await notifyRevalidate(taskId)
+    await publishTaskProgress({
+      taskId,
+      status: "failed",
+      progress: 0,
+      message,
+      updatedAt: Date.now(),
+    })
+    await sendToDLQ(entry, message.slice(0, 200), MAX_RETRIES)
+    Sentry.captureException(lastError)
   }
+
+  // Always ack the entry
+  await upstashXAck(STREAM, GROUP, [entryId])
+  await notifyRevalidate(taskId)
 }
 
 async function main() {

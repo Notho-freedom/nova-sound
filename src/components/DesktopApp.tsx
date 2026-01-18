@@ -59,7 +59,6 @@ import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 import { Input } from "@/components/ui/input";
 import { CoachmarkProvider } from "@/features/coachmarks";
 import "@/features/coachmarks/styles/coachmarks-theme.css";
-import { recoverMissingYouTubeTracks } from "@/lib/youtube-track-recovery";
 //import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 //import { useAudioVibes } from "@/hooks/useAudioVibes";
 //import { useAudioAI } from "@/hooks/useAudioAI";
@@ -221,8 +220,16 @@ export const DesktopApp = () => {
         });
         
         if (missingIds.length > 0) {
-          console.log(`[DesktopApp] 🔄 Récupération de ${missingIds.length} tracks YouTube manquants...`);
-          await recoverMissingYouTubeTracks(missingIds);
+          console.log(`[DesktopApp] 🔄 Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
+          try {
+            // Spawn async recovery task via bus (instead of blocking inline)
+            await spawnTask("youtube-recovery", { trackIds: missingIds })
+          } catch (err) {
+            console.error("[DesktopApp] Failed to spawn recovery task:", err);
+            // Fallback to inline recovery if task fails
+            const { recoverMissingYouTubeTracks } = await import("@/lib/youtube-track-recovery");
+            await recoverMissingYouTubeTracks(missingIds);
+          }
         }
       } catch (error) {
         console.warn('[DesktopApp] Erreur récupération tracks YouTube:', error);
