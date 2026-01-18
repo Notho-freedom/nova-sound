@@ -78,6 +78,7 @@
     "@upstash/vector": "^1.2.2",
     "archiver": "^7.0.1",
     "axios": "^1.13.2",
+    "electron-updater": "^6.3.9",
     "basic-ftp": "^5.0.5",
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
@@ -306,7 +307,14 @@
       "target": [
         "nsis"
       ],
-      "icon": "public/favicon.ico"
+      "icon": "public/favicon.ico",
+      "publish": [
+        {
+          "provider": "generic",
+          "url": "${env.ELECTRON_UPDATER_URL}",
+          "channel": "latest"
+        }
+      ]
     },
     "mac": {
       "target": [

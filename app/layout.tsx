@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { FirebaseProvider } from "@/components/FirebaseProvider";
 import { ProUploadCtaModal } from "@/components/ProUploadCtaModal";
 import { I18nProvider, useI18n } from "@/i18n";
+import { initIdb } from "@/lib/idb-cache";
 import "./globals.css";
 
 const queryClient = new QueryClient();
@@ -19,6 +20,20 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    // Register service worker for PWA cache/offline and init IndexedDB cache
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      // Avoid file:// (electron shell) or non-HTTPS
+      const protocol = window.location.protocol;
+      if (protocol === "https:" || protocol === "http:") {
+        navigator.serviceWorker
+          .register("/sw.js")
+          .catch((err) => console.warn("[SW] registration failed", err));
+      }
+    }
+    initIdb().catch(() => undefined);
   }, []);
 
   return (
