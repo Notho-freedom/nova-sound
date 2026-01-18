@@ -1182,10 +1182,10 @@ export const DesktopApp = () => {
       return;
     }
 
-    // Get tracks from playlist trackIds - utiliser allTracks pour inclure les tracks YouTube
+    // Get tracks from playlist trackIds - utiliser getTrackFromAllOrCache pour fallback au cache YouTube
     const playlistTracks = playlist.trackIds
-      .map(id => allTracks.find(t => t.id === id))
-      .filter((t): t is Track => t !== undefined);
+      .map(id => getTrackFromAllOrCache(allTracks, id))
+      .filter((t): t is Track => t !== null);
 
     if (playlistTracks.length === 0) {
       const errorMsg = 'La playlist est vide';
@@ -1214,10 +1214,10 @@ export const DesktopApp = () => {
       return;
     }
 
-    // Get tracks from playlist trackIds - utiliser allTracks pour inclure les tracks YouTube
+    // Get tracks from playlist trackIds - utiliser getTrackFromAllOrCache pour fallback au cache YouTube
     const playlistTracks = playlist.trackIds
-      .map(id => allTracks.find(t => t.id === id))
-      .filter((t): t is Track => t !== undefined);
+      .map(id => getTrackFromAllOrCache(allTracks, id))
+      .filter((t): t is Track => t !== null);
 
     if (playlistTracks.length === 0) {
       const errorMsg = 'La playlist est vide';
@@ -1310,8 +1310,8 @@ export const DesktopApp = () => {
   // Elle ne supprime AUCUNE autre donnée (playlists, favoris, historique, etc.)
   const handleShuffleTracks = useCallback((trackIds: string[]) => {
     const tracksToPlay = trackIds
-      .map(id => allTracks.find(t => t.id === id))
-      .filter((t): t is Track => t !== undefined);
+      .map(id => getTrackFromAllOrCache(allTracks, id))
+      .filter((t): t is Track => t !== null);
 
     if (tracksToPlay.length === 0) {
       const errorMsg = t("errorNoTracksFound");
