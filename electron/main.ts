@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage, type BrowserWindowConstructorOptions, type BrowserWindow as ElectronBrowserWindow, type Rectangle } from 'electron';
-import { autoUpdater, type UpdateInfo } from 'electron-updater';
+import updater, { type UpdateInfo } from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -27,6 +27,7 @@ import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions, ty
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const { autoUpdater } = updater;
 
 // Global error handlers to prevent ECONNRESET and other connection errors from crashing
 process.on('uncaughtException', (error: any) => {

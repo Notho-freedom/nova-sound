@@ -1,7 +1,7 @@
 {
   "name": "nexus-audio",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "NEXUS - Futuristic Audio Player",
   "author": "NEXUS Team",
   "license": "MIT",
@@ -164,9 +164,10 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
       "dist-electron/**/*",
-      "public/**/*"
+      "public/**/*",
+      "!dist/**/*",
+      "!**/*.map"
     ],
     "fileAssociations": [
       {

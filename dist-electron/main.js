@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import updater from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -22,6 +22,7 @@ import { analyzeQuality, detectDuplicates, checkIntegrity, cleanupMissingFiles, 
 import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions } from './cli.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const { autoUpdater } = updater;
 // Global error handlers to prevent ECONNRESET and other connection errors from crashing
 process.on('uncaughtException', (error) => {
     // Silently ignore connection reset errors (client closed connection)
