@@ -1,47 +1,50 @@
 /**
- * Upstash Vector Integration (Ready for activation)
+ * Upstash Vector Integration
  * 
- * Vector = Serverless semantic search + embeddings
+ * Semantic search + RAG (Retrieval Augmented Generation)
  * 
  * Use cases:
- *   - RAG (Retrieval Augmented Generation)
- *   - Semantic search
- *   - AI context retrieval
- *   - Similar content discovery
- *   - Spam detection
+ *   - Search tracks by description ("energetic rock song")
+ *   - Find similar tracks by vibe
+ *   - AI context retrieval for SkyOS assistant
+ *   - Content recommendations
+ *   - Duplicate detection (semantic)
  * 
- * To enable:
- *   1. Get UPSTASH_VECTOR_REST_URL + token from Upstash console
- *   2. Add to Vercel environment variables
- *   3. Create embedding model (Jina AI, OpenAI, Cohere)
- * 
- * Pattern:
- *   - Chunk documents
- *   - Generate embeddings
- *   - Store in Vector (indexed)
- *   - Query by semantic similarity
- *   - Return top K results for LLM context
+ * Architecture:
+ *   - Text → Embeddings (Jina AI free tier)
+ *   - Embeddings → Vector DB (Upstash)
+ *   - Query → Similar vectors → Top K results
+ *   - Results → LLM context → Generated response
  */
 
-import type { Metadata } from "@upstash/vector";
+import { Index } from "@upstash/vector";
 
-const VECTOR_ENDPOINT = process.env.UPSTASH_VECTOR_REST_URL;
-const VECTOR_TOKEN = process.env.UPSTASH_VECTOR_REST_TOKEN;
+type VectorMetadata = Record<string, string | number | boolean | string[]>;
+
+// Upstash Vector client (Edge-compatible)
+export const vector = process.env.UPSTASH_VECTOR_REST_URL &&
+  process.env.UPSTASH_VECTOR_REST_TOKEN
+  ? new Index({
+      url: process.env.UPSTASH_VECTOR_REST_URL,
+      token: process.env.UPSTASH_VECTOR_REST_TOKEN,
+    })
+  : null;
 
 export const vectorConfig = {
-  enabled: !!VECTOR_ENDPOINT && !!VECTOR_TOKEN,
-  endpoint: VECTOR_ENDPOINT,
-  model: "jina-embeddings-v3", // or "text-embedding-3-small", etc.
-  dimension: 1024, // jina-v3 = 1024, openai = 1536
-};
-
-/**
- * Generate embeddings using Jina API (free tier available)
+  enabled: !!vector,
+  embeddingModel: "jina-embeddings-I (free tier)
+ * 
+ * Free tier: 1M tokens/month
+ * https://jina.ai/embeddings/
  */
-export async function generateEmbeddings(text: string): Promise<number[]> {
+export async function generateEmbeddings(
+  text: string | string[]
+): Promise<number[] | number[][]> {
   if (!vectorConfig.enabled) {
     throw new Error("Vector not configured");
   }
+
+  const input = Array.isArray(text) ? text : [text];
 
   try {
     const response = await fetch("https://api.jina.ai/v1/embeddings", {
@@ -51,8 +54,8 @@ export async function generateEmbeddings(text: string): Promise<number[]> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: vectorConfig.model,
-        input: text,
+        model: vectorConfig.embeddingModel,
+        input,
       }),
     });
 
@@ -60,39 +63,49 @@ export async function generateEmbeddings(text: string): Promise<number[]> {
       throw new Error(`Embeddings failed: ${response.statusText}`);
     }
 
-    const data = (await response.json()) as any;
-    return data.data[0].embedding;
-  } catch (error) {
-    console.error("[Vector] Embedding generation failed:", error);
-    throw error;
-  }
-}
+    const data = (await response.json()) as {
+      data: Array<{ embedding: number[] }>;
+    };
 
-/**
- * Upsert vector with metadata
+    const embeddings = data.data.map((d) => d.embedding);
+    return Array.isArray(text) ? embeddings : embeddings[0]
+
+    if (!response.ok) {
+      throw new Error(`Embeddings failed: ${response.statusText}`);
+    }s with metadata
+ * 
+ * Usage:
+ *   await upsertVectors([
+ *     { id: "track-1", text: "Rock song", metadata: { ... } }
+ *   ]);
  */
-export async function upsertVector(
-  id: string,
-  vector: number[],
-  metadata: Metadata
+export async function upsertVectors(
+  items: Array<{
+    id: string;
+    text: string;
+    metadata?: VectorMetadata;
+  }>
 ): Promise<void> {
-  if (!vectorConfig.enabled) {
+  if (!vector) {
     console.warn("[Vector] Not configured");
     return;
   }
 
   try {
-    const response = await fetch(`${VECTOR_ENDPOINT}/upsert`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${VECTOR_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        vectors: [
-          {
-            id,
-            values: vector,
+    // Generate embeddings for all texts
+    const texts = items.map((item) => item.text);
+    const embeddings = (await generateEmbeddings(texts)) as number[][];
+
+    // Upsert to Vector DB
+    await vector.upsert(
+      items.map((item, idx) => ({
+        id: item.id,
+        vector: embeddings[idx],
+        metadata: item.metadata || {},
+      }))
+    );
+
+    console.log(`[Vector] Upserted ${items.length} vectors
             metadata,
           },
         ],
@@ -102,58 +115,176 @@ export async function upsertVector(
     if (!response.ok) {
       throw new Error(`Upsert failed: ${response.statusText}`);
     }
-
-    console.log(`[Vector] Upserted: ${id}`);
-  } catch (error) {
-    console.error("[Vector] Upsert error:", error);
-    throw error;
-  }
-}
-
-/**
- * Query vectors by semantic similarity
+ 
+ * Usage:
+ *   const results = await queryVectors("energetic rock song", 5);
+ *   results.forEach(r => console.log(r.id, r.score));
  */
 export async function queryVectors(
   query: string,
-  topK: number = 5
-): Promise<Array<{ id: string; score: number; metadata: Metadata }>> {
-  if (!vectorConfig.enabled) {
+  options: {
+    topK?: number;
+    filter?: string;
+    includeVectors?: boolean;
+  } = {}
+): Promise<
+  Array<{
+    id: string;
+    score: number;
+    metadata?: VectorMetadata;
+    vector?: number[];
+  }>
+> {
+  if (!vector) {
     console.warn("[Vector] Not configured");
     return [];
   }
 
+  const { topK = vectorConfig.topK, filter, includeVectors = false } = options;
+
   try {
     // Generate embedding for query
-    const queryEmbedding = await generateEmbeddings(query);
+    const queryEmbedding = (await generateEmbeddings(query)) as number[];
 
     // Search
-    const response = await fetch(`${VECTOR_ENDPOINT}/query`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${VECTOR_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        vector: queryEmbedding,
-        topK,
+    const results = await vector.query({
+      vector: queryEmbedding,
+      topK,
+      includeMetadata: true,
+      includeVectors,
+      filter,
+    });
+
+    return results.map((r) => ({
+      id: r.id,
+      score: r.score,
+      metadata: r.metadata as VectorMetadata,
+      vector: r.vector,
+    }))
         includeMetadata: true,
       }),
     });
 
     if (!response.ok) {
       throw new Error(`Query failed: ${response.statusText}`);
-    }
+   Delete vectors by IDs
+ */
+export async function deleteVectors(ids: string[]): Promise<void> {
+  if (!vector) {
+    console.warn("[Vector] Not configured");
+    return;
+  }
 
-    const data = (await response.json()) as any;
-    return data.matches || [];
+  try {
+    await vector.delete(ids);
+    console.log(`[Vector] Deleted ${ids.length} vectors`);
   } catch (error) {
-    console.error("[Vector] Query error:", error);
+    console.error("[Vector] Delete error:", error);
+    throw error;
+  }
+}
+Chunk text into smaller pieces for embedding
+ * 
+ * Usage:
+ *   const chunks = chunkText(longText, 500);
+ *   await upsertVectors(chunks.map((chunk, i) => ({
+ *     id: `doc-${i}`,
+ *     text: chunk,
+ *     metadata: { source: "manual" }
+ *   })));
+ */
+export function chunkText(
+  text: string,
+  maxTokens: number = vectorConfig.maxChunkSize
+): string[] {
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const chunks: string[] = [];
+  let currentChunk = "";
+
+  for (const sentence of sentences) {
+    // Rough token estimate (1 token ≈ 4 chars)
+    const estimatedTokens = (currentChunk + sentence).length / 4;
+
+    if (estimatedTokens > maxTokens && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += sentence + ". ";
+    }
+  }
+
+  if (currentChunk.trim().length > 0) {
+    chunks.push(currentChunk.trim());
+  }
+
+  return chunks;
+}
+
+/**
+ * Reset vector index (delete all vectors)
+ * Use with caution!
+ */
+export async function resetVectorIndex(): Promise<void> {
+  if (!vector) {
+    console.warn("[Vector] Not configured");
+    return;
+  }
+
+  try {
+    await vector.reset();
+    console.log("[Vector] Index reset complete");
+  } catch (error) {
+    console.error("[Vector] Reset error:", error);
     throw error;
   }
 }
 
 /**
- * RAG Pattern: Retrieve context + Generate response
+ * Get index stats
+ */
+export async function getVectorStats(): Promise<{
+  vectorCount: number;
+  dimension: number;
+}> {
+  if (!vector) {
+    throw new Error("Vector not configured");
+  }
+
+  try {
+    const info = await vector.info();
+    return {
+      vectorCount: info.vectorCount,
+      dimension: info.dimension,
+    };
+  } catch (error) {
+    console.error("[Vector] Stats error:", error);
+    throw error;
+  }
+}   const prompt = `Context: ${context.map(c => c.content).join('\n')}\nQuestion: ...`;
+ */
+export async function ragRetrieve(
+  userQuery: string,
+  options: {
+    topK?: number;
+    filter?: string;
+  } = {}
+): Promise<
+  Array<{
+    id: string;
+    content: string;
+    source: string;
+    score: number;
+    metadata?: VectorMetadata;
+  }>
+> {
+  const results = await queryVectors(userQuery, options);
+
+  return results.map((result) => ({
+    id: result.id,
+    content: (result.metadata?.content as string) || "",
+    source: (result.metadata?.source as string) || "",
+    score: result.score,
+    metadata: result.metadatae context + Generate response
  */
 export async function ragRetrieve(
   userQuery: string,
