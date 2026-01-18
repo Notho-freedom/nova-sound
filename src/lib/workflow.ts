@@ -1,122 +1,188 @@
 /**
  * Upstash Workflow Integration (Ready for activation)
  * 
- * Workflow = Temporal-lite (serverless)
+ * Workflow = Persistent multi-step processes
  * 
  * Use cases:
- *   - Multi-step processes
- *   - Onboarding flows
- *   - AI pipelines
- *   - Long-running operations
- *   - State persistence
+ *   - User onboarding flows
+ *   - YouTube recovery pipelines
+ *   - File processing workflows
+ *   - Payment processing
+ *   - Multi-step AI operations
  * 
- * To enable:
- *   1. Get WORKFLOW_CLIENT from Upstash console
- *   2. Add to Vercel environment variables
- *   3. Create workflow handlers in app/api/workflows/
- * 
- * Pattern:
- *   - Define steps declaratively
- *   - Upstash handles retries, state, resumption
+ * Benefits:
+ *   - State persists across steps
+ *   - Automatic retry per step
+ *   - Can pause/resume workflows
  *   - No worker process needed
+ *   - Built on QStash + Redis
  */
+
+import { qstash } from "@/lib/qstash-helpers";
+import { redis } from "@/lib/redis";
+
+const baseUrl =
+  process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
 
 /**
- * Example Workflow Pattern
- * 
- * Place in app/api/workflows/onboarding/route.ts
- * 
- * import { serve } from "@upstash/workflow/nextjs";
- * import { redis } from "@/lib/redis";
- * 
- * export const POST = serve<{ userId: string; email: string }>(
- *   async (context) => {
- *     const data = context.requestPayload;
- * 
- *     // Step 1: Create user
- *     const user = await context.run("create-user", async () => {
- *       return await db.user.create({ email: data.email });
- *     });
- * 
- *     // Step 2: Wait 60 seconds
- *     await context.sleep("wait-confirmation", 60);
- * 
- *     // Step 3: Send welcome email
- *     const emailSent = await context.run("send-email", async () => {
- *       return await sendWelcome(user.email);
- *     });
- * 
- *     // Step 4: Store in Redis
- *     await context.run("store-workflow", async () => {
- *       await redis.set(`workflow:onboarding:${user.id}`, {
- *         userId: user.id,
- *         emailSent,
- *         completedAt: new Date(),
- *       }, 86400);
- *     });
- * 
- *     return { success: true, userId: user.id };
- *   }
- * );
+ * Workflow configuration
  */
-
 export const workflowConfig = {
-  enabled: !!process.env.WORKFLOW_CLIENT,
-  baseUrl: process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000",
+  enabled: true, // Workflows use QStash + Redis (already configured)
+  baseUrl,
 };
 
 /**
- * Helper to trigger a workflow
+ * Start user onboarding workflow
  * 
  * Usage:
- *   await triggerWorkflow("onboarding", { userId: "123", email: "test@example.com" })
+ *   const workflowId = await workflows.startOnboarding({
+ *     userId: "123",
+ *     email: "user@example.com",
+ *     name: "John Doe"
+ *   });
  */
-export async function triggerWorkflow<T extends Record<string, any>>(
-  workflowName: string,
-  payload: T
-): Promise<string | null> {
-  if (!workflowConfig.enabled) {
-    console.warn("[Workflow] Not configured");
-    return null;
+export async function startOnboarding(params: {
+  userId: string;
+  email: string;
+  name: string;
+  signupSource?: string;
+}): Promise<string> {
+  const response = await fetch(`${baseUrl}/api/workflows/onboarding`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Onboarding workflow failed: ${response.statusText}`);
   }
 
-  try {
-    const url = `${workflowConfig.baseUrl}/api/workflows/${workflowName}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Workflow trigger failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log(`[Workflow] ${workflowName} triggered:`, data);
-    return data.id || null;
-  } catch (error) {
-    console.error(`[Workflow] Error triggering ${workflowName}:`, error);
-    throw error;
-  }
+  const data = await response.json();
+  return data.userId;
 }
 
 /**
- * Workflow patterns to implement
+ * Start YouTube recovery workflow
+ * 
+ * Usage:
+ *   const workflowId = await workflows.startYouTubeRecovery({
+ *     trackIds: ["123", "456"],
+ *     userId: "user-123"
+ *   });
+ */
+export async function startYouTubeRecovery(params: {
+  trackIds: string[];
+  userId: string;
+  priority?: "low" | "normal" | "high";
+}): Promise<string> {
+  const response = await fetch(`${baseUrl}/api/workflows/youtube-recovery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new Error(`YouTube recovery workflow failed: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.workflowId;
+}
+
+/**
+ * Get workflow status
+ * 
+ * Usage:
+ *   const status = await workflows.getStatus("youtube-recovery", "workflow-123");
+ */
+export async function getWorkflowStatus(
+  workflowType: string,
+  workflowId: string
+): Promise<Record<string, unknown>> {
+  const response = await fetch(
+    `${baseUrl}/api/workflows/${workflowType}?workflowId=${workflowId}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Get workflow status failed: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Cancel workflow
+ * 
+ * Usage:
+ *   await workflows.cancel("youtube-recovery", "workflow-123");
+ */
+export async function cancelWorkflow(
+  workflowType: string,
+  workflowId: string
+): Promise<void> {
+  // Delete workflow state from Redis
+  await redis.del(`workflow:${workflowType}:${workflowId}`);
+  console.log(`[Workflow] Cancelled: ${workflowType}/${workflowId}`);
+}
+
+/**
+ * List active workflows for a user
+ * 
+ * Usage:
+ *   const workflows = await listUserWorkflows("user-123");
+ */
+export async function listUserWorkflows(
+  userId: string
+): Promise<Array<{ type: string; id: string; state: Record<string, unknown> }>> {
+  // TODO: Implement workflow listing via Redis scan
+  // For now, return empty array
+  return [];
+}
+
+/**
+ * Workflow helpers
+ */
+export const workflows = {
+  startOnboarding,
+  startYouTubeRecovery,
+  getStatus: getWorkflowStatus,
+  cancel: cancelWorkflow,
+  listUserWorkflows,
+};
+
+/**
+ * Workflow patterns available
  */
 export const workflowPatterns = {
   /**
-   * Onboarding: Create user → Wait → Send email → Store
+   * Onboarding: Create user → Wait → Send emails → Check upgrade
    */
-  onboarding: "app/api/workflows/onboarding/route.ts",
+  onboarding: {
+    path: "app/api/workflows/onboarding/route.ts",
+    steps: ["welcome", "tips", "check-pro"],
+    duration: "7 days",
+  },
 
   /**
-   * AI Pipeline: Validate → Process → Generate → Store → Notify
+   * YouTube Recovery: Validate → Fetch → Download → Process → Store → Notify
    */
-  aiPipeline: "app/api/workflows/ai-pipeline/route.ts",
+  youtubeRecovery: {
+    path: "app/api/workflows/youtube-recovery/route.ts",
+    steps: ["validate", "fetch", "download", "process", "store", "notify"],
+    duration: "Variable (depends on track count)",
+  },
 
   /**
-   * Cleanup: Run every day, delete old data
+   * File Import: Upload → Scan → Extract metadata → Process → Store
    */
-  dailyCleanup: "app/api/workflows/cleanup/route.ts",
+  fileImport: {
+    path: "app/api/workflows/file-import/route.ts",
+    steps: ["upload", "scan", "extract", "process", "store"],
+    duration: "Variable (depends on file size)",
+  },
 };

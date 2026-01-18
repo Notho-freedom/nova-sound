@@ -18,7 +18,10 @@ export type TaskHandlerMeta = {
   version?: string;
 };
 
-export type TaskHandler = (payload: any, meta: TaskHandlerMeta) => Promise<any>;
+export type TaskHandler = (
+  payload: Record<string, unknown>,
+  meta: TaskHandlerMeta
+) => Promise<Record<string, unknown>>;
 
 /**
  * Handler: open-files
@@ -32,7 +35,7 @@ export const handleOpenFiles: TaskHandler = async (payload, meta) => {
   }
 
   // Process file metadata
-  const processedFiles = files.map((f: any, idx: number) => ({
+  const processedFiles = files.map((f: Record<string, unknown>, idx: number) => ({
     index: idx,
     name: f.name,
     size: f.size,
@@ -82,12 +85,12 @@ export const handleYouTubeRecovery: TaskHandler = async (payload, meta) => {
       results,
       timestamp: Date.now(),
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       recovered: 0,
       failed: trackIds.length,
       results: [],
-      error: String(err?.message ?? err),
+      error: err instanceof Error ? err.message : String(err),
     };
   }
 };
@@ -132,11 +135,15 @@ export const handleEmailSend: TaskHandler = async (payload, meta) => {
 export const handleWebhookDelivery: TaskHandler = async (payload, meta) => {
   const { url, method = "POST", body, headers = {} } = payload;
 
+  if (typeof url !== "string") {
+    throw new Error("Invalid URL");
+  }
+
   const response = await fetch(url, {
-    method,
+    method: method as string,
     headers: {
       "Content-Type": "application/json",
-      ...headers,
+      ...(headers as Record<string, string>),
     },
     body: JSON.stringify(body),
   });
@@ -167,6 +174,131 @@ export const handleDailyCleanup: TaskHandler = async (payload, meta) => {
 };
 
 /**
+ * Handler: onboarding-welcome
+ * Send welcome email (step 1 of onboarding workflow)
+ */
+export const handleOnboardingWelcome: TaskHandler = async (payload, meta) => {
+  const { userId, email, name } = payload;
+
+  // Send welcome email
+  console.log(`[onboarding-welcome] Sending welcome email to ${email}`);
+
+  // TODO: Integrate with email provider (Resend, SendGrid, etc.)
+  // For now, just log
+  const emailSent = true;
+
+  // Update workflow state
+  try {
+    const { redis } = await import("@/lib/redis");
+    const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
+    if (stateRaw) {
+      const state = JSON.parse(stateRaw as string);
+      state.welcomeEmailSent = true;
+      await redis.set(
+        `workflow:onboarding:${userId}`,
+        JSON.stringify(state),
+        { ex: 604800 }
+      );
+    }
+  } catch (error) {
+    console.error("[onboarding-welcome] Failed to update state:", error);
+  }
+
+  return {
+    sent: emailSent,
+    userId,
+    email,
+    step: "welcome",
+    timestamp: Date.now(),
+  };
+};
+
+/**
+ * Handler: onboarding-tips
+ * Send tips & tricks email (step 2 of onboarding workflow)
+ */
+export const handleOnboardingTips: TaskHandler = async (payload, meta) => {
+  const { userId, email, name } = payload;
+
+  console.log(`[onboarding-tips] Sending tips email to ${email}`);
+
+  // TODO: Send tips email
+  const emailSent = true;
+
+  // Update workflow state
+  try {
+    const { redis } = await import("@/lib/redis");
+    const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
+    if (stateRaw) {
+      const state = JSON.parse(stateRaw as string);
+      state.tipsEmailSent = true;
+      await redis.set(
+        `workflow:onboarding:${userId}`,
+        JSON.stringify(state),
+        { ex: 604800 }
+      );
+    }
+  } catch (error) {
+    console.error("[onboarding-tips] Failed to update state:", error);
+  }
+
+  return {
+    sent: emailSent,
+    userId,
+    email,
+    step: "tips",
+    timestamp: Date.now(),
+  };
+};
+
+/**
+ * Handler: onboarding-check-pro
+ * Check if user upgraded to Pro (step 3 of onboarding workflow)
+ */
+export const handleOnboardingCheckPro: TaskHandler = async (payload, meta) => {
+  const { userId, email, name } = payload;
+
+  console.log(`[onboarding-check-pro] Checking Pro status for ${userId}`);
+
+  // TODO: Check Firebase user subscription status
+  const isPro = false; // Placeholder
+
+  // Update workflow state
+  try {
+    const { redis } = await import("@/lib/redis");
+    const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
+    if (stateRaw) {
+      const state = JSON.parse(stateRaw as string);
+      state.isPro = isPro;
+
+      if (!isPro) {
+        // Send upgrade reminder
+        console.log(`[onboarding-check-pro] Sending upgrade reminder to ${email}`);
+        // TODO: Send upgrade reminder email
+        state.upgradeReminderSent = true;
+      }
+
+      state.completedAt = Date.now();
+      await redis.set(
+        `workflow:onboarding:${userId}`,
+        JSON.stringify(state),
+        { ex: 604800 }
+      );
+    }
+  } catch (error) {
+    console.error("[onboarding-check-pro] Failed to update state:", error);
+  }
+
+  return {
+    userId,
+    isPro,
+    upgradeReminderSent: !isPro,
+    step: "check-pro",
+    timestamp: Date.now(),
+  };
+};
+
+/**
  * Default handler for unknown tasks
  */
 export const defaultHandler: TaskHandler = async (payload, meta) => {
@@ -187,4 +319,7 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   "email-send": handleEmailSend,
   "webhook-delivery": handleWebhookDelivery,
   "daily-cleanup": handleDailyCleanup,
+  "onboarding-welcome": handleOnboardingWelcome,
+  "onboarding-tips": handleOnboardingTips,
+  "onboarding-check-pro": handleOnboardingCheckPro,
 };
