@@ -19,7 +19,10 @@ export function useFavorites(): UseFavoritesReturn {
   // Load favorites on mount
   useEffect(() => {
     const loadFavorites = async () => {
-      if (!isElectron) {
+      const api = isElectron ? window.electronAPI : undefined;
+      const hasElectronHandlers = api && typeof api.getFavorites === 'function';
+
+      if (!hasElectronHandlers || !api) {
         // Use localStorage in web mode
         const stored = localStorage.getItem("nexus-favorites");
         if (stored) {
@@ -30,12 +33,7 @@ export function useFavorites(): UseFavoritesReturn {
       }
 
       try {
-        if (!window.electronAPI) {
-          setFavorites([]);
-          setLoading(false);
-          return;
-        }
-        const favs = await window.electronAPI.getFavorites();
+        const favs = await api.getFavorites();
         setFavorites(favs);
       } catch (err) {
         console.error("Failed to load favorites:", err);

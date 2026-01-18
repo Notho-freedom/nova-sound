@@ -1,34 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const isShellOnly = (() => {
-  const env = (process.env.ELECTRON_SHELL_ONLY || '').toLowerCase();
-  if (env === 'false' || env === '0') return false;
-  if (env === 'true' || env === '1') return true;
-  return process.env.NODE_ENV !== 'production';
-})();
-
 // Log that preload is loading
 console.log('[Preload] Preload script is loading...');
 
-// Helper to expose minimal API in shell-only mode
-const exposeShellOnlyAPI = () => {
-  contextBridge.exposeInMainWorld('electronAPI', {
-    minimize: () => ipcRenderer.invoke('window:minimize'),
-    maximize: () => ipcRenderer.invoke('window:maximize'),
-    close: () => ipcRenderer.invoke('window:close'),
-    openExternal: (url) => ipcRenderer.invoke('window:openExternal', url),
-    openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
-    openFile: (filters) => ipcRenderer.invoke('dialog:openFile', filters),
-  });
-  console.log('[Preload] ✅ Shell-only electronAPI exposed');
-};
-
 // Expose protected methods for window controls
 try {
-  if (isShellOnly) {
-    exposeShellOnlyAPI();
-  } else {
-    contextBridge.exposeInMainWorld('electronAPI', {
+  contextBridge.exposeInMainWorld('electronAPI', {
     // Window controls
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),
@@ -229,7 +206,6 @@ try {
     });
     
     console.log('[Preload] ✅ electronAPI successfully exposed to window');
-  }
 } catch (error) {
   console.error('[Preload] ❌ Error exposing electronAPI:', error);
   // Still expose a minimal API to prevent app crashes

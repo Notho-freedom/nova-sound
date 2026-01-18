@@ -78,17 +78,6 @@ const secondaryWindowStatePath = path.join(app.getPath('userData'), 'window-stat
 
 const isDev = !app.isPackaged;
 
-// Shell-only mode: Electron as a lightweight OS bridge (no local services/scanners).
-// Default: enabled in development unless ELECTRON_SHELL_ONLY explicitly set to "false".
-const isShellOnly = (() => {
-  const env = process.env.ELECTRON_SHELL_ONLY?.toLowerCase();
-  if (env === 'false' || env === '0') return false;
-  if (env === 'true' || env === '1') return true;
-  return isDev; // default to shell-only for dev, full mode when packaged
-})();
-
-const shouldInitLocalServices = !isShellOnly;
-
 if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
@@ -1920,12 +1909,10 @@ app.whenReady().then(async () => {
   // Register OAuth callback server for desktop app authentication
   registerOAuthCallbackServer();
   
-  // Register custom protocols only when local services are enabled
-  if (shouldInitLocalServices) {
-    registerLocalAudioProtocol();
-    registerLocalVideoProtocol();
-    registerLocalImageProtocol();
-  }
+  // Register custom protocols
+  registerLocalAudioProtocol();
+  registerLocalVideoProtocol();
+  registerLocalImageProtocol();
 
   // Create window ASAP for faster dev startup
   createWindow();
@@ -1935,21 +1922,13 @@ app.whenReady().then(async () => {
     console.warn('⚠️ Failed to start native auto-updater:', error);
   });
 
-  // Always initialize storage (lightweight) but gate heavy services
+  // Initialize storage and services
   if (isDev || cliOptions.dev) {
     storage.init().catch((error) => console.error('❌ Failed to initialize storage:', error));
-    if (shouldInitLocalServices) {
-      initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
-    } else {
-      console.log('🪶 Shell-only mode: skipping local services init');
-    }
+    initServices().catch((error) => console.error('❌ Failed to initialize services:', error));
   } else {
     await storage.init();
-    if (shouldInitLocalServices) {
-      await initServices();
-    } else {
-      console.log('🪶 Shell-only mode: skipping local services init');
-    }
+    await initServices();
   }
   
   // Handle pending OAuth callback if window was not ready
@@ -1993,32 +1972,30 @@ app.whenReady().then(async () => {
     console.log('═══════════════════════════════════════════════════════════');
   }
 
-  if (shouldInitLocalServices) {
-    // Handle CLI options for reset and cache clearing
-    if (cliOptions.reset) {
-      await storage.resetSettings();
-      console.log('Settings reset to defaults');
-    }
+  // Handle CLI options for reset and cache clearing
+  if (cliOptions.reset) {
+    await storage.resetSettings();
+    console.log('Settings reset to defaults');
+  }
 
-    if (cliOptions.clearCache) {
-      // Clear cache logic would go here
-      console.log('Cache cleared');
-    }
+  if (cliOptions.clearCache) {
+    // Clear cache logic would go here
+    console.log('Cache cleared');
+  }
 
-    // Handle music directories from CLI
-    if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
-      const settings = await storage.getSettings();
-      const newDirs = cliOptions.musicDir.filter(dir => 
-        !settings.musicDirectories.includes(dir)
-      );
-      if (newDirs.length > 0) {
-        await storage.updateSettings({
-          musicDirectories: [...settings.musicDirectories, ...newDirs]
-        });
-        console.log(`Added music directories: ${newDirs.join(', ')}`);
-      }
+  // Handle music directories from CLI
+  if (cliOptions.musicDir && cliOptions.musicDir.length > 0) {
+    const settings = await storage.getSettings();
+    const newDirs = cliOptions.musicDir.filter(dir => 
+      !settings.musicDirectories.includes(dir)
+    );
+    if (newDirs.length > 0) {
+      await storage.updateSettings({
+        musicDirectories: [...settings.musicDirectories, ...newDirs]
+      });
+      console.log(`Added music directories: ${newDirs.join(', ')}`);
     }
-
+  }
     // Auto-scan on startup (respect CLI scanMode)
     const settings = await storage.getSettings();
     let shouldAutoScan = false;
