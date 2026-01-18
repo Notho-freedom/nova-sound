@@ -169,10 +169,45 @@ async function writeJSON<T>(filePath: string, data: T): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+type CacheEntry<T> = { value: T; expiresAt: number };
+
+const STORAGE_CACHE_TTL_MS = {
+  playlists: 5000,
+  favorites: 5000,
+  history: 5000,
+  settings: 3000,
+  equalizer: 10000,
+};
+
+type StorageCache = {
+  playlists: CacheEntry<Playlist[]> | null;
+  favorites: CacheEntry<string[]> | null;
+  history: CacheEntry<HistoryEntry[]> | null;
+  settings: CacheEntry<Settings> | null;
+  equalizer: CacheEntry<EqualizerPreset[]> | null;
+};
+
 // Storage class
 class Storage {
   private initialized = false;
   private thumbnailCache = new Map<string, { url: string | null; checkedAt: number }>();
+  private cache: StorageCache = {
+    playlists: null,
+    favorites: null,
+    history: null,
+    settings: null,
+    equalizer: null,
+  };
+
+  private getCacheValue<T>(entry: CacheEntry<T> | null): T | null {
+    if (!entry) return null;
+    if (entry.expiresAt < Date.now()) return null;
+    return entry.value;
+  }
+
+  private setCacheValue<T>(value: T, ttlMs: number): CacheEntry<T> {
+    return { value, expiresAt: Date.now() + ttlMs };
+  }
 
   private pruneThumbnailCache() {
     const now = Date.now();
@@ -405,11 +440,16 @@ class Storage {
 
   // Playlists
   async getPlaylists(): Promise<Playlist[]> {
-    return readJSON<Playlist[]>(PATHS.playlists, []);
+    const cached = this.getCacheValue(this.cache.playlists);
+    if (cached !== null) return cached;
+    const playlists = await readJSON<Playlist[]>(PATHS.playlists, []);
+    this.cache.playlists = this.setCacheValue(playlists, STORAGE_CACHE_TTL_MS.playlists);
+    return playlists;
   }
 
   async savePlaylists(playlists: Playlist[]): Promise<void> {
     await writeJSON(PATHS.playlists, playlists);
+    this.cache.playlists = this.setCacheValue(playlists, STORAGE_CACHE_TTL_MS.playlists);
   }
 
   async createPlaylist(name: string, trackIds: string[] = []): Promise<Playlist> {
@@ -459,11 +499,16 @@ class Storage {
 
   // Favorites
   async getFavorites(): Promise<string[]> {
-    return readJSON<string[]>(PATHS.favorites, []);
+    const cached = this.getCacheValue(this.cache.favorites);
+    if (cached !== null) return cached;
+    const favorites = await readJSON<string[]>(PATHS.favorites, []);
+    this.cache.favorites = this.setCacheValue(favorites, STORAGE_CACHE_TTL_MS.favorites);
+    return favorites;
   }
 
   async saveFavorites(favorites: string[]): Promise<void> {
     await writeJSON(PATHS.favorites, favorites);
+    this.cache.favorites = this.setCacheValue(favorites, STORAGE_CACHE_TTL_MS.favorites);
   }
 
   async addFavorite(trackId: string): Promise<void> {
@@ -487,7 +532,11 @@ class Storage {
 
   // History
   async getHistory(): Promise<HistoryEntry[]> {
-    return readJSON<HistoryEntry[]>(PATHS.history, []);
+    const cached = this.getCacheValue(this.cache.history);
+    if (cached !== null) return cached;
+    const history = await readJSON<HistoryEntry[]>(PATHS.history, []);
+    this.cache.history = this.setCacheValue(history, STORAGE_CACHE_TTL_MS.history);
+    return history;
   }
 
   async addToHistory(entry: HistoryEntry): Promise<void> {
@@ -497,32 +546,44 @@ class Storage {
     // Keep only last 1000 entries
     const trimmed = history.slice(0, 1000);
     await writeJSON(PATHS.history, trimmed);
+    this.cache.history = this.setCacheValue(trimmed, STORAGE_CACHE_TTL_MS.history);
   }
 
   async clearHistory(): Promise<void> {
     await writeJSON(PATHS.history, []);
+    this.cache.history = this.setCacheValue([], STORAGE_CACHE_TTL_MS.history);
   }
 
   // Settings
   async getSettings(): Promise<Settings> {
-    return readJSON<Settings>(PATHS.settings, DEFAULT_SETTINGS);
+    const cached = this.getCacheValue(this.cache.settings);
+    if (cached !== null) return cached;
+    const settings = await readJSON<Settings>(PATHS.settings, DEFAULT_SETTINGS);
+    this.cache.settings = this.setCacheValue(settings, STORAGE_CACHE_TTL_MS.settings);
+    return settings;
   }
 
   async updateSettings(updates: Partial<Settings>): Promise<Settings> {
     const settings = await this.getSettings();
     const updated = { ...settings, ...updates };
     await writeJSON(PATHS.settings, updated);
+    this.cache.settings = this.setCacheValue(updated, STORAGE_CACHE_TTL_MS.settings);
     return updated;
   }
 
   async resetSettings(): Promise<Settings> {
     await writeJSON(PATHS.settings, DEFAULT_SETTINGS);
+    this.cache.settings = this.setCacheValue(DEFAULT_SETTINGS, STORAGE_CACHE_TTL_MS.settings);
     return DEFAULT_SETTINGS;
   }
 
   // Equalizer
   async getEqualizerPresets(): Promise<EqualizerPreset[]> {
-    return readJSON<EqualizerPreset[]>(PATHS.equalizer, DEFAULT_EQUALIZER_PRESETS);
+    const cached = this.getCacheValue(this.cache.equalizer);
+    if (cached !== null) return cached;
+    const presets = await readJSON<EqualizerPreset[]>(PATHS.equalizer, DEFAULT_EQUALIZER_PRESETS);
+    this.cache.equalizer = this.setCacheValue(presets, STORAGE_CACHE_TTL_MS.equalizer);
+    return presets;
   }
 
   async saveEqualizerPreset(name: string, bands: number[], preamp: number = 0): Promise<void> {
@@ -538,12 +599,14 @@ class Storage {
     }
     
     await writeJSON(PATHS.equalizer, presets);
+    this.cache.equalizer = this.setCacheValue(presets, STORAGE_CACHE_TTL_MS.equalizer);
   }
 
   async deleteEqualizerPreset(name: string): Promise<void> {
     const presets = await this.getEqualizerPresets();
     const filtered = presets.filter(p => !(p.name === name && p.isCustom));
     await writeJSON(PATHS.equalizer, filtered);
+    this.cache.equalizer = this.setCacheValue(filtered, STORAGE_CACHE_TTL_MS.equalizer);
   }
 
   // Scrobble Queue (for offline scrobbling)
