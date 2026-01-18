@@ -43,6 +43,12 @@ export async function publishMessage<T extends Record<string, any>>(
     headers?: Record<string, string>;
   }
 ) {
+  // Skip QStash for localhost (development) - QStash blocks loopback addresses
+  if (callbackUrl.includes("localhost") || callbackUrl.includes("127.0.0.1") || callbackUrl.includes("::1")) {
+    console.warn("[QStash] Skipping localhost URL in development mode");
+    return { id: "dev-mock", url: callbackUrl };
+  }
+
   const qstash = getQStash();
   if (!qstash) {
     console.warn("[QStash] Not configured - message not published");

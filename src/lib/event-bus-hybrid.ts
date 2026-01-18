@@ -83,6 +83,14 @@ async function publishToQStash<T>(
 ): Promise<void> {
   const baseUrl =
     process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
+  
+  // Skip QStash for localhost (development) - QStash blocks loopback addresses
+  if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("::1")) {
+    console.warn("[QStash] Skipping in development (localhost detected) - using Redis Streams instead");
+    // Fall back to Redis Streams for development
+    return publishToRedisStreams(envelope, opts);
+  }
+
   const callbackUrl = `${baseUrl}/api/qstash/tasks`;
 
   await publishMessage(
