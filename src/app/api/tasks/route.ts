@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { publishTask } from "@/lib/event-bus"
+import { publishTaskSmart } from "@/lib/event-bus-hybrid"
 import { buildQueuedSnapshot, saveTaskSnapshot } from "@/lib/task-store"
 
 export const runtime = "edge"
@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
 
   const { type, payload } = body
 
-  // Publish into the event bus (fire & forget)
-  const envelope = await publishTask(type, payload, { source: "api" })
+  // Smart routing: QStash for critical tasks, Redis Streams for real-time
+  const envelope = await publishTaskSmart(type, payload, { source: "api" })
 
   // Persist initial snapshot (queued)
   const snapshot = buildQueuedSnapshot(envelope.id, envelope.type, payload)

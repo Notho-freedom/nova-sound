@@ -1,11 +1,11 @@
 "use server"
 
-import { publishTask } from "@/lib/event-bus"
+import { publishTaskSmart } from "@/lib/event-bus-hybrid"
 import { buildQueuedSnapshot, saveTaskSnapshot } from "@/lib/task-store"
 
 export async function spawnTask<T>(type: string, payload: T) {
-  // Edge-friendly server action to enqueue a task
-  const envelope = await publishTask(type, payload, { source: "action" })
+  // Smart routing: QStash for critical tasks, Redis Streams for real-time
+  const envelope = await publishTaskSmart(type, payload, { source: "action" })
   const snapshot = buildQueuedSnapshot(envelope.id, envelope.type, payload)
   await saveTaskSnapshot(snapshot)
   
