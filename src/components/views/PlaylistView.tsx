@@ -27,7 +27,7 @@ import { Track, Playlist } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl, formatDuration } from "@/lib/audio";
 import { getTrackFromAllOrCache } from "@/lib/track-resolver";
-import { recoverMissingYouTubeTracks } from "@/lib/youtube-track-recovery";
+import { spawnTask } from "@/app/actions/spawn-task";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -307,12 +307,15 @@ export const PlaylistView = memo(({
       });
       
       if (missingIds.length > 0) {
-        console.log(`[PlaylistView] 🔄 Récupération de ${missingIds.length} tracks YouTube manquants pour les playlists...`);
+        console.log(`[PlaylistView] 🔄 Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
         try {
-          await recoverMissingYouTubeTracks(missingIds);
-          console.log(`[PlaylistView] ✅ Tracks récupérés avec succès`);
+          // Spawn async recovery task via bus
+          await spawnTask("youtube-recovery", { trackIds: missingIds })
         } catch (error) {
-          console.warn('[PlaylistView] Erreur lors de la récupération des tracks:', error);
+          console.warn('[PlaylistView] Failed to spawn recovery task:', error);
+          // Fallback to inline recovery if task fails
+          const { recoverMissingYouTubeTracks } = await import("@/lib/youtube-track-recovery");
+          await recoverMissingYouTubeTracks(missingIds);
         }
       }
     };

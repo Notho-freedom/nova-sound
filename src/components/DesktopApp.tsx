@@ -39,6 +39,8 @@ import { useLibrary } from "@/hooks/useLibrary";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePlayHistory } from "@/hooks/usePlayHistory";
 import { usePlaylists } from "@/hooks/usePlaylists";
+import { spawnTask } from "@/app/actions/spawn-task";
+import { useTaskStatus } from "@/hooks/useTaskStatus";
 import { useQueue } from "@/hooks/useQueue";
 import { useFileProcessing } from "@/hooks/useFileProcessing";
 import { useCloudSync } from "@/hooks/useCloudSync";
@@ -57,7 +59,6 @@ import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 import { Input } from "@/components/ui/input";
 import { CoachmarkProvider } from "@/features/coachmarks";
 import "@/features/coachmarks/styles/coachmarks-theme.css";
-import { recoverMissingYouTubeTracks } from "@/lib/youtube-track-recovery";
 //import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 //import { useAudioVibes } from "@/hooks/useAudioVibes";
 //import { useAudioAI } from "@/hooks/useAudioAI";
@@ -219,8 +220,16 @@ export const DesktopApp = () => {
         });
         
         if (missingIds.length > 0) {
-          console.log(`[DesktopApp] 🔄 Récupération de ${missingIds.length} tracks YouTube manquants...`);
-          await recoverMissingYouTubeTracks(missingIds);
+          console.log(`[DesktopApp] 🔄 Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
+          try {
+            // Spawn async recovery task via bus (instead of blocking inline)
+            await spawnTask("youtube-recovery", { trackIds: missingIds })
+          } catch (err) {
+            console.error("[DesktopApp] Failed to spawn recovery task:", err);
+            // Fallback to inline recovery if task fails
+            const { recoverMissingYouTubeTracks } = await import("@/lib/youtube-track-recovery");
+            await recoverMissingYouTubeTracks(missingIds);
+          }
         }
       } catch (error) {
         console.warn('[DesktopApp] Erreur récupération tracks YouTube:', error);
@@ -347,7 +356,11 @@ export const DesktopApp = () => {
   const [isPlayQueueDialogOpen, setIsPlayQueueDialogOpen] = useState(false);
   const [pendingFilesToProcess, setPendingFilesToProcess] = useState<File[]>([]);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
+  const [currentOpenFilesTaskId, setCurrentOpenFilesTaskId] = useState<string | null>(null);
   // const [isKaraokeOpen, setIsKaraokeOpen] = useState(false); // DÉSACTIVÉ - Système karaoke désactivé
+
+  // Monitor open-files task status with polling
+  const { snapshot: openFilesSnapshot, isLoading: isOpenFilesLoading } = useTaskStatus(currentOpenFilesTaskId);
 
   // Restore sidebar collapsed state
   useEffect(() => {
@@ -1580,12 +1593,36 @@ export const DesktopApp = () => {
           console.log('[DesktopApp] Files selected:', files.length);
           
           try {
-            // Stocker les fichiers et ouvrir le dialog
+            // Spawn a task to process the files asynchronously
+            // Files will be serialized as a list of { name, size, lastModified, type }
+            const fileData = files.map(f => ({
+              name: f.name,
+              size: f.size,
+              lastModified: f.lastModified,
+              type: f.type,
+              arrayBuffer: null as any, // Will need to be handled differently via Blob URL or base64
+            }))
+            
+            const envelope = await spawnTask("open-files", {
+              fileCount: files.length,
+              files: fileData,
+              action: "queue", // Will be overridden by dialog choice
+              timestamp: Date.now(),
+            })
+            
+            // Store the files in state for the dialog (still needed for choice UI)
             setPendingFilesToProcess(files);
+            
+            // Track the task ID for polling status
+            setCurrentOpenFilesTaskId(envelope.id);
+            
+            // Open the dialog for play/queue choice
             setIsPlayQueueDialogOpen(true);
             
-          } catch (parseErr) {
-            console.error('[DesktopApp] Error processing files:', parseErr);
+            console.log('[DesktopApp] Task spawned:', envelope.id);
+            
+          } catch (err) {
+            console.error('[DesktopApp] Error spawning task:', err);
             toast.error(t("errorProcessFiles"));
           }
         };
@@ -1748,9 +1785,9 @@ export const DesktopApp = () => {
 
     setIsProcessingFiles(true);
     try {
-      console.log('[DesktopApp] Processing files with worker...');
+      console.log('[DesktopApp] Processing files locally...');
       
-      // Utiliser le worker pour traiter les fichiers
+      // Still process locally (faster UI feedback) using the hook
       const newTracks = await processFiles(pendingFilesToProcess);
       
       if (newTracks.length > 0) {
@@ -1774,6 +1811,7 @@ export const DesktopApp = () => {
       setIsProcessingFiles(false);
       setPendingFilesToProcess([]);
       setIsPlayQueueDialogOpen(false);
+      setCurrentOpenFilesTaskId(null);
     }
   }, [pendingFilesToProcess, processFiles, addToQueue, queue.tracks.length, setCurrentIndex, t]);
 
@@ -1783,9 +1821,9 @@ export const DesktopApp = () => {
 
     setIsProcessingFiles(true);
     try {
-      console.log('[DesktopApp] Processing files with worker for queue...');
+      console.log('[DesktopApp] Processing files locally for queue...');
       
-      // Utiliser le worker pour traiter les fichiers
+      // Still process locally using the hook
       const newTracks = await processFiles(pendingFilesToProcess);
       
       if (newTracks.length > 0) {
@@ -1803,6 +1841,7 @@ export const DesktopApp = () => {
       setIsProcessingFiles(false);
       setPendingFilesToProcess([]);
       setIsPlayQueueDialogOpen(false);
+      setCurrentOpenFilesTaskId(null);
     }
   }, [pendingFilesToProcess, processFiles, addToQueue, t]);
 
