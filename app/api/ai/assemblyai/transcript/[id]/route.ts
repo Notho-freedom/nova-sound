@@ -28,12 +28,14 @@ export async function GET(
     const { id: transcriptId } = await params;
 
     // Vérifier d'abord dans le cache Upstash
-    const cacheKey = `ai:transcript:${transcriptId}`;
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      const cacheData = JSON.parse(cached as string);
-      if (cacheData?.userId === auth.userId) {
-        return NextResponse.json(cacheData);
+    if (redis) {
+      const cacheKey = `ai:transcript:${transcriptId}`;
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        const cacheData = JSON.parse(cached as string);
+        if (cacheData?.userId === auth.userId) {
+          return NextResponse.json(cacheData);
+        }
       }
     }
 
