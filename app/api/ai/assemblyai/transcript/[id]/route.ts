@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '../../../../auth/middleware';
+import { redis } from '@/lib/redis';
 
 const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
 
@@ -26,18 +27,11 @@ export async function GET(
 
     const { id: transcriptId } = await params;
 
-    // Vérifier d'abord dans le cache Firestore
-    const { getFirebaseAdmin } = await import('~/lib/firebaseAdmin');
-    const admin = getFirebaseAdmin();
-    const db = admin.firestore();
-    
-    const cacheRef = db.collection('ai_transcriptions').doc(transcriptId);
-    const cacheDoc = await cacheRef.get();
-
-    if (cacheDoc.exists) {
-      const cacheData = cacheDoc.data();
-      
-      // Vérifier que l'utilisateur a accès à cette transcription
+    // Vérifier d'abord dans le cache Upstash
+    const cacheKey = `ai:transcript:${transcriptId}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      const cacheData = JSON.parse(cached as string);
       if (cacheData?.userId === auth.userId) {
         return NextResponse.json(cacheData);
       }

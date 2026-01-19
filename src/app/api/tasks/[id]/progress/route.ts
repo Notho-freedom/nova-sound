@@ -1,15 +1,13 @@
 import { NextRequest } from "next/server"
 import { getTaskSnapshot } from "@/lib/task-store"
+import { upstashXAck, upstashXGroupCreate, upstashXReadGroup } from "@/lib/upstash"
 
 export const runtime = "edge"
 export const dynamic = "force-dynamic"
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params
-  const controller = new AbortController()
-
-  // Close SSE after 5 minutes
-  const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+  const timeoutSignal = AbortSignal.timeout(5 * 60 * 1000)
 
   const encoder = new TextEncoder()
   let isClosed = false
@@ -20,54 +18,79 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         // Send initial message
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "connected", taskId: id })}\n\n`))
 
-        // Poll task status every 500ms
-        const pollInterval = setInterval(async () => {
-          if (isClosed) {
-            clearInterval(pollInterval)
-            controller.close()
-            return
+        const progressStream = `task-progress:${id}`
+        const group = `progress-${id}`
+        const consumer = `sse-${crypto.randomUUID()}`
+
+        try {
+          await upstashXGroupCreate(progressStream, group, "$", timeoutSignal)
+        } catch {
+          // Group may already exist
+        }
+
+        const initialSnapshot = await getTaskSnapshot(id)
+        if (initialSnapshot) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "progress",
+                status: initialSnapshot.status,
+                progress: initialSnapshot.progress,
+                updatedAt: initialSnapshot.updatedAt,
+                error: initialSnapshot.error,
+              })}\n\n`
+            )
+          )
+        }
+        req.signal.addEventListener("abort", () => {
+          isClosed = true
+        })
+
+        timeoutSignal.addEventListener("abort", () => {
+          isClosed = true
+        })
+
+        while (!isClosed) {
+          const result = await upstashXReadGroup(
+            progressStream,
+            group,
+            consumer,
+            { count: 1, blockMs: 30000 },
+            timeoutSignal
+          )
+
+          if (!result || result.length === 0) {
+            continue
           }
 
-          try {
-            const snapshot = await getTaskSnapshot(id)
-
-            if (!snapshot) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "not-found" })}\n\n`))
-              clearInterval(pollInterval)
-              controller.close()
-              return
+          const entries = result[0]?.[1] ?? []
+          for (const [entryId, fields] of entries) {
+            const payload: Record<string, string> = {}
+            for (let i = 0; i < fields.length; i += 2) {
+              payload[String(fields[i])] = String(fields[i + 1] ?? "")
             }
 
-            // Send progress update
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "progress",
-                  status: snapshot.status,
-                  progress: snapshot.progress,
-                  updatedAt: snapshot.updatedAt,
-                  error: snapshot.error,
+                  status: payload.status,
+                  progress: payload.progress ? Number(payload.progress) : undefined,
+                  updatedAt: payload.updatedAt ? Number(payload.updatedAt) : undefined,
+                  message: payload.message || undefined,
                 })}\n\n`
               )
             )
 
-            // Close when done
-            if (snapshot.status === "done" || snapshot.status === "failed") {
-              clearInterval(pollInterval)
-              controller.close()
-            }
-          } catch (err) {
-            console.error(`[SSE] Error polling task ${id}:`, err)
-            clearInterval(pollInterval)
-            controller.close()
-          }
-        }, 500)
+            await upstashXAck(progressStream, group, [entryId], timeoutSignal)
 
-        req.signal.addEventListener("abort", () => {
-          isClosed = true
-          clearInterval(pollInterval)
-          clearTimeout(timeout)
-        })
+            if (payload.status === "done" || payload.status === "failed") {
+              isClosed = true
+              controller.close()
+              return
+            }
+          }
+        }
       } catch (err) {
         console.error(`[SSE] Error starting stream for task ${id}:`, err)
         controller.close()

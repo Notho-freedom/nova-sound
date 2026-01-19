@@ -6,6 +6,7 @@
  */
 
 import { NextRequest } from 'next/server';
+import { redis } from '@/lib/redis';
 
 interface RateLimitOptions {
   windowMs: number; // Time window in milliseconds
@@ -15,58 +16,21 @@ interface RateLimitOptions {
   skipFailedRequests?: boolean;
 }
 
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
+function rateLimitKey(identifier: string, windowMs: number): string {
+  return `ratelimit:${identifier}:${windowMs}`;
 }
 
-class MemoryStore {
-  private store: RateLimitStore = {};
-  private cleanupInterval: NodeJS.Timeout;
-
-  constructor() {
-    // Cleanup expired entries every minute
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      Object.keys(this.store).forEach((key) => {
-        if (this.store[key].resetTime < now) {
-          delete this.store[key];
-        }
-      });
-    }, 60000);
+async function incrementRateLimit(key: string, windowMs: number): Promise<{ count: number; resetTime: number }> {
+  const count = await redis.incr(key);
+  if (count === 1) {
+    await redis.expire(key, Math.ceil(windowMs / 1000));
   }
 
-  increment(key: string, windowMs: number): { count: number; resetTime: number } {
-    const now = Date.now();
-    const entry = this.store[key];
+  const ttl = await redis.ttl(key);
+  const resetTime = Date.now() + Math.max(0, ttl) * 1000;
 
-    if (!entry || entry.resetTime < now) {
-      // Create new entry or reset expired entry
-      this.store[key] = {
-        count: 1,
-        resetTime: now + windowMs,
-      };
-      return this.store[key];
-    }
-
-    // Increment existing entry
-    entry.count++;
-    return entry;
-  }
-
-  reset(key: string): void {
-    delete this.store[key];
-  }
-
-  destroy(): void {
-    clearInterval(this.cleanupInterval);
-    this.store = {};
-  }
+  return { count, resetTime };
 }
-
-const memoryStore = new MemoryStore();
 
 /**
  * Create a rate limiter function
@@ -94,7 +58,7 @@ export function createRateLimiter(options: RateLimitOptions) {
       return { allowed: true, remaining: max, resetTime: Date.now() + windowMs };
     }
 
-    const result = memoryStore.increment(identifier, windowMs);
+    const result = await incrementRateLimit(rateLimitKey(identifier, windowMs), windowMs);
 
     if (result.count > max) {
       return {

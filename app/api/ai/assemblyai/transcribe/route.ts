@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyAuth } from '../../../auth/middleware';
+import { qstash } from '@/lib/qstash-helpers';
 
 const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -164,73 +165,22 @@ export async function POST(request: NextRequest) {
     const transcriptData = await transcriptResponse.json();
     const transcriptId = transcriptData.id;
 
-    // Polling pour obtenir le résultat
-    let transcriptResult = null;
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max (5s * 60)
+    // Déléguer le polling à QStash
+    await qstash.task.publishDelayed(
+      'assemblyai-poll',
+      {
+        transcriptId,
+        userId: auth.userId,
+        audioUrl: finalAudioUrl,
+      },
+      5
+    );
 
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Attendre 5 secondes
-
-      const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
-        headers: {
-          'authorization': ASSEMBLYAI_API_KEY,
-        },
-      });
-
-      if (!statusResponse.ok) {
-        throw new Error('Erreur lors de la vérification du statut');
-      }
-
-      transcriptResult = await statusResponse.json();
-
-      if (transcriptResult.status === 'completed') {
-        break;
-      } else if (transcriptResult.status === 'error') {
-        return NextResponse.json(
-          { error: 'Erreur lors de la transcription', details: transcriptResult.error },
-          { status: 500 }
-        );
-      }
-
-      attempts++;
-    }
-
-    if (!transcriptResult || transcriptResult.status !== 'completed') {
-      return NextResponse.json(
-        { error: 'Timeout lors de la transcription' },
-        { status: 504 }
-      );
-    }
-
-    // Sauvegarder le résultat dans Firestore pour le cache
-    const cacheRef = db.collection('ai_transcriptions').doc(transcriptId);
-    await cacheRef.set({
-      userId: auth.userId,
-      audioUrl: finalAudioUrl,
-      transcript: transcriptResult.text,
-      words: transcriptResult.words || [],
-      chapters: transcriptResult.chapters || [],
-      sentiment_analysis_results: transcriptResult.sentiment_analysis_results || [],
-      entities: transcriptResult.entities || [],
-      toxicity: transcriptResult.toxicity || null,
-      speakers: transcriptResult.utterances || [],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), // 30 jours
-    });
-
-    // Retourner le résultat
     return NextResponse.json({
       id: transcriptId,
-      text: transcriptResult.text,
-      words: transcriptResult.words || [],
-      chapters: transcriptResult.chapters || [],
-      sentiment: transcriptResult.sentiment_analysis_results || [],
-      entities: transcriptResult.entities || [],
-      toxicity: transcriptResult.toxicity || null,
-      speakers: transcriptResult.utterances || [],
-      confidence: transcriptResult.confidence || null,
-    });
+      status: 'processing',
+      message: 'Transcription en cours. Utilisez /api/ai/assemblyai/transcript/[id] pour récupérer le résultat.',
+    }, { status: 202 });
 
   } catch (error) {
     console.error('Erreur lors de la transcription:', error);

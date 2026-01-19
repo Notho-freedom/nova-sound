@@ -9,16 +9,31 @@ export function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number
 ): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let rafId: number | null = null;
+  let startTime: number | null = null;
   
   return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    if (rafId) {
+      cancelAnimationFrame(rafId);
     }
-    timeoutId = setTimeout(() => {
-      fn(...args);
-      timeoutId = null;
-    }, delay);
+
+    if (typeof requestAnimationFrame === "undefined") {
+      queueMicrotask(() => fn(...args));
+      return;
+    }
+
+    startTime = performance.now();
+    const tick = (now: number) => {
+      if (startTime !== null && now - startTime >= delay) {
+        fn(...args);
+        startTime = null;
+        rafId = null;
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
   };
 }
 
@@ -31,18 +46,40 @@ export function throttle<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
   let inThrottle = false;
   let lastArgs: Parameters<T> | null = null;
+  let rafId: number | null = null;
+  let startTime: number | null = null;
   
   return (...args: Parameters<T>) => {
     if (!inThrottle) {
       fn(...args);
       inThrottle = true;
-      setTimeout(() => {
-        inThrottle = false;
-        if (lastArgs) {
-          fn(...lastArgs);
-          lastArgs = null;
+      if (typeof requestAnimationFrame === "undefined") {
+        queueMicrotask(() => {
+          inThrottle = false;
+          if (lastArgs) {
+            fn(...lastArgs);
+            lastArgs = null;
+          }
+        });
+        return;
+      }
+
+      startTime = performance.now();
+      const tick = (now: number) => {
+        if (startTime !== null && now - startTime >= limit) {
+          inThrottle = false;
+          if (lastArgs) {
+            fn(...lastArgs);
+            lastArgs = null;
+          }
+          startTime = null;
+          rafId = null;
+          return;
         }
-      }, limit);
+        rafId = requestAnimationFrame(tick);
+      };
+
+      rafId = requestAnimationFrame(tick);
     } else {
       lastArgs = args;
     }

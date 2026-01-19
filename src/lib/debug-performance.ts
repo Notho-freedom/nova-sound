@@ -88,9 +88,16 @@ if (typeof window !== 'undefined') {
   // Auto-log metrics when app hydration completes
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        console.log('🚀 App Ready. Run: window.__PERF_DEBUG.logMetrics()');
-      }, 500);
+      const start = performance.now();
+      const tick = (now: number) => {
+        if (now - start >= 500) {
+          console.log('🚀 App Ready. Run: window.__PERF_DEBUG.logMetrics()');
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
     });
   }
 }

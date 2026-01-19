@@ -376,8 +376,7 @@ async function processRecoveryQueue(): Promise<void> {
       
       await recoverMissingYouTubeTracks(batch);
       
-      // Petite pause entre les batches pour ne pas surcharger
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // No local timer delay (Upstash workflows handle pacing)
     }
   } finally {
     isProcessingQueue = false;

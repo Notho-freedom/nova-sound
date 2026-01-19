@@ -133,7 +133,7 @@ type BackupEnvelope = {
 class FirebaseSyncService {
   private syncListeners: Map<string, () => void> = new Map();
   private isSyncing: boolean = false;
-  private syncQueue: Array<{ type: string; data: any }> = [];
+  private syncQueue: Array<{ type: string; data: unknown }> = [];
   private currentUserId: string | null = null;
   private reconnectAttempts: Map<string, number> = new Map();
   private maxReconnectAttempts: number = 3;
@@ -231,14 +231,14 @@ class FirebaseSyncService {
       
       // Différer la migration pour ne pas bloquer l'initialisation
       // (opération non-critique qui peut être faite en arrière-plan)
-      setTimeout(async () => {
+      queueMicrotask(async () => {
         try {
           const { migrateToUserIsolatedStorage } = await import('../lib/storage-utils');
           await migrateToUserIsolatedStorage();
         } catch (error) {
           console.error('Failed to migrate to user-isolated storage:', error);
         }
-      }, 1000);
+      });
       
       // NOUVEAU SYSTÈME: Charger les données depuis Firebase une seule fois au login
       // Les listeners temps réel sont désactivés pour éviter d'écraser les changements locaux
@@ -263,19 +263,20 @@ class FirebaseSyncService {
 
       // Utiliser requestIdleCallback pour différer les opérations non-critiques
       if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(() => deferredInit(), { timeout: 3000 });
+        const idleWindow = window as Window & {
+          requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+        };
+        idleWindow.requestIdleCallback?.(() => deferredInit(), { timeout: 3000 });
       } else {
-        setTimeout(deferredInit, 500);
+        queueMicrotask(() => void deferredInit());
       }
       
       // Setup realtime listeners for bidirectional sync (if enabled)
       // This is done after initial load to avoid conflicts
-      setTimeout(() => {
-        this.setupRealtimeListeners(userId);
-      }, 1000);
+      this.setupRealtimeListeners(userId);
       
       // Start periodic sync (every hour) - différé
-      setTimeout(() => this.startPeriodicSync(userId), 2000);
+      this.startPeriodicSync(userId);
       
       // Only log on first initialization, not on every call
       if (!this.syncListeners.has('appData')) {
@@ -326,17 +327,14 @@ class FirebaseSyncService {
   }
 
   private async fetchBackupApi<T>(url: string, init?: RequestInit, timeoutMs: number = 8000): Promise<T | null> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const signal = AbortSignal.timeout(timeoutMs);
 
     try {
-      const res = await fetch(url, { ...init, signal: controller.signal, cache: 'no-store' });
+      const res = await fetch(url, { ...init, signal, cache: 'no-store' });
       if (!res.ok) return null;
       return (await res.json()) as T;
     } catch {
       return null;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
@@ -356,6 +354,7 @@ class FirebaseSyncService {
         body: JSON.stringify({
           userId,
           intervalSeconds: Math.max(60, Math.floor(this.backupIntervalMs / 1000)),
+          initialDelaySeconds: 5,
         }),
       }, 8000);
 
@@ -363,6 +362,23 @@ class FirebaseSyncService {
     } catch {
       return false;
     }
+  }
+
+  private async scheduleDeferredRemoteSync(userId: string, type: string, data: unknown): Promise<boolean> {
+    if (!this.shouldUseQStashScheduler()) return false;
+
+    const res = await this.fetchBackupApi<{ scheduled: boolean }>(`/api/qstash/sync-deferred`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        type,
+        data,
+        delaySeconds: Math.max(1, Math.floor(this.changeDetectionDelay / 1000)),
+      }),
+    }, 8000);
+
+    return !!res?.scheduled;
   }
 
   // Load all user data from Firestore (silent mode - minimal logs)
@@ -402,14 +418,15 @@ class FirebaseSyncService {
         await this.saveToFirestore(targetUserId);
         return null;
       }
-    } catch (error: any) {
-      if (error?.code === 'resource-exhausted') {
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      if (err?.code === 'resource-exhausted') {
         this.firestoreDisabled = true;
         this.backupProvider = await this.resolveBackupProvider();
         return null;
       }
       // Only log actual errors
-      if (error.code !== 'unavailable' && error.code !== 'cancelled') {
+      if (err?.code !== 'unavailable' && err?.code !== 'cancelled') {
         console.error('Error loading from Firestore:', error);
       }
       return null;
@@ -559,8 +576,9 @@ class FirebaseSyncService {
       // Démarrer le système de backup automatique
       this.startAutomaticBackup(userId);
       
-    } catch (error: any) {
-      if (error?.code === 'resource-exhausted') {
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      if (err?.code === 'resource-exhausted') {
         this.firestoreDisabled = true;
         console.warn('⚠️ Firestore quota exceeded during initial load, switching to Upstash backup');
       } else {
@@ -580,25 +598,18 @@ class FirebaseSyncService {
     
     console.log(`🕐 Starting automatic backup system (every 1 hour if data changed) [${this.backupProvider}]`);
     
-    // Créer un backup initial
-    setTimeout(() => {
-      this.createBackupIfNeeded(userId);
-    }, 5000); // Premier backup après 5 secondes
-
-    // Backup périodique via QStash (production) avec fallback local
+    // Backup périodique via QStash
     if (!this.qstashBackupScheduled) {
       this.scheduleBackupLoop(userId).then((scheduled) => {
         if (scheduled) {
           this.qstashBackupScheduled = true;
           return;
         }
-
-        // Fallback local interval (dev/offline)
-        this.backupInterval = setInterval(async () => {
-          await this.createBackupIfNeeded(userId);
-        }, this.backupIntervalMs);
       });
     }
+
+    // Create one immediate backup locally (no timer)
+    void this.createBackupIfNeeded(userId);
   }
 
   // Créer un backup uniquement si les données ont changé
@@ -650,8 +661,9 @@ class FirebaseSyncService {
         console.warn('⚠️ Backup not saved (Upstash unavailable)');
       }
       
-    } catch (error: any) {
-      if (error?.code === 'resource-exhausted') {
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      if (err?.code === 'resource-exhausted') {
         this.firestoreDisabled = true;
         console.warn('⚠️ Firestore quota exceeded during backup, switching to Upstash backup');
       } else {
@@ -766,7 +778,7 @@ class FirebaseSyncService {
 
   // Comparaison intelligente de valeurs
   // Retourne: 'keep-local' | 'use-firebase' | 'merge' | 'no-change'
-  private intelligentCompare(local: any, firebase: any, type: 'object' | 'array' | 'primitive'): string {
+  private intelligentCompare(local: unknown, firebase: unknown, type: 'object' | 'array' | 'primitive'): string {
     // Cas 1: Firebase a une valeur, local est null/undefined/vide
     const localIsEmpty = local === null || local === undefined || 
       (Array.isArray(local) && local.length === 0) ||
@@ -1094,14 +1106,10 @@ class FirebaseSyncService {
     const newAttempts = attempts + 1;
     this.reconnectAttempts.set(listenerKey, newAttempts);
     
-    // Exponential backoff: delay * 2^attempts
-    const delay = this.reconnectDelay * Math.pow(2, attempts - 1);
-    
     // Silent retry - no console log
-    
-    setTimeout(() => {
+    queueMicrotask(() => {
       retryCallback();
-    }, delay);
+    });
   }
 
   // Handle remote updates from Firestore
@@ -1199,19 +1207,17 @@ class FirebaseSyncService {
 
       // Trigger Electron storage update if available (en arrière-plan)
       if (window.electronAPI && data.settings) {
-        // Différer les opérations Electron pour ne pas bloquer
-        setTimeout(async () => {
+        queueMicrotask(async () => {
           try {
             await window.electronAPI!.updateSettings(data.settings!);
           } catch (error) {
             console.warn('Error updating Electron settings:', error);
           }
-        }, 0);
+        });
       }
 
       if (window.electronAPI && data.favorites) {
-        // Différer les opérations Electron pour ne pas bloquer
-        setTimeout(async () => {
+        queueMicrotask(async () => {
           try {
             for (const trackId of data.favorites!) {
               await window.electronAPI!.addFavorite(trackId);
@@ -1219,7 +1225,7 @@ class FirebaseSyncService {
           } catch (error) {
             console.warn('Error updating Electron favorites:', error);
           }
-        }, 0);
+        });
       }
 
       // Update hash after remote update
@@ -1353,8 +1359,9 @@ class FirebaseSyncService {
       }
       
       // Silent sync - no console logs for normal operations
-    } catch (error: any) {
-      if (error?.code === 'resource-exhausted') {
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      if (err?.code === 'resource-exhausted') {
         console.warn('⚠️ Firestore quota exceeded, switching to Upstash backup');
         this.firestoreDisabled = true;
         this.backupProvider = await this.resolveBackupProvider();
@@ -1554,14 +1561,14 @@ class FirebaseSyncService {
       }
     }
 
-    const cloudinaryConfig = this.loadFromLocalStorage<any>('nexus-cloudinary-config');
-    if (cloudinaryConfig) data.cloudinaryConfig = cloudinaryConfig;
+    const cloudinaryConfig = this.loadFromLocalStorage<Record<string, unknown>>('nexus-cloudinary-config');
+    if (cloudinaryConfig) data.cloudinaryConfig = cloudinaryConfig as UserAppData['cloudinaryConfig'];
 
     const equalizerPresets = this.loadFromLocalStorage<EqualizerPreset[]>('nexus-equalizer-presets');
     if (equalizerPresets) data.equalizerPresets = equalizerPresets;
 
-    const scrobblerSettings = this.loadFromLocalStorage<any>('nexus-scrobbler-settings');
-    if (scrobblerSettings) data.scrobblerSettings = scrobblerSettings;
+    const scrobblerSettings = this.loadFromLocalStorage<Record<string, unknown>>('nexus-scrobbler-settings');
+    if (scrobblerSettings) data.scrobblerSettings = scrobblerSettings as UserAppData['scrobblerSettings'];
 
     const youtubeApiKey = this.loadFromLocalStorage<string>('nexus-youtube-api-key');
     if (youtubeApiKey) data.youtubeApiKey = youtubeApiKey;
@@ -1614,38 +1621,7 @@ class FirebaseSyncService {
       console.log('🔄 Periodic sync handled via QStash scheduler');
       return;
     }
-
-    // Clear existing interval if any
-    if (this.periodicSyncInterval) {
-      clearInterval(this.periodicSyncInterval);
-      console.log('🔄 Restarting periodic sync');
-    } else {
-      console.log('🔄 Starting periodic sync (every hour)');
-    }
-
-    this.periodicSyncInterval = setInterval(async () => {
-      if (!this.currentUserId || this.isSyncing) {
-        return;
-      }
-      
-      console.log('🔄 Periodic sync triggered');
-
-      try {
-        // Silent periodic sync check
-        const currentData = await this.getCurrentLocalData();
-        const newHash = this.calculateDataHash(currentData);
-
-        // Only sync if there are pending changes or data has changed
-        if (this.pendingChanges.size > 0 || newHash !== this.lastSyncedDataHash) {
-          // Silent periodic sync - only sync if needed
-          await this.saveToFirestore(userId);
-        }
-      } catch (error) {
-        console.error('Error during periodic sync:', error);
-      }
-    }, this.syncIntervalMs);
-
-    // Silent - no console log for periodic sync start
+    console.log('🔄 Periodic sync disabled locally (QStash required)');
   }
 
   // Stop periodic sync
@@ -1667,63 +1643,24 @@ class FirebaseSyncService {
 
   // Queue a sync operation (with debounce and change detection)
   // Non-blocking: toutes les opérations sont différées pour ne pas ralentir la navigation
-  queueSync(type: string, data: any): void {
-    // Utiliser requestIdleCallback ou setTimeout pour ne jamais bloquer l'UI
+  queueSync(type: string, data: unknown): void {
     const deferredOperation = () => {
       // Save locally immediately (synchrone mais très rapide)
-      const dataMap: Record<string, any> = { [type]: data };
+      const dataMap: Record<string, unknown> = { [type]: data };
       this.saveDataLocally(dataMap as Partial<UserAppData>);
       
       // Mark as pending change
       this.pendingChanges.add(type);
 
-      // Clear existing debounce timer
-      if (this.changeDetectionDebounce) {
-        clearTimeout(this.changeDetectionDebounce);
+      // Schedule deferred remote sync via QStash
+      if (this.currentUserId) {
+        this.scheduleDeferredRemoteSync(this.currentUserId, type, data).catch((error) => {
+          console.error(`Error scheduling sync for ${type}:`, error);
+        });
       }
-
-      // Debounce sync to Firestore (only sync if changes persist after delay)
-      // Utiliser un délai plus long pour éviter de bloquer la navigation
-      this.changeDetectionDebounce = setTimeout(async () => {
-        if (!this.currentUserId) {
-          return;
-        }
-
-        // Différer l'opération Firestore via requestIdleCallback pour ne jamais bloquer
-        const performSync = async () => {
-          try {
-            // Check if data actually changed before syncing
-            const currentData = await this.getCurrentLocalData();
-            const newHash = this.calculateDataHash(currentData);
-
-            if (newHash !== this.lastSyncedDataHash) {
-              // Silent sync - no console log
-              await this.saveToFirestore(this.currentUserId!, { [type]: data } as Partial<UserAppData>);
-            } else {
-              // Silent - no changes
-              this.pendingChanges.delete(type);
-            }
-          } catch (error) {
-            console.error(`Error syncing ${type}:`, error);
-            // Will be retried in periodic sync
-          }
-        };
-
-        // Exécuter via requestIdleCallback si disponible, sinon setTimeout
-        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(() => performSync(), { timeout: 5000 });
-        } else {
-          setTimeout(performSync, 100);
-        }
-      }, this.changeDetectionDelay);
     };
 
-    // Différer l'opération initiale pour ne pas bloquer la navigation
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(deferredOperation, { timeout: 1000 });
-    } else {
-      setTimeout(deferredOperation, 0);
-    }
+    deferredOperation();
   }
 
   // Process sync queue
@@ -1732,57 +1669,55 @@ class FirebaseSyncService {
       return;
     }
 
-    const item = this.syncQueue.shift();
-    if (!item) return;
+    while (this.syncQueue.length > 0) {
+      const item = this.syncQueue.shift();
+      if (!item) break;
 
-    try {
-      switch (item.type) {
-        case 'settings':
-          await this.saveToFirestore(this.currentUserId, { settings: item.data });
-          break;
-        case 'favorites':
-          await this.saveToFirestore(this.currentUserId, { favorites: item.data });
-          break;
-        case 'history':
-          await this.saveToFirestore(this.currentUserId, { history: item.data });
-          break;
-        case 'theme':
-          await this.saveToFirestore(this.currentUserId, { theme: item.data });
-          break;
-        case 'notifications':
-          await this.saveToFirestore(this.currentUserId, { notificationsEnabled: item.data });
-          break;
-        case 'volume':
-          await this.saveToFirestore(this.currentUserId, { volume: item.data });
-          break;
-        case 'searchHistory':
-          await this.saveToFirestore(this.currentUserId, { searchHistory: item.data });
-          break;
-        case 'uploadedMedia':
-          await this.saveToFirestore(this.currentUserId, { uploadedMedia: item.data });
-          break;
-        case 'cloudinary':
-          await this.saveToFirestore(this.currentUserId, { cloudinaryConfig: item.data });
-          break;
-        case 'equalizer':
-          await this.saveToFirestore(this.currentUserId, { equalizerPresets: item.data });
-          break;
-        case 'scrobbler':
-          await this.saveToFirestore(this.currentUserId, { scrobblerSettings: item.data });
-          break;
-        case 'playlists':
-          await this.savePlaylistsToFirestore(this.currentUserId, item.data);
-          break;
+      try {
+        switch (item.type) {
+          case 'settings':
+            await this.saveToFirestore(this.currentUserId, { settings: item.data as Settings });
+            break;
+          case 'favorites':
+            await this.saveToFirestore(this.currentUserId, { favorites: item.data as string[] });
+            break;
+          case 'history':
+            await this.saveToFirestore(this.currentUserId, { history: item.data as HistoryEntry[] });
+            break;
+          case 'theme':
+            await this.saveToFirestore(this.currentUserId, { theme: item.data as UserAppData['theme'] });
+            break;
+          case 'notifications':
+            await this.saveToFirestore(this.currentUserId, { notificationsEnabled: item.data as boolean });
+            break;
+          case 'volume':
+            await this.saveToFirestore(this.currentUserId, { volume: item.data as number });
+            break;
+          case 'searchHistory':
+            await this.saveToFirestore(this.currentUserId, { searchHistory: item.data as string[] });
+            break;
+          case 'uploadedMedia':
+            await this.saveToFirestore(this.currentUserId, { uploadedMedia: item.data as UserAppData['uploadedMedia'] });
+            break;
+          case 'cloudinary':
+            await this.saveToFirestore(this.currentUserId, { cloudinaryConfig: item.data as UserAppData['cloudinaryConfig'] });
+            break;
+          case 'equalizer':
+            await this.saveToFirestore(this.currentUserId, { equalizerPresets: item.data as EqualizerPreset[] });
+            break;
+          case 'scrobbler':
+            await this.saveToFirestore(this.currentUserId, { scrobblerSettings: item.data as UserAppData['scrobblerSettings'] });
+            break;
+          case 'playlists':
+            await this.savePlaylistsToFirestore(this.currentUserId, item.data as Playlist[]);
+            break;
+        }
+      } catch (error) {
+        console.error(`Error syncing ${item.type}:`, error);
+        // Re-queue on error
+        this.syncQueue.unshift(item);
+        break;
       }
-    } catch (error) {
-      console.error(`Error syncing ${item.type}:`, error);
-      // Re-queue on error
-      this.syncQueue.unshift(item);
-    }
-
-    // Process next item
-    if (this.syncQueue.length > 0) {
-      setTimeout(() => this.processSyncQueue(), 100);
     }
   }
 
@@ -1964,9 +1899,6 @@ class FirebaseSyncService {
       }
       
       console.log('✅ Sync vers Firebase terminée');
-      
-      // Attendre un peu pour laisser Firestore se mettre à jour
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Vérifier la cohérence en rechargeant depuis Firebase
       console.log('🔍 ===== VÉRIFICATION POST-SYNC =====');

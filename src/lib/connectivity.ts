@@ -43,17 +43,14 @@ async function actualNetworkCheck(): Promise<boolean> {
 
   for (const endpoint of endpoints) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const signal = AbortSignal.timeout(3000); // 3 second timeout
 
       const response = await fetch(endpoint, {
         method: 'HEAD',
         mode: 'no-cors', // Bypass CORS - we just care if request succeeds
         cache: 'no-store',
-        signal: controller.signal,
+        signal,
       });
-
-      clearTimeout(timeoutId);
       
       // If we get here, we're online
       return true;
@@ -182,6 +179,8 @@ export function onConnectivityChange(callback: (isOnline: boolean) => void): () 
  */
 export function waitForConnectivity(timeout: number = 30000): Promise<void> {
   return new Promise((resolve, reject) => {
+    const timeoutSignal = AbortSignal.timeout(timeout);
+
     // Check if already online
     isOnline().then((online) => {
       if (online) {
@@ -189,19 +188,17 @@ export function waitForConnectivity(timeout: number = 30000): Promise<void> {
         return;
       }
 
-      // Set up timeout
-      const timeoutId = setTimeout(() => {
-        cleanup();
-        reject(new Error('Connectivity timeout'));
-      }, timeout);
-
       // Set up listener
       const cleanup = onConnectivityChange((isOnline) => {
         if (isOnline) {
-          clearTimeout(timeoutId);
           cleanup();
           resolve();
         }
+      });
+
+      timeoutSignal.addEventListener('abort', () => {
+        cleanup();
+        reject(new Error('Connectivity timeout'));
       });
     });
   });

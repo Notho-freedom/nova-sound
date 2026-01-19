@@ -95,13 +95,7 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    // Add timeout to prevent hanging requests
-    const bodyPromise = req.json();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), 5000)
-    );
-    
-    const body = await Promise.race([bodyPromise, timeoutPromise]) as any;
+    const body = await req.json();
     
     if (!Array.isArray(body) || body.length === 0) {
       return NextResponse.json(
@@ -126,15 +120,11 @@ export async function PUT(req: NextRequest) {
       count: body.length,
       message: `Batch stored ${body.length} tracks via pipeline`
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Silently handle connection abort errors
-    if (error?.code === 'ECONNRESET' || error?.name === 'AbortError' || req.signal.aborted) {
+    const err = error as { code?: string; name?: string; message?: string };
+    if (err?.code === 'ECONNRESET' || err?.name === 'AbortError' || req.signal.aborted) {
       return new NextResponse(null, { status: 499 });
-    }
-    
-    // Handle timeout silently
-    if (error?.message === 'Request timeout') {
-      return new NextResponse(null, { status: 408 });
     }
     
     console.error('[Redis Batch] PUT error:', error);

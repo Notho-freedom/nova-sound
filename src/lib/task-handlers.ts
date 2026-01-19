@@ -186,11 +186,119 @@ export const handleStatsAggregation: TaskHandler = async () => {
 };
 
 /**
+ * Handler: sync-deferred
+ * Merge client patches into Upstash latest backup
+ */
+export const handleSyncDeferred: TaskHandler = async (payload) => {
+  const { userId, type, data } = payload;
+
+  if (typeof userId !== "string" || !userId || typeof type !== "string") {
+    return { ok: false, error: "Missing userId or type" };
+  }
+
+  const { redis } = await import("@/lib/redis");
+  const latestKey = `backup:${userId}:latest`;
+  const latestRaw = await redis.get(latestKey);
+
+  const latest = latestRaw ? JSON.parse(latestRaw as string) : { data: {}, playlists: [] };
+  const now = Date.now();
+
+  const dataMap: Record<string, string> = {
+    settings: "settings",
+    favorites: "favorites",
+    history: "history",
+    theme: "theme",
+    notifications: "notificationsEnabled",
+    volume: "volume",
+    searchHistory: "searchHistory",
+    uploadedMedia: "uploadedMedia",
+    cloudinary: "cloudinaryConfig",
+    equalizer: "equalizerPresets",
+    scrobbler: "scrobblerSettings",
+  };
+
+  if (type === "playlists") {
+    latest.playlists = Array.isArray(data) ? data : latest.playlists;
+  } else if (dataMap[type]) {
+    latest.data = latest.data || {};
+    latest.data[dataMap[type]] = data;
+  } else {
+    return { ok: false, error: `Unknown sync type: ${type}` };
+  }
+
+  latest.data = latest.data || {};
+  latest.data.lastSyncAt = new Date(now).toISOString();
+  latest.data.version = (Number(latest.data.version) || 0) + 1;
+
+  await redis.setex(latestKey, 60 * 60 * 24 * 30, JSON.stringify(latest));
+
+  return { ok: true, updatedAt: now };
+};
+
+/**
+ * Handler: assemblyai-poll
+ * Poll AssemblyAI status and cache result
+ */
+export const handleAssemblyAIPoll: TaskHandler = async (payload) => {
+  const { transcriptId, userId, audioUrl } = payload;
+
+  if (typeof transcriptId !== "string" || !transcriptId || typeof userId !== "string") {
+    return { ok: false, error: "Missing transcriptId or userId" };
+  }
+
+  const apiKey = process.env.ASSEMBLYAI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, error: "AssemblyAI not configured" };
+  }
+
+  const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
+    headers: { authorization: apiKey },
+  });
+
+  if (!statusResponse.ok) {
+    return { ok: false, error: "Failed to fetch transcript status" };
+  }
+
+  const transcriptResult = await statusResponse.json();
+
+  if (transcriptResult.status === "completed") {
+    const { redis } = await import("@/lib/redis");
+    const cacheKey = `ai:transcript:${transcriptId}`;
+    const payloadToStore = {
+      userId,
+      audioUrl,
+      transcript: transcriptResult.text,
+      words: transcriptResult.words || [],
+      chapters: transcriptResult.chapters || [],
+      sentiment_analysis_results: transcriptResult.sentiment_analysis_results || [],
+      entities: transcriptResult.entities || [],
+      toxicity: transcriptResult.toxicity || null,
+      speakers: transcriptResult.utterances || [],
+      createdAt: new Date().toISOString(),
+      status: "completed",
+    };
+
+    await redis.setex(cacheKey, 60 * 60 * 24 * 30, JSON.stringify(payloadToStore));
+
+    return { ok: true, status: "completed" };
+  }
+
+  if (transcriptResult.status === "error") {
+    return { ok: false, status: "error", details: transcriptResult.error };
+  }
+
+  const { qstash } = await import("@/lib/qstash-helpers");
+  await qstash.task.publishDelayed('assemblyai-poll', { transcriptId, userId, audioUrl }, 5);
+
+  return { ok: true, status: transcriptResult.status };
+};
+
+/**
  * Handler: backup-snapshot
  * Create a periodic backup from the latest Upstash snapshot
  */
 export const handleBackupSnapshot: TaskHandler = async (payload, meta) => {
-  const { userId } = payload;
+  const { userId, intervalSeconds } = payload;
 
   if (typeof userId !== "string" || !userId) {
     return { ok: false, error: "Missing userId" };
@@ -205,9 +313,11 @@ export const handleBackupSnapshot: TaskHandler = async (payload, meta) => {
   const latestKey = `backup:${userId}:latest`;
   const latestRaw = await redis.get(latestKey);
 
+  const nextInterval = Math.max(60, Number(intervalSeconds) || 3600);
+
   if (!latestRaw) {
     // Reschedule and exit if nothing to snapshot yet
-    await qstash.task.publishDelayed("backup-snapshot", { userId }, 3600);
+    await qstash.task.publishDelayed("backup-snapshot", { userId, intervalSeconds: nextInterval }, nextInterval);
     return { ok: true, skipped: true };
   }
 
@@ -240,7 +350,7 @@ export const handleBackupSnapshot: TaskHandler = async (payload, meta) => {
   }
 
   // Reschedule next snapshot
-  await qstash.task.publishDelayed("backup-snapshot", { userId }, 3600);
+  await qstash.task.publishDelayed("backup-snapshot", { userId, intervalSeconds: nextInterval }, nextInterval);
 
   return {
     ok: true,
@@ -397,6 +507,8 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   "daily-cleanup": handleDailyCleanup,
   "stats-aggregation": handleStatsAggregation,
   "backup-snapshot": handleBackupSnapshot,
+  "sync-deferred": handleSyncDeferred,
+  "assemblyai-poll": handleAssemblyAIPoll,
   "onboarding-welcome": handleOnboardingWelcome,
   "onboarding-tips": handleOnboardingTips,
   "onboarding-check-pro": handleOnboardingCheckPro,

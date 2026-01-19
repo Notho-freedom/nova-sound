@@ -7,7 +7,7 @@ export const runtime = "edge";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, intervalSeconds = 3600 } = body ?? {};
+    const { userId, intervalSeconds = 3600, initialDelaySeconds = 5 } = body ?? {};
 
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
@@ -25,8 +25,11 @@ export async function POST(req: NextRequest) {
 
     await qstash.task.publishDelayed(
       "backup-snapshot",
-      { userId },
-      Math.max(60, Number(intervalSeconds))
+      {
+        userId,
+        intervalSeconds: Math.max(60, Number(intervalSeconds)),
+      },
+      Math.max(5, Number(initialDelaySeconds))
     );
 
     return NextResponse.json({ scheduled: true });

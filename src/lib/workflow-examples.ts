@@ -231,7 +231,6 @@ export async function* streamWorkflowProgress(workflowId: string) {
       break;
     }
 
-    // Wait 2 seconds before next check
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // No timer delay (use external scheduler if needed)
   }
 }

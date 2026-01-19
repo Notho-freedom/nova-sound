@@ -90,14 +90,11 @@ export async function verifyAuth(request: NextRequest): Promise<{ userId: string
 
     // Try to verify as access token
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const signal = AbortSignal.timeout(5000); // 5 second timeout
       
       const response = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`, {
-        signal: controller.signal,
+        signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (response.ok) {
         const userInfo = await response.json() as { id?: string; sub?: string; email?: string };
