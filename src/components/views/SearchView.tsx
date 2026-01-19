@@ -414,6 +414,10 @@ export const SearchView = ({
     return tracks.filter((t) => isFavorite(t.id)).map((t) => t.id)
   }, [tracks, isFavorite])
 
+  // Extract stable references to avoid infinite loops
+  const vectorSearchFn = vectorSearch.search
+  const vectorSearchAvailable = vectorSearch.isAvailable
+
   // Effect to search YouTube when query changes (with debounce)
   useEffect(() => {
     if (youtubeSearchTimerRef.current) {
@@ -422,8 +426,8 @@ export const SearchView = ({
 
     if (query.trim() && query.length >= 2) {
       // Trigger semantic search if enabled
-      if (useSemanticSearch && vectorSearch.isAvailable) {
-        vectorSearch.search(query)
+      if (useSemanticSearch && vectorSearchAvailable) {
+        vectorSearchFn(query)
       }
       
       // Also trigger YouTube search
@@ -439,7 +443,7 @@ export const SearchView = ({
         clearTimeout(youtubeSearchTimerRef.current)
       }
     }
-  }, [query, searchYouTube, useSemanticSearch, vectorSearch])
+  }, [query, searchYouTube, useSemanticSearch, vectorSearchAvailable, vectorSearchFn])
 
   // Ref pour éviter les boucles infinies dans la conversion YouTube
   const lastYoutubeResultsKeyRef = useRef<string>("")
