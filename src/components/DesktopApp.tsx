@@ -21,18 +21,20 @@ import { UpdateNotification } from "./UpdateNotification";
 import { NexusFAB } from "./NexusFAB";
 import { lazy, Suspense } from "react";
 
-const lazyWithRetry = <T,>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lazyWithRetry = <T extends React.ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
   key: string
-) =>
+): React.LazyExoticComponent<T> =>
   lazy(() =>
-    factory().catch((error) => {
+    factory().catch((error): Promise<{ default: T }> => {
       if (typeof window !== "undefined") {
         const storageKey = `lazy-retry:${key}`;
         if (!sessionStorage.getItem(storageKey)) {
           sessionStorage.setItem(storageKey, "1");
           window.location.reload();
-          return new Promise<{ default: T }>(() => undefined);
+          // Return a never-resolving promise to prevent further rendering while reloading
+          return new Promise<{ default: T }>(() => {});
         }
       }
       throw error;
@@ -2045,8 +2047,8 @@ export const DesktopApp = () => {
     };
   }, [allTracks, recentTracks, playlists, favorites, history]);
 
-  // Calculer la vue actuelle avec useMemo pour éviter les problèmes de hooks
-  const currentViewContent = useMemo(() => {
+  // Render the current view without memoization to keep lifecycle stable
+  const renderViewContent = () => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
@@ -2094,15 +2096,15 @@ export const DesktopApp = () => {
           recentTracks={recentTracks}
           favoriteTracks={favoriteTracks}
           history={history}
-          onFilterByArtist={(artistName) => {
+          onFilterByArtist={(artistName: string) => {
             setSelectedArtist(artistName);
             setCurrentView("artist-detail");
           }}
-          onNavigateToArtist={(artistName) => {
+          onNavigateToArtist={(artistName: string) => {
             setSelectedArtist(artistName);
             setCurrentView("artist-detail");
           }}
-          onNavigateToAlbum={(albumName, artistName) => {
+          onNavigateToAlbum={(albumName: string, artistName: string) => {
             const albumKey = `${albumName}-${artistName}`;
             setAlbumToOpen(albumKey);
             setCurrentView("albums");
@@ -2627,55 +2629,7 @@ export const DesktopApp = () => {
           </div>
         );
     }
-  }, [
-    showInlinePlayer,
-    currentTrack,
-    isPlaying,
-    currentTime,
-    isShuffle,
-    repeatMode,
-    volume,
-    isMuted,
-    youtubeDuration,
-    currentView,
-    tracks,
-    currentTrackIndex,
-    libraryLoading,
-    recentTracks,
-    favoriteTracks,
-    history,
-    playlists,
-    recentlyAddedTracks,
-    albumToOpen,
-    selectedArtist,
-    audioRef.current,
-    isFavorite,
-    handleToggleFavorite,
-    handlePlayPause,
-    handlePrevious,
-    handleNext,
-    handleShuffle,
-    handleRepeat,
-    handleSeek,
-    handleVolumeChange,
-    handleShowPlayer,
-    handleTrackSelect,
-    handlePlayNext,
-    handleAddToQueue,
-    handleAddToPlaylist,
-    handlePlayTrackList,
-    handlePlayTracks,
-    handleShuffleTracks,
-    createPlaylist,
-    updatePlaylist,
-    deletePlaylist,
-    addTracksToPlaylist,
-    removeTracksFromPlaylist,
-    handlePlayTrack,
-    setSelectedArtist,
-    setCurrentView,
-    setAlbumToOpen,
-  ]);
+  };
 
   // Show loading screen
   if (isLoading) {
@@ -2699,6 +2653,9 @@ export const DesktopApp = () => {
       </div>
     </div>
   );
+
+  const viewKey = showInlinePlayer ? `player:${currentTrack?.id ?? "none"}` : currentView;
+  const viewContent = renderViewContent();
 
   return (
     <CoachmarkProvider autoStart={true}>
@@ -2811,17 +2768,17 @@ export const DesktopApp = () => {
             )}>
               <Suspense fallback={null}>
                 {showInlinePlayer ? (
-                  <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
-                    {currentViewContent}
+                  <div key={viewKey} className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
+                    {viewContent}
                   </div>
                 ) : currentView === "videos" ? (
-                  <div className="h-full w-full relative">
-                    {currentViewContent}
+                  <div key={viewKey} className="h-full w-full relative">
+                    {viewContent}
                   </div>
                 ) : (
                   <ScrollArea className="h-full w-full min-h-0">
-                    <div className="animate-in fade-in duration-200 min-h-0 w-full">
-                      {currentViewContent}
+                    <div key={viewKey} className="animate-in fade-in duration-200 min-h-0 w-full">
+                      {viewContent}
                     </div>
                   </ScrollArea>
                 )}

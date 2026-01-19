@@ -55,8 +55,8 @@ interface SimpleTooltipProps {
 }
 
 const SimpleTooltip = React.memo(
-  ({ content, children, side = "top", className }: SimpleTooltipProps) => (
-    <Tooltip>
+  ({ content, children, side = "top", delayDuration = 300, className }: SimpleTooltipProps) => (
+    <Tooltip delayDuration={delayDuration}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side={side} className={className}>
         {content}
