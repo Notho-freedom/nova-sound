@@ -174,6 +174,82 @@ export const handleDailyCleanup: TaskHandler = async (payload, meta) => {
 };
 
 /**
+ * Handler: stats-aggregation
+ * Aggregate metrics or analytics on schedule
+ */
+export const handleStatsAggregation: TaskHandler = async () => {
+  // TODO: Implement aggregation (analytics, cache warmup, etc.)
+  return {
+    aggregated: true,
+    timestamp: Date.now(),
+  };
+};
+
+/**
+ * Handler: backup-snapshot
+ * Create a periodic backup from the latest Upstash snapshot
+ */
+export const handleBackupSnapshot: TaskHandler = async (payload, meta) => {
+  const { userId } = payload;
+
+  if (typeof userId !== "string" || !userId) {
+    return { ok: false, error: "Missing userId" };
+  }
+
+  const { redis } = await import("@/lib/redis");
+  const { qstash } = await import("@/lib/qstash-helpers");
+
+  const lockKey = `backup:${userId}:loop`;
+  await redis.set(lockKey, String(meta.id), { ex: 7200 });
+
+  const latestKey = `backup:${userId}:latest`;
+  const latestRaw = await redis.get(latestKey);
+
+  if (!latestRaw) {
+    // Reschedule and exit if nothing to snapshot yet
+    await qstash.task.publishDelayed("backup-snapshot", { userId }, 3600);
+    return { ok: true, skipped: true };
+  }
+
+  const latest = JSON.parse(latestRaw as string);
+  const timestamp = Date.now();
+  const backupId = `backup_appdata_${timestamp}`;
+
+  const backup = {
+    ...latest,
+    id: backupId,
+    backupCreatedAt: new Date(timestamp).toISOString(),
+    backupTimestamp: timestamp,
+  };
+
+  const indexKey = `backup:${userId}:index`;
+  const itemKey = `backup:${userId}:item:${backupId}`;
+
+  await redis.setex(itemKey, 60 * 60 * 24 * 30, JSON.stringify(backup));
+  await redis.zadd(indexKey, { score: timestamp, member: backupId });
+
+  const count = await redis.zcard(indexKey);
+  if (count > 10) {
+    const excess = count - 10;
+    const oldIds = await redis.zrange(indexKey, 0, excess - 1);
+    if (oldIds.length > 0) {
+      await redis.zrem(indexKey, ...oldIds);
+      const oldKeys = oldIds.map((id) => `backup:${userId}:item:${String(id)}`);
+      await redis.del(...oldKeys);
+    }
+  }
+
+  // Reschedule next snapshot
+  await qstash.task.publishDelayed("backup-snapshot", { userId }, 3600);
+
+  return {
+    ok: true,
+    backupId,
+    timestamp,
+  };
+};
+
+/**
  * Handler: onboarding-welcome
  * Send welcome email (step 1 of onboarding workflow)
  */
@@ -319,6 +395,8 @@ export const TASK_HANDLERS: Record<string, TaskHandler> = {
   "email-send": handleEmailSend,
   "webhook-delivery": handleWebhookDelivery,
   "daily-cleanup": handleDailyCleanup,
+  "stats-aggregation": handleStatsAggregation,
+  "backup-snapshot": handleBackupSnapshot,
   "onboarding-welcome": handleOnboardingWelcome,
   "onboarding-tips": handleOnboardingTips,
   "onboarding-check-pro": handleOnboardingCheckPro,

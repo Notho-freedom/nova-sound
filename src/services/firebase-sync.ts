@@ -121,6 +121,15 @@ export interface UserAppData {
   version?: number;
 }
 
+type BackupEnvelope = {
+  id: string;
+  data: UserAppData;
+  playlists?: Playlist[];
+  backupCreatedAt: string;
+  backupTimestamp: number;
+  version?: number;
+};
+
 class FirebaseSyncService {
   private syncListeners: Map<string, () => void> = new Map();
   private isSyncing: boolean = false;
@@ -149,6 +158,12 @@ class FirebaseSyncService {
   private backupInterval: NodeJS.Timeout | null = null;
   private backupIntervalMs: number = 60 * 60 * 1000; // 1 heure
   private lastBackupDataHash: string | null = null;
+  private firestoreDisabled: boolean = false;
+  private upstashAvailable: boolean | null = null;
+  private upstashLastCheck: number = 0;
+  private upstashCheckTtlMs: number = 5 * 60 * 1000; // 5 minutes
+  private backupProvider: 'firestore' | 'upstash' = 'firestore';
+  private qstashBackupScheduled: boolean = false;
   
   async initializeSync(userId: string): Promise<void> {
     // Validate that userId is a Firebase Auth UID (28 characters, no @, no user_ prefix)
@@ -168,14 +183,23 @@ class FirebaseSyncService {
       // Try to wait for Firebase to be ready
       const firebase = await waitForFirebase();
       if (!firebase || !firebase.db) {
-        console.warn('⚠️ Firebase not available, sync disabled');
-        return;
-      }
-      // Retry getting Firestore instance after wait
-      const retryDb = getFirestoreInstance();
-      if (!retryDb) {
-        console.warn('⚠️ Firestore still not available after wait, sync disabled');
-        return;
+        const upstashOk = await this.isUpstashAvailable();
+        if (!upstashOk) {
+          console.warn('⚠️ Firebase not available and Upstash backup not available, sync disabled');
+          return;
+        }
+        console.warn('⚠️ Firebase not available, using Upstash backup only');
+      } else {
+        // Retry getting Firestore instance after wait
+        const retryDb = getFirestoreInstance();
+        if (!retryDb) {
+          const upstashOk = await this.isUpstashAvailable();
+          if (!upstashOk) {
+            console.warn('⚠️ Firestore still not available after wait, sync disabled');
+            return;
+          }
+          console.warn('⚠️ Firestore still not available, using Upstash backup only');
+        }
       }
     }
 
@@ -203,6 +227,7 @@ class FirebaseSyncService {
       this.cleanup();
 
       this.currentUserId = userId;
+      this.backupProvider = await this.resolveBackupProvider();
       
       // Différer la migration pour ne pas bloquer l'initialisation
       // (opération non-critique qui peut être faite en arrière-plan)
@@ -217,15 +242,15 @@ class FirebaseSyncService {
       
       // NOUVEAU SYSTÈME: Charger les données depuis Firebase une seule fois au login
       // Les listeners temps réel sont désactivés pour éviter d'écraser les changements locaux
-      console.log('🔄 Initial load: Fetching backup from Firebase...');
-      await this.loadInitialDataFromFirebase(userId);
+      console.log('🔄 Initial load: Fetching backup data...');
+      await this.loadInitialDataFromBackup(userId);
       
       // Différer la synchronisation périodique
       // Cette opération synchronise Local → Firebase
       const deferredInit = async () => {
         try {
           // Sauvegarder les données locales vers Firebase comme backup
-          console.log('💾 Syncing local data to Firebase as backup...');
+          console.log(`💾 Syncing local data to ${this.backupProvider === 'upstash' ? 'Upstash' : 'Firebase'} as backup...`);
           await this.saveToFirestore(userId);
           
           // Calculate initial hash for change detection
@@ -272,12 +297,94 @@ class FirebaseSyncService {
     }
   }
 
+  private async resolveBackupProvider(): Promise<'firestore' | 'upstash'> {
+    const upstashOk = await this.isUpstashAvailable();
+    if (upstashOk) return 'upstash';
+
+    const db = getFirestoreInstance();
+    if (db && !this.firestoreDisabled) return 'firestore';
+
+    return 'upstash';
+  }
+
+  private async isUpstashAvailable(): Promise<boolean> {
+    const now = Date.now();
+    if (this.upstashAvailable !== null && now - this.upstashLastCheck < this.upstashCheckTtlMs) {
+      return this.upstashAvailable;
+    }
+
+    try {
+      const res = await this.fetchBackupApi<{ status: string }>(`/api/health/redis`);
+      this.upstashAvailable = !!res && res.status === 'ok';
+    } catch {
+      this.upstashAvailable = false;
+    } finally {
+      this.upstashLastCheck = now;
+    }
+
+    return this.upstashAvailable;
+  }
+
+  private async fetchBackupApi<T>(url: string, init?: RequestInit, timeoutMs: number = 8000): Promise<T | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal, cache: 'no-store' });
+      if (!res.ok) return null;
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private shouldUseQStashScheduler(): boolean {
+    if (typeof window === 'undefined') return false;
+    const host = window.location?.hostname || '';
+    return host !== 'localhost' && host !== '127.0.0.1' && host !== '::1';
+  }
+
+  private async scheduleBackupLoop(userId: string): Promise<boolean> {
+    if (!this.shouldUseQStashScheduler()) return false;
+
+    try {
+      const res = await this.fetchBackupApi<{ scheduled: boolean }>(`/api/qstash/schedule-backup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          intervalSeconds: Math.max(60, Math.floor(this.backupIntervalMs / 1000)),
+        }),
+      }, 8000);
+
+      return !!res?.scheduled;
+    } catch {
+      return false;
+    }
+  }
+
   // Load all user data from Firestore (silent mode - minimal logs)
   // Made public for external access (settings, theme, notifications hooks)
   async loadFromFirestore(userId?: string): Promise<UserAppData | null> {
-    const db = getFirestoreInstance();
     const targetUserId = userId || this.currentUserId;
-    if (!db || !targetUserId) return null;
+    if (!targetUserId) return null;
+
+    this.backupProvider = await this.resolveBackupProvider();
+    if (this.backupProvider === 'upstash') {
+      const backup = await this.loadLatestFromUpstash(targetUserId);
+      if (backup?.data) {
+        await this.mergeWithLocal(backup.data);
+        if (backup.playlists && backup.playlists.length > 0) {
+          await this.mergePlaylistsWithLocal(backup.playlists);
+        }
+        return backup.data;
+      }
+    }
+
+    const db = getFirestoreInstance();
+    if (!db) return null;
     
     try {
       const userDataRef = doc(db, 'users', targetUserId, 'appData', 'data');
@@ -296,12 +403,114 @@ class FirebaseSyncService {
         return null;
       }
     } catch (error: any) {
+      if (error?.code === 'resource-exhausted') {
+        this.firestoreDisabled = true;
+        this.backupProvider = await this.resolveBackupProvider();
+        return null;
+      }
       // Only log actual errors
       if (error.code !== 'unavailable' && error.code !== 'cancelled') {
         console.error('Error loading from Firestore:', error);
       }
       return null;
     }
+  }
+
+  private async loadInitialDataFromBackup(userId: string): Promise<void> {
+    this.backupProvider = await this.resolveBackupProvider();
+
+    if (this.backupProvider === 'upstash') {
+      const backup = await this.loadLatestFromUpstash(userId);
+      if (backup?.data) {
+        this.isSyncing = true;
+        try {
+          console.log('📥 Initial load: Found backup data in Upstash');
+          await this.mergeFirebaseWithLocal(backup.data);
+          if (backup.playlists && backup.playlists.length > 0) {
+            await this.mergePlaylistsWithLocal(backup.playlists);
+          }
+
+          this.initialLoadComplete = true;
+          console.log('✅ Initial load complete. Local is now source of truth.');
+          this.startAutomaticBackup(userId);
+          return;
+        } finally {
+          this.isSyncing = false;
+        }
+      }
+
+      // No Upstash backup yet → attempt Firestore once for migration
+      if (!this.firestoreDisabled && getFirestoreInstance()) {
+        await this.loadInitialDataFromFirebase(userId);
+        const payload = this.getUpstashBackupPayload();
+        await this.saveToUpstashLatest(userId, payload);
+        await this.createUpstashBackup(userId, payload);
+        return;
+      }
+
+      // No remote backup available, keep local as source of truth
+      this.initialLoadComplete = true;
+      console.log('✅ Initial load complete. Local is now source of truth.');
+      this.startAutomaticBackup(userId);
+      return;
+    }
+
+    // Fallback to Firebase if Upstash unavailable
+    await this.loadInitialDataFromFirebase(userId);
+  }
+
+  private getUpstashBackupPayload(): { data: UserAppData; playlists?: Playlist[] } {
+    const data = this.getCurrentLocalData() as UserAppData;
+    const playlists = this.loadFromLocalStorage<Playlist[]>('nexus-playlists') || [];
+    return { data, playlists };
+  }
+
+  private async loadLatestFromUpstash(userId: string): Promise<BackupEnvelope | null> {
+    const res = await this.fetchBackupApi<{ backup: BackupEnvelope | null }>(
+      `/api/backup?userId=${encodeURIComponent(userId)}`
+    );
+    return res?.backup ?? null;
+  }
+
+  private async createUpstashBackup(userId: string, payload: { data: UserAppData; playlists?: Playlist[] }): Promise<string | null> {
+    const res = await this.fetchBackupApi<{ success: boolean; backupId?: string }>(`/api/backup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        data: payload.data,
+        playlists: payload.playlists,
+        mode: 'backup',
+      }),
+    });
+    return res?.backupId ?? null;
+  }
+
+  private async saveToUpstashLatest(userId: string, payload: { data: UserAppData; playlists?: Playlist[] }): Promise<void> {
+    await this.fetchBackupApi<{ success: boolean }>(`/api/backup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        data: payload.data,
+        playlists: payload.playlists,
+        mode: 'latest',
+      }),
+    });
+  }
+
+  private async listUpstashBackups(userId: string): Promise<Array<{ id: string; timestamp: number; date: string }>> {
+    const res = await this.fetchBackupApi<{ backups: Array<{ id: string; timestamp: number; date: string }> }>(
+      `/api/backup?userId=${encodeURIComponent(userId)}&list=1`
+    );
+    return res?.backups ?? [];
+  }
+
+  private async restoreUpstashBackup(userId: string, backupId: string): Promise<BackupEnvelope | null> {
+    const res = await this.fetchBackupApi<{ backup: BackupEnvelope | null }>(
+      `/api/backup?userId=${encodeURIComponent(userId)}&backupId=${encodeURIComponent(backupId)}`
+    );
+    return res?.backup ?? null;
   }
 
   // Chargement initial des données depuis Firebase (backup/restore au login uniquement)
@@ -350,8 +559,13 @@ class FirebaseSyncService {
       // Démarrer le système de backup automatique
       this.startAutomaticBackup(userId);
       
-    } catch (error) {
-      console.error('Error loading initial data from Firebase:', error);
+    } catch (error: any) {
+      if (error?.code === 'resource-exhausted') {
+        this.firestoreDisabled = true;
+        console.warn('⚠️ Firestore quota exceeded during initial load, switching to Upstash backup');
+      } else {
+        console.error('Error loading initial data from Firebase:', error);
+      }
     } finally {
       this.isSyncing = false;
     }
@@ -364,28 +578,40 @@ class FirebaseSyncService {
       clearInterval(this.backupInterval);
     }
     
-    console.log('🕐 Starting automatic backup system (every 1 hour if data changed)');
+    console.log(`🕐 Starting automatic backup system (every 1 hour if data changed) [${this.backupProvider}]`);
     
     // Créer un backup initial
     setTimeout(() => {
       this.createBackupIfNeeded(userId);
     }, 5000); // Premier backup après 5 secondes
-    
-    // Backup périodique
-    this.backupInterval = setInterval(async () => {
-      await this.createBackupIfNeeded(userId);
-    }, this.backupIntervalMs);
+
+    // Backup périodique via QStash (production) avec fallback local
+    if (!this.qstashBackupScheduled) {
+      this.scheduleBackupLoop(userId).then((scheduled) => {
+        if (scheduled) {
+          this.qstashBackupScheduled = true;
+          return;
+        }
+
+        // Fallback local interval (dev/offline)
+        this.backupInterval = setInterval(async () => {
+          await this.createBackupIfNeeded(userId);
+        }, this.backupIntervalMs);
+      });
+    }
   }
 
   // Créer un backup uniquement si les données ont changé
   private async createBackupIfNeeded(userId: string): Promise<void> {
+    this.backupProvider = await this.resolveBackupProvider();
     const db = getFirestoreInstance();
-    if (!db) return;
+    if (this.backupProvider === 'firestore' && !db) return;
     
     try {
       // Récupérer les données actuelles
       const currentData = await this.getCurrentLocalData();
-      const currentHash = this.calculateDataHash(currentData);
+      const playlists = this.loadFromLocalStorage<Playlist[]>('nexus-playlists') || [];
+      const currentHash = this.calculateBackupHash(currentData, playlists);
       
       // Vérifier si les données ont changé depuis le dernier backup
       if (currentHash === this.lastBackupDataHash) {
@@ -396,30 +622,50 @@ class FirebaseSyncService {
       // Créer le backup avec timestamp
       const timestamp = Date.now();
       const backupId = `backup_appdata_${timestamp}`;
+
+      let upstashBackupId: string | null = null;
+      let backupSaved = false;
+      if (this.backupProvider === 'upstash') {
+        upstashBackupId = await this.createUpstashBackup(userId, { data: currentData as UserAppData, playlists });
+        backupSaved = !!upstashBackupId;
+      } else {
+        const backupRef = doc(db!, 'users', userId, 'backups', backupId);
+        await setDoc(backupRef, {
+          ...currentData,
+          backupCreatedAt: new Date().toISOString(),
+          backupTimestamp: timestamp,
+          version: currentData.version || 1
+        });
+
+        // Nettoyer les vieux backups (garder seulement les 10 derniers)
+        await this.cleanupOldBackups(userId);
+        backupSaved = true;
+      }
+
+      if (backupSaved) {
+        this.lastBackupDataHash = currentHash;
+        this.lastBackupTime = timestamp;
+        console.log(`💾 Backup created: ${upstashBackupId || backupId}`);
+      } else {
+        console.warn('⚠️ Backup not saved (Upstash unavailable)');
+      }
       
-      const backupRef = doc(db, 'users', userId, 'backups', backupId);
-      await setDoc(backupRef, {
-        ...currentData,
-        backupCreatedAt: new Date().toISOString(),
-        backupTimestamp: timestamp,
-        version: currentData.version || 1
-      });
-      
-      this.lastBackupDataHash = currentHash;
-      this.lastBackupTime = timestamp;
-      
-      console.log(`💾 Backup created: ${backupId}`);
-      
-      // Nettoyer les vieux backups (garder seulement les 10 derniers)
-      await this.cleanupOldBackups(userId);
-      
-    } catch (error) {
-      console.error('Error creating backup:', error);
+    } catch (error: any) {
+      if (error?.code === 'resource-exhausted') {
+        this.firestoreDisabled = true;
+        console.warn('⚠️ Firestore quota exceeded during backup, switching to Upstash backup');
+      } else {
+        console.error('Error creating backup:', error);
+      }
     }
   }
 
   // Nettoyer les anciens backups (garder les 10 plus récents)
   private async cleanupOldBackups(userId: string): Promise<void> {
+    if (this.backupProvider === 'upstash') {
+      // Upstash cleanup handled server-side during backup creation
+      return;
+    }
     const db = getFirestoreInstance();
     if (!db) return;
     
@@ -452,20 +698,33 @@ class FirebaseSyncService {
 
   // Restaurer depuis un backup spécifique
   async restoreFromBackup(userId: string, backupId: string): Promise<boolean> {
+    this.backupProvider = await this.resolveBackupProvider();
     const db = getFirestoreInstance();
-    if (!db) return false;
+    if (this.backupProvider === 'firestore' && !db) return false;
     
     try {
-      const backupRef = doc(db, 'users', userId, 'backups', backupId);
-      const backupSnap = await getDoc(backupRef);
-      
-      if (!backupSnap.exists()) {
-        console.error('Backup not found:', backupId);
-        return false;
+      if (this.backupProvider === 'upstash') {
+        const backup = await this.restoreUpstashBackup(userId, backupId);
+        if (!backup?.data) {
+          console.error('Backup not found:', backupId);
+          return false;
+        }
+        await this.mergeFirebaseWithLocal(backup.data);
+        if (backup.playlists && backup.playlists.length > 0) {
+          await this.mergePlaylistsWithLocal(backup.playlists);
+        }
+      } else {
+        const backupRef = doc(db!, 'users', userId, 'backups', backupId);
+        const backupSnap = await getDoc(backupRef);
+
+        if (!backupSnap.exists()) {
+          console.error('Backup not found:', backupId);
+          return false;
+        }
+
+        const backupData = backupSnap.data() as UserAppData;
+        await this.mergeFirebaseWithLocal(backupData);
       }
-      
-      const backupData = backupSnap.data() as UserAppData;
-      await this.mergeFirebaseWithLocal(backupData);
       
       console.log(`✅ Restored from backup: ${backupId}`);
       return true;
@@ -477,11 +736,16 @@ class FirebaseSyncService {
 
   // Lister les backups disponibles
   async listBackups(userId: string): Promise<Array<{ id: string; timestamp: number; date: string }>> {
+    this.backupProvider = await this.resolveBackupProvider();
     const db = getFirestoreInstance();
-    if (!db) return [];
+    if (this.backupProvider === 'firestore' && !db) return [];
     
     try {
-      const backupsRef = collection(db, 'users', userId, 'backups');
+      if (this.backupProvider === 'upstash') {
+        return await this.listUpstashBackups(userId);
+      }
+
+      const backupsRef = collection(db!, 'users', userId, 'backups');
       const backupsSnap = await getDocs(backupsRef);
       
       return backupsSnap.docs
@@ -544,7 +808,7 @@ class FirebaseSyncService {
   // Merger intelligemment les données Firebase avec le local
   // RÈGLE: Comparaison intelligente pour chaque champ
   private async mergeFirebaseWithLocal(firebaseData: UserAppData): Promise<void> {
-    console.log('🔄 Intelligent merge: Comparing Firebase backup with local data...');
+    console.log('🔄 Intelligent merge: Comparing remote backup with local data...');
     
     const localData = await this.getCurrentLocalData();
     let changesApplied = 0;
@@ -552,7 +816,7 @@ class FirebaseSyncService {
     // Settings
     const settingsAction = this.intelligentCompare(localData.settings, firebaseData.settings, 'object');
     if (settingsAction === 'use-firebase') {
-      console.log('📥 Settings: Local empty → Restoring from Firebase');
+      console.log('📥 Settings: Local empty → Restoring from backup');
       this.saveToLocalStorage('nexus-settings', firebaseData.settings);
       changesApplied++;
     } else if (settingsAction === 'no-change') {
@@ -564,7 +828,7 @@ class FirebaseSyncService {
     // Favorites (merge = union)
     const favoritesAction = this.intelligentCompare(localData.favorites, firebaseData.favorites, 'array');
     if (favoritesAction === 'use-firebase') {
-      console.log('📥 Favorites: Local empty → Restoring from Firebase');
+      console.log('📥 Favorites: Local empty → Restoring from backup');
       this.saveToLocalStorage('nexus-favorites', firebaseData.favorites);
       window.dispatchEvent(new CustomEvent('favorites-updated'));
       changesApplied++;
@@ -573,7 +837,7 @@ class FirebaseSyncService {
       const firebaseFavorites = firebaseData.favorites || [];
       const merged = [...new Set([...localFavorites, ...firebaseFavorites])];
       if (merged.length > localFavorites.length) {
-        console.log(`📥 Favorites: Merging ${localFavorites.length} local + ${firebaseFavorites.length} Firebase = ${merged.length} total`);
+        console.log(`📥 Favorites: Merging ${localFavorites.length} local + ${firebaseFavorites.length} backup = ${merged.length} total`);
         this.saveToLocalStorage('nexus-favorites', merged);
         window.dispatchEvent(new CustomEvent('favorites-updated'));
         changesApplied++;
@@ -585,7 +849,7 @@ class FirebaseSyncService {
     // History (merge = union intelligent avec préservation des playCount les plus élevés)
     const historyAction = this.intelligentCompare(localData.history, firebaseData.history, 'array');
     if (historyAction === 'use-firebase') {
-      console.log(`📥 History: Local empty → Restoring ${firebaseData.history?.length || 0} entries from Firebase`);
+      console.log(`📥 History: Local empty → Restoring ${firebaseData.history?.length || 0} entries from backup`);
       this.saveToLocalStorage('nexus-play-history', firebaseData.history);
       window.dispatchEvent(new CustomEvent('firebase-history-update', { detail: { history: firebaseData.history } }));
       changesApplied++;
@@ -627,7 +891,7 @@ class FirebaseSyncService {
         .slice(0, 1000); // Max 1000 entrées
       
       if (mergedArray.length > localHistory.length) {
-        console.log(`📥 History: Merging ${localHistory.length} local + ${firebaseHistory.length} Firebase = ${mergedArray.length} total`);
+        console.log(`📥 History: Merging ${localHistory.length} local + ${firebaseHistory.length} backup = ${mergedArray.length} total`);
         this.saveToLocalStorage('nexus-play-history', mergedArray);
         window.dispatchEvent(new CustomEvent('firebase-history-update', { detail: { history: mergedArray } }));
         changesApplied++;
@@ -644,7 +908,7 @@ class FirebaseSyncService {
     // Cloudinary Config
     const cloudinaryAction = this.intelligentCompare(localData.cloudinaryConfig, firebaseData.cloudinaryConfig, 'object');
     if (cloudinaryAction === 'use-firebase') {
-      console.log('📥 Cloudinary: Local empty → Restoring from Firebase');
+      console.log('📥 Cloudinary: Local empty → Restoring from backup');
       this.saveToLocalStorage('nexus-cloudinary-config', firebaseData.cloudinaryConfig);
       changesApplied++;
     } else if (cloudinaryAction === 'no-change') {
@@ -656,7 +920,7 @@ class FirebaseSyncService {
     // Equalizer Presets
     const equalizerAction = this.intelligentCompare(localData.equalizerPresets, firebaseData.equalizerPresets, 'array');
     if (equalizerAction === 'use-firebase') {
-      console.log('📥 Equalizer: Local empty → Restoring from Firebase');
+      console.log('📥 Equalizer: Local empty → Restoring from backup');
       this.saveToLocalStorage('nexus-equalizer-presets', firebaseData.equalizerPresets);
       changesApplied++;
     } else {
@@ -666,7 +930,7 @@ class FirebaseSyncService {
     // Uploaded Media
     const mediaAction = this.intelligentCompare(localData.uploadedMedia, firebaseData.uploadedMedia, 'array');
     if (mediaAction === 'use-firebase') {
-      console.log('📥 Uploaded Media: Local empty → Restoring from Firebase');
+      console.log('📥 Uploaded Media: Local empty → Restoring from backup');
       if (this.currentUserId) {
         const storageKey = getUserStorageKeySync('nexus-uploaded-media', this.currentUserId);
         this.saveToLocalStorage(storageKey, firebaseData.uploadedMedia);
@@ -674,7 +938,7 @@ class FirebaseSyncService {
       changesApplied++;
     }
     
-    console.log(`✅ Intelligent merge complete: ${changesApplied} changes applied from Firebase backup.`);
+    console.log(`✅ Intelligent merge complete: ${changesApplied} changes applied from backup.`);
   }
 
   // Merger les playlists Firebase avec le local
@@ -708,6 +972,11 @@ class FirebaseSyncService {
     if (!this.realtimeListenersEnabled) {
       console.log('ℹ️ Real-time listeners DISABLED. Local is source of truth.');
       console.log('💾 Sync direction: Local → Firebase (backup mode)');
+      return;
+    }
+
+    if (this.firestoreDisabled) {
+      console.warn('⚠️ Firestore disabled (quota), skipping realtime listeners');
       return;
     }
     
@@ -1019,11 +1288,11 @@ class FirebaseSyncService {
     }
   }
 
-  // Save data to Firestore (only if changed)
+  // Save data to remote backup (Upstash or Firestore) (only if changed)
   async saveToFirestore(userId: string, data?: Partial<UserAppData>): Promise<void> {
     const db = getFirestoreInstance();
-    if (!db || !userId) {
-      console.warn('Cannot save to Firestore: no user ID or Firestore not initialized');
+    if (!userId) {
+      console.warn('Cannot save to remote backup: no user ID');
       return;
     }
 
@@ -1053,8 +1322,6 @@ class FirebaseSyncService {
     }
 
     try {
-      const userDataRef = doc(db, 'users', userId, 'appData', 'data');
-      
       // Merge with provided data
       const dataToSave: UserAppData = {
         ...mergedData,
@@ -1062,7 +1329,19 @@ class FirebaseSyncService {
         version: (currentData.version || 0) + 1,
       };
 
-      await setDoc(userDataRef, dataToSave, { merge: true });
+      this.backupProvider = await this.resolveBackupProvider();
+      if (this.backupProvider === 'upstash') {
+        const payload = this.getUpstashBackupPayload();
+        payload.data = dataToSave;
+        await this.saveToUpstashLatest(userId, payload);
+      } else {
+        if (!db) {
+          console.warn('Cannot save to Firestore: Firestore not initialized');
+          return;
+        }
+        const userDataRef = doc(db, 'users', userId, 'appData', 'data');
+        await setDoc(userDataRef, dataToSave, { merge: true });
+      }
       
       // Update hash after successful sync
       this.lastSyncedDataHash = newHash;
@@ -1074,8 +1353,21 @@ class FirebaseSyncService {
       }
       
       // Silent sync - no console logs for normal operations
-    } catch (error) {
-      console.error('Error saving to Firestore:', error);
+    } catch (error: any) {
+      if (error?.code === 'resource-exhausted') {
+        console.warn('⚠️ Firestore quota exceeded, switching to Upstash backup');
+        this.firestoreDisabled = true;
+        this.backupProvider = await this.resolveBackupProvider();
+        try {
+          const payload = this.getUpstashBackupPayload();
+          payload.data = { ...mergedData, lastSyncAt: new Date().toISOString(), version: (currentData.version || 0) + 1 };
+          await this.saveToUpstashLatest(userId, payload);
+        } catch (upstashError) {
+          console.error('Error saving to Upstash after Firestore quota exceeded:', upstashError);
+        }
+      } else {
+        console.error('Error saving to remote backup:', error);
+      }
       // Mark as pending for retry
       if (data) {
         Object.keys(data).forEach(key => this.pendingChanges.add(key));
@@ -1294,8 +1586,19 @@ class FirebaseSyncService {
       scrobblerSettings: data.scrobblerSettings,
     };
     
-    // Simple hash using JSON stringify (for change detection)
-    const str = JSON.stringify(hashableData);
+    return this.hashString(JSON.stringify(hashableData));
+  }
+
+  private calculateBackupHash(data: Partial<UserAppData>, playlists: Playlist[]): string {
+    const playlistSignature = playlists
+      .map(p => `${p.id}:${p.trackIds?.length ?? 0}`)
+      .slice(0, 200)
+      .join('|');
+
+    return this.hashString(`${this.calculateDataHash(data)}|${playlistSignature}`);
+  }
+
+  private hashString(str: string): string {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
@@ -1307,6 +1610,11 @@ class FirebaseSyncService {
 
   // Start periodic sync (every hour)
   private startPeriodicSync(userId: string): void {
+    if (this.shouldUseQStashScheduler()) {
+      console.log('🔄 Periodic sync handled via QStash scheduler');
+      return;
+    }
+
     // Clear existing interval if any
     if (this.periodicSyncInterval) {
       clearInterval(this.periodicSyncInterval);

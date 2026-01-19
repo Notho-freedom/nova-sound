@@ -53,9 +53,25 @@ async function upstashFetch<T>(path: string, args: (string | number)[], signal?:
 
 /** XADD helper (streams). */
 export async function upstashXAdd(stream: string, args: (string | number)[], signal?: AbortSignal) {
-  // For XADD with REST API: /xadd/{stream} with args array (no stream name in args)
   // Args format: ["*", "field1", "value1", "field2", "value2", ...]
-  return upstashFetch<string>(`xadd/${encodeURIComponent(stream)}`, args, signal)
+  // Note: Some Upstash deployments expect stream name in args (POST /xadd),
+  // while others accept /xadd/{stream}. We try both for compatibility.
+  const filteredArgs = args.filter((arg) => arg !== undefined && arg !== null)
+  if (filteredArgs.length < 3 || filteredArgs.length % 2 === 0) {
+    throw new Error(`Invalid XADD args length (${filteredArgs.length}). Expected odd length >= 3.`)
+  }
+
+  try {
+    // Preferred: /xadd with stream in args (most compatible)
+    return await upstashFetch<string>("xadd", [stream, ...filteredArgs], signal)
+  } catch (error: any) {
+    const message = String(error?.message || "")
+    if (message.includes("xadd") || message.includes("wrong number of arguments")) {
+      // Fallback: /xadd/{stream}
+      return await upstashFetch<string>(`xadd/${encodeURIComponent(stream)}`, filteredArgs, signal)
+    }
+    throw error
+  }
 }
 
 /** XGROUP CREATE helper. */

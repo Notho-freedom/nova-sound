@@ -11,6 +11,8 @@ import { extractYouTubeVideoId } from './youtube';
 import { cacheYouTubeTrack, getCachedYouTubeTrackByVideoId } from './youtube-track-cache';
 import { YouTube, type YouTubeVideo } from '@/services/youtube';
 import { youtubeSearch } from '@/services/youtube/search';
+import { workflows, workflowConfig } from '@/lib/workflow';
+import { getCurrentUserId } from '@/lib/storage-utils';
 
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG_YOUTUBE_RECOVERY === 'true';
 
@@ -20,6 +22,8 @@ const recoveryInProgress = new Set<string>();
 // Queue pour les récupérations en attente (évite de surcharger l'API)
 const recoveryQueue: string[] = [];
 let isProcessingQueue = false;
+const workflowScheduled = new Map<string, number>();
+const WORKFLOW_SCHEDULE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Tente de récupérer un track YouTube manquant à partir de son ID
@@ -257,6 +261,7 @@ export function queueTrackRecovery(trackIds: string[]): void {
     if (!isYouTubeTrackId(id)) return false;
     if (recoveryInProgress.has(id)) return false;
     if (recoveryQueue.includes(id)) return false; // Éviter les doublons dans la queue
+    if (isWorkflowScheduled(id)) return false;
     
     // Vérifier si le track n'est pas déjà en cache
     const videoId = extractVideoIdFromTrackId(id);
@@ -272,6 +277,12 @@ export function queueTrackRecovery(trackIds: string[]): void {
   });
   
   if (youtubeTrackIds.length === 0) return;
+
+  if (shouldUseWorkflowOrchestration()) {
+    markWorkflowScheduled(youtubeTrackIds);
+    void enqueueRecoveryWorkflow(youtubeTrackIds);
+    return;
+  }
   
   // Ajouter à la queue (sans doublons)
   recoveryQueue.push(...youtubeTrackIds);
@@ -284,6 +295,64 @@ export function queueTrackRecovery(trackIds: string[]): void {
   if (!isProcessingQueue) {
     processRecoveryQueue();
   }
+}
+
+async function enqueueRecoveryWorkflow(trackIds: string[]): Promise<void> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      clearWorkflowScheduled(trackIds);
+      // Fallback to local queue if no user ID
+      recoveryQueue.push(...trackIds);
+      if (!isProcessingQueue) {
+        processRecoveryQueue();
+      }
+      return;
+    }
+
+    const batchSize = 10;
+    for (let i = 0; i < trackIds.length; i += batchSize) {
+      const batch = trackIds.slice(i, i + batchSize);
+      await workflows.startYouTubeRecovery({
+        trackIds: batch,
+        userId,
+        priority: "normal",
+      });
+    }
+  } catch (error) {
+    console.warn('[YouTubeRecovery] Workflow scheduling failed, falling back to local queue', error);
+    clearWorkflowScheduled(trackIds);
+    recoveryQueue.push(...trackIds);
+    if (!isProcessingQueue) {
+      processRecoveryQueue();
+    }
+  }
+}
+
+function shouldUseWorkflowOrchestration(): boolean {
+  if (!workflowConfig.enabled) return false;
+  const baseUrl = workflowConfig.baseUrl || '';
+  const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('::1');
+  return !isLocalhost;
+}
+
+function isWorkflowScheduled(trackId: string): boolean {
+  const ts = workflowScheduled.get(trackId);
+  if (!ts) return false;
+  if (Date.now() - ts > WORKFLOW_SCHEDULE_TTL_MS) {
+    workflowScheduled.delete(trackId);
+    return false;
+  }
+  return true;
+}
+
+function markWorkflowScheduled(trackIds: string[]): void {
+  const now = Date.now();
+  trackIds.forEach(id => workflowScheduled.set(id, now));
+}
+
+function clearWorkflowScheduled(trackIds: string[]): void {
+  trackIds.forEach(id => workflowScheduled.delete(id));
 }
 
 /**

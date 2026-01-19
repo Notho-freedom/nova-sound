@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '../../auth/middleware';
+import { redis } from '@/lib/redis';
 
-// In-memory storage for sync status (in production, use a database)
-const syncStatusMap = new Map<string, {
+type SyncStatus = {
   lastSyncAt: string;
   tracksUploaded: number;
   tracksDownloaded: number;
   totalStorage: number;
-}>();
+};
+
+function syncStatusKey(userId: string): string {
+  return `sync:status:${userId}`;
+}
+
+async function getSyncStatus(userId: string): Promise<SyncStatus | null> {
+  try {
+    const raw = await redis.get(syncStatusKey(userId));
+    if (!raw) return null;
+    return JSON.parse(raw as string) as SyncStatus;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }
 
-    const status = syncStatusMap.get(auth.userId) || {
+    const status = (await getSyncStatus(auth.userId)) || {
       lastSyncAt: '',
       tracksUploaded: 0,
       tracksDownloaded: 0,
@@ -24,10 +38,10 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(status);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting sync status:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get sync status' },
+      { error: error instanceof Error ? error.message : 'Failed to get sync status' },
       { status: 500 }
     );
   }

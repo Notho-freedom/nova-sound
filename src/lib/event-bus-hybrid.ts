@@ -20,7 +20,7 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
-import { publishMessage } from "@/lib/qstash";
+import { publishMessage, qstashConfig } from "@/lib/qstash";
 import { upstashXAdd, assertUpstashConfig } from "@/lib/upstash";
 
 export type EventEnvelope<T = unknown> = {
@@ -132,9 +132,7 @@ export async function publishTask<T>(
       await publishToQStash(envelope, opts);
     } else {
       // Use Redis Streams (default for backward compatibility)
-      // Disabled in development due to XADD format issues
-      // Will be re-enabled once command format is fixed
-      // await publishToRedisStreams(envelope, opts);
+      await publishToRedisStreams(envelope, opts);
     }
     return envelope;
   } catch (error) {
@@ -147,22 +145,21 @@ export async function publishTask<T>(
  * Task type routing: Auto-select Redis Streams or QStash
  */
 export function shouldUseQStash(taskType: string): boolean {
-  const qstashTasks = [
-    // Critical tasks that need guaranteed delivery
-    "email-send",
-    "webhook-delivery",
-    "payment-process",
-    "subscription-update",
-    // Long-running tasks
-    "youtube-recovery",
-    "library-scan",
-    "file-import",
-    // Scheduled tasks
-    "daily-cleanup",
-    "stats-aggregation",
+  if (!qstashConfig.enabled) return false;
+
+  // Keep Redis Streams for real-time, low-latency internal events
+  const redisOnlyTasks = [
+    "notification",
+    "progress-update",
+    "live-event",
   ];
 
-  return qstashTasks.includes(taskType);
+  if (redisOnlyTasks.includes(taskType)) {
+    return false;
+  }
+
+  // Default to QStash for backend orchestration
+  return true;
 }
 
 /**
