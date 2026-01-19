@@ -21,17 +21,35 @@ import { UpdateNotification } from "./UpdateNotification";
 import { NexusFAB } from "./NexusFAB";
 import { lazy, Suspense } from "react";
 
+const lazyWithRetry = <T,>(
+  factory: () => Promise<{ default: T }>,
+  key: string
+) =>
+  lazy(() =>
+    factory().catch((error) => {
+      if (typeof window !== "undefined") {
+        const storageKey = `lazy-retry:${key}`;
+        if (!sessionStorage.getItem(storageKey)) {
+          sessionStorage.setItem(storageKey, "1");
+          window.location.reload();
+          return new Promise<{ default: T }>(() => undefined);
+        }
+      }
+      throw error;
+    })
+  );
+
 // Lazy load ALL heavy view components for better initial load
-const HomeView = lazy(() => import("./views/HomeView").then(m => ({ default: m.HomeView })));
-const SearchView = lazy(() => import("./views/SearchView").then(m => ({ default: m.SearchView })));
-const LibraryView = lazy(() => import("./views/LibraryView").then(m => ({ default: m.LibraryView })));
-const PlaylistView = lazy(() => import("./views/PlaylistView").then(m => ({ default: m.PlaylistView })));
-const SettingsView = lazy(() => import("./views/SettingsView").then(m => ({ default: m.SettingsView })));
-const NotificationsView = lazy(() => import("./views/NotificationsView").then(m => ({ default: m.NotificationsView })));
-const ArtistView = lazy(() => import("./views/ArtistView").then(m => ({ default: m.ArtistView })));
-const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
-const CloudView = lazy(() => import("./views/CloudView").then(m => ({ default: m.CloudView })));
-const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })));
+const HomeView = lazyWithRetry(() => import("./views/HomeView").then(m => ({ default: m.HomeView })), "HomeView");
+const SearchView = lazyWithRetry(() => import("./views/SearchView").then(m => ({ default: m.SearchView })), "SearchView");
+const LibraryView = lazyWithRetry(() => import("./views/LibraryView").then(m => ({ default: m.LibraryView })), "LibraryView");
+const PlaylistView = lazyWithRetry(() => import("./views/PlaylistView").then(m => ({ default: m.PlaylistView })), "PlaylistView");
+const SettingsView = lazyWithRetry(() => import("./views/SettingsView").then(m => ({ default: m.SettingsView })), "SettingsView");
+const NotificationsView = lazyWithRetry(() => import("./views/NotificationsView").then(m => ({ default: m.NotificationsView })), "NotificationsView");
+const ArtistView = lazyWithRetry(() => import("./views/ArtistView").then(m => ({ default: m.ArtistView })), "ArtistView");
+const VideosView = lazyWithRetry(() => import("./views/VideosView").then(m => ({ default: m.VideosView })), "VideosView");
+const CloudView = lazyWithRetry(() => import("./views/CloudView").then(m => ({ default: m.CloudView })), "CloudView");
+const AudioSensesView = lazyWithRetry(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })), "AudioSensesView");
 
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -2975,20 +2993,10 @@ export const DesktopApp = () => {
           <div 
             className={cn(
               "fixed inset-0",
-              isFullscreen ? "z-[9998] pointer-events-auto" : "pointer-events-none"
+              isFullscreen
+                ? "z-[9998] pointer-events-auto opacity-100 w-full h-full"
+                : "pointer-events-none z-[-1] opacity-0 w-px h-px overflow-hidden"
             )}
-            style={isFullscreen ? {
-              zIndex: 9998,
-              opacity: 1,
-              width: '100%',
-              height: '100%',
-            } : {
-              zIndex: -1,
-              opacity: 0,
-              width: '1px',
-              height: '1px',
-              overflow: 'hidden',
-            }}
           >
             <YouTubePlayer
               key={currentTrack?.id || 'yt-player'}

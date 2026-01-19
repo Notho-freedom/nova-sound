@@ -12,6 +12,26 @@ import { I18nProvider, useI18n } from "@/i18n";
 import { initIdb } from "@/lib/idb-cache";
 import "./globals.css";
 
+if (typeof window !== "undefined" && typeof performance !== "undefined" && typeof performance.measure === "function") {
+  const originalMeasure = performance.measure.bind(performance);
+  const safeMeasure = (...args: Parameters<Performance["measure"]>) => {
+    try {
+      return originalMeasure(...args);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotFoundError") {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("negative time stamp")) {
+        return;
+      }
+      throw error;
+    }
+  };
+
+  performance.measure = safeMeasure as Performance["measure"];
+}
+
 const queryClient = new QueryClient();
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -28,22 +48,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     const originalMeasure = performance.measure.bind(performance);
-    const safeMeasure = (...args: Parameters<Performance["measure"]>) => {
-      try {
-        return originalMeasure(...args);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "NotFoundError") {
-          return;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes("negative time stamp")) {
-          return;
-        }
-        throw error;
-      }
-    };
-
-    performance.measure = safeMeasure as Performance["measure"];
     return () => {
       performance.measure = originalMeasure as Performance["measure"];
     };
