@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import type { Track } from "@/types/music";
 
 type HistoryEntry = { trackId: string; playCount: number };
 
 type SearchAlbum = { name: string; artist: string; coverUrl?: string | null; count: number };
-
 type SearchArtist = { name: string; coverUrl?: string | null; count: number };
 
-type SearchResults = { tracks: Track[]; albums: SearchAlbum[]; artists: SearchArtist[] };
+type SearchResults = {
+  tracks: Track[];
+  albums: SearchAlbum[];
+  artists: SearchArtist[];
+};
 
 type DynamicData = {
   topArtists: Array<{ name: string; playCount: number; coverUrl?: string | null }>;
@@ -42,15 +45,19 @@ interface UseSearchWorkerResult {
 export function useSearchWorker(payload: SearchWorkerPayload): UseSearchWorkerResult {
   const workerRef = useRef<Worker | null>(null);
   const requestIdRef = useRef(0);
+  const lastPayloadKeyRef = useRef<string>("");
+
   const [computed, setComputed] = useState<SearchWorkerResult | null>(null);
   const [computing, setComputing] = useState(false);
 
-  const isBrowser = typeof window !== "undefined";
-
+  // Worker créé une seule fois
   useEffect(() => {
-    if (!isBrowser) return;
-    const worker = new Worker(new URL("../workers/search-worker.ts", import.meta.url), { type: "module" });
-    workerRef.current = worker;
+    if (typeof window === "undefined") return;
+
+    const worker = new Worker(
+      new URL("../workers/search-worker.ts", import.meta.url),
+      { type: "module" }
+    );
 
     worker.onmessage = (event: MessageEvent<{ id: number; result: SearchWorkerResult }>) => {
       if (event.data.id !== requestIdRef.current) return;
@@ -58,27 +65,57 @@ export function useSearchWorker(payload: SearchWorkerPayload): UseSearchWorkerRe
       setComputing(false);
     };
 
+    workerRef.current = worker;
+
     return () => {
       worker.terminate();
       workerRef.current = null;
     };
-  }, [isBrowser]);
+  }, []);
 
-  const stablePayload = useMemo(() => payload, [
-    payload.query,
-    payload.tracks,
-    payload.youtubeTracks,
-    payload.searchHistory,
-    payload.history,
-    payload.favoriteTrackIds,
-  ]);
+  // Clé STRICTEMENT primitive et stable
+  const payloadKey = useMemo(
+    () =>
+      [
+        payload.query,
+        payload.tracks.length,
+        payload.youtubeTracks.length,
+        payload.searchHistory.length,
+        payload.history.length,
+        payload.favoriteTrackIds.length,
+      ].join("|"),
+    [
+      payload.query,
+      payload.tracks.length,
+      payload.youtubeTracks.length,
+      payload.searchHistory.length,
+      payload.history.length,
+      payload.favoriteTrackIds.length,
+    ],
+  );
 
+  // Effet déclenché uniquement par payloadKey
   useEffect(() => {
     if (!workerRef.current) return;
+    if (payloadKey === lastPayloadKeyRef.current) return;
+
+    lastPayloadKeyRef.current = payloadKey;
     const id = ++requestIdRef.current;
+
     setComputing(true);
-    workerRef.current.postMessage({ id, payload: stablePayload });
-  }, [stablePayload]);
+
+    workerRef.current.postMessage({
+      id,
+      payload: {
+        query: payload.query,
+        tracks: payload.tracks,
+        youtubeTracks: payload.youtubeTracks,
+        searchHistory: payload.searchHistory,
+        history: payload.history,
+        favoriteTrackIds: payload.favoriteTrackIds,
+      },
+    });
+  }, [payloadKey]);
 
   return { computed, computing };
 }

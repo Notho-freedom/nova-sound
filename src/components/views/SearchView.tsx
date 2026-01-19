@@ -441,8 +441,19 @@ export const SearchView = ({
     }
   }, [query, searchYouTube, useSemanticSearch, vectorSearch])
 
-  // Convert YouTube results to tracks
+  // Ref pour éviter les boucles infinies dans la conversion YouTube
+  const lastYoutubeResultsKeyRef = useRef<string>("")
+
+  // Convert YouTube results to tracks - utilise une clé stable pour éviter les boucles
+  const youtubeResultsKey = useMemo(() => {
+    return youtubeResults.map(r => r.videoId).join("|")
+  }, [youtubeResults])
+
   useEffect(() => {
+    // Évite les re-renders inutiles si la clé n'a pas changé
+    if (youtubeResultsKey === lastYoutubeResultsKeyRef.current) return
+    lastYoutubeResultsKeyRef.current = youtubeResultsKey
+
     if (youtubeResults.length > 0) {
       const converted = youtubeResults
         .filter((result) => result.videoId && result.videoId !== "undefined" && result.videoId.trim() !== "")
@@ -451,7 +462,7 @@ export const SearchView = ({
     } else {
       setYoutubeTracks([])
     }
-  }, [youtubeResults])
+  }, [youtubeResultsKey, youtubeResults])
 
   const { computed } = useSearchWorker({
     query,

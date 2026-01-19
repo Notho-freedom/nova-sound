@@ -8,8 +8,8 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "next dev",
-    "dev:electron": "concurrently -k \"next dev\" \"npm run electron:dev\"",
+    "dev": "next dev --webpack",
+    "dev:electron": "concurrently -k \"next dev --webpack\" \"npm run electron:dev\"",
     "electron:dev": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron/services')) { New-Item -ItemType Directory -Path 'dist-electron/services' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\" && electron .",
     "build": "next build",
     "compile:electron": "tsc -p electron/tsconfig.json && powershell -Command \"if (-not (Test-Path 'dist-electron')) { New-Item -ItemType Directory -Path 'dist-electron' -Force }; Copy-Item -Path 'electron/preload.cjs' -Destination 'dist-electron/preload.cjs' -Force\"",
