@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
     }
 
     const lockKey = `backup:${userId}:loop`;
+    if (!redis) {
+      return NextResponse.json({ error: "Redis not configured" }, { status: 500 });
+    }
     const lock = await redis.set(lockKey, "scheduled", {
       ex: Math.max(Number(intervalSeconds) * 2, 7200),
       nx: true,

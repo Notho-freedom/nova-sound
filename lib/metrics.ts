@@ -12,6 +12,7 @@ const METRICS_UPDATED_KEY = "metrics:updatedAt";
 async function incrementRemote(key: CounterKey, by: number): Promise<void> {
   try {
     const { redis } = await import("@/lib/redis");
+    if (!redis) return;
     await redis.hincrby(METRICS_HASH_KEY, key, by);
     await redis.setex(METRICS_UPDATED_KEY, 60 * 60 * 24, new Date().toISOString());
   } catch {
@@ -45,6 +46,7 @@ export function getMetrics(): MetricsSnapshot {
 export async function getMetricsRemote(): Promise<MetricsSnapshot> {
   try {
     const { redis } = await import("@/lib/redis");
+    if (!redis) return getMetrics();
     const remote = await redis.hgetall<Record<string, number | string>>(METRICS_HASH_KEY);
     const updatedAt = (await redis.get(METRICS_UPDATED_KEY)) as string | null;
 

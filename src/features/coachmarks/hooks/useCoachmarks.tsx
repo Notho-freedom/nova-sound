@@ -124,7 +124,6 @@ export function CoachmarksDisplay({
       spotlightClicks={true}
       debug={DEBUG_COACHMARKS}
       floaterProps={{
-        disableAnimation: false,
         styles: {
           floater: {
             // Position fixed pour ne pas affecter le layout

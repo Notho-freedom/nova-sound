@@ -21,6 +21,10 @@ function rateLimitKey(identifier: string, windowMs: number): string {
 }
 
 async function incrementRateLimit(key: string, windowMs: number): Promise<{ count: number; resetTime: number }> {
+  if (!redis) {
+    // If redis is not available, allow all requests
+    return { count: 0, resetTime: Date.now() + windowMs };
+  }
   const count = await redis.incr(key);
   if (count === 1) {
     await redis.expire(key, Math.ceil(windowMs / 1000));

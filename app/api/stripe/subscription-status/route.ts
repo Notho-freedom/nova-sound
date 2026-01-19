@@ -30,6 +30,7 @@ function subscriptionCacheKey(userId: string): string {
 
 async function getCachedSubscription(userId: string): Promise<SubscriptionStatusData | null> {
   try {
+    if (!redis) return null;
     const raw = await redis.get(subscriptionCacheKey(userId));
     if (!raw) return null;
     return JSON.parse(raw as string) as SubscriptionStatusData;
@@ -40,6 +41,7 @@ async function getCachedSubscription(userId: string): Promise<SubscriptionStatus
 
 async function setCachedSubscription(userId: string, data: SubscriptionStatusData): Promise<void> {
   try {
+    if (!redis) return;
     await redis.setex(subscriptionCacheKey(userId), CACHE_DURATION_SECONDS, JSON.stringify(data));
   } catch {
     // Non-blocking cache failure

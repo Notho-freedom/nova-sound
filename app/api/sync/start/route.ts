@@ -15,6 +15,7 @@ function syncStatusKey(userId: string): string {
 
 async function getSyncStatus(userId: string): Promise<SyncStatus | null> {
   try {
+    if (!redis) return null;
     const raw = await redis.get(syncStatusKey(userId));
     if (!raw) return null;
     return JSON.parse(raw as string) as SyncStatus;
@@ -25,6 +26,7 @@ async function getSyncStatus(userId: string): Promise<SyncStatus | null> {
 
 async function setSyncStatus(userId: string, status: SyncStatus): Promise<void> {
   try {
+    if (!redis) return;
     await redis.setex(syncStatusKey(userId), 60 * 60 * 24, JSON.stringify(status));
   } catch {
     // Non-blocking cache failure

@@ -126,7 +126,9 @@ export async function cancelWorkflow(
   workflowId: string
 ): Promise<void> {
   // Delete workflow state from Redis
-  await redis.del(`workflow:${workflowType}:${workflowId}`);
+  if (redis) {
+    await redis.del(`workflow:${workflowType}:${workflowId}`);
+  }
   console.log(`[Workflow] Cancelled: ${workflowType}/${workflowId}`);
 }
 

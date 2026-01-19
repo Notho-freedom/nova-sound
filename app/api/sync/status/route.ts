@@ -15,6 +15,7 @@ function syncStatusKey(userId: string): string {
 
 async function getSyncStatus(userId: string): Promise<SyncStatus | null> {
   try {
+    if (!redis) return null;
     const raw = await redis.get(syncStatusKey(userId));
     if (!raw) return null;
     return JSON.parse(raw as string) as SyncStatus;

@@ -67,11 +67,13 @@ export async function POST(req: NextRequest) {
     };
 
     // Store initial state
-    await redis.set(
-      `workflow:onboarding:${userId}`,
-      JSON.stringify(state),
-      { ex: 604800 } // 7 days
-    );
+    if (redis) {
+      await redis.set(
+        `workflow:onboarding:${userId}`,
+        JSON.stringify(state),
+        { ex: 604800 } // 7 days
+      );
+    }
 
     // Step 1: Send welcome email after 2 minutes
     await qstash.task.publishDelayed(
@@ -125,6 +127,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (!redis) {
+      return NextResponse.json(
+        { error: "Redis not configured" },
+        { status: 500 }
+      );
+    }
     const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
     if (!stateRaw) {
       return NextResponse.json(

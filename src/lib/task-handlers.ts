@@ -197,6 +197,9 @@ export const handleSyncDeferred: TaskHandler = async (payload) => {
   }
 
   const { redis } = await import("@/lib/redis");
+  if (!redis) {
+    return { ok: false, error: "Redis not configured" };
+  }
   const latestKey = `backup:${userId}:latest`;
   const latestRaw = await redis.get(latestKey);
 
@@ -263,22 +266,24 @@ export const handleAssemblyAIPoll: TaskHandler = async (payload) => {
 
   if (transcriptResult.status === "completed") {
     const { redis } = await import("@/lib/redis");
-    const cacheKey = `ai:transcript:${transcriptId}`;
-    const payloadToStore = {
-      userId,
-      audioUrl,
-      transcript: transcriptResult.text,
-      words: transcriptResult.words || [],
-      chapters: transcriptResult.chapters || [],
-      sentiment_analysis_results: transcriptResult.sentiment_analysis_results || [],
-      entities: transcriptResult.entities || [],
-      toxicity: transcriptResult.toxicity || null,
-      speakers: transcriptResult.utterances || [],
-      createdAt: new Date().toISOString(),
-      status: "completed",
-    };
+    if (redis) {
+      const cacheKey = `ai:transcript:${transcriptId}`;
+      const payloadToStore = {
+        userId,
+        audioUrl,
+        transcript: transcriptResult.text,
+        words: transcriptResult.words || [],
+        chapters: transcriptResult.chapters || [],
+        sentiment_analysis_results: transcriptResult.sentiment_analysis_results || [],
+        entities: transcriptResult.entities || [],
+        toxicity: transcriptResult.toxicity || null,
+        speakers: transcriptResult.utterances || [],
+        createdAt: new Date().toISOString(),
+        status: "completed",
+      };
 
-    await redis.setex(cacheKey, 60 * 60 * 24 * 30, JSON.stringify(payloadToStore));
+      await redis.setex(cacheKey, 60 * 60 * 24 * 30, JSON.stringify(payloadToStore));
+    }
 
     return { ok: true, status: "completed" };
   }
@@ -306,6 +311,10 @@ export const handleBackupSnapshot: TaskHandler = async (payload, meta) => {
 
   const { redis } = await import("@/lib/redis");
   const { qstash } = await import("@/lib/qstash-helpers");
+  
+  if (!redis) {
+    return { ok: false, error: "Redis not configured" };
+  }
 
   const lockKey = `backup:${userId}:loop`;
   await redis.set(lockKey, String(meta.id), { ex: 7200 });
@@ -376,15 +385,17 @@ export const handleOnboardingWelcome: TaskHandler = async (payload, meta) => {
   // Update workflow state
   try {
     const { redis } = await import("@/lib/redis");
-    const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
-    if (stateRaw) {
-      const state = JSON.parse(stateRaw as string);
-      state.welcomeEmailSent = true;
-      await redis.set(
-        `workflow:onboarding:${userId}`,
-        JSON.stringify(state),
-        { ex: 604800 }
-      );
+    if (redis) {
+      const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
+      if (stateRaw) {
+        const state = JSON.parse(stateRaw as string);
+        state.welcomeEmailSent = true;
+        await redis.set(
+          `workflow:onboarding:${userId}`,
+          JSON.stringify(state),
+          { ex: 604800 }
+        );
+      }
     }
   } catch (error) {
     console.error("[onboarding-welcome] Failed to update state:", error);
@@ -414,15 +425,17 @@ export const handleOnboardingTips: TaskHandler = async (payload, meta) => {
   // Update workflow state
   try {
     const { redis } = await import("@/lib/redis");
-    const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
-    if (stateRaw) {
-      const state = JSON.parse(stateRaw as string);
-      state.tipsEmailSent = true;
-      await redis.set(
-        `workflow:onboarding:${userId}`,
-        JSON.stringify(state),
-        { ex: 604800 }
-      );
+    if (redis) {
+      const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
+      if (stateRaw) {
+        const state = JSON.parse(stateRaw as string);
+        state.tipsEmailSent = true;
+        await redis.set(
+          `workflow:onboarding:${userId}`,
+          JSON.stringify(state),
+          { ex: 604800 }
+        );
+      }
     }
   } catch (error) {
     console.error("[onboarding-tips] Failed to update state:", error);
@@ -452,24 +465,26 @@ export const handleOnboardingCheckPro: TaskHandler = async (payload, meta) => {
   // Update workflow state
   try {
     const { redis } = await import("@/lib/redis");
-    const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
-    if (stateRaw) {
-      const state = JSON.parse(stateRaw as string);
-      state.isPro = isPro;
+    if (redis) {
+      const stateRaw = await redis.get(`workflow:onboarding:${userId}`);
+      if (stateRaw) {
+        const state = JSON.parse(stateRaw as string);
+        state.isPro = isPro;
 
-      if (!isPro) {
-        // Send upgrade reminder
-        console.log(`[onboarding-check-pro] Sending upgrade reminder to ${email}`);
-        // TODO: Send upgrade reminder email
-        state.upgradeReminderSent = true;
+        if (!isPro) {
+          // Send upgrade reminder
+          console.log(`[onboarding-check-pro] Sending upgrade reminder to ${email}`);
+          // TODO: Send upgrade reminder email
+          state.upgradeReminderSent = true;
+        }
+
+        state.completedAt = Date.now();
+        await redis.set(
+          `workflow:onboarding:${userId}`,
+          JSON.stringify(state),
+          { ex: 604800 }
+        );
       }
-
-      state.completedAt = Date.now();
-      await redis.set(
-        `workflow:onboarding:${userId}`,
-        JSON.stringify(state),
-        { ex: 604800 }
-      );
     }
   } catch (error) {
     console.error("[onboarding-check-pro] Failed to update state:", error);

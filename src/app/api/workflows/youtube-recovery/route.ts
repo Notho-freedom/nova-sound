@@ -86,11 +86,13 @@ export async function POST(req: NextRequest) {
     };
 
     // Store state
-    await redis.set(
-      `workflow:youtube-recovery:${workflowId}`,
-      JSON.stringify(state),
-      { ex: 86400 } // 24 hours
-    );
+    if (redis) {
+      await redis.set(
+        `workflow:youtube-recovery:${workflowId}`,
+        JSON.stringify(state),
+        { ex: 86400 } // 24 hours
+      );
+    }
 
     // Start workflow steps with QStash
     // Step 1: Validate track IDs
@@ -132,6 +134,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (!redis) {
+      return NextResponse.json(
+        { error: "Redis not configured" },
+        { status: 500 }
+      );
+    }
     const stateRaw = await redis.get(`workflow:youtube-recovery:${workflowId}`);
     if (!stateRaw) {
       return NextResponse.json(

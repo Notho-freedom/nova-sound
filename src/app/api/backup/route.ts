@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "userId and data are required" }, { status: 400 });
     }
 
+    if (!redis) {
+      return NextResponse.json({ error: "Redis not configured" }, { status: 500 });
+    }
+
+    const redisClient = redis;
     const timestamp = Date.now();
     const backupId = `backup_appdata_${timestamp}`;
     const backup = {
@@ -37,23 +42,23 @@ export async function POST(request: NextRequest) {
     const itemKey = `${itemPrefix}:${backupId}`;
 
     // Always update latest snapshot
-    await redis.setex(latestKey, BACKUP_TTL_SECONDS, JSON.stringify(backup));
+    await redisClient.setex(latestKey, BACKUP_TTL_SECONDS, JSON.stringify(backup));
 
     if (mode === "backup") {
       if (itemKey) {
-        await redis.setex(itemKey, BACKUP_TTL_SECONDS, JSON.stringify(backup));
+        await redisClient.setex(itemKey, BACKUP_TTL_SECONDS, JSON.stringify(backup));
       }
 
-      await redis.zadd(indexKey, { score: timestamp, member: backupId });
+      await redisClient.zadd(indexKey, { score: timestamp, member: backupId });
 
-      const count = await redis.zcard(indexKey);
+      const count = await redisClient.zcard(indexKey);
       if (count > MAX_BACKUPS) {
         const excess = count - MAX_BACKUPS;
-        const oldIds = await redis.zrange(indexKey, 0, excess - 1);
+        const oldIds = await redisClient.zrange(indexKey, 0, excess - 1);
         if (oldIds.length > 0) {
-          await redis.zrem(indexKey, ...oldIds);
+          await redisClient.zrem(indexKey, ...oldIds);
           const oldKeys = oldIds.map(id => `${itemPrefix}:${String(id)}`);
-          await redis.del(...oldKeys);
+          await redisClient.del(...oldKeys);
         }
       }
     }
@@ -79,10 +84,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
+    if (!redis) {
+      return NextResponse.json({ error: "Redis not configured" }, { status: 500 });
+    }
+
+    const redisClient = redis;
     const { indexKey, latestKey, itemPrefix } = getKeys(userId);
 
     if (backupId) {
-      const backupRaw = await redis.get(`${itemPrefix}:${backupId}`);
+      const backupRaw = await redisClient.get(`${itemPrefix}:${backupId}`);
       if (!backupRaw) {
         return NextResponse.json({ backup: null }, { status: 404 });
       }
@@ -90,11 +100,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (list) {
-      const ids = await redis.zrange(indexKey, 0, MAX_BACKUPS - 1, { rev: true });
+      const ids = await redisClient.zrange(indexKey, 0, MAX_BACKUPS - 1, { rev: true });
       const backups = await Promise.all(
         ids.map(async id => {
           const member = String(id);
-          const score = await redis.zscore(indexKey, member);
+          const score = await redisClient.zscore(indexKey, member);
           return {
             id: member,
             timestamp: Number(score || 0),
@@ -105,7 +115,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ backups });
     }
 
-    const latestRaw = await redis.get(latestKey);
+    const latestRaw = await redisClient.get(latestKey);
     if (!latestRaw) {
       return NextResponse.json({ backup: null });
     }

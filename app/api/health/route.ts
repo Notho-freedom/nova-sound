@@ -4,6 +4,8 @@ import { redis } from '@/lib/redis';
 
 async function ensureQStashSchedules(): Promise<void> {
   try {
+    if (!redis) return;
+    
     const lock = await redis.set('qstash:schedules:boot', new Date().toISOString(), {
       nx: true,
       ex: 60 * 60 * 24,
