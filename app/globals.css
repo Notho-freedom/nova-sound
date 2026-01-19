@@ -1,2 +1,6 @@
 @import '../src/index.css';
 
+.layout-hidden {
+	display: none;
+}
+

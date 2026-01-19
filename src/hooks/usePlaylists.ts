@@ -32,7 +32,10 @@ export function usePlaylists(): UsePlaylistsReturn {
     };
 
     const loadPlaylists = async () => {
-      if (!isElectron) {
+      const api = isElectron ? window.electronAPI : undefined;
+      const hasElectronHandlers = api && typeof api.getPlaylists === 'function';
+
+      if (!hasElectronHandlers || !api) {
         // Use localStorage in web mode
         const stored = localStorage.getItem("nexus-playlists");
         if (stored) {
@@ -45,12 +48,7 @@ export function usePlaylists(): UsePlaylistsReturn {
       }
 
       try {
-        if (!window.electronAPI) {
-          setPlaylists([]);
-          setLoading(false);
-          return;
-        }
-        const lists = await window.electronAPI.getPlaylists();
+        const lists = await api.getPlaylists();
         setPlaylists(lists);
         emitLocalUpdate(lists);
       } catch (err) {

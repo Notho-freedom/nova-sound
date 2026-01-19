@@ -1,7 +1,7 @@
 {
   "name": "nexus-audio",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "NEXUS - Futuristic Audio Player",
   "author": "NEXUS Team",
   "license": "MIT",
@@ -17,10 +17,11 @@
     "start": "next start",
     "build:dev": "vite build --mode development",
     "electron": "npm run build:electron && powershell -Command \"$env:FORCE_PROD='true'; electron .\"",
-    "package": "npm run compile:electron && electron-builder",
-    "package:win": "npm run compile:electron && electron-builder --win",
-    "package:mac": "npm run compile:electron && electron-builder --mac",
-    "package:linux": "npm run compile:electron && electron-builder --linux",
+    "bump-version": "npx tsx scripts/bump-version.ts",
+    "package": "npm run bump-version && npm run compile:electron && electron-builder",
+    "package:win": "npm run bump-version && npm run compile:electron && electron-builder --win",
+    "package:mac": "npm run bump-version && npm run compile:electron && electron-builder --mac",
+    "package:linux": "npm run bump-version && npm run compile:electron && electron-builder --linux",
     "build:prod": "npx tsx scripts/build-production.ts",
     "lint": "eslint .",
     "preview": "next start",
@@ -73,8 +74,12 @@
     "@tanstack/react-query": "^5.83.0",
     "@types/multer": "^2.0.0",
     "@types/react-helmet": "^6.1.11",
+    "@upstash/qstash": "^2.8.4",
+    "@upstash/redis": "^1.36.1",
+    "@upstash/vector": "^1.2.2",
     "archiver": "^7.0.1",
     "axios": "^1.13.2",
+    "electron-updater": "^6.3.9",
     "basic-ftp": "^5.0.5",
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
@@ -159,9 +164,10 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
       "dist-electron/**/*",
-      "public/**/*"
+      "public/**/*",
+      "!dist/**/*",
+      "!**/*.map"
     ],
     "fileAssociations": [
       {
@@ -303,7 +309,14 @@
       "target": [
         "nsis"
       ],
-      "icon": "public/favicon.ico"
+      "icon": "public/favicon.ico",
+      "publish": [
+        {
+          "provider": "generic",
+          "url": "${env.ELECTRON_UPDATER_URL}",
+          "channel": "latest"
+        }
+      ]
     },
     "mac": {
       "target": [

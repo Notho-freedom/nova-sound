@@ -29,6 +29,7 @@ import { AlbumArt } from "./AlbumArt";
 import { LegacyAudioVisualizer } from "./LegacyAudioVisualizer";
 import { BackgroundEffects } from "./BackgroundEffects";
 import { useAudioVibes } from "@/hooks/useAudioVibes";
+import { SimilarTracks } from "./SimilarTracks";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
@@ -57,6 +58,8 @@ interface FullscreenPlayerProps {
   onMuteToggle: () => void;
   onClose: () => void;
   onToggleFavorite?: () => void;
+  onPlayTrack?: (track: Track) => void;
+  onAddToQueue?: (track: Track) => void;
   youtubePlayerRef?: React.RefObject<YouTubePlayerRef | null>;
 }
 
@@ -99,6 +102,8 @@ export const FullscreenPlayer = ({
   onMuteToggle,
   onClose,
   onToggleFavorite,
+  onPlayTrack,
+  onAddToQueue,
   youtubePlayerRef: sharedYoutubePlayerRef,
 }: FullscreenPlayerProps) => {
   const [showLyrics, setShowLyrics] = useState(false);
@@ -1012,13 +1017,30 @@ useEffect(() => {
                 {isMuted ? 0 : volume}%
               </span>
             </motion.div>
+
+            {/* Similar Tracks Section */}
+            {!isYouTube && onPlayTrack && onAddToQueue && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+                className="mt-8"
+              >
+                <SimilarTracks
+                  currentTrack={currentTrack}
+                  onPlayTrack={onPlayTrack}
+                  onAddToQueue={onAddToQueue}
+                  limit={3}
+                />
+              </motion.div>
+            )}
           </div>
 
           {/* Bottom Actions */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
+            transition={{ delay: 0.9 }}
             className="p-6 border-t border-white/5"
           >
             <div className="flex items-center justify-center gap-6">

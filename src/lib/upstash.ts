@@ -21,13 +21,16 @@ async function upstashFetch<T>(path: string, args: (string | number)[], signal?:
   const url = `${endpoint!.replace(/\/$/, "")}/${path.replace(/^\//, "")}`
 
   try {
+    // Convert all args to strings for Upstash REST API
+    const stringArgs = args.map(arg => String(arg))
+    
     const res = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(args),
+      body: JSON.stringify(stringArgs),
       cache: "no-store",
       signal,
     })
@@ -50,13 +53,31 @@ async function upstashFetch<T>(path: string, args: (string | number)[], signal?:
 
 /** XADD helper (streams). */
 export async function upstashXAdd(stream: string, args: (string | number)[], signal?: AbortSignal) {
-  return upstashFetch<string>(`xadd/${stream}`, args, signal)
+  // Args format: ["*", "field1", "value1", "field2", "value2", ...]
+  // Note: Some Upstash deployments expect stream name in args (POST /xadd),
+  // while others accept /xadd/{stream}. We try both for compatibility.
+  const filteredArgs = args.filter((arg) => arg !== undefined && arg !== null)
+  if (filteredArgs.length < 3 || filteredArgs.length % 2 === 0) {
+    throw new Error(`Invalid XADD args length (${filteredArgs.length}). Expected odd length >= 3.`)
+  }
+
+  try {
+    // Preferred: /xadd with stream in args (most compatible)
+    return await upstashFetch<string>("xadd", [stream, ...filteredArgs], signal)
+  } catch (error: any) {
+    const message = String(error?.message || "")
+    if (message.includes("xadd") || message.includes("wrong number of arguments")) {
+      // Fallback: /xadd/{stream}
+      return await upstashFetch<string>(`xadd/${encodeURIComponent(stream)}`, filteredArgs, signal)
+    }
+    throw error
+  }
 }
 
 /** XGROUP CREATE helper. */
 export async function upstashXGroupCreate(stream: string, group: string, start: string = "$", signal?: AbortSignal) {
   // XGROUP CREATE <stream> <group> <id> MKSTREAM
-  return upstashFetch<string>("xgroup", ["CREATE", stream, group, start, "MKSTREAM"], signal)
+  return upstashFetch<string>("xgroup/create", [stream, group, start, "MKSTREAM"], signal)
 }
 
 export type XReadGroupResult = Array<

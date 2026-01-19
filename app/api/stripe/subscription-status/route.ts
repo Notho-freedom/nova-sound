@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { verifyAuth } from '../../auth/middleware';
+import { redis } from '@/lib/redis';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY || '';
@@ -13,38 +14,35 @@ const stripe = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.trim() !== ''
   : null;
 
 // Cache pour les statuts d'abonnement (évite les appels API répétés)
-interface SubscriptionCacheEntry {
-  data: any;
-  timestamp: number;
-  userId: string;
+type SubscriptionStatusData = {
+  isActive: boolean;
+  plan: 'free' | 'pro';
+  status: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+};
+
+const CACHE_DURATION_SECONDS = 30; // 30 secondes de cache
+
+function subscriptionCacheKey(userId: string): string {
+  return `stripe:subscription:${userId}`;
 }
 
-const subscriptionCache = new Map<string, SubscriptionCacheEntry>();
-const CACHE_DURATION = 30 * 1000; // 30 secondes de cache
-
-function getCachedSubscription(userId: string): any | null {
-  const cached = subscriptionCache.get(userId);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
+async function getCachedSubscription(userId: string): Promise<SubscriptionStatusData | null> {
+  try {
+    const raw = await redis.get(subscriptionCacheKey(userId));
+    if (!raw) return null;
+    return JSON.parse(raw as string) as SubscriptionStatusData;
+  } catch {
+    return null;
   }
-  return null;
 }
 
-function setCachedSubscription(userId: string, data: any): void {
-  subscriptionCache.set(userId, {
-    data,
-    timestamp: Date.now(),
-    userId,
-  });
-  
-  // Nettoyer le cache toutes les 5 minutes (supprimer les entrées > 5 min)
-  if (subscriptionCache.size > 100) {
-    const now = Date.now();
-    for (const [key, entry] of subscriptionCache.entries()) {
-      if (now - entry.timestamp > 5 * 60 * 1000) {
-        subscriptionCache.delete(key);
-      }
-    }
+async function setCachedSubscription(userId: string, data: SubscriptionStatusData): Promise<void> {
+  try {
+    await redis.setex(subscriptionCacheKey(userId), CACHE_DURATION_SECONDS, JSON.stringify(data));
+  } catch {
+    // Non-blocking cache failure
   }
 }
 
@@ -56,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Vérifier le cache d'abord (performance maximale)
-    const cached = getCachedSubscription(auth.userId);
+    const cached = await getCachedSubscription(auth.userId);
     if (cached) {
       return NextResponse.json(cached);
     }
@@ -125,7 +123,7 @@ export async function GET(request: NextRequest) {
     // Récupérer TOUTES les informations DIRECTEMENT depuis Stripe (source de vérité absolue)
     // Aucune simulation, toutes les données proviennent de l'API Stripe
     const periodEnd = (subscription as any).current_period_end;
-    const subscriptionData = {
+    const subscriptionData: SubscriptionStatusData = {
       isActive: subscription.status === 'active',
       plan: isPro ? 'pro' : 'free',
       status: subscription.status, // Statut réel depuis Stripe: 'active', 'canceled', 'past_due', 'trialing', etc.
@@ -198,7 +196,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Mettre en cache pour éviter les appels répétés
-    setCachedSubscription(auth.userId, subscriptionData);
+    await setCachedSubscription(auth.userId, subscriptionData);
 
     return NextResponse.json(subscriptionData);
   } catch (error: any) {

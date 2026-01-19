@@ -55,14 +55,18 @@ export const PlaylistCard = memo(
     const thumbnails = useMemo(() => tracks.slice(0, maxThumbnails), [tracks, maxThumbnails]);
     const extraCount = useMemo(() => Math.max(0, tracks.length - maxThumbnails), [tracks.length, maxThumbnails]);
 
-    const tooltipContent = (
-      <div>
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-muted-foreground">
-          {tracks.length} piste{tracks.length > 1 ? "s" : ""}
+    // Memoize tooltip content to prevent infinite re-renders
+    const tooltipContent = useMemo(
+      () => (
+        <div>
+          <div className="text-sm font-medium">{title}</div>
+          <div className="text-xs text-muted-foreground">
+            {tracks.length} piste{tracks.length > 1 ? "s" : ""}
+          </div>
+          {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
         </div>
-        {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
-      </div>
+      ),
+      [title, tracks.length, subtitle]
     );
 
     return (

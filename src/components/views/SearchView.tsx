@@ -44,6 +44,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ContentCarousel } from "@/components/ui/ContentCarousel"
 import { FeaturedCard } from "@/components/ui/FeaturedCard"
 import { useI18n } from "@/i18n"
+import { useVectorSearch } from "@/hooks/useVectorSearch"
+import { Badge } from "@/components/ui/badge"
 
 interface SearchViewProps {
   tracks: Track[];
@@ -263,10 +265,14 @@ export const SearchView = ({
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [youtubeTracks, setYoutubeTracks] = useState<Track[]>([])
   const [isFocused, setIsFocused] = useState(false)
+  const [useSemanticSearch, setUseSemanticSearch] = useState(false)
   const youtubeSearchTimerRef = useRef<NodeJS.Timeout | null>(null)
   const historySaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestTypedQueryRef = useRef("")
   const inputRef = useRef<HTMLInputElement>(null)
+  
+  // Vector search hook
+  const vectorSearch = useVectorSearch()
   
   // Hooks for context menu
   const playlistsResult = usePlaylists()
@@ -415,6 +421,12 @@ export const SearchView = ({
     }
 
     if (query.trim() && query.length >= 2) {
+      // Trigger semantic search if enabled
+      if (useSemanticSearch && vectorSearch.isAvailable) {
+        vectorSearch.search(query)
+      }
+      
+      // Also trigger YouTube search
       youtubeSearchTimerRef.current = setTimeout(() => {
         searchYouTube(query)
       }, 3000)
@@ -427,7 +439,7 @@ export const SearchView = ({
         clearTimeout(youtubeSearchTimerRef.current)
       }
     }
-  }, [query, searchYouTube])
+  }, [query, searchYouTube, useSemanticSearch, vectorSearch])
 
   // Convert YouTube results to tracks
   useEffect(() => {
@@ -514,6 +526,33 @@ export const SearchView = ({
 
             {/* Search Bar - Enhanced */}
             <div className="relative">
+              {/* Semantic Search Toggle */}
+              {vectorSearch.isAvailable && !vectorSearch.checkingAvailability && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="absolute -top-10 right-0 z-10"
+                >
+                  <button
+                    onClick={() => setUseSemanticSearch(!useSemanticSearch)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+                      useSemanticSearch
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "bg-muted/50 text-muted-foreground border border-border/50 hover:border-primary/30"
+                    )}
+                  >
+                    <Sparkles className={cn("w-3.5 h-3.5", useSemanticSearch && "animate-pulse")} />
+                    <span>Recherche IA{useSemanticSearch && " activée"}</span>
+                    {useSemanticSearch && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        Beta
+                      </Badge>
+                    )}
+                  </button>
+                </motion.div>
+              )}
+              
               <div
                 className={cn(
                   "relative flex items-center rounded-2xl overflow-hidden",
@@ -734,6 +773,82 @@ export const SearchView = ({
                       ))}
                     </div>
                   </section>
+                )}
+
+                {/* Semantic Search Results */}
+                {useSemanticSearch && vectorSearch.isAvailable && query.trim() && (
+                  <motion.section
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative"
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                      <h2 className="font-display text-lg font-semibold">
+                        Résultats IA
+                        {vectorSearch.results.length > 0 && (
+                          <span className="ml-2 text-sm text-muted-foreground font-normal">
+                            ({vectorSearch.results.length})
+                          </span>
+                        )}
+                      </h2>
+                      <Badge variant="secondary" className="text-[10px]">
+                        Sémantique
+                      </Badge>
+                    </div>
+
+                    {vectorSearch.loading ? (
+                      <div className="space-y-1 bg-white/5 rounded-2xl p-2">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <SearchTrackItemSkeleton key={`semantic-skeleton-${i}`} />
+                        ))}
+                      </div>
+                    ) : vectorSearch.error ? (
+                      <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                        <p className="text-sm text-rose-400">{vectorSearch.error}</p>
+                      </div>
+                    ) : vectorSearch.results.length > 0 ? (
+                      <div className="space-y-1 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-2xl p-2 border border-primary/10">
+                        {vectorSearch.results.map((result, index) => {
+                          const track = result.track;
+                          const trackIndex = tracks.findIndex((t) => t.id === track.id);
+                          const isCurrent = currentTrackIndex === trackIndex;
+                          const isPlayingNow = isCurrent && isPlaying;
+                          
+                          return (
+                            <SearchTrackItem
+                              key={track.id}
+                              track={track}
+                              isPlaying={isPlayingNow}
+                              isCurrent={isCurrent}
+                              onPlay={() => {
+                                if (trackIndex >= 0) {
+                                  onTrackSelect(trackIndex);
+                                } else {
+                                  onPlayTrack?.(track);
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                        <div className="mt-2 p-2 text-center">
+                          <p className="text-xs text-muted-foreground">
+                            ✨ Résultats trouvés par similarité sémantique
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center bg-white/5 rounded-2xl">
+                        <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Aucun résultat sémantique trouvé
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Essayez une recherche plus descriptive
+                        </p>
+                      </div>
+                    )}
+                  </motion.section>
                 )}
 
                 {/* Tracks Results */}

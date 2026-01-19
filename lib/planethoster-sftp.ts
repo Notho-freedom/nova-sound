@@ -275,8 +275,11 @@ export async function uploadToPlanetHoster(
         // Add connection timeout wrapper
         const connectTimeout = 60000; // 60s
         const connectPromise = sftp.connect(connectConfig);
+        const timeoutSignal = AbortSignal.timeout(connectTimeout);
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error(`Connection timeout after ${connectTimeout / 1000} seconds`)), connectTimeout);
+          timeoutSignal.addEventListener('abort', () => {
+            reject(new Error(`Connection timeout after ${connectTimeout / 1000} seconds`));
+          });
         });
 
         await Promise.race([connectPromise, timeoutPromise]);
@@ -363,7 +366,10 @@ export async function uploadToPlanetHoster(
       // Exponential backoff: wait 2^attempt seconds before retry
       const waitTime = Math.min(1000 * Math.pow(2, attempt), 10000); // Max 10 seconds
       console.log(`[PlanetHoster] ⏳ Retrying in ${waitTime / 1000}s...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      const waitSignal = AbortSignal.timeout(waitTime);
+      await new Promise<void>((resolve) => {
+        waitSignal.addEventListener('abort', () => resolve());
+      });
     }
   }
 

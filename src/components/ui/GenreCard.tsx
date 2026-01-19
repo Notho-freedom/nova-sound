@@ -2,7 +2,6 @@
 
 import { memo, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { SimpleTooltip } from "@/components/ui/tooltip";
 
 interface GenreCardProps {
   name: string;
@@ -63,65 +62,58 @@ export const GenreCard = memo(
       return genreGradients[normalizedName] || genreGradients.default;
     }, [gradient, name]);
 
-    const tooltipContent = (
-      <div>
-        <div className="text-sm font-medium capitalize">{name}</div>
-        {trackCount !== undefined && (
-          <div className="text-xs text-muted-foreground">
-            {trackCount} titre{trackCount > 1 ? "s" : ""}
-          </div>
-        )}
-      </div>
-    );
+    // Title attribute for native tooltip (no re-render issues)
+    const titleText = trackCount !== undefined 
+      ? `${name} - ${trackCount} titre${trackCount > 1 ? "s" : ""}`
+      : name;
 
     return (
-      <SimpleTooltip content={tooltipContent}>
-        <button
-          onClick={handleClick}
-          className={cn(
-            "group relative overflow-hidden rounded-xl",
-            "aspect-[2/1] min-h-[80px]",
-            "transition-all duration-200 ease-out",
-            "hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
-            "text-left w-full",
-            className,
-          )}
-        >
-          {/* Background image if provided */}
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 transition-opacity"
-            />
-          )}
-
-          {/* Gradient background */}
-          <div className={cn("absolute inset-0 bg-gradient-to-br", effectiveGradient)} />
-
-          {/* Decorative element */}
-          <div
-            className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-300"
-            aria-hidden="true"
+      <button
+        onClick={handleClick}
+        title={titleText}
+        className={cn(
+          "group relative overflow-hidden rounded-xl",
+          "aspect-[2/1] min-h-[80px]",
+          "transition-all duration-200 ease-out",
+          "hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+          "text-left w-full",
+          className,
+        )}
+      >
+        {/* Background image if provided */}
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 transition-opacity"
           />
+        )}
 
-          {/* Content */}
-          <div className="relative h-full p-4 flex flex-col justify-end">
-            <div className="flex items-center gap-2">
-              {icon && <div className="text-white/90">{icon}</div>}
-              <h3 className="font-display text-lg font-bold text-white drop-shadow-lg capitalize truncate">{name}</h3>
-            </div>
-            {trackCount !== undefined && (
-              <p className="text-white/70 text-xs mt-0.5">
-                {trackCount} titre{trackCount > 1 ? "s" : ""}
-              </p>
-            )}
+        {/* Gradient background */}
+        <div className={cn("absolute inset-0 bg-gradient-to-br", effectiveGradient)} />
+
+        {/* Decorative element */}
+        <div
+          className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:scale-125 transition-transform duration-300"
+          aria-hidden="true"
+        />
+
+        {/* Content */}
+        <div className="relative h-full p-4 flex flex-col justify-end">
+          <div className="flex items-center gap-2">
+            {icon && <div className="text-white/90">{icon}</div>}
+            <h3 className="font-display text-lg font-bold text-white drop-shadow-lg capitalize truncate">{name}</h3>
           </div>
-        </button>
-      </SimpleTooltip>
+          {trackCount !== undefined && (
+            <p className="text-white/70 text-xs mt-0.5">
+              {trackCount} titre{trackCount > 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+      </button>
     );
   },
 );

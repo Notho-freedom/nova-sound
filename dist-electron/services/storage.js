@@ -73,10 +73,34 @@ async function writeJSON(filePath, data) {
     await ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
+const STORAGE_CACHE_TTL_MS = {
+    playlists: 5000,
+    favorites: 5000,
+    history: 5000,
+    settings: 3000,
+    equalizer: 10000,
+};
 // Storage class
 class Storage {
     initialized = false;
     thumbnailCache = new Map();
+    cache = {
+        playlists: null,
+        favorites: null,
+        history: null,
+        settings: null,
+        equalizer: null,
+    };
+    getCacheValue(entry) {
+        if (!entry)
+            return null;
+        if (entry.expiresAt < Date.now())
+            return null;
+        return entry.value;
+    }
+    setCacheValue(value, ttlMs) {
+        return { value, expiresAt: Date.now() + ttlMs };
+    }
     pruneThumbnailCache() {
         const now = Date.now();
         for (const [key, value] of this.thumbnailCache.entries()) {
@@ -273,10 +297,16 @@ class Storage {
     }
     // Playlists
     async getPlaylists() {
-        return readJSON(PATHS.playlists, []);
+        const cached = this.getCacheValue(this.cache.playlists);
+        if (cached !== null)
+            return cached;
+        const playlists = await readJSON(PATHS.playlists, []);
+        this.cache.playlists = this.setCacheValue(playlists, STORAGE_CACHE_TTL_MS.playlists);
+        return playlists;
     }
     async savePlaylists(playlists) {
         await writeJSON(PATHS.playlists, playlists);
+        this.cache.playlists = this.setCacheValue(playlists, STORAGE_CACHE_TTL_MS.playlists);
     }
     async createPlaylist(name, trackIds = []) {
         const playlists = await this.getPlaylists();
@@ -316,10 +346,16 @@ class Storage {
     }
     // Favorites
     async getFavorites() {
-        return readJSON(PATHS.favorites, []);
+        const cached = this.getCacheValue(this.cache.favorites);
+        if (cached !== null)
+            return cached;
+        const favorites = await readJSON(PATHS.favorites, []);
+        this.cache.favorites = this.setCacheValue(favorites, STORAGE_CACHE_TTL_MS.favorites);
+        return favorites;
     }
     async saveFavorites(favorites) {
         await writeJSON(PATHS.favorites, favorites);
+        this.cache.favorites = this.setCacheValue(favorites, STORAGE_CACHE_TTL_MS.favorites);
     }
     async addFavorite(trackId) {
         const favorites = await this.getFavorites();
@@ -339,7 +375,12 @@ class Storage {
     }
     // History
     async getHistory() {
-        return readJSON(PATHS.history, []);
+        const cached = this.getCacheValue(this.cache.history);
+        if (cached !== null)
+            return cached;
+        const history = await readJSON(PATHS.history, []);
+        this.cache.history = this.setCacheValue(history, STORAGE_CACHE_TTL_MS.history);
+        return history;
     }
     async addToHistory(entry) {
         const history = await this.getHistory();
@@ -347,27 +388,41 @@ class Storage {
         // Keep only last 1000 entries
         const trimmed = history.slice(0, 1000);
         await writeJSON(PATHS.history, trimmed);
+        this.cache.history = this.setCacheValue(trimmed, STORAGE_CACHE_TTL_MS.history);
     }
     async clearHistory() {
         await writeJSON(PATHS.history, []);
+        this.cache.history = this.setCacheValue([], STORAGE_CACHE_TTL_MS.history);
     }
     // Settings
     async getSettings() {
-        return readJSON(PATHS.settings, DEFAULT_SETTINGS);
+        const cached = this.getCacheValue(this.cache.settings);
+        if (cached !== null)
+            return cached;
+        const settings = await readJSON(PATHS.settings, DEFAULT_SETTINGS);
+        this.cache.settings = this.setCacheValue(settings, STORAGE_CACHE_TTL_MS.settings);
+        return settings;
     }
     async updateSettings(updates) {
         const settings = await this.getSettings();
         const updated = { ...settings, ...updates };
         await writeJSON(PATHS.settings, updated);
+        this.cache.settings = this.setCacheValue(updated, STORAGE_CACHE_TTL_MS.settings);
         return updated;
     }
     async resetSettings() {
         await writeJSON(PATHS.settings, DEFAULT_SETTINGS);
+        this.cache.settings = this.setCacheValue(DEFAULT_SETTINGS, STORAGE_CACHE_TTL_MS.settings);
         return DEFAULT_SETTINGS;
     }
     // Equalizer
     async getEqualizerPresets() {
-        return readJSON(PATHS.equalizer, DEFAULT_EQUALIZER_PRESETS);
+        const cached = this.getCacheValue(this.cache.equalizer);
+        if (cached !== null)
+            return cached;
+        const presets = await readJSON(PATHS.equalizer, DEFAULT_EQUALIZER_PRESETS);
+        this.cache.equalizer = this.setCacheValue(presets, STORAGE_CACHE_TTL_MS.equalizer);
+        return presets;
     }
     async saveEqualizerPreset(name, bands, preamp = 0) {
         const presets = await this.getEqualizerPresets();
@@ -380,11 +435,13 @@ class Storage {
             presets.push(preset);
         }
         await writeJSON(PATHS.equalizer, presets);
+        this.cache.equalizer = this.setCacheValue(presets, STORAGE_CACHE_TTL_MS.equalizer);
     }
     async deleteEqualizerPreset(name) {
         const presets = await this.getEqualizerPresets();
         const filtered = presets.filter(p => !(p.name === name && p.isCustom));
         await writeJSON(PATHS.equalizer, filtered);
+        this.cache.equalizer = this.setCacheValue(filtered, STORAGE_CACHE_TTL_MS.equalizer);
     }
     // Scrobble Queue (for offline scrobbling)
     async getScrobbleQueue() {

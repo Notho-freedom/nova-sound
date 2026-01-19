@@ -108,7 +108,7 @@ export const HomeView = memo(({
   const { uploadTrack: uploadTrackToNexus, getTrackProgress: getNexusTrackProgress } = useNexusUpload();
   const { cloudinaryConfigured, nexusIsPro, nexusAuthenticated, nexusUser } = useCloudSync();
   const { isUploaded, getUploadedProvider } = useUploadedStatus();
-  const { stats } = useListeningStats(tracks, history);
+  const { stats, loading: statsLoading } = useListeningStats(tracks, history);
   const { genres, getTracksByGenre } = useGenres(tracks);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const isDayMix = new Date().getHours() < 18;
@@ -134,7 +134,7 @@ export const HomeView = memo(({
     return stats.recentArtists;
   }, [stats]);
 
-  const { computed } = useHomeWorker({
+  const { computed, computing: isHomeWorkerProcessing } = useHomeWorker({
     tracks,
     recentTracks,
     favoriteTracks,
@@ -164,8 +164,12 @@ export const HomeView = memo(({
     return t("homeGreetingEvening");
   };
 
+  // Show skeleton while initial loading OR while stats are computing via worker
+  // Allow partial render once tracks are available, don't block on worker completion
+  const isStillBootingUI = loading || statsLoading;
+
   // Loading skeleton
-  if (loading) {
+  if (isStillBootingUI) {
     return <HomeViewSkeleton />;
   }
 

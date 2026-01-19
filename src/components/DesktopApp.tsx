@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo, startTransition, memo } from "react";
 import { flushSync } from "react-dom";
+
+// Load debug performance utilities (for console monitoring)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  import('@/lib/debug-performance').catch(() => {}); // Non-blocking
+}
 import { TitleBar } from "./TitleBar";
 import { Sidebar, ViewType } from "./Sidebar";
 import { useViewNavigation } from "@/hooks/useViewNavigation";
@@ -13,19 +18,40 @@ import { ArtistInfoPanel } from "./ArtistInfoPanel";
 import { PlayQueueChoiceDialog } from "./PlayQueueChoiceDialog";
 // import { KaraokePanel } from "./KaraokePanel"; // DÉSACTIVÉ - Système karaoke désactivé
 import { UpdateNotification } from "./UpdateNotification";
+import { NexusFAB } from "./NexusFAB";
 import { lazy, Suspense } from "react";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lazyWithRetry = <T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  key: string
+): React.LazyExoticComponent<T> =>
+  lazy(() =>
+    factory().catch((error): Promise<{ default: T }> => {
+      if (typeof window !== "undefined") {
+        const storageKey = `lazy-retry:${key}`;
+        if (!sessionStorage.getItem(storageKey)) {
+          sessionStorage.setItem(storageKey, "1");
+          window.location.reload();
+          // Return a never-resolving promise to prevent further rendering while reloading
+          return new Promise<{ default: T }>(() => {});
+        }
+      }
+      throw error;
+    })
+  );
+
 // Lazy load ALL heavy view components for better initial load
-const HomeView = lazy(() => import("./views/HomeView").then(m => ({ default: m.HomeView })));
-const SearchView = lazy(() => import("./views/SearchView").then(m => ({ default: m.SearchView })));
-const LibraryView = lazy(() => import("./views/LibraryView").then(m => ({ default: m.LibraryView })));
-const PlaylistView = lazy(() => import("./views/PlaylistView").then(m => ({ default: m.PlaylistView })));
-const SettingsView = lazy(() => import("./views/SettingsView").then(m => ({ default: m.SettingsView })));
-const NotificationsView = lazy(() => import("./views/NotificationsView").then(m => ({ default: m.NotificationsView })));
-const ArtistView = lazy(() => import("./views/ArtistView").then(m => ({ default: m.ArtistView })));
-const VideosView = lazy(() => import("./views/VideosView").then(m => ({ default: m.VideosView })));
-const CloudView = lazy(() => import("./views/CloudView").then(m => ({ default: m.CloudView })));
-const AudioSensesView = lazy(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })));
+const HomeView = lazyWithRetry(() => import("./views/HomeView").then(m => ({ default: m.HomeView })), "HomeView");
+const SearchView = lazyWithRetry(() => import("./views/SearchView").then(m => ({ default: m.SearchView })), "SearchView");
+const LibraryView = lazyWithRetry(() => import("./views/LibraryView").then(m => ({ default: m.LibraryView })), "LibraryView");
+const PlaylistView = lazyWithRetry(() => import("./views/PlaylistView").then(m => ({ default: m.PlaylistView })), "PlaylistView");
+const SettingsView = lazyWithRetry(() => import("./views/SettingsView").then(m => ({ default: m.SettingsView })), "SettingsView");
+const NotificationsView = lazyWithRetry(() => import("./views/NotificationsView").then(m => ({ default: m.NotificationsView })), "NotificationsView");
+const ArtistView = lazyWithRetry(() => import("./views/ArtistView").then(m => ({ default: m.ArtistView })), "ArtistView");
+const VideosView = lazyWithRetry(() => import("./views/VideosView").then(m => ({ default: m.VideosView })), "VideosView");
+const CloudView = lazyWithRetry(() => import("./views/CloudView").then(m => ({ default: m.CloudView })), "CloudView");
+const AudioSensesView = lazyWithRetry(() => import("./views/AudioSensesView").then(m => ({ default: m.AudioSensesView })), "AudioSensesView");
 
 import { BackgroundEffects } from "./BackgroundEffects";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -75,9 +101,10 @@ export const DesktopApp = () => {
   // État pour stocker les tracks YouTube chargés dynamiquement
   const [youtubeTracksCache, setYoutubeTracksCache] = useState<Map<string, Track[]>>(new Map());
   
-  // Initialize Redis cache migration on app startup
+  // Initialize Redis cache migration on app startup (NON-BLOCKING)
   useEffect(() => {
-    (async () => {
+    // Defer cache migration to background - don't block initial render
+    const timeoutId = setTimeout(async () => {
       try {
         const { ensureMigrated } = await import('@/lib/cache-migration');
         const result = await ensureMigrated();
@@ -85,28 +112,36 @@ export const DesktopApp = () => {
       } catch (err) {
         console.warn('[DesktopApp] Cache migration failed:', err);
       }
-    })();
+    }, 3000); // Defer 3s after initial render to avoid blocking boot
+    
+    return () => clearTimeout(timeoutId);
   }, []);
   
-  // Charger les tracks YouTube en cache au démarrage pour restaurer les playlists
+  // Charger les tracks YouTube en cache au démarrage (ASYNC - pas de blocage)
   useEffect(() => {
-    (async () => {
+    // Load YouTube cache asynchronously to restore playlists
+    // This runs in parallel with HomeView rendering
+    const loadYouTubeCache = async () => {
       try {
         const { getYouTubeTracksCache } = await import('@/lib/youtube-track-cache');
         const cachedTracks = getYouTubeTracksCache();
         if (cachedTracks && cachedTracks.size > 0) {
-          // Mettre les tracks en cache dans un pseudo-playlist 'persistent-cache'
           const cachedArray = Array.from(cachedTracks.values());
           setYoutubeTracksCache(prev => {
             const newMap = new Map(prev);
             newMap.set('persistent-cache', cachedArray);
             return newMap;
           });
+          console.log(`[DesktopApp] Loaded ${cachedArray.length} cached YouTube tracks`);
         }
       } catch (err) {
-        // Ignore errors loading cache
+        // Ignore errors loading cache - app works fine without it
+        console.debug('[DesktopApp] YouTube cache load skipped:', err);
       }
-    })();
+    };
+
+    // Schedule load in next microtask to avoid blocking render
+    Promise.resolve().then(loadYouTubeCache).catch(console.debug);
   }, []);
   
   // Écouter les événements de chargement de tracks YouTube
@@ -191,11 +226,11 @@ export const DesktopApp = () => {
     removeTracksFromPlaylist 
   } = usePlaylists();
   
-  // Récupération automatique des tracks YouTube manquants au démarrage
+  // Récupération automatique des tracks YouTube manquants au démarrage (ASYNC - background task)
   useEffect(() => {
     const recoverMissingTracks = async () => {
-      // Attendre que les données soient chargées
-      if (libraryLoading) return;
+      // Don't block on libraryLoading - spawn recovery task in background
+      // It's OK if task runs before library is fully loaded
       
       try {
         // Collecter tous les IDs de tracks référencés
@@ -220,26 +255,24 @@ export const DesktopApp = () => {
         });
         
         if (missingIds.length > 0) {
-          console.log(`[DesktopApp] 🔄 Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
+          console.log(`[DesktopApp] Spawning recovery task for ${missingIds.length} missing YouTube tracks...`);
           try {
-            // Spawn async recovery task via bus (instead of blocking inline)
+            // Spawn async recovery task via bus (doesn't block boot)
             await spawnTask("youtube-recovery", { trackIds: missingIds })
           } catch (err) {
-            console.error("[DesktopApp] Failed to spawn recovery task:", err);
-            // Fallback to inline recovery if task fails
-            const { recoverMissingYouTubeTracks } = await import("@/lib/youtube-track-recovery");
-            await recoverMissingYouTubeTracks(missingIds);
+            console.debug("[DesktopApp] Task spawn skipped (OK on boot):", err);
+            // Fallback to inline recovery only if needed later
           }
         }
       } catch (error) {
-        console.warn('[DesktopApp] Erreur récupération tracks YouTube:', error);
+        console.debug('[DesktopApp] Recovery task deferral OK:', error);
       }
     };
     
-    // Lancer la récupération après un court délai pour ne pas bloquer le démarrage
-    const timer = setTimeout(recoverMissingTracks, 2000);
+    // Defer recovery to background (5s delay) - don't block initial render at all
+    const timer = setTimeout(recoverMissingTracks, 5000);
     return () => clearTimeout(timer);
-  }, [libraryLoading]); // Retirer les autres dépendances pour éviter la boucle infinie
+  }, [favorites, history, playlists, allTracks]); // Include deps but recovery still deferred
   
   const { overallProgress: cloudSyncProgress, isUploading: cloudSyncUploading } = useCloudSync();
   const { overallProgress: cloudinaryProgress, isUploading: cloudinaryUploading } = useCloudinaryUpload();
@@ -2014,8 +2047,8 @@ export const DesktopApp = () => {
     };
   }, [allTracks, recentTracks, playlists, favorites, history]);
 
-  // Calculer la vue actuelle avec useMemo pour éviter les problèmes de hooks
-  const currentViewContent = useMemo(() => {
+  // Render the current view without memoization to keep lifecycle stable
+  const renderViewContent = () => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
@@ -2040,6 +2073,8 @@ export const DesktopApp = () => {
           isInline={true}
           isFavorite={currentTrack ? isFavorite(currentTrack.id) : false}
           onToggleFavorite={handleToggleFavorite}
+          onPlayTrack={handlePlayTrack}
+          onAddToQueue={handleAddToQueue}
         />
       );
     }
@@ -2061,15 +2096,15 @@ export const DesktopApp = () => {
           recentTracks={recentTracks}
           favoriteTracks={favoriteTracks}
           history={history}
-          onFilterByArtist={(artistName) => {
+          onFilterByArtist={(artistName: string) => {
             setSelectedArtist(artistName);
             setCurrentView("artist-detail");
           }}
-          onNavigateToArtist={(artistName) => {
+          onNavigateToArtist={(artistName: string) => {
             setSelectedArtist(artistName);
             setCurrentView("artist-detail");
           }}
-          onNavigateToAlbum={(albumName, artistName) => {
+          onNavigateToAlbum={(albumName: string, artistName: string) => {
             const albumKey = `${albumName}-${artistName}`;
             setAlbumToOpen(albumKey);
             setCurrentView("albums");
@@ -2594,55 +2629,7 @@ export const DesktopApp = () => {
           </div>
         );
     }
-  }, [
-    showInlinePlayer,
-    currentTrack,
-    isPlaying,
-    currentTime,
-    isShuffle,
-    repeatMode,
-    volume,
-    isMuted,
-    youtubeDuration,
-    currentView,
-    tracks,
-    currentTrackIndex,
-    libraryLoading,
-    recentTracks,
-    favoriteTracks,
-    history,
-    playlists,
-    recentlyAddedTracks,
-    albumToOpen,
-    selectedArtist,
-    audioRef.current,
-    isFavorite,
-    handleToggleFavorite,
-    handlePlayPause,
-    handlePrevious,
-    handleNext,
-    handleShuffle,
-    handleRepeat,
-    handleSeek,
-    handleVolumeChange,
-    handleShowPlayer,
-    handleTrackSelect,
-    handlePlayNext,
-    handleAddToQueue,
-    handleAddToPlaylist,
-    handlePlayTrackList,
-    handlePlayTracks,
-    handleShuffleTracks,
-    createPlaylist,
-    updatePlaylist,
-    deletePlaylist,
-    addTracksToPlaylist,
-    removeTracksFromPlaylist,
-    handlePlayTrack,
-    setSelectedArtist,
-    setCurrentView,
-    setAlbumToOpen,
-  ]);
+  };
 
   // Show loading screen
   if (isLoading) {
@@ -2666,6 +2653,9 @@ export const DesktopApp = () => {
       </div>
     </div>
   );
+
+  const viewKey = showInlinePlayer ? `player:${currentTrack?.id ?? "none"}` : currentView;
+  const viewContent = renderViewContent();
 
   return (
     <CoachmarkProvider autoStart={true}>
@@ -2695,6 +2685,8 @@ export const DesktopApp = () => {
             onClose={() => setIsFullscreen(false)}
             isFavorite={isFavorite(currentTrack.id)}
             onToggleFavorite={handleToggleFavorite}
+            onPlayTrack={handlePlayTrack}
+            onAddToQueue={handleAddToQueue}
             youtubePlayerRef={youtubePlayerRef}
           />
         )}
@@ -2776,17 +2768,17 @@ export const DesktopApp = () => {
             )}>
               <Suspense fallback={null}>
                 {showInlinePlayer ? (
-                  <div className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
-                    {currentViewContent}
+                  <div key={viewKey} className="h-full w-full flex items-center justify-center animate-in fade-in duration-200">
+                    {viewContent}
                   </div>
                 ) : currentView === "videos" ? (
-                  <div className="h-full w-full relative">
-                    {currentViewContent}
+                  <div key={viewKey} className="h-full w-full relative">
+                    {viewContent}
                   </div>
                 ) : (
                   <ScrollArea className="h-full w-full min-h-0">
-                    <div className="animate-in fade-in duration-200 min-h-0 w-full">
-                      {currentViewContent}
+                    <div key={viewKey} className="animate-in fade-in duration-200 min-h-0 w-full">
+                      {viewContent}
                     </div>
                   </ScrollArea>
                 )}
@@ -2958,20 +2950,10 @@ export const DesktopApp = () => {
           <div 
             className={cn(
               "fixed inset-0",
-              isFullscreen ? "z-[9998] pointer-events-auto" : "pointer-events-none"
+              isFullscreen
+                ? "z-[9998] pointer-events-auto opacity-100 w-full h-full"
+                : "pointer-events-none z-[-1] opacity-0 w-px h-px overflow-hidden"
             )}
-            style={isFullscreen ? {
-              zIndex: 9998,
-              opacity: 1,
-              width: '100%',
-              height: '100%',
-            } : {
-              zIndex: -1,
-              opacity: 0,
-              width: '1px',
-              height: '1px',
-              overflow: 'hidden',
-            }}
           >
             <YouTubePlayer
               key={currentTrack?.id || 'yt-player'}
@@ -3091,6 +3073,9 @@ export const DesktopApp = () => {
           fileCount={pendingFilesToProcess.length}
           isProcessing={isProcessingFiles}
         />
+
+        {/* Nexus Assistant FAB */}
+        <NexusFAB />
       </div>
     </TooltipProvider>
     </CoachmarkProvider>

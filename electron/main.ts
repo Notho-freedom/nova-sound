@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, protocol, safeStorage, type BrowserWindowConstructorOptions, type BrowserWindow as ElectronBrowserWindow, type Rectangle } from 'electron';
+import updater, { type UpdateInfo } from 'electron-updater';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
@@ -26,6 +27,7 @@ import { parseArgs, showHelp, showVersion, applyCLIOptions, normalizeOptions, ty
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const { autoUpdater } = updater;
 
 // Global error handlers to prevent ECONNRESET and other connection errors from crashing
 process.on('uncaughtException', (error: any) => {
@@ -502,8 +504,13 @@ function createWindow() {
       preload: finalPreloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
-      webSecurity: false, // Allow loading local files
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      devTools: isDev,
+      spellcheck: false,
+      autoplayPolicy: 'document-user-activation-required',
+      disableBlinkFeatures: 'Auxclick',
     },
   });
   
@@ -608,7 +615,11 @@ function createWindow() {
 
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url);
+    } else {
+      console.warn('[Security] Blocked external URL:', url);
+    }
     return { action: 'deny' };
   });
 }
@@ -676,6 +687,84 @@ async function initServices() {
   // Note: IPC handlers are registered synchronously in init functions
   // If handlers are missing, it's likely due to an error during service initialization
   // which would have been logged above
+}
+
+async function initBinaryAutoUpdater() {
+  if (isDev || cliOptions.dev) {
+    console.log('🧪 Dev mode: skipping native auto-updater');
+    return;
+  }
+
+  if (process.platform !== 'win32') {
+    console.log(`ℹ️ Native auto-updater enabled only on Windows (detected ${process.platform})`);
+    return;
+  }
+
+  const feedUrl = (process.env.ELECTRON_UPDATER_URL || process.env.UPDATE_BASE_URL || '').trim().replace(/\/+$/, '');
+  if (feedUrl) {
+    try {
+      autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl, channel: 'latest' });
+    } catch (error) {
+      console.warn('⚠️ Failed to set auto-update feed URL:', error);
+    }
+  } else {
+    console.log('ℹ️ No ELECTRON_UPDATER_URL provided; relying on bundled app-update.yml if present');
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoRunAppAfterInstall = true;
+
+  const notifyRenderer = (info: UpdateInfo, downloaded: boolean) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const stringNotes = typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined;
+      const aggregatedNotes = Array.isArray(info.releaseNotes)
+        ? info.releaseNotes
+            .map((note: any) => {
+              if (typeof note === 'string') return note;
+              if (note && typeof note.note === 'string') return note.note;
+              return null;
+            })
+            .filter(Boolean)
+            .join('\n')
+        : stringNotes;
+
+      mainWindow.webContents.send('update:available', {
+        version: info.version,
+        changelog: aggregatedNotes,
+        buildDate: info.releaseDate,
+        downloaded,
+        source: 'binary',
+      });
+    }
+  };
+
+  autoUpdater.on('update-available', (info: UpdateInfo) => {
+    console.log(`🔄 Update available: ${info.version}`);
+    notifyRenderer(info, false);
+  });
+
+  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+    console.log(`✅ Update downloaded: ${info.version}`);
+    notifyRenderer(info, true);
+    setTimeout(() => {
+      try {
+        autoUpdater.quitAndInstall(false, true);
+      } catch (error) {
+        console.warn('⚠️ Failed to install update:', error);
+      }
+    }, 1200);
+  });
+
+  autoUpdater.on('error', (error: Error) => {
+    console.warn('⚠️ Auto-updater error:', error);
+  });
+
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    console.warn('⚠️ Auto-updater check failed:', error);
+  }
 }
 
 // Window control handlers
@@ -1827,6 +1916,11 @@ app.whenReady().then(async () => {
 
   // Create window ASAP for faster dev startup
   createWindow();
+
+  // Kick off native auto-updates for packaged Windows builds
+  initBinaryAutoUpdater().catch((error) => {
+    console.warn('⚠️ Failed to start native auto-updater:', error);
+  });
 
   // Initialize storage and services
   if (isDev || cliOptions.dev) {

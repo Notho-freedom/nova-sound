@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo, memo } from "react";
 import { Disc, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpIcon } from "@/components/ui/HelpButton";
@@ -20,6 +21,29 @@ interface GenreExploreSectionProps {
   showHelp?: boolean;
 }
 
+// Memoized genre card wrapper to prevent re-renders
+const MemoizedGenreCard = memo(({ 
+  genre, 
+  onSelect 
+}: { 
+  genre: GenreExploreItem; 
+  onSelect: (name: string) => void;
+}) => {
+  const handleClick = useCallback(() => {
+    onSelect(genre.name);
+  }, [genre.name, onSelect]);
+
+  return (
+    <GenreCard
+      name={genre.name}
+      trackCount={genre.trackCount}
+      onClick={handleClick}
+      className="flex-shrink-0 snap-start w-40"
+    />
+  );
+});
+MemoizedGenreCard.displayName = "MemoizedGenreCard";
+
 export function GenreExploreSection({
   title = "Explorer par genre",
   subtitle,
@@ -28,6 +52,17 @@ export function GenreExploreSection({
   onViewAll,
   showHelp = true,
 }: GenreExploreSectionProps) {
+  // Memoize the action button
+  const actionButton = useMemo(() => {
+    if (!onViewAll || genres.length <= 8) return null;
+    return (
+      <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground" onClick={onViewAll}>
+        Voir tout
+        <ChevronRight className="w-4 h-4" />
+      </Button>
+    );
+  }, [onViewAll, genres.length]);
+
   if (genres.length === 0) return null;
 
   return (
@@ -45,22 +80,13 @@ export function GenreExploreSection({
         title={title}
         subtitle={subtitle ?? `${genres.length} genres disponibles`}
         icon={<Disc className="w-5 h-5 text-secondary" />}
-        action={
-          onViewAll && genres.length > 8 ? (
-            <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground hover:text-foreground" onClick={onViewAll}>
-              Voir tout
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          ) : null
-        }
+        action={actionButton}
       >
         {genres.map((genre) => (
-          <GenreCard
+          <MemoizedGenreCard
             key={genre.name}
-            name={genre.name}
-            trackCount={genre.trackCount}
-            onClick={() => onSelectGenre(genre.name)}
-            className="flex-shrink-0 snap-start w-40"
+            genre={genre}
+            onSelect={onSelectGenre}
           />
         ))}
       </ContentCarousel>
