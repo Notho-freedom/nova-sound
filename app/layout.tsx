@@ -23,6 +23,33 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (typeof performance === "undefined" || typeof performance.measure !== "function") {
+      return;
+    }
+
+    const originalMeasure = performance.measure.bind(performance);
+    const safeMeasure = (...args: Parameters<Performance["measure"]>) => {
+      try {
+        return originalMeasure(...args);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "NotFoundError") {
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("negative time stamp")) {
+          return;
+        }
+        throw error;
+      }
+    };
+
+    performance.measure = safeMeasure as Performance["measure"];
+    return () => {
+      performance.measure = originalMeasure as Performance["measure"];
+    };
+  }, []);
+
+  useEffect(() => {
     // Register service worker for PWA cache/offline and init IndexedDB cache
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       // Avoid file:// (electron shell) or non-HTTPS
@@ -84,7 +111,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </ThemeProvider>
           </QueryClientProvider>
         ) : (
-          <div style={{ display: 'none' }}>{children}</div>
+          <div className="layout-hidden">{children}</div>
         )}
       </body>
     </html>
