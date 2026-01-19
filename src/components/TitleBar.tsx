@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Settings, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, Play, Music, Cloud, Copy, Plus, FileText, FolderOpen } from "lucide-react"
+import { Minus, Square, X, Settings, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, Play, Music, Cloud, Copy, Plus, FileText, FolderOpen, Bot } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -39,6 +39,7 @@ interface TitleBarProps {
   canGoForward?: boolean
   onGoBack?: () => void
   onGoForward?: () => void
+  onOpenAssistant?: () => void
 }
 
 const TitleBarComponent = ({
@@ -56,6 +57,7 @@ const TitleBarComponent = ({
   canGoForward = false,
   onGoBack,
   onGoForward,
+  onOpenAssistant,
 }: TitleBarProps) => {
   const [isMaximized, setIsMaximized] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
@@ -540,6 +542,21 @@ const TitleBarComponent = ({
           </div>
 
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            {/* AI Assistant Button */}
+            {onOpenAssistant && (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onOpenAssistant}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] active:scale-95 transition-all duration-300 group"
+                  >
+                    <Bot className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Assistant IA</TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Firebase Sync Indicator */}
             {nexusAuthenticated && (
               <DropdownMenu open={isSyncPopoverOpen} onOpenChange={setIsSyncPopoverOpen}>

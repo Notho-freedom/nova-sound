@@ -18,7 +18,7 @@ import { ArtistInfoPanel } from "./ArtistInfoPanel";
 import { PlayQueueChoiceDialog } from "./PlayQueueChoiceDialog";
 // import { KaraokePanel } from "./KaraokePanel"; // DÉSACTIVÉ - Système karaoke désactivé
 import { UpdateNotification } from "./UpdateNotification";
-import { NexusFAB } from "./NexusFAB";
+import { AssistantPanel } from "./AssistantPanel";
 import { lazy, Suspense } from "react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -378,6 +378,7 @@ export const DesktopApp = () => {
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isArtistInfoOpen, setIsArtistInfoOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
@@ -2636,24 +2637,6 @@ export const DesktopApp = () => {
     return <LoadingScreen onLoadComplete={handleLoadComplete} />;
   }
 
-  // Show message if no tracks
-  const noTracksMessage = tracks.length === 0 && !libraryLoading && !showInlinePlayer && currentView !== "settings" && (
-    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-      <div className="glass rounded-xl p-8 text-center max-w-md pointer-events-auto animate-in fade-in zoom-in duration-300">
-        <h2 className="font-display text-xl mb-3">Bibliothèque vide</h2>
-        <p className="text-muted-foreground mb-4">
-          Ajoutez des dossiers de musique dans les Paramètres pour commencer à écouter.
-        </p>
-        <button 
-          onClick={handleOpenSettings}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          Ouvrir les Paramètres
-        </button>
-      </div>
-    </div>
-  );
-
   const viewKey = showInlinePlayer ? `player:${currentTrack?.id ?? "none"}` : currentView;
   const viewContent = renderViewContent();
 
@@ -2721,6 +2704,7 @@ export const DesktopApp = () => {
             canGoForward={canGoForward}
             onGoBack={goBack}
             onGoForward={goForward}
+            onOpenAssistant={() => setIsAssistantOpen(true)}
           />
 
         {/* Main Content */}
@@ -2758,7 +2742,6 @@ export const DesktopApp = () => {
 
           {/* Content Area */}
           <div className="flex-1 flex overflow-hidden relative z-10">
-            {noTracksMessage}
             
             <div className={cn(
               "flex-1 min-h-0 min-w-0 transition-all duration-300 relative",
@@ -2860,6 +2843,15 @@ export const DesktopApp = () => {
                 />
               </div>
             )} */}
+
+            {/* AI Assistant Panel */}
+            {isAssistantOpen && (
+              <div className="absolute right-0 top-0 bottom-0 z-20 animate-in slide-in-from-right duration-300">
+                <AssistantPanel
+                  onClose={() => setIsAssistantOpen(false)}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -3073,9 +3065,6 @@ export const DesktopApp = () => {
           fileCount={pendingFilesToProcess.length}
           isProcessing={isProcessingFiles}
         />
-
-        {/* Nexus Assistant FAB */}
-        <NexusFAB />
       </div>
     </TooltipProvider>
     </CoachmarkProvider>
