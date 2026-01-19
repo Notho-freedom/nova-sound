@@ -75,28 +75,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         {/* Apply theme immediately before React mounts to prevent flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const saved = localStorage.getItem("nexus-theme");
-                  const themes = ["dark", "light", "cyberpunk", "minimal", "spotify", "apple-music", "youtube-music", "tidal", "deezer", "system"];
-                  if (saved && themes.includes(saved)) {
-                    const root = document.documentElement;
-                    root.classList.remove(...themes);
-                    if (saved === "system") {
-                      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-                      root.classList.add(prefersDark ? "dark" : "light");
-                    } else {
-                      root.classList.add(saved);
-                    }
-                  } else {
-                    document.documentElement.classList.add("dark");
-                  }
-                } catch (e) {
-                  document.documentElement.classList.add("dark");
-                }
-              })();
-            `,
+            __html: `(function(){try{var s=localStorage.getItem("nexus-theme");var t=["dark","light","cyberpunk","minimal","spotify","apple-music","youtube-music","tidal","deezer","system"];if(s&&t.includes(s)){var r=document.documentElement;r.classList.remove.apply(r.classList,t);if(s==="system"){var p=window.matchMedia("(prefers-color-scheme: dark)").matches;r.classList.add(p?"dark":"light")}else{r.classList.add(s)}}else{document.documentElement.classList.add("dark")}}catch(e){document.documentElement.classList.add("dark")}})();`,
           }}
         />
       </head>
