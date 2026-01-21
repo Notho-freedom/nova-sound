@@ -603,7 +603,7 @@ export const VideosView = memo(() => {
         )}
 
         {/* Empty State */}
-        {!loading && !error && enhancedVideos.length === 0 && (
+        {!loading && !error && enhancedVideos.length === 0 && viewMode !== "youtube" && (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="w-24 h-24 rounded-full bg-muted/30 flex items-center justify-center mb-6">
               <Film className="w-12 h-12 text-muted-foreground" />
