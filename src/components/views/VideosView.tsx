@@ -1205,26 +1205,27 @@ export const VideosView = memo(() => {
           </div>
         )}
 
-        {/* Watchlist / Favorites / History Views */}
         {/* YouTube Search View */}
         {viewMode === "youtube" && (
-          <YouTubeSearchView
-            onPlayVideo={() => {
-              // Ne pas naviguer automatiquement vers le player vidéo
-              // YouTubeSearchView gère sa propre lecture interne
-            }}
-            onAddToQueue={(video) => {
-              // Ajouter à la file d'attente si nécessaire
-              toast.success(t("videosToastAddedToQueue"));
-            }}
-            onPlayAsAudio={(track) => {
-              // Jouer comme audio et naviguer vers inline player
-              // Ce callback sera passé depuis DesktopApp
-              if (window.dispatchEvent) {
-                window.dispatchEvent(new CustomEvent('youtube-audio-play', { detail: track }));
-              }
-            }}
-          />
+          <div className="h-full min-h-0 flex flex-col">
+            <YouTubeSearchView
+              onPlayVideo={() => {
+                // Ne pas naviguer automatiquement vers le player vidéo
+                // YouTubeSearchView gère sa propre lecture interne
+              }}
+              onAddToQueue={(video) => {
+                // Ajouter à la file d'attente si nécessaire
+                toast.success(t("videosToastAddedToQueue"));
+              }}
+              onPlayAsAudio={(track) => {
+                // Jouer comme audio et naviguer vers inline player
+                // Ce callback sera passé depuis DesktopApp
+                if (window.dispatchEvent) {
+                  window.dispatchEvent(new CustomEvent('youtube-audio-play', { detail: track }));
+                }
+              }}
+            />
+          </div>
         )}
 
         {!loading && !error && (viewMode === "watchlist" || viewMode === "favorites" || viewMode === "history") && (
