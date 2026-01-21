@@ -187,7 +187,7 @@ export const VideosView = memo(() => {
   useEffect(() => {
     // Vérifier si une clé API YouTube est configurée avant de charger
     const apiKey = typeof window !== 'undefined' 
-      ? localStorage.getItem("nexus-youtube-api-key") || process.env.YOUTUBE_API_KEY
+      ? localStorage.getItem("nexus-youtube-api-key") || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
       : null;
     
     if (!apiKey) {

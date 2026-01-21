@@ -108,7 +108,7 @@ NEXT_PUBLIC_DEBUG_YOUTUBE_RECOVERY=true
 
 La récupération utilise automatiquement :
 1. La clé stockée dans `localStorage` (`nexus-youtube-api-key`)
-2. La variable d'environnement `YOUTUBE_API_KEY` si disponible
+2. La variable d'environnement `NEXT_PUBLIC_YOUTUBE_API_KEY` si disponible
 
 ## Gestion du quota API
 

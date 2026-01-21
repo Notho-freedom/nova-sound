@@ -77,7 +77,7 @@ Pour utiliser la fonctionnalité de recherche YouTube, vous devez configurer une
    - Copiez la clé générée
 
 4. **Configurer dans Nexus** :
-   - Ajoutez la variable d'environnement `YOUTUBE_API_KEY` dans votre fichier `.env.local`
+   - Ajoutez la variable d'environnement `NEXT_PUBLIC_YOUTUBE_API_KEY` dans votre fichier `.env.local`
    - Ou configurez-la dans les paramètres de l'application (si implémenté)
 
 **Note** : L'API YouTube Data v3 est gratuite jusqu'à 10 000 unités/jour, ce qui est largement suffisant pour un usage personnel.

@@ -468,7 +468,7 @@ function initYouTubeApiKey(): void {
     return;
   }
   
-  const envKey = process.env.YOUTUBE_API_KEY;
+  const envKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
   if (envKey) {
     YouTube.setApiKey(envKey);
   }

@@ -28,7 +28,7 @@ function getYouTubeApiKey(): string | null {
   const fromStorage = localStorage.getItem("nexus-youtube-api-key");
   if (fromStorage) return fromStorage;
   
-  return process.env.YOUTUBE_API_KEY || null;
+  return process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || null;
 }
 
 /**
