@@ -232,7 +232,10 @@ export const HeroCarousel = memo(({
   return (
     <div
       className={cn(
+        // Vision Pro spatial hero carousel
         "relative w-full h-[500px] md:h-[550px] lg:h-[600px] rounded-3xl overflow-hidden group mt-1",
+        "border border-white/[0.06]",
+        "shadow-[0_24px_80px_-20px_rgba(0,0,0,0.5)]",
         className
       )}
       onMouseEnter={() => setIsPaused(true)}

@@ -97,10 +97,15 @@ const CompactTrackCard = memo(
           onClick={onPlay}
           onContextMenu={handleContextMenu}
           className={cn(
-            "group relative overflow-hidden rounded-xl bg-card/50 backdrop-blur-sm text-left transition-all duration-200 ease-out w-full",
-            "hover:bg-card hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]",
-            isCurrent && isPlaying && "ring-2 ring-primary",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+            // Vision Pro spatial card
+            "group relative overflow-hidden rounded-2xl text-left transition-all duration-300 ease-out w-full",
+            "bg-white/[0.03] backdrop-blur-xl",
+            "border border-white/[0.06] hover:border-white/[0.12]",
+            "hover:bg-white/[0.06] hover:scale-[1.02]",
+            "hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
+            "active:scale-[0.98]",
+            isCurrent && isPlaying && "ring-2 ring-primary/60 bg-primary/[0.08]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
             sizes.container,
             className,
           )}
@@ -218,12 +223,15 @@ const DefaultTrackCard = memo(
           onMouseLeave={() => setIsHovered(false)}
           onContextMenu={handleContextMenu}
           className={cn(
-            "group relative flex flex-col rounded-xl overflow-hidden text-left w-full",
-            "bg-white/5 hover:bg-white/10",
+            // Vision Pro spatial card with depth
+            "group relative flex flex-col rounded-2xl overflow-hidden text-left w-full",
+            "bg-white/[0.03] backdrop-blur-xl",
+            "border border-white/[0.06] hover:border-white/[0.12]",
             "transition-all duration-300 ease-out",
-            "hover:scale-[1.03] hover:shadow-xl hover:shadow-primary/10",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-            isCurrent && "ring-2 ring-primary bg-primary/10",
+            "hover:bg-white/[0.06] hover:scale-[1.03]",
+            "hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            isCurrent && "ring-2 ring-primary/60 bg-primary/[0.08] border-primary/20",
             sizes.container,
             className,
           )}
