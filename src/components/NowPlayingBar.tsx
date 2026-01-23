@@ -130,20 +130,23 @@ export const NowPlayingBar = ({
         data-coachmark="player-bar"
         className={cn(
           "relative flex flex-col",
-          // Pure Vision Pro glass bar (theme-aware)
-          "bg-[hsl(var(--glass-bar))] backdrop-blur-3xl",
-          "border-t border-border/50",
+          // Theme-aware glass bar using sidebar tokens for consistency
+          "bg-sidebar-background/95 backdrop-blur-2xl",
+          "border-t border-sidebar-border/50",
         )}
       >
-        {/* Ambient glow from currently playing */}
+        {/* Ambient glow from currently playing - uses sidebar-primary */}
         <div 
-          className="absolute inset-0 pointer-events-none opacity-30"
+          className="absolute inset-0 pointer-events-none opacity-25"
           style={{
-            background: 'radial-gradient(ellipse 50% 100% at 50% 100%, hsl(var(--primary) / 0.15) 0%, transparent 60%)'
+            background: 'radial-gradient(ellipse 50% 100% at 50% 100%, hsl(var(--sidebar-primary) / 0.15) 0%, transparent 60%)'
           }}
         />
+        
+        {/* Subtle top edge highlight */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sidebar-border/50 to-transparent pointer-events-none" />
 
-        {/* Progress Bar - Vision Pro style with glow */}
+        {/* Progress Bar - Vision Pro style with theme-aware glow */}
         <div
           className="relative h-[3px] w-full group cursor-pointer hover:h-1.5 transition-all duration-200"
           onClick={(e) => {
@@ -153,19 +156,22 @@ export const NowPlayingBar = ({
           }}
         >
           {/* Track background */}
-          <div className="absolute inset-0 bg-muted/50" />
-          {/* Progress fill with glow */}
+          <div className="absolute inset-0 bg-sidebar-accent/50" />
+          {/* Progress fill with glow - uses sidebar-primary */}
           <div 
-            className="absolute left-0 top-0 h-full bg-primary transition-all duration-100"
+            className="absolute left-0 top-0 h-full bg-sidebar-primary transition-all duration-100"
             style={{ 
               width: `${progress}%`,
-              boxShadow: '0 0 10px hsl(var(--primary) / 0.5)'
+              boxShadow: '0 0 12px hsl(var(--sidebar-primary) / 0.5)'
             }}
           />
           {/* Hover indicator */}
           <div 
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg shadow-primary/50" 
-            style={{ left: `calc(${progress}% - 6px)` }}
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-sidebar-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg" 
+            style={{ 
+              left: `calc(${progress}% - 6px)`,
+              boxShadow: '0 0 8px hsl(var(--sidebar-primary) / 0.6)'
+            }}
           />
         </div>
 
@@ -182,11 +188,11 @@ export const NowPlayingBar = ({
                     aria-label="Ouvrir le lecteur"
                     className={cn(
                       "relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 group",
-                      "ring-2 ring-border/50 hover:ring-primary/50",
+                      "ring-2 ring-sidebar-border/50 hover:ring-sidebar-primary/50",
                       "transition-all duration-300 ease-out",
-                      "hover:shadow-xl hover:shadow-primary/20",
+                      "hover:shadow-xl hover:shadow-sidebar-primary/20",
                       "active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                     )}
                   >
                     <img
@@ -198,10 +204,10 @@ export const NowPlayingBar = ({
                     {isPlaying && (
                       <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                         <div className="flex items-end gap-0.5 h-4">
-                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-full" />
-                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-70 wave-delay-100" />
-                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-85 wave-delay-200" />
-                          <div className="w-1 bg-primary rounded-full animate-wave wave-bar-60 wave-delay-300" />
+                          <div className="w-1 bg-sidebar-primary rounded-full animate-wave wave-bar-full" />
+                          <div className="w-1 bg-sidebar-primary rounded-full animate-wave wave-bar-70 wave-delay-100" />
+                          <div className="w-1 bg-sidebar-primary rounded-full animate-wave wave-bar-85 wave-delay-200" />
+                          <div className="w-1 bg-sidebar-primary rounded-full animate-wave wave-bar-60 wave-delay-300" />
                         </div>
                       </div>
                     )}
@@ -218,21 +224,21 @@ export const NowPlayingBar = ({
               <div className="flex-1 min-w-0">
                 <button
                   onClick={onShowPlayer}
-                  className="text-sm font-semibold truncate text-foreground hover:text-primary transition-colors duration-200 block w-full text-left"
+                  className="text-sm font-semibold truncate text-sidebar-foreground hover:text-sidebar-primary transition-colors duration-200 block w-full text-left"
                 >
                   {currentTrack.title}
                 </button>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60 mt-0.5">
                   <button
                     onClick={onNavigateToArtist}
-                    className="hover:text-foreground hover:underline transition-colors truncate"
+                    className="hover:text-sidebar-foreground hover:underline transition-colors truncate"
                   >
                     {currentTrack.artist}
                   </button>
-                  <span className="text-muted-foreground/40">•</span>
+                  <span className="text-sidebar-foreground/30">•</span>
                   <button
                     onClick={onNavigateToAlbum}
-                    className="hover:text-foreground hover:underline transition-colors truncate"
+                    className="hover:text-sidebar-foreground hover:underline transition-colors truncate"
                   >
                     {currentTrack.album}
                   </button>
@@ -247,9 +253,9 @@ export const NowPlayingBar = ({
                     aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      isFavorite ? "text-rose-500 hover:text-rose-400" : "text-muted-foreground/50 hover:text-rose-500",
-                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      isFavorite ? "text-rose-500 hover:text-rose-400" : "text-sidebar-foreground/40 hover:text-rose-500",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                   >
                     <Heart
@@ -278,9 +284,9 @@ export const NowPlayingBar = ({
                       aria-label="Lecture aléatoire"
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
-                        isShuffle ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
-                        "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                        isShuffle ? "text-sidebar-primary bg-sidebar-primary/10" : "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                        "hover:bg-sidebar-accent active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                       )}
                     >
                       <Shuffle className="w-4 h-4" />
@@ -295,28 +301,31 @@ export const NowPlayingBar = ({
                   aria-label="Piste précédente"
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
-                    "text-foreground/80 hover:text-foreground",
-                    "hover:bg-[hsl(var(--glass-item-hover))] active:scale-90",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    "text-sidebar-foreground/80 hover:text-sidebar-foreground",
+                    "hover:bg-sidebar-accent active:scale-90",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                   )}
                 >
                   <SkipBack className="w-5 h-5 fill-current" />
                 </button>
 
-                {/* Play/Pause - Main button - Vision Pro style */}
+                {/* Play/Pause - Main button - Theme-aware */}
                 <button
                   onClick={onPlayPause}
                   aria-label={isPlaying ? "Pause" : "Lecture"}
                   className={cn(
                     "w-11 h-11 rounded-full flex items-center justify-center",
-                    // Glass button with primary fill (theme-aware)
-                    "bg-primary text-primary-foreground",
-                    "shadow-lg shadow-primary/20",
-                    "hover:bg-primary/90 hover:scale-105",
+                    // Uses sidebar-primary for theme consistency
+                    "bg-sidebar-primary text-sidebar-primary-foreground",
+                    "shadow-lg",
+                    "hover:opacity-90 hover:scale-105",
                     "active:scale-95",
-                    "transition-all duration-200 ease-out-expo",
+                    "transition-all duration-200 ease-out",
                     "focus:outline-none",
                   )}
+                  style={{
+                    boxShadow: '0 4px 20px hsl(var(--sidebar-primary) / 0.3)'
+                  }}
                 >
                   {isPlaying ? (
                     <Pause className="w-5 h-5 fill-current" />
@@ -331,9 +340,9 @@ export const NowPlayingBar = ({
                   aria-label="Piste suivante"
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
-                    "text-foreground/80 hover:text-foreground",
-                    "hover:bg-[hsl(var(--glass-item-hover))] active:scale-90",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    "text-sidebar-foreground/80 hover:text-sidebar-foreground",
+                    "hover:bg-sidebar-accent active:scale-90",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                   )}
                 >
                   <SkipForward className="w-5 h-5 fill-current" />
@@ -348,10 +357,10 @@ export const NowPlayingBar = ({
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
                         repeatMode !== "off"
-                          ? "text-primary bg-primary/10"
-                          : "text-muted-foreground/50 hover:text-foreground",
-                        "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                          ? "text-sidebar-primary bg-sidebar-primary/10"
+                          : "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                        "hover:bg-sidebar-accent active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                       )}
                     >
                       {repeatMode === "one" ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
@@ -365,11 +374,11 @@ export const NowPlayingBar = ({
 
               {/* Time display */}
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-[11px] font-mono text-muted-foreground/60 w-10 text-right">
+                <span className="text-[11px] font-mono text-sidebar-foreground/50 w-10 text-right tabular-nums">
                   {formatTime(roundedCurrentTime)}
                 </span>
-                <span className="text-[11px] text-muted-foreground/30">/</span>
-                <span className="text-[11px] font-mono text-muted-foreground/60 w-10">
+                <span className="text-[11px] text-sidebar-foreground/25">/</span>
+                <span className="text-[11px] font-mono text-sidebar-foreground/50 w-10 tabular-nums">
                   {formatTime(effectiveDuration)}
                 </span>
               </div>
@@ -396,10 +405,10 @@ export const NowPlayingBar = ({
                       className={cn(
                         "p-2 rounded-full transition-all duration-300 relative",
                         audioAnalysis.browserAnalysis?.hasVoice 
-                          ? "text-primary bg-primary/10" 
-                          : "text-muted-foreground/50 hover:text-primary",
-                        "hover:bg-primary/10 active:scale-95",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                          ? "text-sidebar-primary bg-sidebar-primary/10" 
+                          : "text-sidebar-foreground/40 hover:text-sidebar-primary",
+                        "hover:bg-sidebar-accent active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                       )}
                     >
                       <Brain className="w-4 h-4" />
@@ -409,7 +418,7 @@ export const NowPlayingBar = ({
                       )}
                       {/* Indicateur Pro */}
                       {isAudioAIPro && (
-                        <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-primary" />
+                        <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-sidebar-primary" />
                       )}
                     </button>
                   </TooltipTrigger>
@@ -442,7 +451,7 @@ export const NowPlayingBar = ({
                         </div>
                       )}
                       {isAudioAIPro && !audioAnalysis.transcription && (
-                        <p className="text-xs text-primary mt-2">Cliquez pour lancer l'analyse IA</p>
+                        <p className="text-xs text-sidebar-primary mt-2">Cliquez pour lancer l'analyse IA</p>
                       )}
                     </div>
                   </TooltipContent>
@@ -457,9 +466,9 @@ export const NowPlayingBar = ({
                     aria-label="Profil artiste"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      "text-muted-foreground/50 hover:text-primary",
-                      "hover:bg-primary/10 active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      "text-sidebar-foreground/40 hover:text-sidebar-primary",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                     disabled={!onShowArtistInfo}
                   >
@@ -497,9 +506,9 @@ export const NowPlayingBar = ({
                     aria-label="Afficher les paroles"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                   >
                     <Mic2 className="w-4 h-4" />
@@ -517,9 +526,9 @@ export const NowPlayingBar = ({
                     aria-label="Ouvrir la file d'attente"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      isQueueOpen ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      isQueueOpen ? "text-sidebar-primary bg-sidebar-primary/10" : "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                   >
                     <ListMusic className="w-4 h-4" />
@@ -535,9 +544,9 @@ export const NowPlayingBar = ({
                     aria-label="Appareils"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                   >
                     <Airplay className="w-4 h-4" />
@@ -557,9 +566,9 @@ export const NowPlayingBar = ({
                   aria-label={isMuted ? "Activer le son" : "Couper le son"}
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                 >
                   <VolumeIcon className="w-4 h-4" />
@@ -588,9 +597,9 @@ export const NowPlayingBar = ({
                     aria-label="Plein écran"
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
-                      "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                      "hover:bg-sidebar-accent active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                     )}
                   >
                     <Maximize2 className="w-4 h-4" />
@@ -606,9 +615,9 @@ export const NowPlayingBar = ({
                     aria-label="Plus d'options"
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
-                        "text-muted-foreground/50 hover:text-foreground",
-                        "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                        "text-sidebar-foreground/40 hover:text-sidebar-foreground",
+                        "hover:bg-sidebar-accent active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
                       )}
                   >
                     <MoreHorizontal className="w-4 h-4" />
