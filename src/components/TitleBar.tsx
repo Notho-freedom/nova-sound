@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { memo, useEffect, useRef, useState } from "react"
-import { Minus, Square, X, Settings, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, Play, Music, Cloud, Copy, Plus, FileText, FolderOpen, Bot } from "lucide-react"
+import { Minus, Square, X, Settings, Bell, User, LogOut, Crown, Sparkles, Search, UserCircle, ArrowLeft, ArrowRight, CloudOff, RefreshCw, Check, AlertCircle, Play, Music, Cloud, Copy, Plus, FileText, FolderOpen, Bot, Sun, Moon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { useCloudSync } from "@/hooks/useCloudSync"
+import { useTheme } from "@/hooks/useTheme"
 import { useYouTubeSearch } from "@/hooks/useYouTubeSearch"
 import { useI18n } from "@/i18n"
 import { firebaseService } from "@/services/firebase"
@@ -41,6 +42,37 @@ interface TitleBarProps {
   onGoForward?: () => void
   onOpenAssistant?: () => void
 }
+
+// Theme toggle button component
+const ThemeToggleButton = memo(() => {
+  const { resolvedTheme, setTheme } = useTheme()
+  
+  const toggleTheme = () => {
+    setTheme(resolvedTheme === "dark" ? "light" : "dark")
+  }
+  
+  return (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <button
+          onClick={toggleTheme}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] active:scale-95 transition-all duration-300 group"
+          aria-label={resolvedTheme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+        >
+          {resolvedTheme === "dark" ? (
+            <Moon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          ) : (
+            <Sun className="w-4 h-4 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="text-xs">
+        {resolvedTheme === "dark" ? "Mode clair" : "Mode sombre"}
+      </TooltipContent>
+    </Tooltip>
+  )
+})
+ThemeToggleButton.displayName = "ThemeToggleButton"
 
 const TitleBarComponent = ({
   title = "NEXUS",
@@ -69,6 +101,7 @@ const TitleBarComponent = ({
   const electronAPI = getElectronAPI()
   const { t } = useI18n()
   const { nexusUser, nexusAuthenticated, nexusIsPro, nexusLogout } = useCloudSync()
+  const { theme, resolvedTheme, setTheme } = useTheme()
   const { results: ytResults, search: searchYouTube, loading: ytLoading } = useYouTubeSearch()
   const [quickResults, setQuickResults] = useState<Track[]>([])
   const searchContainerRef = useRef<HTMLDivElement | null>(null)
@@ -542,6 +575,9 @@ const TitleBarComponent = ({
           </div>
 
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            {/* Theme Toggle */}
+            <ThemeToggleButton />
+            
             {/* AI Assistant Button */}
             {onOpenAssistant && (
               <Tooltip delayDuration={0}>
