@@ -72,11 +72,16 @@ export const GenreCard = memo(
         onClick={handleClick}
         title={titleText}
         className={cn(
-          "group relative overflow-hidden rounded-xl",
+          // Vision Pro spatial genre card
+          "group relative overflow-hidden rounded-2xl",
           "aspect-[2/1] min-h-[80px]",
-          "transition-all duration-200 ease-out",
-          "hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+          "backdrop-blur-xl",
+          "border border-white/[0.08] hover:border-white/[0.15]",
+          "transition-all duration-300 ease-out",
+          "hover:scale-[1.03] hover:-translate-y-1",
+          "hover:shadow-[0_16px_48px_rgba(0,0,0,0.4)]",
+          "active:scale-[0.98]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
           "text-left w-full",
           className,
         )}

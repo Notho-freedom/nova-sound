@@ -26,15 +26,18 @@ export const QuickPlayCard = memo(({
 }: QuickPlayCardProps) => {
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-4 p-3 rounded-xl w-full text-left",
-        "bg-card/50 hover:bg-card/80 backdrop-blur-sm",
-        "border border-border/30 hover:border-primary/30",
+        // Vision Pro spatial quick play card
+        "flex items-center gap-4 p-3 rounded-2xl w-full text-left",
+        "bg-white/[0.04] backdrop-blur-xl",
+        "border border-white/[0.06] hover:border-white/[0.12]",
+        "hover:bg-white/[0.08]",
+        "hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)]",
         "transition-all duration-300 group",
-        isCurrent && "ring-2 ring-primary/50 bg-primary/5",
+        isCurrent && "ring-2 ring-primary/50 bg-primary/[0.08] border-primary/20",
         className
       )}
     >

@@ -34,14 +34,21 @@ export const StatCard = ({
   return (
     <div
       className={cn(
+        // Vision Pro spatial stat card
         "relative group p-5 rounded-2xl overflow-hidden",
-        "bg-gradient-to-br border backdrop-blur-sm",
+        "bg-gradient-to-br border backdrop-blur-xl",
+        "border-white/[0.08]",
         "transition-all duration-300 ease-out",
-        "hover:scale-[1.02] hover:shadow-lg",
+        "hover:scale-[1.02]",
+        "hover:shadow-[0_8px_32px_rgba(0,0,0,0.25)]",
+        "hover:border-white/[0.12]",
         colorClasses[color],
         className,
       )}
     >
+      {/* Ambient glow effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+      
       {/* Background glow */}
       <div
         className={cn(

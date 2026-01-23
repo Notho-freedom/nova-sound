@@ -74,9 +74,15 @@ export const PlaylistCard = memo(
         <button
           onClick={handleClick}
           className={cn(
-            "group relative aspect-[3/2] rounded-xl overflow-hidden cursor-pointer",
-            "shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+            // Vision Pro spatial playlist card
+            "group relative aspect-[3/2] rounded-2xl overflow-hidden cursor-pointer",
+            "backdrop-blur-xl",
+            "border border-white/[0.08] hover:border-white/[0.15]",
+            "shadow-[0_8px_32px_rgba(0,0,0,0.25)]",
+            "hover:shadow-[0_20px_60px_rgba(0,0,0,0.4)]",
+            "transition-all duration-300",
+            "hover:scale-[1.03] hover:-translate-y-1",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
             "text-left w-full",
             className,
           )}

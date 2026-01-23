@@ -212,10 +212,14 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
             style={style}
             onClick={() => data.onPlayTrack ? data.onPlayTrack(track) : data.onTrackSelect(actualIndex)}
             className={cn(
+              // Vision Pro spatial row
               "grid items-center cursor-pointer",
-              "border-b border-border/30",
-              isCurrentTrack ? "bg-primary/10" : "hover:bg-muted/40 active:bg-muted/50",
+              "border-b border-white/[0.04]",
+              isCurrentTrack 
+                ? "bg-primary/[0.08] backdrop-blur-sm" 
+                : "hover:bg-white/[0.04] active:bg-white/[0.06]",
               "transition-all duration-200 ease-out",
+              "group",
             )}
             role="row"
             aria-selected={isCurrentTrack}
@@ -313,9 +317,16 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
     });
 
     return (
-      <div className="bg-card/30 backdrop-blur-sm rounded-xl border border-border/30 overflow-hidden relative">
-        <div className="border-b border-border/30 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50">
-          <div className="grid items-center px-4 py-2.5 text-xs font-display uppercase tracking-widest text-muted-foreground" style={{ gridTemplateColumns: columnsTemplate }}>
+      <div className={cn(
+        // Vision Pro spatial table container
+        "rounded-2xl overflow-hidden relative",
+        "bg-white/[0.02] backdrop-blur-xl",
+        "border border-white/[0.06]",
+        "shadow-[0_8px_32px_rgba(0,0,0,0.2)]",
+      )}>
+        {/* Header with glass effect */}
+        <div className="border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-xl">
+          <div className="grid items-center px-4 py-3 text-xs font-display uppercase tracking-widest text-muted-foreground/60" style={{ gridTemplateColumns: columnsTemplate }}>
             <div>{showTrackNumber ? "#" : ""}</div>
             <div>Titre</div>
             {showAlbum && <div className="hidden md:block">Album</div>}

@@ -78,8 +78,11 @@ export const ContentCarousel = memo(({
                   onClick={() => scroll("left")}
                   disabled={!canScrollLeft}
                   className={cn(
+                    // Vision Pro glass navigation button
                     "w-9 h-9 rounded-full flex items-center justify-center",
-                    "bg-muted/50 hover:bg-muted transition-colors",
+                    "bg-white/[0.06] backdrop-blur-xl",
+                    "border border-white/[0.08] hover:border-white/[0.15]",
+                    "hover:bg-white/[0.1] transition-all duration-200",
                     "disabled:opacity-30 disabled:cursor-not-allowed"
                   )}
                 >
@@ -89,8 +92,11 @@ export const ContentCarousel = memo(({
                   onClick={() => scroll("right")}
                   disabled={!canScrollRight}
                   className={cn(
+                    // Vision Pro glass navigation button
                     "w-9 h-9 rounded-full flex items-center justify-center",
-                    "bg-muted/50 hover:bg-muted transition-colors",
+                    "bg-white/[0.06] backdrop-blur-xl",
+                    "border border-white/[0.08] hover:border-white/[0.15]",
+                    "hover:bg-white/[0.1] transition-all duration-200",
                     "disabled:opacity-30 disabled:cursor-not-allowed"
                   )}
                 >
