@@ -90,18 +90,18 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
         "transition-all duration-300 ease-out-expo group",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
         collapsed ? "px-0 py-3 justify-center" : "px-4 py-3.5 gap-3",
-        // Active state - Frosted glass with glow
+        // Active state - Frosted glass with glow (theme-aware)
         isActive
           ? cn(
-              "bg-white/[0.1] backdrop-blur-xl",
-              "border border-white/[0.15]",
+              "bg-[hsl(var(--glass-item-active))] backdrop-blur-xl",
+              "border border-border/50",
               "shadow-lg shadow-primary/10",
               "text-foreground"
             )
           : cn(
               "text-muted-foreground",
               "hover:text-foreground",
-              "hover:bg-white/[0.05]",
+              "hover:bg-[hsl(var(--glass-item-hover))]",
               "border border-transparent"
             ),
       )}
@@ -151,8 +151,8 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
               className={cn(
                 "min-w-[22px] h-[22px] px-1.5 text-[11px] font-semibold rounded-full",
                 "flex items-center justify-center",
-                "bg-white/[0.08] backdrop-blur-sm text-muted-foreground",
-                "border border-white/[0.1]",
+                "bg-secondary/80 backdrop-blur-sm text-secondary-foreground",
+                "border border-border/50",
                 "transition-all duration-200",
               )}
             >
@@ -172,9 +172,9 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           side="right" 
           className={cn(
             "flex items-center gap-2",
-            "bg-black/80 backdrop-blur-2xl",
-            "border border-white/[0.12]",
-            "shadow-xl shadow-black/30"
+            "bg-popover/95 backdrop-blur-2xl",
+            "border border-border",
+            "shadow-xl"
           )}
         >
           <span className="font-medium">{label}</span>
@@ -353,9 +353,9 @@ export const Sidebar = ({
         className={cn(
           "h-full flex flex-col relative",
           "transition-all duration-500 ease-out-expo",
-          // Pure Vision Pro glass sidebar
-          "bg-black/50 backdrop-blur-3xl",
-          "border-r border-white/[0.08]",
+          // Pure Vision Pro glass sidebar (theme-aware)
+          "bg-[hsl(var(--glass-sidebar))] backdrop-blur-3xl",
+          "border-r border-border/50",
           collapsed ? "w-[72px]" : "w-64",
         )}
       >
@@ -368,12 +368,12 @@ export const Sidebar = ({
         />
         
         {/* Subtle edge highlight */}
-        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-white/[0.1] via-white/[0.05] to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-border/30 via-border/10 to-transparent pointer-events-none" />
 
         {/* Top section with logo */}
         <div
           className={cn(
-            "relative flex items-center border-b border-white/5 transition-all duration-500",
+            "relative flex items-center border-b border-border/30 transition-all duration-500",
             collapsed ? "px-3 py-4 justify-center hidden" : "px-4 py-5",
           )}
         >
