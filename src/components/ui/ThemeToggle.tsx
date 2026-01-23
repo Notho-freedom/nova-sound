@@ -2,9 +2,9 @@
 
 import { memo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sun, Moon, Monitor, Palette, Check } from "lucide-react";
+import { Sun, Moon, Monitor, Palette, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTheme, type Theme } from "@/hooks/useTheme";
+import { useTheme, type Theme, type ThemeDefinition } from "@/hooks/useTheme";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,104 +17,108 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ThemeToggleProps {
-  variant?: "icon" | "full" | "minimal";
+  variant?: "icon" | "full" | "minimal" | "compact";
   className?: string;
+  showLabel?: boolean;
 }
 
-const themeIcons: Record<string, React.ReactNode> = {
-  light: <Sun className="w-4 h-4" />,
-  dark: <Moon className="w-4 h-4" />,
-  system: <Monitor className="w-4 h-4" />,
-  cyberpunk: <Palette className="w-4 h-4" />,
-  minimal: <Palette className="w-4 h-4" />,
-  spotify: <Palette className="w-4 h-4" />,
-  "apple-music": <Palette className="w-4 h-4" />,
-  "youtube-music": <Palette className="w-4 h-4" />,
-  tidal: <Palette className="w-4 h-4" />,
-  deezer: <Palette className="w-4 h-4" />,
+// Icon mapping for themes
+const getThemeIcon = (themeId: string, className = "w-4 h-4") => {
+  switch (themeId) {
+    case "light":
+      return <Sun className={className} />;
+    case "dark":
+      return <Moon className={className} />;
+    case "system":
+      return <Monitor className={className} />;
+    default:
+      return <Palette className={className} />;
+  }
 };
 
-const themeColors: Record<string, string> = {
-  light: "from-amber-400 to-orange-500",
-  dark: "from-indigo-500 to-purple-600",
-  system: "from-gray-400 to-gray-600",
-  cyberpunk: "from-yellow-400 via-pink-500 to-purple-600",
-  minimal: "from-gray-700 to-gray-900",
-  spotify: "from-green-500 to-green-700",
-  "apple-music": "from-red-500 to-pink-600",
-  "youtube-music": "from-red-600 to-red-800",
-  tidal: "from-cyan-400 to-cyan-600",
-  deezer: "from-cyan-400 via-pink-500 to-purple-500",
-};
+// Theme preview badge component
+const ThemePreviewBadge = memo(({ theme, isActive }: { theme: ThemeDefinition; isActive: boolean }) => (
+  <div className={cn(
+    "w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center shrink-0",
+    "shadow-sm transition-all duration-200",
+    theme.accentColor,
+    isActive && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+  )}>
+    {getThemeIcon(theme.id, "w-4 h-4 text-white drop-shadow-sm")}
+  </div>
+));
+ThemePreviewBadge.displayName = "ThemePreviewBadge";
 
-// Quick toggle between light and dark
+// Quick toggle between light and dark with animation
 const QuickThemeToggle = memo(({ className }: { className?: string }) => {
-  const { theme, resolvedTheme, setTheme } = useTheme();
-  
-  const toggleTheme = () => {
-    if (resolvedTheme === "dark") {
-      setTheme("light");
-    } else {
-      setTheme("dark");
-    }
-  };
+  const { resolvedTheme, toggleLightDark, isDark } = useTheme();
   
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
-          onClick={toggleTheme}
+          onClick={toggleLightDark}
           className={cn(
             "relative w-10 h-10 rounded-full flex items-center justify-center",
             "glass-button",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
             className
           )}
-          aria-label={resolvedTheme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+          aria-label={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
         >
           <AnimatePresence mode="wait">
             <motion.div
-              key={resolvedTheme}
+              key={isDark ? "dark" : "light"}
               initial={{ scale: 0, rotate: -90, opacity: 0 }}
               animate={{ scale: 1, rotate: 0, opacity: 1 }}
               exit={{ scale: 0, rotate: 90, opacity: 0 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
             >
-              {resolvedTheme === "dark" ? (
+              {isDark ? (
                 <Moon className="w-5 h-5 text-foreground" />
               ) : (
                 <Sun className="w-5 h-5 text-foreground" />
               )}
             </motion.div>
           </AnimatePresence>
+          
+          {/* Subtle glow on hover */}
+          <motion.div 
+            className={cn(
+              "absolute inset-0 rounded-full pointer-events-none",
+              isDark ? "bg-primary/10" : "bg-amber-400/15"
+            )}
+            initial={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          />
         </button>
       </TooltipTrigger>
-      <TooltipContent>
-        {resolvedTheme === "dark" ? "Mode clair" : "Mode sombre"}
+      <TooltipContent side="bottom" className="glass-subtle">
+        {isDark ? "Mode clair" : "Mode sombre"}
       </TooltipContent>
     </Tooltip>
   );
 });
 QuickThemeToggle.displayName = "QuickThemeToggle";
 
-// Full theme selector dropdown
-const FullThemeToggle = memo(({ className }: { className?: string }) => {
-  const { theme, resolvedTheme, setTheme, themes } = useTheme();
+// Full theme selector dropdown with all themes
+const FullThemeToggle = memo(({ className, showLabel = false }: { className?: string; showLabel?: boolean }) => {
+  const { theme, resolvedTheme, setTheme, baseThemes, musicThemes, isDark } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   
-  // Group themes
-  const basicThemes = themes.filter(t => ["light", "dark", "system"].includes(t.id));
-  const specialThemes = themes.filter(t => !["light", "dark", "system"].includes(t.id));
+  const currentTheme = [...baseThemes, ...musicThemes].find(t => t.id === theme);
   
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={showLabel ? "default" : "icon"}
           className={cn(
-            "relative w-10 h-10 rounded-full",
+            "relative rounded-full gap-2",
             "glass-button",
+            !showLabel && "w-10 h-10",
             className
           )}
           aria-label="Changer de thème"
@@ -126,8 +130,12 @@ const FullThemeToggle = memo(({ className }: { className?: string }) => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ duration: 0.15 }}
+              className="flex items-center gap-2"
             >
-              {themeIcons[resolvedTheme] || <Palette className="w-5 h-5" />}
+              {getThemeIcon(resolvedTheme, "w-5 h-5")}
+              {showLabel && currentTheme && (
+                <span className="text-sm font-medium">{currentTheme.name}</span>
+              )}
             </motion.div>
           </AnimatePresence>
         </Button>
@@ -135,40 +143,40 @@ const FullThemeToggle = memo(({ className }: { className?: string }) => {
       
       <DropdownMenuContent
         align="end"
+        sideOffset={8}
         className={cn(
-          "w-56 p-2",
+          "w-64 p-2",
           "glass-panel",
-          "border-white/[0.08]"
+          "border border-white/[0.08] dark:border-white/[0.08]"
         )}
       >
-        <DropdownMenuLabel className="text-xs text-muted-foreground px-2 py-1.5">
+        <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1.5">
+          <Sun className="w-3.5 h-3.5" />
           Apparence
         </DropdownMenuLabel>
         
-        {/* Basic themes */}
-        <div className="space-y-1">
-          {basicThemes.map((t) => (
+        {/* Base themes */}
+        <div className="space-y-0.5">
+          {baseThemes.map((t) => (
             <DropdownMenuItem
               key={t.id}
               onClick={() => setTheme(t.id)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer",
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer",
                 "transition-all duration-200",
                 theme === t.id && "bg-primary/10"
               )}
             >
-              <div className={cn(
-                "w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center",
-                themeColors[t.id]
-              )}>
-                {themeIcons[t.id]}
+              <ThemePreviewBadge theme={t} isActive={theme === t.id} />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{t.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{t.description}</div>
               </div>
-              <span className="flex-1 font-medium text-sm">{t.name}</span>
               {theme === t.id && (
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="w-5 h-5 rounded-full bg-primary flex items-center justify-center"
+                  className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0"
                 >
                   <Check className="w-3 h-3 text-primary-foreground" />
                 </motion.div>
@@ -177,36 +185,35 @@ const FullThemeToggle = memo(({ className }: { className?: string }) => {
           ))}
         </div>
         
-        <DropdownMenuSeparator className="my-2 bg-white/[0.08]" />
+        <DropdownMenuSeparator className="my-2 bg-border/50" />
         
-        <DropdownMenuLabel className="text-xs text-muted-foreground px-2 py-1.5">
+        <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1.5">
+          <Sparkles className="w-3.5 h-3.5" />
           Thèmes musicaux
         </DropdownMenuLabel>
         
-        {/* Special themes */}
-        <div className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-thin">
-          {specialThemes.map((t) => (
+        {/* Music themes */}
+        <div className="space-y-0.5 max-h-[240px] overflow-y-auto scrollbar-thin pr-1">
+          {musicThemes.map((t) => (
             <DropdownMenuItem
               key={t.id}
               onClick={() => setTheme(t.id)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer",
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer",
                 "transition-all duration-200",
                 theme === t.id && "bg-primary/10"
               )}
             >
-              <div className={cn(
-                "w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center",
-                themeColors[t.id] || "from-primary to-accent"
-              )}>
-                {themeIcons[t.id]}
+              <ThemePreviewBadge theme={t} isActive={theme === t.id} />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{t.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{t.description}</div>
               </div>
-              <span className="flex-1 font-medium text-sm">{t.name}</span>
               {theme === t.id && (
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="w-5 h-5 rounded-full bg-primary flex items-center justify-center"
+                  className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0"
                 >
                   <Check className="w-3 h-3 text-primary-foreground" />
                 </motion.div>
@@ -220,15 +227,9 @@ const FullThemeToggle = memo(({ className }: { className?: string }) => {
 });
 FullThemeToggle.displayName = "FullThemeToggle";
 
-// Minimal inline toggle (light/dark/system)
+// Minimal inline toggle (light/dark/system only)
 const MinimalThemeToggle = memo(({ className }: { className?: string }) => {
-  const { theme, setTheme } = useTheme();
-  
-  const options: { id: Theme; icon: React.ReactNode }[] = [
-    { id: "light", icon: <Sun className="w-4 h-4" /> },
-    { id: "dark", icon: <Moon className="w-4 h-4" /> },
-    { id: "system", icon: <Monitor className="w-4 h-4" /> },
-  ];
+  const { theme, setTheme, baseThemes } = useTheme();
   
   return (
     <div className={cn(
@@ -236,34 +237,88 @@ const MinimalThemeToggle = memo(({ className }: { className?: string }) => {
       "glass-subtle",
       className
     )}>
-      {options.map((opt) => (
-        <button
-          key={opt.id}
-          onClick={() => setTheme(opt.id)}
-          className={cn(
-            "relative w-8 h-8 rounded-full flex items-center justify-center",
-            "transition-all duration-200",
-            theme === opt.id 
-              ? "bg-primary text-primary-foreground" 
-              : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
-          )}
-          aria-label={opt.id}
-        >
-          {opt.icon}
-        </button>
+      {baseThemes.map((t) => (
+        <Tooltip key={t.id}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setTheme(t.id)}
+              className={cn(
+                "relative w-8 h-8 rounded-full flex items-center justify-center",
+                "transition-all duration-200",
+                theme === t.id 
+                  ? "bg-primary text-primary-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/[0.05]"
+              )}
+              aria-label={t.name}
+            >
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {getThemeIcon(t.id)}
+              </motion.div>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="glass-subtle text-xs">
+            {t.name}
+          </TooltipContent>
+        </Tooltip>
       ))}
     </div>
   );
 });
 MinimalThemeToggle.displayName = "MinimalThemeToggle";
 
+// Compact toggle for tight spaces (current theme icon only, opens full menu)
+const CompactThemeToggle = memo(({ className }: { className?: string }) => {
+  const { theme, resolvedTheme, setTheme, themes } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center",
+            "glass-button text-sm",
+            className
+          )}
+          aria-label="Thème"
+        >
+          {getThemeIcon(resolvedTheme, "w-4 h-4")}
+        </button>
+      </DropdownMenuTrigger>
+      
+      <DropdownMenuContent align="end" className="glass-panel p-1 w-40">
+        {themes.map((t) => (
+          <DropdownMenuItem
+            key={t.id}
+            onClick={() => setTheme(t.id)}
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer",
+              theme === t.id && "bg-primary/10"
+            )}
+          >
+            {getThemeIcon(t.id, "w-4 h-4")}
+            <span>{t.name}</span>
+            {theme === t.id && <Check className="w-3 h-3 ml-auto" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
+CompactThemeToggle.displayName = "CompactThemeToggle";
+
 // Main export with variant selection
-export const ThemeToggle = memo(({ variant = "icon", className }: ThemeToggleProps) => {
+export const ThemeToggle = memo(({ variant = "icon", className, showLabel }: ThemeToggleProps) => {
   switch (variant) {
     case "full":
-      return <FullThemeToggle className={className} />;
+      return <FullThemeToggle className={className} showLabel={showLabel} />;
     case "minimal":
       return <MinimalThemeToggle className={className} />;
+    case "compact":
+      return <CompactThemeToggle className={className} />;
     case "icon":
     default:
       return <QuickThemeToggle className={className} />;
@@ -272,4 +327,4 @@ export const ThemeToggle = memo(({ variant = "icon", className }: ThemeTogglePro
 ThemeToggle.displayName = "ThemeToggle";
 
 // Export individual variants for direct use
-export { QuickThemeToggle, FullThemeToggle, MinimalThemeToggle };
+export { QuickThemeToggle, FullThemeToggle, MinimalThemeToggle, CompactThemeToggle };

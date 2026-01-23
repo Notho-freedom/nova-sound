@@ -45,21 +45,17 @@ interface TitleBarProps {
 
 // Theme toggle button component
 const ThemeToggleButton = memo(() => {
-  const { resolvedTheme, setTheme } = useTheme()
-  
-  const toggleTheme = () => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark")
-  }
+  const { isDark, toggleLightDark } = useTheme()
   
   return (
     <Tooltip delayDuration={0}>
       <TooltipTrigger asChild>
         <button
-          onClick={toggleTheme}
+          onClick={toggleLightDark}
           className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] active:scale-95 transition-all duration-300 group"
-          aria-label={resolvedTheme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+          aria-label={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
         >
-          {resolvedTheme === "dark" ? (
+          {isDark ? (
             <Moon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
           ) : (
             <Sun className="w-4 h-4 text-muted-foreground group-hover:text-amber-500 transition-colors" />
@@ -67,7 +63,7 @@ const ThemeToggleButton = memo(() => {
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="text-xs">
-        {resolvedTheme === "dark" ? "Mode clair" : "Mode sombre"}
+        {isDark ? "Mode clair" : "Mode sombre"}
       </TooltipContent>
     </Tooltip>
   )
