@@ -35,11 +35,11 @@ export const QuickPlayCard = memo(({
       className={cn(
         // Pure Vision Pro spatial quick play card
         "relative flex items-center gap-4 p-3 rounded-2xl w-full text-left",
-        "bg-white/[0.03] backdrop-blur-2xl",
-        "border border-white/[0.06]",
-        "hover:bg-white/[0.06]",
-        "hover:border-white/[0.1]",
-        "hover:shadow-[0_12px_32px_rgba(0,0,0,0.35)]",
+        "bg-[hsl(var(--glass-bg))] backdrop-blur-2xl",
+        "border border-border/30",
+        "hover:bg-[hsl(var(--glass-bg-hover))]",
+        "hover:border-border/50",
+        "hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)]",
         "transition-all duration-300 group overflow-hidden",
         isCurrent && [
           "bg-primary/[0.08]",
@@ -58,7 +58,7 @@ export const QuickPlayCard = memo(({
       />
 
       {/* Image */}
-      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 shadow-lg shadow-black/30">
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
         <img
           src={imageUrl}
           alt={title}
@@ -121,8 +121,8 @@ export const QuickPlayCard = memo(({
       <div
         className={cn(
           "relative w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-          "bg-white text-black",
-          "shadow-xl shadow-white/20",
+          "bg-primary text-primary-foreground",
+          "shadow-xl shadow-primary/20",
           "opacity-0 group-hover:opacity-100",
           "scale-75 group-hover:scale-100",
           "transition-all duration-300"
