@@ -521,7 +521,7 @@ export const CloudView = () => {
   };
 
   return (
-    <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden">
+    <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden animate-in fade-in duration-300">
       <PageHeader
         title={t("cloudTitle")}
         subtitle={t("cloudSubtitle")}

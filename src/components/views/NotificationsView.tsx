@@ -60,17 +60,19 @@ export const NotificationsView = () => {
 
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/50 border-b border-border/30">
+      {/* Header - Vision Pro glassmorphism */}
+      <div className="sticky top-0 z-20 bg-background/60 backdrop-blur-2xl border-b border-white/[0.05] shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 backdrop-blur-xl border border-white/[0.1] flex items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
+                <Bell className="w-6 h-6 text-primary" />
+              </div>
               <div>
-                <h1 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
-                  <Bell className="w-6 h-6" />
+                <h1 className="font-display text-2xl font-bold text-foreground">
                   {t("notificationsTitle")}
                 </h1>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {t("notificationsCount", {
                     count: notifications.length,
                     suffix: notifications.length > 1 ? "s" : "",
