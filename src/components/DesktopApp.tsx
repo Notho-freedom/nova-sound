@@ -84,7 +84,7 @@ import { mapHistoryEntriesToTracks } from "@/lib/history-utils";
 import { getTrackFromAllOrCache } from "@/lib/track-resolver";
 import { Input } from "@/components/ui/input";
 import { CoachmarkProvider } from "@/features/coachmarks";
-import "@/features/coachmarks/styles/coachmarks-theme.css";
+import "@/features/coachmarks/styles/shepherd-theme.css";
 //import { VibrantUI, BassPulse } from "@/components/VibrantUI";
 //import { useAudioVibes } from "@/hooks/useAudioVibes";
 //import { useAudioAI } from "@/hooks/useAudioAI";
