@@ -1,10 +1,9 @@
-import type { Step } from 'react-joyride';
-
 /**
  * VERSION DE TEST: Coachmarks simplifié pour debug
+ * Note: Using Shepherd.js instead of react-joyride
  */
 
-export interface CoachmarkConfig extends Step {
+export interface CoachmarkConfig {
   id: string;
   target: string;
   title: string | React.ReactNode;
