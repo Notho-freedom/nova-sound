@@ -3,6 +3,11 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISION PRO TABS
+// Glass pill tabs with smooth transitions
+// ═══════════════════════════════════════════════════════════════════════════════
+
 const Tabs = TabsPrimitive.Root;
 
 const TabsList = React.memo(
@@ -13,7 +18,10 @@ const TabsList = React.memo(
     <TabsPrimitive.List
       ref={ref}
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+        "inline-flex items-center justify-center gap-1",
+        "rounded-xl p-1",
+        "bg-white/[0.05] backdrop-blur-sm",
+        "border border-white/[0.08]",
         className,
       )}
       {...props}
@@ -30,12 +38,18 @@ const TabsTrigger = React.memo(
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium",
-        "ring-offset-background transition-all duration-200",
-        "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        "disabled:pointer-events-none disabled:opacity-50",
-        "hover:text-foreground/80",
+        "inline-flex items-center justify-center whitespace-nowrap",
+        "rounded-lg px-4 py-2 text-sm font-medium",
+        "text-muted-foreground",
+        "transition-all duration-200 ease-out-expo",
+        // Active state
+        "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+        "data-[state=active]:shadow-lg data-[state=active]:shadow-primary/20",
+        // Hover
+        "hover:text-foreground",
+        // Focus
+        "focus:outline-none",
+        "disabled:pointer-events-none disabled:opacity-40",
         className,
       )}
       {...props}
@@ -52,9 +66,9 @@ const TabsContent = React.memo(
     <TabsPrimitive.Content
       ref={ref}
       className={cn(
-        "mt-2 ring-offset-background",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2",
+        "mt-4",
+        "focus:outline-none",
+        "data-[state=active]:animate-fade-in-up",
         className,
       )}
       {...props}
@@ -72,7 +86,8 @@ const TabsListUnderline = React.memo(
     <TabsPrimitive.List
       ref={ref}
       className={cn(
-        "inline-flex h-10 items-center justify-start gap-4 border-b border-border",
+        "inline-flex items-center justify-start gap-6",
+        "border-b border-white/[0.08]",
         className,
       )}
       {...props}
@@ -89,12 +104,16 @@ const TabsTriggerUnderline = React.memo(
     <TabsPrimitive.Trigger
       ref={ref}
       className={cn(
-        "relative inline-flex items-center justify-center whitespace-nowrap pb-3 pt-2 text-sm font-medium",
-        "text-muted-foreground transition-all duration-200",
+        "relative inline-flex items-center justify-center whitespace-nowrap",
+        "pb-3 pt-2 text-sm font-medium",
+        "text-muted-foreground",
+        "transition-all duration-200",
         "data-[state=active]:text-foreground",
-        "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform after:duration-200",
+        // Underline animation
+        "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5",
+        "after:bg-primary after:scale-x-0 after:transition-transform after:duration-300 after:ease-out-expo",
         "data-[state=active]:after:scale-x-100",
-        "focus-visible:outline-none",
+        "focus:outline-none",
         "hover:text-foreground/80",
         className,
       )}
