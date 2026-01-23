@@ -85,48 +85,63 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
     <button
       onClick={onClick}
       className={cn(
-        // Base styles - Vision Pro
-        "relative w-full flex items-center rounded-xl",
+        // Base styles - Pure Vision Pro
+        "relative w-full flex items-center rounded-2xl",
         "transition-all duration-300 ease-out-expo group",
-        "focus:outline-none",
-        collapsed ? "px-0 py-3 justify-center" : "px-4 py-3 gap-3",
-        // Active state - subtle glass highlight
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+        collapsed ? "px-0 py-3 justify-center" : "px-4 py-3.5 gap-3",
+        // Active state - Frosted glass with glow
         isActive
-          ? "bg-white/[0.08] text-foreground"
-          : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
+          ? cn(
+              "bg-white/[0.1] backdrop-blur-xl",
+              "border border-white/[0.15]",
+              "shadow-lg shadow-primary/10",
+              "text-foreground"
+            )
+          : cn(
+              "text-muted-foreground",
+              "hover:text-foreground",
+              "hover:bg-white/[0.05]",
+              "border border-transparent"
+            ),
       )}
     >
-      {/* Left accent bar for active - Vision Pro style */}
+      {/* Glow effect for active state */}
       {isActive && !collapsed && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
+        <div 
+          className="absolute inset-0 rounded-2xl opacity-60 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--primary) / 0.15) 0%, transparent 70%)'
+          }}
+        />
       )}
 
       <div
         className={cn(
           "relative flex items-center justify-center transition-all duration-200",
-          collapsed ? "w-6 h-6" : "w-5 h-5",
+          collapsed ? "w-7 h-7" : "w-5 h-5",
         )}
       >
         <Icon
           className={cn(
-            "flex-shrink-0 transition-all duration-200",
+            "flex-shrink-0 transition-all duration-300",
             collapsed ? "w-5 h-5" : "w-[18px] h-[18px]",
-            isActive ? "text-primary" : color || "text-current",
-            "group-hover:scale-105",
+            isActive ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]" : color || "text-current",
+            "group-hover:scale-110",
           )}
         />
       </div>
 
       {collapsed && badge !== undefined && badge > 0 && (
-        <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary shadow-lg shadow-primary/50 animate-pulse" />
       )}
 
       {!collapsed && (
         <>
           <span
             className={cn(
-              "text-sm flex-1 text-left truncate transition-colors duration-200",
-              isActive ? "font-medium text-foreground" : "font-normal",
+              "text-[13px] flex-1 text-left truncate transition-colors duration-200",
+              isActive ? "font-semibold text-foreground" : "font-medium",
             )}
           >
             {label}
@@ -134,10 +149,11 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           {badge !== undefined && badge > 0 && (
             <span
               className={cn(
-                "min-w-[20px] h-5 px-1.5 text-xs font-medium rounded-full",
+                "min-w-[22px] h-[22px] px-1.5 text-[11px] font-semibold rounded-full",
                 "flex items-center justify-center",
-                "bg-white/[0.06] text-muted-foreground",
-                "transition-colors duration-200",
+                "bg-white/[0.08] backdrop-blur-sm text-muted-foreground",
+                "border border-white/[0.1]",
+                "transition-all duration-200",
               )}
             >
               {badge > 99 ? "99+" : badge}
@@ -152,12 +168,20 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
     return (
       <Tooltip delayDuration={0}>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="right" className="flex items-center gap-2 bg-card/95 backdrop-blur-xl border-border/50">
+        <TooltipContent 
+          side="right" 
+          className={cn(
+            "flex items-center gap-2",
+            "bg-black/80 backdrop-blur-2xl",
+            "border border-white/[0.12]",
+            "shadow-xl shadow-black/30"
+          )}
+        >
           <span className="font-medium">{label}</span>
           {badge !== undefined && badge > 0 && (
             <span 
               className={cn(
-                "px-1.5 py-0.5 text-xs font-bold rounded-full flex items-center justify-center",
+                "px-1.5 py-0.5 text-xs font-bold rounded-full",
                 "bg-primary/20 text-primary"
               )}
             >
@@ -329,14 +353,22 @@ export const Sidebar = ({
         className={cn(
           "h-full flex flex-col relative",
           "transition-all duration-500 ease-out-expo",
-          // Vision Pro glass sidebar
-          "bg-black/40 backdrop-blur-2xl",
-          "border-r border-white/[0.06]",
-          collapsed ? "w-[72px]" : "w-60",
+          // Pure Vision Pro glass sidebar
+          "bg-black/50 backdrop-blur-3xl",
+          "border-r border-white/[0.08]",
+          collapsed ? "w-[72px]" : "w-64",
         )}
       >
-        {/* Subtle inner glow */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+        {/* Ambient top glow */}
+        <div 
+          className="absolute inset-x-0 top-0 h-32 pointer-events-none opacity-50"
+          style={{
+            background: 'radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--primary) / 0.1) 0%, transparent 70%)'
+          }}
+        />
+        
+        {/* Subtle edge highlight */}
+        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-white/[0.1] via-white/[0.05] to-transparent pointer-events-none" />
 
         {/* Top section with logo */}
         <div

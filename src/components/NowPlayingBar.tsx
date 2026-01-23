@@ -130,14 +130,22 @@ export const NowPlayingBar = ({
         data-coachmark="player-bar"
         className={cn(
           "relative flex flex-col",
-          // Vision Pro glass bar
-          "bg-black/60 backdrop-blur-3xl",
-          "border-t border-white/[0.08]",
+          // Pure Vision Pro glass bar
+          "bg-black/70 backdrop-blur-3xl",
+          "border-t border-white/[0.1]",
         )}
       >
-        {/* Progress Bar - Vision Pro style */}
+        {/* Ambient glow from currently playing */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-30"
+          style={{
+            background: 'radial-gradient(ellipse 50% 100% at 50% 100%, hsl(var(--primary) / 0.15) 0%, transparent 60%)'
+          }}
+        />
+
+        {/* Progress Bar - Vision Pro style with glow */}
         <div
-          className="relative h-1 w-full group cursor-pointer hover:h-1.5 transition-all duration-200"
+          className="relative h-[3px] w-full group cursor-pointer hover:h-1.5 transition-all duration-200"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect()
             const percent = (e.clientX - rect.left) / rect.width
@@ -145,18 +153,24 @@ export const NowPlayingBar = ({
           }}
         >
           {/* Track background */}
-          <div className="absolute inset-0 bg-white/[0.08]" />
-          {/* Progress fill */}
+          <div className="absolute inset-0 bg-white/[0.1]" />
+          {/* Progress fill with glow */}
           <div 
-            className="absolute left-0 top-0 h-full bg-white/90 transition-all duration-100"
-            style={{ width: `${progress}%` }}
+            className="absolute left-0 top-0 h-full bg-white transition-all duration-100"
+            style={{ 
+              width: `${progress}%`,
+              boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
+            }}
           />
           {/* Hover indicator */}
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg" style={{ left: `calc(${progress}% - 6px)` }} />
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg shadow-white/50" 
+            style={{ left: `calc(${progress}% - 6px)` }} 
+          />
         </div>
 
         {/* Main Content */}
-        <div className="relative px-4 py-3 mt-2">
+        <div className="relative px-5 py-4">
           <div className="flex items-center gap-4">
             {/* Left: Track Info */}
             <div className="flex items-center gap-4 min-w-0 w-[280px] flex-shrink-0">
