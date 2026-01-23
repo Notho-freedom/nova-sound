@@ -10,7 +10,7 @@ import { Sidebar, ViewType } from "./Sidebar";
 import { useViewNavigation } from "@/hooks/useViewNavigation";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
-import { FullscreenPlayer } from "./FullscreenPlayer";
+import { VisionProPlayer } from "./VisionProPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { NotificationsPanel } from "./NotificationsPanel";
@@ -2053,7 +2053,7 @@ export const DesktopApp = () => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
-        <FullscreenPlayer
+        <VisionProPlayer
           currentTrack={currentTrack}
           isPlaying={isPlaying}
           currentTime={currentTime}
@@ -2062,6 +2062,7 @@ export const DesktopApp = () => {
           volume={volume}
           isMuted={isMuted}
           youtubeDuration={youtubeDuration}
+          audioElement={audioRef.current}
           onPlayPause={handlePlayPause}
           onPrevious={handlePrevious}
           onNext={handleNext}
@@ -2071,11 +2072,8 @@ export const DesktopApp = () => {
           onVolumeChange={handleVolumeChange}
           onMuteToggle={() => setIsMuted(!isMuted)}
           onClose={handleShowPlayer}
-          isInline={true}
           isFavorite={currentTrack ? isFavorite(currentTrack.id) : false}
           onToggleFavorite={handleToggleFavorite}
-          onPlayTrack={handlePlayTrack}
-          onAddToQueue={handleAddToQueue}
         />
       );
     }
@@ -2645,9 +2643,9 @@ export const DesktopApp = () => {
       <TooltipProvider delayDuration={0}>
       <UpdateNotification />
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-        {/* Fullscreen Player */}
+        {/* Fullscreen Player - Vision Pro Style */}
         {isFullscreen && currentTrack && (
-          <FullscreenPlayer
+          <VisionProPlayer
             currentTrack={currentTrack}
             isPlaying={isPlaying}
             currentTime={currentTime}
@@ -2668,9 +2666,6 @@ export const DesktopApp = () => {
             onClose={() => setIsFullscreen(false)}
             isFavorite={isFavorite(currentTrack.id)}
             onToggleFavorite={handleToggleFavorite}
-            onPlayTrack={handlePlayTrack}
-            onAddToQueue={handleAddToQueue}
-            youtubePlayerRef={youtubePlayerRef}
           />
         )}
 
