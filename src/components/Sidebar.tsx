@@ -85,23 +85,23 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
     <button
       onClick={onClick}
       className={cn(
-        // Base styles - Pure Vision Pro
-        "relative w-full flex items-center rounded-2xl",
-        "transition-all duration-300 ease-out-expo group",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-        collapsed ? "px-0 py-3 justify-center" : "px-4 py-3.5 gap-3",
-        // Active state - Frosted glass with glow (theme-aware)
+        // Base styles - Theme-aware Vision Pro
+        "relative w-full flex items-center rounded-xl",
+        "transition-all duration-300 ease-out group/nav",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/30",
+        collapsed ? "px-0 py-3 justify-center" : "px-4 py-3 gap-3",
+        // Active state - Using sidebar semantic tokens
         isActive
           ? cn(
-              "bg-[hsl(var(--glass-item-active))] backdrop-blur-xl",
-              "border border-border/50",
-              "shadow-lg shadow-primary/10",
-              "text-foreground"
+              "bg-sidebar-accent/80 backdrop-blur-xl",
+              "border border-sidebar-primary/30",
+              "shadow-lg shadow-sidebar-primary/10",
+              "text-sidebar-foreground"
             )
           : cn(
-              "text-muted-foreground",
-              "hover:text-foreground",
-              "hover:bg-[hsl(var(--glass-item-hover))]",
+              "text-sidebar-foreground/70",
+              "hover:text-sidebar-foreground",
+              "hover:bg-sidebar-accent/50",
               "border border-transparent"
             ),
       )}
@@ -109,9 +109,9 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
       {/* Glow effect for active state */}
       {isActive && !collapsed && (
         <div 
-          className="absolute inset-0 rounded-2xl opacity-60 pointer-events-none"
+          className="absolute inset-0 rounded-xl opacity-50 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--primary) / 0.15) 0%, transparent 70%)'
+            background: 'radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--sidebar-primary) / 0.2) 0%, transparent 70%)'
           }}
         />
       )}
@@ -126,14 +126,16 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           className={cn(
             "flex-shrink-0 transition-all duration-300",
             collapsed ? "w-5 h-5" : "w-[18px] h-[18px]",
-            isActive ? "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]" : color || "text-current",
-            "group-hover:scale-110",
+            isActive 
+              ? "text-sidebar-primary drop-shadow-[0_0_8px_hsl(var(--sidebar-primary)/0.5)]" 
+              : color || "text-current",
+            "group-hover/nav:scale-110",
           )}
         />
       </div>
 
       {collapsed && badge !== undefined && badge > 0 && (
-        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary shadow-lg shadow-primary/50 animate-pulse" />
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-sidebar-primary shadow-lg shadow-sidebar-primary/50 animate-pulse" />
       )}
 
       {!collapsed && (
@@ -141,7 +143,7 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           <span
             className={cn(
               "text-[13px] flex-1 text-left truncate transition-colors duration-200",
-              isActive ? "font-semibold text-foreground" : "font-medium",
+              isActive ? "font-semibold text-sidebar-foreground" : "font-medium",
             )}
           >
             {label}
@@ -151,8 +153,8 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
               className={cn(
                 "min-w-[22px] h-[22px] px-1.5 text-[11px] font-semibold rounded-full",
                 "flex items-center justify-center",
-                "bg-secondary/80 backdrop-blur-sm text-secondary-foreground",
-                "border border-border/50",
+                "bg-sidebar-accent backdrop-blur-sm text-sidebar-accent-foreground",
+                "border border-sidebar-border/50",
                 "transition-all duration-200",
               )}
             >
@@ -177,7 +179,7 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
             "shadow-xl"
           )}
         >
-          <span className="font-medium">{label}</span>
+          <span className="font-medium text-popover-foreground">{label}</span>
           {badge !== undefined && badge > 0 && (
             <span 
               className={cn(
@@ -346,59 +348,63 @@ export const Sidebar = ({
     localStorage.setItem('nexus-sidebar-collapsed', String(collapsed));
   }, [collapsed]);
 
-  return (
+    return (
     <TooltipProvider>
       <div
         data-coachmark="sidebar"
         className={cn(
-          "h-full flex flex-col relative",
+          "h-full flex flex-col relative group",
           "transition-all duration-500 ease-out-expo",
-          // Pure Vision Pro glass sidebar (theme-aware)
-          "bg-[hsl(var(--glass-sidebar))] backdrop-blur-3xl",
-          "border-r border-border/50",
+          // Theme-aware glass sidebar using semantic tokens
+          "bg-sidebar-background/95 backdrop-blur-2xl",
+          "border-r border-sidebar-border/50",
           collapsed ? "w-[72px]" : "w-64",
         )}
       >
-        {/* Ambient top glow */}
+        {/* Ambient top glow - uses primary from current theme */}
         <div 
-          className="absolute inset-x-0 top-0 h-32 pointer-events-none opacity-50"
+          className="absolute inset-x-0 top-0 h-32 pointer-events-none opacity-40"
           style={{
-            background: 'radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--primary) / 0.1) 0%, transparent 70%)'
+            background: 'radial-gradient(ellipse 100% 100% at 50% 0%, hsl(var(--sidebar-primary) / 0.15) 0%, transparent 70%)'
           }}
         />
         
         {/* Subtle edge highlight */}
-        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-border/30 via-border/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-sidebar-border/40 via-sidebar-border/20 to-transparent pointer-events-none" />
 
         {/* Top section with logo */}
         <div
           className={cn(
-            "relative flex items-center border-b border-border/30 transition-all duration-500",
+            "relative flex items-center border-b border-sidebar-border/30 transition-all duration-500",
             collapsed ? "px-3 py-4 justify-center hidden" : "px-4 py-5",
           )}
         >
           <div className="flex items-center gap-3">
-            <div className="relative group">
+            <div className="relative group/logo">
               <div
                 className={cn(
-                  "rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-all duration-300 overflow-hidden",
-                  collapsed ? "w-10 h-10" : "w-7 h-7",
+                  "rounded-xl bg-gradient-to-br from-sidebar-primary/20 via-sidebar-primary/10 to-sidebar-accent/30",
+                  "flex items-center justify-center",
+                  "border border-sidebar-primary/20 group-hover/logo:border-sidebar-primary/40",
+                  "transition-all duration-300 overflow-hidden",
+                  "shadow-lg shadow-sidebar-primary/10",
+                  collapsed ? "w-10 h-10" : "w-8 h-8",
                 )}
               >
                 <img 
                   src="/icon.png" 
                   alt="NEXUS" 
-                  className={cn("object-contain", collapsed ? "w-10 h-10" : "w-7 h-7")}
+                  className={cn("object-contain", collapsed ? "w-10 h-10" : "w-8 h-8")}
                 />
               </div>
-              <div className="absolute inset-0 rounded-lg bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
+              <div className="absolute inset-0 rounded-xl bg-sidebar-primary/20 blur-lg opacity-0 group-hover/logo:opacity-100 transition-opacity duration-300 -z-10" />
             </div>
             {!collapsed && (
               <div className="animate-in fade-in slide-in-from-left-2 duration-500">
-                <h1 className="font-display text-lg font-bold tracking-wider bg-gradient-to-r from-primary via-foreground to-secondary bg-clip-text text-transparent">
+                <h1 className="font-display text-lg font-bold tracking-wider bg-gradient-to-r from-sidebar-primary via-sidebar-foreground to-sidebar-accent-foreground bg-clip-text text-transparent">
                   NEXUS
                 </h1>
-                <p className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/50">{t("appSubtitle")}</p>
+                <p className="text-[9px] uppercase tracking-[0.3em] text-sidebar-foreground/40">{t("appSubtitle")}</p>
               </div>
             )}
           </div>
@@ -408,15 +414,16 @@ export const Sidebar = ({
         <button
           onClick={() => handleCollapsedChange(!collapsed)}
           className={cn(
-            "absolute -right-3 top-20 z-99",
+            "absolute -right-3 top-20 z-50",
             "w-6 h-6 rounded-full",
-            "bg-card/90 backdrop-blur-xl border border-white/10",
+            "bg-sidebar-accent/90 backdrop-blur-xl",
+            "border border-sidebar-border",
             "flex items-center justify-center",
-            "text-muted-foreground hover:text-primary hover:border-primary/50",
+            "text-sidebar-foreground/70 hover:text-sidebar-primary hover:border-sidebar-primary/50",
             "transition-all duration-300 ease-out",
-            "hover:shadow-lg hover:shadow-primary/20",
+            "hover:shadow-lg hover:shadow-sidebar-primary/20",
             "active:scale-95",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/50",
           )}
         >
           {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
