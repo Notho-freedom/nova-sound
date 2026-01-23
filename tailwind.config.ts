@@ -170,6 +170,16 @@ export default {
         "float": "float 4s ease-in-out infinite",
         "shimmer": "shimmer 2s ease-in-out infinite",
         "spin-slow": "spin-slow 8s linear infinite",
+        // Advanced micro-animations
+        "elastic-bounce": "elastic-bounce 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)",
+        "jiggle": "jiggle 0.5s ease-in-out",
+        "heartbeat": "heartbeat 1.2s ease-in-out infinite",
+        "breathe": "breathe 3s ease-in-out infinite",
+        "border-glow": "border-glow 2s ease-in-out infinite",
+        "spin-bounce": "spin-bounce 1s cubic-bezier(0.68, -0.55, 0.27, 1.55)",
+        "pop-in": "pop-in 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)",
+        "wobble": "wobble 0.8s ease-in-out",
+        "slide-fade-in": "slide-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
       },
       transitionTimingFunction: {
         "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",

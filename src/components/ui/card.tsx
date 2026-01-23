@@ -72,17 +72,18 @@ CardFooter.displayName = "CardFooter";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTERACTIVE CARD
-// Hoverable and pressable with spatial depth
+// Hoverable and pressable with spatial depth and micro-animations
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface InteractiveCardProps extends React.HTMLAttributes<HTMLDivElement> {
   hoverable?: boolean;
   pressable?: boolean;
+  glowOnHover?: boolean;
 }
 
 const InteractiveCard = React.memo(
   React.forwardRef<HTMLDivElement, InteractiveCardProps>(
-    ({ className, hoverable = true, pressable = true, ...props }, ref) => (
+    ({ className, hoverable = true, pressable = true, glowOnHover = false, ...props }, ref) => (
       <div
         ref={ref}
         className={cn(
@@ -96,9 +97,10 @@ const InteractiveCard = React.memo(
             "hover:bg-card/90",
             "hover:border-white/[0.15]",
             "hover:shadow-xl hover:shadow-black/15",
-            "hover:-translate-y-0.5",
+            "hover:-translate-y-1",
           ],
           pressable && "active:scale-[0.98] cursor-pointer",
+          glowOnHover && "hover-border-glow",
           className,
         )}
         {...props}
