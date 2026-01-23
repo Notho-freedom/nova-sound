@@ -488,16 +488,28 @@ export const VideoPlayer = ({
   return (
     <div
       className={cn(
-        "relative bg-black group w-full h-full",
-        isFullApp ? "fixed inset-0 z-[9998]" : "",
+        "relative group w-full h-full overflow-hidden",
+        // Vision Pro glass container
+        "bg-background/95 backdrop-blur-xl",
+        "rounded-2xl border border-border/30",
+        "shadow-2xl shadow-black/20",
+        isFullApp ? "fixed inset-0 z-[9998] rounded-none border-0" : "",
         className
       )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
+      {/* Ambient glow effect */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-30"
+        style={{
+          background: 'radial-gradient(ellipse 80% 50% at 50% 100%, hsl(var(--primary) / 0.2) 0%, transparent 60%)'
+        }}
+      />
+
       {/* YouTube Player ou Video Element */}
       {isYouTube && youtubeVideoId ? (
-        <div className="absolute inset-0 w-full h-full">
+        <div className="absolute inset-0 w-full h-full rounded-2xl overflow-hidden">
           <YouTubePlayer
             ref={youtubePlayerRef}
             videoId={youtubeVideoId}
@@ -514,59 +526,67 @@ export const VideoPlayer = ({
       ) : (
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover rounded-2xl"
           playsInline
           preload="metadata"
           onClick={togglePlayPause}
         />
       )}
 
-      {/* Loading Indicator */}
+      {/* Loading Indicator - Vision Pro style */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-md rounded-2xl">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-b-accent/50 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+          </div>
         </div>
       )}
 
-      {/* Controls Overlay - Superposé sur YouTube avec z-index élevé */}
+      {/* Controls Overlay - Vision Pro glassmorphism */}
       {showControls && (showControlsOverlay || isHovering || !isPlaying) && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-between p-4 transition-opacity z-30 pointer-events-none">
+        <div 
+          className={cn(
+            "absolute inset-0 flex flex-col justify-between transition-opacity duration-300 z-30 pointer-events-none",
+            isFullApp ? "" : "rounded-2xl"
+          )}
+        >
+          {/* Top gradient */}
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 via-black/30 to-transparent pointer-events-none" />
+          
+          {/* Bottom gradient */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none" />
+
           {/* Top Controls */}
-          <div className="flex items-center justify-between pointer-events-auto">
+          <div className="relative flex items-center justify-between p-4 pointer-events-auto">
             {onClose && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="text-white hover:bg-white/20"
+                className={cn(
+                  "w-10 h-10 rounded-xl",
+                  "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                  "border border-white/20 hover:border-white/30",
+                  "text-white transition-all duration-200",
+                  "shadow-lg shadow-black/20"
+                )}
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
             )}
             <div className="flex items-center gap-2">
-              {/* Bouton d'analyse IA désactivé temporairement */}
-              {/* <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowAIPanel(!showAIPanel)}
-                className={cn(
-                  "text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95",
-                  showAIPanel && "bg-primary/20 text-primary",
-                  isAIPro && "ring-2 ring-primary/50"
-                )}
-                title={isAIPro ? "Analyse IA Pro" : "Analyse audio native (Gratuit)"}
-              >
-                <Brain className="w-5 h-5" />
-                {isAIPro && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
-                )}
-              </Button> */}
               {onCinemaMode && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onCinemaMode}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                  className={cn(
+                    "w-10 h-10 rounded-xl",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "border border-white/20 hover:border-white/30",
+                    "text-white transition-all duration-200"
+                  )}
                   title="Mode Ciné"
                 >
                   <Film className="w-5 h-5" />
@@ -579,22 +599,25 @@ export const VideoPlayer = ({
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    // Convertir la vidéo en track et transférer vers le système audio
                     const track = youtubeVideoToTrack({
                       videoId: youtubeVideoId || '',
                       title: video.title,
                       description: video.description || '',
                       thumbnailUrl: video.thumbnailUrl || '',
                       channelTitle: video.channelTitle || '',
-                      duration: video.duration ? `PT${Math.floor(video.duration)}S` : 'PT0S', // Convertir en format ISO 8601
+                      duration: video.duration ? `PT${Math.floor(video.duration)}S` : 'PT0S',
                       publishedAt: new Date().toISOString(),
-                      viewCount: '0', // Pas disponible dans le type Video
+                      viewCount: '0',
                     });
                     onPlayAsAudio(track);
-                    // Fermer le player vidéo car on bascule vers l'audio
                     onClose?.();
                   }}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                  className={cn(
+                    "w-10 h-10 rounded-xl",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "border border-white/20 hover:border-white/30",
+                    "text-white transition-all duration-200"
+                  )}
                   title="Transférer vers le player audio"
                 >
                   <Music className="w-5 h-5" />
@@ -606,7 +629,12 @@ export const VideoPlayer = ({
                   variant="ghost"
                   size="icon"
                   onClick={onFullApp}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                  className={cn(
+                    "w-10 h-10 rounded-xl",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "border border-white/20 hover:border-white/30",
+                    "text-white transition-all duration-200"
+                  )}
                   title="Plein écran dans l'app"
                 >
                   <Monitor className="w-5 h-5" />
@@ -616,7 +644,12 @@ export const VideoPlayer = ({
                 variant="ghost"
                 size="icon"
                 onClick={handlePictureInPicture}
-                className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                className={cn(
+                  "w-10 h-10 rounded-xl",
+                  "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                  "border border-white/20 hover:border-white/30",
+                  "text-white transition-all duration-200"
+                )}
                 disabled={!document.pictureInPictureEnabled}
                 title="Image dans l'image"
               >
@@ -626,7 +659,12 @@ export const VideoPlayer = ({
                 variant="ghost"
                 size="icon"
                 onClick={toggleFullscreen}
-                className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                className={cn(
+                  "w-10 h-10 rounded-xl",
+                  "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                  "border border-white/20 hover:border-white/30",
+                  "text-white transition-all duration-200"
+                )}
                 title="Plein écran"
               >
                 {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
@@ -643,7 +681,14 @@ export const VideoPlayer = ({
                 e.stopPropagation();
                 togglePlayPause();
               }}
-              className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto backdrop-blur-sm"
+              className={cn(
+                "w-20 h-20 rounded-full pointer-events-auto",
+                "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                "border border-white/30 hover:border-white/50",
+                "text-white transition-all duration-300",
+                "shadow-2xl shadow-black/30",
+                "hover:scale-110 active:scale-95"
+              )}
             >
               {isPlaying ? (
                 <Pause className="w-10 h-10 fill-current" />
@@ -654,10 +699,10 @@ export const VideoPlayer = ({
           </div>
 
           {/* Bottom Controls */}
-          <div className="space-y-3 pointer-events-auto">
+          <div className="relative space-y-3 p-4 pointer-events-auto">
             {/* Progress Bar */}
             <div className="flex items-center gap-3">
-              <span className="text-white text-sm font-mono min-w-[60px] text-right">
+              <span className="text-white/90 text-sm font-mono min-w-[60px] text-right tabular-nums">
                 {formatTime(currentTime)}
               </span>
               <Slider
@@ -667,7 +712,7 @@ export const VideoPlayer = ({
                 onValueChange={handleSeek}
                 className="flex-1"
               />
-              <span className="text-white text-sm font-mono min-w-[60px]">
+              <span className="text-white/90 text-sm font-mono min-w-[60px] tabular-nums">
                 {formatTime(duration)}
               </span>
             </div>
@@ -680,7 +725,7 @@ export const VideoPlayer = ({
                     variant="ghost"
                     size="icon"
                     onClick={onPrevious}
-                    className="text-white hover:bg-white/20"
+                    className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10"
                     disabled={!videos.length}
                   >
                     <SkipBack className="w-5 h-5" />
@@ -690,7 +735,7 @@ export const VideoPlayer = ({
                   variant="ghost"
                   size="icon"
                   onClick={togglePlayPause}
-                  className="text-white hover:bg-white/20"
+                  className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10"
                 >
                   {isPlaying ? (
                     <Pause className="w-5 h-5 fill-current" />
@@ -703,7 +748,7 @@ export const VideoPlayer = ({
                     variant="ghost"
                     size="icon"
                     onClick={onNext}
-                    className="text-white hover:bg-white/20"
+                    className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10"
                     disabled={!videos.length}
                   >
                     <SkipForward className="w-5 h-5" />
@@ -718,9 +763,9 @@ export const VideoPlayer = ({
                     variant="ghost"
                     size="icon"
                     onClick={toggleMute}
-                    className="text-white hover:bg-white/20"
+                    className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white"
                   >
-                    <VolumeIcon className="w-5 h-5" />
+                    <VolumeIcon className="w-4 h-4" />
                   </Button>
                   <Slider
                     value={[volume]}
@@ -733,96 +778,102 @@ export const VideoPlayer = ({
 
                 {/* Subtitles (if available) */}
                 {video.subtitles && video.subtitles.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                      aria-label="Sous-titres"
-                    >
-                      <option value="">Sous-titres désactivés</option>
-                      {video.subtitles.map((sub) => (
-                        <option key={sub.id} value={sub.id}>
-                          {sub.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    className={cn(
+                      "h-9 px-3 text-sm rounded-lg",
+                      "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                      "text-white border border-white/20",
+                      "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    )}
+                    aria-label="Sous-titres"
+                  >
+                    <option value="">Sous-titres désactivés</option>
+                    {video.subtitles.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.label}
+                      </option>
+                    ))}
+                  </select>
                 )}
 
                 {/* Audio Tracks (if available) */}
                 {video.audioTracks && video.audioTracks.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                      aria-label="Piste audio"
-                    >
-                      {video.audioTracks.map((track) => (
-                        <option key={track.id} value={track.id}>
-                          {track.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    className={cn(
+                      "h-9 px-3 text-sm rounded-lg",
+                      "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                      "text-white border border-white/20",
+                      "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    )}
+                    aria-label="Piste audio"
+                  >
+                    {video.audioTracks.map((track) => (
+                      <option key={track.id} value={track.id}>
+                        {track.label}
+                      </option>
+                    ))}
+                  </select>
                 )}
 
-                {/* Quality (if available) */}
+                {/* Quality Badge */}
                 {video.quality && (
-                  <div className="px-2 py-1 bg-white/20 rounded text-xs text-white font-medium">
+                  <div className={cn(
+                    "h-7 px-2.5 rounded-lg text-xs font-semibold",
+                    "bg-primary/20 text-primary border border-primary/30",
+                    "flex items-center"
+                  )}>
                     {video.quality}
                   </div>
                 )}
 
                 {/* Playback Rate */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={playbackRate}
-                    onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                    className="bg-white/20 text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                    aria-label="Vitesse de lecture"
-                  >
-                    <option value="0.25">0.25x</option>
-                    <option value="0.5">0.5x</option>
-                    <option value="0.75">0.75x</option>
-                    <option value="1">1x</option>
-                    <option value="1.25">1.25x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                  </select>
-                </div>
+                <select
+                  value={playbackRate}
+                  onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
+                  className={cn(
+                    "h-9 px-3 text-sm rounded-lg",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "text-white border border-white/20",
+                    "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                  aria-label="Vitesse de lecture"
+                >
+                  <option value="0.25">0.25x</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1">1x</option>
+                  <option value="1.25">1.25x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2x</option>
+                </select>
               </div>
             </div>
 
-            {/* Video Info */}
-            <div className="text-white">
-              <h3 className="font-medium text-sm truncate">{video.title}</h3>
-              <div className="flex items-center gap-2 text-xs text-white/70">
-              {video.width && video.height && (
-                  <span>{video.width} × {video.height}</span>
+            {/* Video Info - Glass panel */}
+            <div className={cn(
+              "mt-2 p-3 rounded-xl",
+              "bg-white/5 backdrop-blur-md",
+              "border border-white/10"
+            )}>
+              <h3 className="font-medium text-sm text-white truncate">{video.title}</h3>
+              <div className="flex items-center gap-2 text-xs text-white/60 mt-1">
+                {video.width && video.height && (
+                  <span className="px-2 py-0.5 rounded-md bg-white/10">{video.width} × {video.height}</span>
                 )}
                 {video.format && (
-                  <span>• {video.format.toUpperCase()}</span>
+                  <span className="px-2 py-0.5 rounded-md bg-white/10">{video.format.toUpperCase()}</span>
                 )}
                 {video.codec && (
-                  <span>• {video.codec}</span>
+                  <span className="px-2 py-0.5 rounded-md bg-white/10">{video.codec}</span>
                 )}
                 {video.duration > 0 && (
-                  <span>• {formatTime(video.duration)}</span>
-              )}
+                  <span className="px-2 py-0.5 rounded-md bg-white/10">{formatTime(video.duration)}</span>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* AI Analysis Panel - DÉSACTIVÉ */}
-      {/* {showAIPanel && (
-        <div className="absolute bottom-20 right-4 w-96 z-40 pointer-events-auto">
-          <AIAnalysisPanel
-            analysis={aiAnalysis}
-            onStartAI={startAIAnalysis}
-          />
-        </div>
-      )} */}
     </div>
   );
 };
-

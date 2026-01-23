@@ -179,18 +179,29 @@ export const CinemaMode = ({
     <div
       ref={containerRef}
       className={cn(
-        "fixed inset-0 z-[9999] bg-black",
+        "fixed inset-0 z-[9999]",
+        "bg-background",
         "animate-in fade-in duration-500",
         className
       )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Ambient Background Effect */}
+      {/* Ambient Background Effect - Theme aware */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black opacity-80" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50" />
-        <div className="absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,_transparent_0deg,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-30 animate-spin-slow" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background opacity-90" />
+        <div 
+          className="absolute inset-0 opacity-40"
+          style={{
+            background: 'radial-gradient(circle at center, hsl(var(--primary) / 0.15) 0%, transparent 60%)'
+          }}
+        />
+        <div 
+          className="absolute inset-0 opacity-20 animate-spin-slow"
+          style={{
+            background: 'conic-gradient(from 0deg at 50% 50%, transparent 0deg, hsl(var(--primary) / 0.1) 60deg, transparent 120deg)'
+          }}
+        />
       </div>
 
       {/* Video Element - Full screen */}
@@ -199,54 +210,73 @@ export const CinemaMode = ({
           ref={videoRef}
           className="w-full h-full object-cover"
           style={{
-            filter: "brightness(1.05) contrast(1.1) saturate(1.1)",
+            filter: "brightness(1.02) contrast(1.05) saturate(1.05)",
           }}
           playsInline
           preload="metadata"
           onClick={togglePlayPause}
         />
         
-        {/* Film grain overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay">
+        {/* Subtle film grain overlay */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.02] mix-blend-overlay">
           <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSBiYXNlRnJlcXVlbmN5PSIwLjkiIG51bU9jdGF2ZXM9IjQiLz48ZmVDb2xvck1hdHJpeCB0eXBlPSJzYXR1cmF0ZSIgdmFsdWVzPSIwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbHRlcj0idXJsKCNub2lzZSkiIG9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==')] bg-repeat" />
         </div>
       </div>
 
-      {/* Loading Indicator */}
+      {/* Loading Indicator - Vision Pro style */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="w-full h-full">
-            <Skeleton className="w-full h-full rounded-none" />
+        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-xl z-50">
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-b-accent/50 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
           </div>
         </div>
       )}
 
-      {/* Controls Overlay */}
+      {/* Controls Overlay - Vision Pro glassmorphism */}
       {(showControls || isHovering || !isPlaying) && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-between p-6 transition-opacity duration-300 z-40">
+        <div className="absolute inset-0 flex flex-col justify-between transition-opacity duration-300 z-40">
+          {/* Top gradient overlay */}
+          <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/70 via-black/30 to-transparent pointer-events-none" />
+          
+          {/* Bottom gradient overlay */}
+          <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+          
           {/* Top Controls */}
-          <div className="flex items-center justify-between">
+          <div className="relative flex items-center justify-between p-6 pointer-events-auto">
             <div className="flex items-center gap-3">
               {onClose && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                  className={cn(
+                    "w-11 h-11 rounded-xl",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "border border-white/20 hover:border-white/30",
+                    "text-white transition-all duration-200",
+                    "shadow-lg shadow-black/20"
+                  )}
                 >
                   <X className="w-5 h-5" />
                 </Button>
               )}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-md border border-white/10">
+              <div className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl",
+                "bg-white/10 backdrop-blur-xl",
+                "border border-white/20"
+              )}>
                 <Film className="w-4 h-4 text-primary" />
                 <span className="text-sm text-white font-medium">Mode Ciné</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-md border border-white/10">
-                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                <span className="text-xs text-white/80">Immersif</span>
-              </div>
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl",
+              "bg-white/10 backdrop-blur-xl",
+              "border border-white/20"
+            )}>
+              <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+              <span className="text-xs text-white/80">Immersif</span>
             </div>
           </div>
 
@@ -259,7 +289,14 @@ export const CinemaMode = ({
                 e.stopPropagation();
                 togglePlayPause();
               }}
-              className="w-24 h-24 rounded-full bg-white/10 hover:bg-white/20 text-white pointer-events-auto backdrop-blur-md border border-white/20 transition-all duration-200 ease-out hover:scale-110 active:scale-95"
+              className={cn(
+                "w-24 h-24 rounded-full pointer-events-auto",
+                "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                "border border-white/30 hover:border-white/50",
+                "text-white transition-all duration-300",
+                "shadow-2xl shadow-black/40",
+                "hover:scale-110 active:scale-95"
+              )}
             >
               {isPlaying ? (
                 <Pause className="w-12 h-12 fill-current" />
@@ -270,10 +307,10 @@ export const CinemaMode = ({
           </div>
 
           {/* Bottom Controls */}
-          <div className="space-y-4">
+          <div className="relative space-y-4 p-6 pointer-events-auto">
             {/* Progress Bar */}
             <div className="flex items-center gap-4">
-              <span className="text-white text-sm font-mono min-w-[70px] text-right">
+              <span className="text-white/90 text-sm font-mono min-w-[70px] text-right tabular-nums">
                 {formatTime(currentTime)}
               </span>
               <Slider
@@ -283,7 +320,7 @@ export const CinemaMode = ({
                 onValueChange={handleSeek}
                 className="flex-1"
               />
-              <span className="text-white text-sm font-mono min-w-[70px]">
+              <span className="text-white/90 text-sm font-mono min-w-[70px] tabular-nums">
                 {formatTime(duration)}
               </span>
             </div>
@@ -296,7 +333,12 @@ export const CinemaMode = ({
                     variant="ghost"
                     size="icon"
                     onClick={onPrevious}
-                    className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                    className={cn(
+                      "w-12 h-12 rounded-xl",
+                      "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                      "border border-white/20",
+                      "text-white transition-all duration-200"
+                    )}
                     disabled={!videos.length}
                   >
                     <SkipBack className="w-6 h-6" />
@@ -306,12 +348,17 @@ export const CinemaMode = ({
                   variant="ghost"
                   size="icon"
                   onClick={togglePlayPause}
-                  className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95 w-12 h-12"
+                  className={cn(
+                    "w-14 h-14 rounded-xl",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "border border-white/20",
+                    "text-white transition-all duration-200"
+                  )}
                 >
                   {isPlaying ? (
-                    <Pause className="w-6 h-6 fill-current" />
+                    <Pause className="w-7 h-7 fill-current" />
                   ) : (
-                    <Play className="w-6 h-6 fill-current" />
+                    <Play className="w-7 h-7 fill-current" />
                   )}
                 </Button>
                 {onNext && (
@@ -319,7 +366,12 @@ export const CinemaMode = ({
                     variant="ghost"
                     size="icon"
                     onClick={onNext}
-                    className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                    className={cn(
+                      "w-12 h-12 rounded-xl",
+                      "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                      "border border-white/20",
+                      "text-white transition-all duration-200"
+                    )}
                     disabled={!videos.length}
                   >
                     <SkipForward className="w-6 h-6" />
@@ -334,7 +386,12 @@ export const CinemaMode = ({
                     variant="ghost"
                     size="icon"
                     onClick={toggleMute}
-                    className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-200 ease-out active:scale-95"
+                    className={cn(
+                      "w-10 h-10 rounded-xl",
+                      "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                      "border border-white/20",
+                      "text-white transition-all duration-200"
+                    )}
                   >
                     <VolumeIcon className="w-5 h-5" />
                   </Button>
@@ -351,7 +408,13 @@ export const CinemaMode = ({
                 <select
                   value={playbackRate}
                   onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                  className="bg-white/10 backdrop-blur-md text-white text-sm rounded-lg px-3 py-1.5 border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200"
+                  className={cn(
+                    "h-10 px-4 text-sm rounded-xl",
+                    "bg-white/10 hover:bg-white/20 backdrop-blur-xl",
+                    "text-white border border-white/20",
+                    "focus:outline-none focus:ring-2 focus:ring-primary/50",
+                    "transition-all duration-200"
+                  )}
                 >
                   <option value="0.25">0.25x</option>
                   <option value="0.5">0.5x</option>
@@ -364,13 +427,24 @@ export const CinemaMode = ({
               </div>
             </div>
 
-            {/* Video Info */}
-            <div className="text-white">
-              <h3 className="font-semibold text-base truncate">{video.title}</h3>
+            {/* Video Info - Glass panel */}
+            <div className={cn(
+              "mt-2 p-4 rounded-2xl",
+              "bg-white/5 backdrop-blur-xl",
+              "border border-white/10"
+            )}>
+              <h3 className="font-semibold text-base text-white truncate">{video.title}</h3>
               {video.width && video.height && (
-                <p className="text-xs text-white/70 mt-1">
-                  {video.width} × {video.height} • {video.format?.toUpperCase()}
-                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs text-white/70">
+                    {video.width} × {video.height}
+                  </span>
+                  {video.format && (
+                    <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs text-white/70">
+                      {video.format.toUpperCase()}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>

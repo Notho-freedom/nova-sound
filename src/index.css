@@ -1230,28 +1230,57 @@
     background-clip: text;
   }
   
-  /* Scrollbar styling - minimal Apple style */
+  /* ═══════════════════════════════════════════════════════════════════════════
+     UNIFIED SCROLLBAR STYLING - Vision Pro / Apple Style
+     Theme-aware scrollbars that adapt to all themes
+     ═══════════════════════════════════════════════════════════════════════════ */
+  
+  /* Global scrollbar styling */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+  }
+  
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  *::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background 0.2s ease;
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.4);
+    background-clip: content-box;
+  }
+  
+  *::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--primary) / 0.5);
+    background-clip: content-box;
+  }
+  
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  
+  /* Thin scrollbar variant */
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
   
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
-  }
-  
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 9999px;
-  }
-  
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
   }
   
   /* Hide scrollbar but keep functionality */
@@ -1262,6 +1291,11 @@
   
   .scrollbar-hidden::-webkit-scrollbar {
     display: none;
+  }
+  
+  /* Gutter scrollbar - shows track on hover */
+  .scrollbar-gutter {
+    scrollbar-gutter: stable;
   }
   
   /* Focus ring - Apple style */

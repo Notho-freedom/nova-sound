@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 // ═══════════════════════════════════════════════════════════════════════════════
 // VISION PRO SCROLL AREA
 // Minimal scrollbars with smooth fade and elegant styling
+// Theme-aware colors that adapt to light/dark/custom themes
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface ScrollAreaProps extends React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
@@ -46,17 +47,19 @@ const ScrollBar = React.memo(
       orientation={orientation}
       className={cn(
         "flex touch-none select-none",
-        "transition-all duration-300 ease-out-expo",
-        // Minimal styling - almost invisible until hover
+        "transition-all duration-300 ease-out",
+        // Fade in/out on hover - Vision Pro style
+        "opacity-0 hover:opacity-100 group-hover:opacity-100",
+        "[&:has(+_*)]:opacity-100", // Show when scrolling
         orientation === "vertical" && [
-          "h-full w-1.5 hover:w-2",
+          "h-full w-2 hover:w-2.5",
           "border-l border-l-transparent",
-          "p-[1px]",
+          "p-[2px]",
         ],
         orientation === "horizontal" && [
-          "h-1.5 hover:h-2 flex-col",
+          "h-2 hover:h-2.5 flex-col",
           "border-t border-t-transparent",
-          "p-[1px]",
+          "p-[2px]",
         ],
         className,
       )}
@@ -65,9 +68,11 @@ const ScrollBar = React.memo(
       <ScrollAreaPrimitive.ScrollAreaThumb
         className={cn(
           "relative flex-1 rounded-full",
-          // Glass-like thumb
-          "bg-white/[0.15] hover:bg-white/[0.25]",
-          "transition-colors duration-200",
+          // Theme-aware glass thumb using semantic tokens
+          "bg-muted-foreground/20 hover:bg-muted-foreground/40",
+          // Subtle glow on hover
+          "hover:shadow-[0_0_8px_hsl(var(--primary)/0.2)]",
+          "transition-all duration-200",
         )}
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
