@@ -68,17 +68,17 @@ export const StatCard = memo(({
       className={cn(
         // Pure Vision Pro spatial stat card
         "relative group p-5 rounded-2xl overflow-hidden",
-        "bg-white/[0.04] backdrop-blur-2xl",
-        "border border-white/[0.08]",
+        "bg-[hsl(var(--glass-bg))] backdrop-blur-2xl",
+        "border border-border/30",
         "transition-all duration-300 ease-out",
-        "hover:bg-white/[0.06]",
-        "hover:border-white/[0.12]",
-        "hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]",
+        "hover:bg-[hsl(var(--glass-bg-hover))]",
+        "hover:border-border/50",
+        "hover:shadow-[0_12px_40px_rgba(0,0,0,0.2)]",
         className,
       )}
     >
       {/* Top highlight line */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border/40 to-transparent" />
       
       {/* Ambient corner glow */}
       <div
@@ -102,7 +102,7 @@ export const StatCard = memo(({
         <div
           className={cn(
             "relative p-3 rounded-xl backdrop-blur-xl",
-            "border border-white/[0.1]",
+            "border border-border/30",
             "transition-all duration-300",
             "group-hover:scale-110",
             colorConfig.iconBg,

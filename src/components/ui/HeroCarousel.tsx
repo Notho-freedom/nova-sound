@@ -234,9 +234,9 @@ export const HeroCarousel = memo(({
       className={cn(
         // Pure Vision Pro immersive hero carousel
         "relative w-full h-[480px] md:h-[540px] lg:h-[580px] rounded-[2rem] overflow-hidden group mt-1",
-        "bg-black/20 backdrop-blur-sm",
-        "border border-white/[0.08]",
-        "shadow-[0_32px_100px_-24px_rgba(0,0,0,0.6)]",
+        "bg-[hsl(var(--glass-panel))] backdrop-blur-sm",
+        "border border-border/30",
+        "shadow-[0_32px_100px_-24px_rgba(0,0,0,0.4)]",
         className
       )}
       onMouseEnter={() => setIsPaused(true)}
@@ -326,10 +326,10 @@ export const HeroCarousel = memo(({
                 transition={{ delay: 0.2 }}
                 className={cn(
                   "inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold",
-                  "bg-white/[0.1] backdrop-blur-xl",
-                  "border border-white/[0.15]",
-                  "text-white/90",
-                  "shadow-lg shadow-black/20",
+                  "bg-[hsl(var(--glass-bg))] backdrop-blur-xl",
+                  "border border-border/50",
+                  "text-foreground/90",
+                  "shadow-lg",
                   "mb-4"
                 )}
               >
@@ -380,9 +380,9 @@ export const HeroCarousel = memo(({
                 onClick={() => onPlay?.(currentSlide)}
                 className={cn(
                   "flex items-center gap-2.5 px-8 py-3.5 rounded-full",
-                  "bg-white text-black font-semibold text-sm",
-                  "shadow-xl shadow-white/25",
-                  "hover:shadow-2xl hover:shadow-white/30",
+                  "bg-primary text-primary-foreground font-semibold text-sm",
+                  "shadow-xl shadow-primary/25",
+                  "hover:shadow-2xl hover:shadow-primary/30",
                   "transition-shadow duration-300"
                 )}
               >
@@ -396,9 +396,9 @@ export const HeroCarousel = memo(({
                   onClick={onShuffle}
                   className={cn(
                     "flex items-center gap-2.5 px-6 py-3.5 rounded-full",
-                    "bg-white/[0.12] backdrop-blur-xl text-white font-medium text-sm",
-                    "border border-white/[0.2]",
-                    "hover:bg-white/[0.18]",
+                    "bg-[hsl(var(--glass-bg))] backdrop-blur-xl text-foreground font-medium text-sm",
+                    "border border-border/50",
+                    "hover:bg-[hsl(var(--glass-bg-hover))]",
                     "transition-colors duration-300"
                   )}
                 >
@@ -422,14 +422,14 @@ export const HeroCarousel = memo(({
             className={cn(
               "hidden sm:flex absolute left-6 top-1/2 -translate-y-1/2 z-20",
               "w-12 h-12 rounded-full items-center justify-center",
-              "bg-black/40 backdrop-blur-2xl",
-              "border border-white/[0.15]",
+              "bg-[hsl(var(--glass-panel))] backdrop-blur-2xl",
+              "border border-border/50",
               "opacity-0 group-hover:opacity-100",
               "transition-opacity duration-300",
-              "hover:bg-black/60"
+              "hover:bg-[hsl(var(--glass-bg-hover))]"
             )}
           >
-            <ChevronLeft className="w-6 h-6 text-white" />
+            <ChevronLeft className="w-6 h-6 text-foreground" />
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -439,28 +439,28 @@ export const HeroCarousel = memo(({
             className={cn(
               "hidden sm:flex absolute right-6 top-1/2 -translate-y-1/2 z-20",
               "w-12 h-12 rounded-full items-center justify-center",
-              "bg-black/40 backdrop-blur-2xl",
-              "border border-white/[0.15]",
+              "bg-[hsl(var(--glass-panel))] backdrop-blur-2xl",
+              "border border-border/50",
               "opacity-0 group-hover:opacity-100",
               "transition-opacity duration-300",
-              "hover:bg-black/60"
+              "hover:bg-[hsl(var(--glass-bg-hover))]"
             )}
           >
-            <ChevronRight className="w-6 h-6 text-white" />
+            <ChevronRight className="w-6 h-6 text-foreground" />
           </motion.button>
         </>
       )}
 
       {/* Progress bar - Subtle line with glow */}
       {autoPlay && !isPaused && enhancedSlides.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/[0.1] z-20">
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-muted/30 z-20">
           <motion.div
             key={currentIndex}
             initial={{ width: "0%" }}
             animate={{ width: "100%" }}
             transition={{ duration: interval / 1000, ease: "linear" }}
-            className="h-full bg-white/90"
-            style={{ boxShadow: '0 0 12px rgba(255, 255, 255, 0.6)' }}
+            className="h-full bg-primary"
+            style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.6)' }}
           />
         </div>
       )}
@@ -475,8 +475,8 @@ export const HeroCarousel = memo(({
               className={cn(
                 "transition-all duration-300 rounded-full",
                 idx === currentIndex
-                  ? "w-8 h-2 bg-white shadow-lg shadow-white/50"
-                  : "w-2 h-2 bg-white/40 hover:bg-white/60"
+                  ? "w-8 h-2 bg-primary shadow-lg shadow-primary/50"
+                  : "w-2 h-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
               )}
               aria-label={`Aller au slide ${idx + 1}`}
             />
