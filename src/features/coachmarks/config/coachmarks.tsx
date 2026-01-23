@@ -1,19 +1,18 @@
-import type { Step } from 'react-joyride';
+import type { Step } from 'shepherd.js';
 
 /**
  * Définition des coachmarks suivant le pattern UX exact
  * Chaque coachmark = 1 action clé avec focus précis
+ * 
+ * Migration: react-joyride → Shepherd.js (React 18 compatible)
  */
 
-export interface CoachmarkConfig extends Step {
+export interface CoachmarkConfig {
   id: string;
   target: string;
-  title: string | React.ReactNode;
-  content: string | React.ReactNode;
-  placement?: 'top' | 'bottom' | 'left' | 'right' | 'center' | 'auto';
-  spotlightPadding?: number;
-  hideFooter?: boolean;
-  disableBeacon?: boolean;
+  title: string;
+  text: string;
+  placement?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
 }
 
 export const COACHMARKS: CoachmarkConfig[] = [
@@ -22,14 +21,14 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'welcome',
     target: 'body',
     title: '🎵 Bienvenue dans Nova Sound',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Bienvenue dans votre nouveau lecteur audio/vidéo multimédia !</p>
-        <p className="font-semibold text-primary">Cette visite guidée vous présentera les fonctionnalités principales en quelques étapes simples.</p>
-        <p className="text-xs text-muted-foreground">Vous pouvez quitter à tout moment en appuyant sur <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">Échap</kbd></p>
+        <p class="shepherd-highlight">Cette visite guidée vous présentera les fonctionnalités principales en quelques étapes simples.</p>
+        <p class="shepherd-hint">Vous pouvez quitter à tout moment en appuyant sur <kbd>Échap</kbd></p>
       </div>
-    ),
-    placement: 'center',
+    `,
+    placement: 'auto',
   },
 
   // Sidebar Navigation
@@ -37,20 +36,19 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'sidebar',
     target: '[data-coachmark="sidebar"]',
     title: '📂 Navigation principale',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Utilisez la <strong>barre latérale</strong> pour naviguer entre les sections :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>Accueil</strong> - Vue d'ensemble</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>Recherche</strong> - Local + YouTube</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>Bibliothèque</strong> - Tous vos morceaux</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>Playlists</strong> - Créez vos listes</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">→</span> <strong>Accueil</strong> - Vue d'ensemble</li>
+          <li><span class="shepherd-bullet">→</span> <strong>Recherche</strong> - Local + YouTube</li>
+          <li><span class="shepherd-bullet">→</span> <strong>Bibliothèque</strong> - Tous vos morceaux</li>
+          <li><span class="shepherd-bullet">→</span> <strong>Playlists</strong> - Créez vos listes</li>
         </ul>
-        <p className="text-xs text-muted-foreground">Vous pouvez réduire/agrandir la barre avec le bouton →</p>
+        <p class="shepherd-hint">Vous pouvez réduire/agrandir la barre avec le bouton →</p>
       </div>
-    ),
+    `,
     placement: 'right',
-    spotlightPadding: 8,
   },
 
   // Recherche
@@ -58,17 +56,17 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'search',
     target: '[data-coachmark="search-input"]',
     title: '🔍 Recherche puissante',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Trouvez rapidement vos morceaux :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span>Vos fichiers <strong>locaux</strong></span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span>Des vidéos <strong>YouTube</strong></span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span>Artistes, albums et playlists</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">→</span> Vos fichiers <strong>locaux</strong></li>
+          <li><span class="shepherd-bullet">→</span> Des vidéos <strong>YouTube</strong></li>
+          <li><span class="shepherd-bullet">→</span> Artistes, albums et playlists</li>
         </ul>
-        <p className="text-xs text-primary/70 font-semibold">💡 Astuce: Activez YouTube pour des millions de morceaux !</p>
+        <p class="shepherd-tip">💡 Astuce: Activez YouTube pour des millions de morceaux !</p>
       </div>
-    ),
+    `,
     placement: 'bottom',
   },
 
@@ -77,18 +75,18 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'player',
     target: '[data-coachmark="player-bar"]',
     title: '🎧 Lecteur audio',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Contrôlez votre lecture avec :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">▶️</span> <span>Lecture / Pause</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">⏭️</span> <span>Morceau suivant/précédent</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🔀</span> <span>Mode aléatoire</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🔁</span> <span>Répétition</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">▶️</span> Lecture / Pause</li>
+          <li><span class="shepherd-bullet">⏭️</span> Morceau suivant/précédent</li>
+          <li><span class="shepherd-bullet">🔀</span> Mode aléatoire</li>
+          <li><span class="shepherd-bullet">🔁</span> Répétition</li>
         </ul>
-        <p className="text-xs text-muted-foreground">Cliquez sur la pochette pour une vue immersive</p>
+        <p class="shepherd-hint">Cliquez sur la pochette pour une vue immersive</p>
       </div>
-    ),
+    `,
     placement: 'top',
   },
 
@@ -97,18 +95,18 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'controls',
     target: '[data-coachmark="player-controls"]',
     title: '🎮 Contrôles de lecture',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Accès rapide aux fonctionnalités essentielles :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">⏮️</span> <span>Revenir au morceau précédent</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">▶️</span> <span>Lecture / Pause (Barre d'espace)</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">⏭️</span> <span>Passer au morceau suivant</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🔀</span> <span>Lecture aléatoire</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🔁</span> <span>Répétition un ou tous</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">⏮️</span> Revenir au morceau précédent</li>
+          <li><span class="shepherd-bullet">▶️</span> Lecture / Pause (Barre d'espace)</li>
+          <li><span class="shepherd-bullet">⏭️</span> Passer au morceau suivant</li>
+          <li><span class="shepherd-bullet">🔀</span> Lecture aléatoire</li>
+          <li><span class="shepherd-bullet">🔁</span> Répétition un ou tous</li>
         </ul>
       </div>
-    ),
+    `,
     placement: 'top',
   },
 
@@ -117,17 +115,17 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'queue',
     target: '[data-coachmark="player-queue-btn"]',
     title: '📋 File d\'attente',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Gérez votre file de morceaux :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>À venir</strong> - Morceaux suivants</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>Récents</strong> - Historique</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">→</span> <span><strong>Similaires</strong> - Recommandations IA</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">→</span> <strong>À venir</strong> - Morceaux suivants</li>
+          <li><span class="shepherd-bullet">→</span> <strong>Récents</strong> - Historique</li>
+          <li><span class="shepherd-bullet">→</span> <strong>Similaires</strong> - Recommandations IA</li>
         </ul>
-        <p className="text-xs text-muted-foreground">Glissez-déposez pour réorganiser</p>
+        <p class="shepherd-hint">Glissez-déposez pour réorganiser</p>
       </div>
-    ),
+    `,
     placement: 'left',
   },
 
@@ -136,17 +134,17 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'playlists',
     target: '[data-coachmark="sidebar-playlists"]',
     title: '🎶 Vos playlists',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Créez et gérez vos listes musicales :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">➕</span> <span>Créer une playlist personnalisée</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🎵</span> <span>Ajouter des morceaux par glisser-déposer</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🌐</span> <span>Importer des playlists YouTube</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">☁️</span> <span>Synchronisation automatique cloud</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">➕</span> Créer une playlist personnalisée</li>
+          <li><span class="shepherd-bullet">🎵</span> Ajouter des morceaux par glisser-déposer</li>
+          <li><span class="shepherd-bullet">🌐</span> Importer des playlists YouTube</li>
+          <li><span class="shepherd-bullet">☁️</span> Synchronisation automatique cloud</li>
         </ul>
       </div>
-    ),
+    `,
     placement: 'right',
   },
 
@@ -155,18 +153,18 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'settings',
     target: '[data-coachmark="sidebar-settings"]',
     title: '⚙️ Personnalisation',
-    content: (
-      <div className="space-y-2 text-sm">
+    text: `
+      <div class="shepherd-content-wrapper">
         <p>Adaptez Nova Sound à votre style :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">🎨</span> <span>10 thèmes différents</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🔊</span> <span>Égaliseur 10 bandes</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">☁️</span> <span>Stockage cloud</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🤖</span> <span>Fonctionnalités IA</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">⌨️</span> <span>Raccourcis clavier</span></li>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">🎨</span> 10 thèmes différents</li>
+          <li><span class="shepherd-bullet">🔊</span> Égaliseur 10 bandes</li>
+          <li><span class="shepherd-bullet">☁️</span> Stockage cloud</li>
+          <li><span class="shepherd-bullet">🤖</span> Fonctionnalités IA</li>
+          <li><span class="shepherd-bullet">⌨️</span> Raccourcis clavier</li>
         </ul>
       </div>
-    ),
+    `,
     placement: 'right',
   },
 
@@ -175,19 +173,19 @@ export const COACHMARKS: CoachmarkConfig[] = [
     id: 'complete',
     target: 'body',
     title: '🎉 C\'est parti !',
-    content: (
-      <div className="space-y-2 text-sm">
-        <p className="font-semibold">Vous êtes maintenant prêt à profiter de Nova Sound !</p>
-        <p className="text-xs text-muted-foreground">Quelques conseils :</p>
-        <ul className="list-none space-y-1 ml-0">
-          <li className="flex items-start gap-2"><span className="text-primary">🔍</span> <span>Commencez par chercher vos morceaux préférés</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🎨</span> <span>Personnalisez l'apparence dans Paramètres</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">🌐</span> <span>Activez YouTube pour un catalogue illimité</span></li>
-          <li className="flex items-start gap-2"><span className="text-primary">❓</span> <span>Survolez les icônes ? pour des conseils</span></li>
+    text: `
+      <div class="shepherd-content-wrapper">
+        <p class="shepherd-highlight">Vous êtes maintenant prêt à profiter de Nova Sound !</p>
+        <p class="shepherd-hint">Quelques conseils :</p>
+        <ul class="shepherd-list">
+          <li><span class="shepherd-bullet">🔍</span> Commencez par chercher vos morceaux préférés</li>
+          <li><span class="shepherd-bullet">🎨</span> Personnalisez l'apparence dans Paramètres</li>
+          <li><span class="shepherd-bullet">🌐</span> Activez YouTube pour un catalogue illimité</li>
+          <li><span class="shepherd-bullet">❓</span> Survolez les icônes ? pour des conseils</li>
         </ul>
-        <p className="text-xs text-primary/70 font-semibold">Vous pouvez relancer ce coachmark depuis Paramètres → À propos</p>
+        <p class="shepherd-tip">Vous pouvez relancer ce coachmark depuis Paramètres → À propos</p>
       </div>
-    ),
-    placement: 'center',
+    `,
+    placement: 'auto',
   },
 ];

@@ -1,12 +1,12 @@
 import { ReactNode, createContext, useContext } from 'react';
 import { useCoachmarks } from '../hooks/useCoachmarks';
-import { CoachmarksDisplay } from '../hooks/useCoachmarks';
 
 interface CoachmarksContextValue {
   isOpen: boolean;
   start: () => void;
   reset: () => void;
   skip: () => void;
+  shouldShow: boolean;
 }
 
 const CoachmarksContext = createContext<CoachmarksContextValue | undefined>(undefined);
@@ -26,7 +26,7 @@ export function CoachmarkProvider({
   onSkip,
   onStart,
 }: CoachmarkProviderProps) {
-  const { isOpen, stepIndex, handleCallback, start, resetCoachmarks, skip, coachmarks } = useCoachmarks({
+  const { isOpen, start, resetCoachmarks, skip, shouldShow } = useCoachmarks({
     autoStart,
     onComplete,
     onSkip,
@@ -34,16 +34,7 @@ export function CoachmarkProvider({
   });
 
   return (
-    <CoachmarksContext.Provider value={{ isOpen, start, reset: resetCoachmarks, skip }}>
-      {/* Les coachmarks sont rendus en position fixed/absolute, ne créent pas de décalage */}
-      {isOpen && (
-        <CoachmarksDisplay 
-          isOpen={isOpen} 
-          onCallback={handleCallback} 
-          steps={coachmarks}
-          stepIndex={stepIndex}
-        />
-      )}
+    <CoachmarksContext.Provider value={{ isOpen, start, reset: resetCoachmarks, skip, shouldShow }}>
       {children}
     </CoachmarksContext.Provider>
   );
