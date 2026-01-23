@@ -85,58 +85,48 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
     <button
       onClick={onClick}
       className={cn(
-        "relative w-full flex items-center rounded-xl transition-all duration-300 ease-out group",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        // Base styles - Vision Pro
+        "relative w-full flex items-center rounded-xl",
+        "transition-all duration-300 ease-out-expo group",
+        "focus:outline-none",
         collapsed ? "px-0 py-3 justify-center" : "px-4 py-3 gap-3",
+        // Active state - subtle glass highlight
         isActive
-          ? "bg-gradient-to-r from-primary/20 via-primary/10 to-transparent text-primary shadow-lg shadow-primary/10"
-          : "text-muted-foreground hover:text-foreground hover:bg-white/5 active:bg-white/10",
+          ? "bg-white/[0.08] text-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-white/[0.04]",
       )}
     >
-      {/* Animated glow border for active */}
-      {isActive && (
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/30 to-secondary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-xl" />
-      )}
-
-      {/* Left accent line */}
+      {/* Left accent bar for active - Vision Pro style */}
       {isActive && !collapsed && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-primary via-primary to-secondary rounded-r-full shadow-lg shadow-primary/50" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
       )}
 
       <div
         className={cn(
-          "relative flex items-center justify-center transition-all duration-300",
+          "relative flex items-center justify-center transition-all duration-200",
           collapsed ? "w-6 h-6" : "w-5 h-5",
-          isActive && "animate-pulse-glow",
         )}
       >
         <Icon
           className={cn(
-            "flex-shrink-0 transition-all duration-300",
+            "flex-shrink-0 transition-all duration-200",
             collapsed ? "w-5 h-5" : "w-[18px] h-[18px]",
-            isActive ? "scale-105" : "group-hover:scale-110",
-            color && !isActive && color,
+            isActive ? "text-primary" : color || "text-current",
+            "group-hover:scale-105",
           )}
         />
       </div>
 
       {collapsed && badge !== undefined && badge > 0 && (
-        <span
-          className={cn(
-            "absolute top-2 right-2 min-w-[6px] h-[6px] px-1 text-[10px] font-bold rounded-full",
-            "flex items-center justify-center",
-            isActive ? "bg-primary text-primary-foreground" : "bg-primary/20 text-primary"
-          )}
-        >
-        </span>
+        <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
       )}
 
       {!collapsed && (
         <>
           <span
             className={cn(
-              "text-sm font-medium flex-1 text-left truncate transition-all duration-300",
-              isActive && "font-semibold",
+              "text-sm flex-1 text-left truncate transition-colors duration-200",
+              isActive ? "font-medium text-foreground" : "font-normal",
             )}
           >
             {label}
@@ -144,10 +134,10 @@ const NavItem = ({ icon: Icon, label, isActive, onClick, badge, collapsed, color
           {badge !== undefined && badge > 0 && (
             <span
               className={cn(
-                "min-w-[20px] h-5 px-1.5 text-xs font-bold rounded-full flex items-center justify-center transition-all duration-300",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-white/10 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
+                "min-w-[20px] h-5 px-1.5 text-xs font-medium rounded-full",
+                "flex items-center justify-center",
+                "bg-white/[0.06] text-muted-foreground",
+                "transition-colors duration-200",
               )}
             >
               {badge > 99 ? "99+" : badge}
@@ -190,7 +180,7 @@ const SectionTitle = ({
   if (collapsed) return null;
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <h3 className="text-[10px] font-display uppercase tracking-[0.2em] text-muted-foreground/50">{children}</h3>
+      <h3 className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/40">{children}</h3>
       {action}
     </div>
   );
@@ -337,14 +327,16 @@ export const Sidebar = ({
       <div
         data-coachmark="sidebar"
         className={cn(
-          "h-full flex flex-col transition-all duration-500 ease-out relative",
-          "bg-gradient-to-b from-card/80 via-card/60 to-card/40 backdrop-blur-2xl",
-          "border-r border-white/5",
+          "h-full flex flex-col relative",
+          "transition-all duration-500 ease-out-expo",
+          // Vision Pro glass sidebar
+          "bg-black/40 backdrop-blur-2xl",
+          "border-r border-white/[0.06]",
           collapsed ? "w-[72px]" : "w-60",
         )}
       >
-        {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        {/* Subtle inner glow */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
 
         {/* Top section with logo */}
         <div

@@ -130,23 +130,29 @@ export const NowPlayingBar = ({
         data-coachmark="player-bar"
         className={cn(
           "relative flex flex-col",
-          "bg-gradient-to-t from-black/90 via-card/80 to-card/60",
-          "backdrop-blur-2xl border-t border-white/5",
+          // Vision Pro glass bar
+          "bg-black/60 backdrop-blur-3xl",
+          "border-t border-white/[0.08]",
         )}
       >
-        {/* Ambient glow from album art */}
-        <div className="absolute inset-0 opacity-30 pointer-events-none now-playing-ambient" />
-
-        {/* Progress Bar - Interactive full width */}
+        {/* Progress Bar - Vision Pro style */}
         <div
-          className="relative h-1.5 w-full group cursor-pointer"
+          className="relative h-1 w-full group cursor-pointer hover:h-1.5 transition-all duration-200"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect()
             const percent = (e.clientX - rect.left) / rect.width
             onSeek([percent * effectiveDuration])
           }}
         >
-          <progress className="now-playing-progress" value={progress} max={100} />
+          {/* Track background */}
+          <div className="absolute inset-0 bg-white/[0.08]" />
+          {/* Progress fill */}
+          <div 
+            className="absolute left-0 top-0 h-full bg-white/90 transition-all duration-100"
+            style={{ width: `${progress}%` }}
+          />
+          {/* Hover indicator */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg" style={{ left: `calc(${progress}% - 6px)` }} />
         </div>
 
         {/* Main Content */}
@@ -283,17 +289,19 @@ export const NowPlayingBar = ({
                   <SkipBack className="w-5 h-5 fill-current" />
                 </button>
 
-                {/* Play/Pause - Main button */}
+                {/* Play/Pause - Main button - Vision Pro style */}
                 <button
                   onClick={onPlayPause}
                   aria-label={isPlaying ? "Pause" : "Lecture"}
                   className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center",
-                    "bg-white text-black",
-                    "hover:scale-105 hover:shadow-xl hover:shadow-white/20",
+                    "w-11 h-11 rounded-full flex items-center justify-center",
+                    // Glass button with white fill
+                    "bg-white/95 text-black",
+                    "shadow-lg shadow-white/10",
+                    "hover:bg-white hover:scale-105",
                     "active:scale-95",
-                    "transition-all duration-300 ease-out",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "transition-all duration-200 ease-out-expo",
+                    "focus:outline-none",
                   )}
                 >
                   {isPlaying ? (
