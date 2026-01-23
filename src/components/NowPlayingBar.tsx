@@ -130,9 +130,9 @@ export const NowPlayingBar = ({
         data-coachmark="player-bar"
         className={cn(
           "relative flex flex-col",
-          // Pure Vision Pro glass bar
-          "bg-black/70 backdrop-blur-3xl",
-          "border-t border-white/[0.1]",
+          // Pure Vision Pro glass bar (theme-aware)
+          "bg-[hsl(var(--glass-bar))] backdrop-blur-3xl",
+          "border-t border-border/50",
         )}
       >
         {/* Ambient glow from currently playing */}
@@ -153,19 +153,19 @@ export const NowPlayingBar = ({
           }}
         >
           {/* Track background */}
-          <div className="absolute inset-0 bg-white/[0.1]" />
+          <div className="absolute inset-0 bg-muted/50" />
           {/* Progress fill with glow */}
           <div 
-            className="absolute left-0 top-0 h-full bg-white transition-all duration-100"
+            className="absolute left-0 top-0 h-full bg-primary transition-all duration-100"
             style={{ 
               width: `${progress}%`,
-              boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
+              boxShadow: '0 0 10px hsl(var(--primary) / 0.5)'
             }}
           />
           {/* Hover indicator */}
           <div 
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg shadow-white/50" 
-            style={{ left: `calc(${progress}% - 6px)` }} 
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg shadow-primary/50" 
+            style={{ left: `calc(${progress}% - 6px)` }}
           />
         </div>
 
@@ -182,7 +182,7 @@ export const NowPlayingBar = ({
                     aria-label="Ouvrir le lecteur"
                     className={cn(
                       "relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 group",
-                      "ring-2 ring-white/10 hover:ring-primary/50",
+                      "ring-2 ring-border/50 hover:ring-primary/50",
                       "transition-all duration-300 ease-out",
                       "hover:shadow-xl hover:shadow-primary/20",
                       "active:scale-95",
@@ -248,7 +248,7 @@ export const NowPlayingBar = ({
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       isFavorite ? "text-rose-500 hover:text-rose-400" : "text-muted-foreground/50 hover:text-rose-500",
-                      "hover:bg-white/5 active:scale-95",
+                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     )}
                   >
@@ -279,7 +279,7 @@ export const NowPlayingBar = ({
                       className={cn(
                         "p-2 rounded-full transition-all duration-300",
                         isShuffle ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
-                        "hover:bg-white/5 active:scale-95",
+                        "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                       )}
                     >
@@ -296,7 +296,7 @@ export const NowPlayingBar = ({
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-foreground/80 hover:text-foreground",
-                    "hover:bg-white/5 active:scale-90",
+                    "hover:bg-[hsl(var(--glass-item-hover))] active:scale-90",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                   )}
                 >
@@ -309,10 +309,10 @@ export const NowPlayingBar = ({
                   aria-label={isPlaying ? "Pause" : "Lecture"}
                   className={cn(
                     "w-11 h-11 rounded-full flex items-center justify-center",
-                    // Glass button with white fill
-                    "bg-white/95 text-black",
-                    "shadow-lg shadow-white/10",
-                    "hover:bg-white hover:scale-105",
+                    // Glass button with primary fill (theme-aware)
+                    "bg-primary text-primary-foreground",
+                    "shadow-lg shadow-primary/20",
+                    "hover:bg-primary/90 hover:scale-105",
                     "active:scale-95",
                     "transition-all duration-200 ease-out-expo",
                     "focus:outline-none",
@@ -332,7 +332,7 @@ export const NowPlayingBar = ({
                   className={cn(
                     "p-2 rounded-full transition-all duration-300",
                     "text-foreground/80 hover:text-foreground",
-                    "hover:bg-white/5 active:scale-90",
+                    "hover:bg-[hsl(var(--glass-item-hover))] active:scale-90",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                   )}
                 >
@@ -350,7 +350,7 @@ export const NowPlayingBar = ({
                         repeatMode !== "off"
                           ? "text-primary bg-primary/10"
                           : "text-muted-foreground/50 hover:text-foreground",
-                        "hover:bg-white/5 active:scale-95",
+                        "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                       )}
                     >
@@ -429,7 +429,7 @@ export const NowPlayingBar = ({
                         </>
                       )}
                       {audioAnalysis.sentiment && audioAnalysis.sentiment.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-white/10">
+                        <div className="mt-2 pt-2 border-t border-border/30">
                           <p className="text-xs font-semibold flex items-center gap-1">
                             <TrendingUp className="w-3 h-3" />
                             Sentiment
@@ -498,7 +498,7 @@ export const NowPlayingBar = ({
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-white/5 active:scale-95",
+                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     )}
                   >
@@ -518,7 +518,7 @@ export const NowPlayingBar = ({
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       isQueueOpen ? "text-primary bg-primary/10" : "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-white/5 active:scale-95",
+                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     )}
                   >
@@ -536,7 +536,7 @@ export const NowPlayingBar = ({
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-white/5 active:scale-95",
+                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     )}
                   >
@@ -555,12 +555,12 @@ export const NowPlayingBar = ({
                 <button
                   onClick={onMuteToggle}
                   aria-label={isMuted ? "Activer le son" : "Couper le son"}
-                  className={cn(
-                    "p-2 rounded-full transition-all duration-300",
-                    "text-muted-foreground/50 hover:text-foreground",
-                    "hover:bg-white/5 active:scale-95",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                  )}
+                    className={cn(
+                      "p-2 rounded-full transition-all duration-300",
+                      "text-muted-foreground/50 hover:text-foreground",
+                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    )}
                 >
                   <VolumeIcon className="w-4 h-4" />
                 </button>
@@ -589,7 +589,7 @@ export const NowPlayingBar = ({
                     className={cn(
                       "p-2 rounded-full transition-all duration-300",
                       "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-white/5 active:scale-95",
+                      "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     )}
                   >
@@ -604,17 +604,17 @@ export const NowPlayingBar = ({
                 <DropdownMenuTrigger asChild>
                   <button
                     aria-label="Plus d'options"
-                    className={cn(
-                      "p-2 rounded-full transition-all duration-300",
-                      "text-muted-foreground/50 hover:text-foreground",
-                      "hover:bg-white/5 active:scale-95",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                    )}
+                      className={cn(
+                        "p-2 rounded-full transition-all duration-300",
+                        "text-muted-foreground/50 hover:text-foreground",
+                        "hover:bg-[hsl(var(--glass-item-hover))] active:scale-95",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      )}
                   >
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52 bg-card/95 backdrop-blur-xl border-white/10">
+                <DropdownMenuContent align="end" className="w-52 bg-popover/95 backdrop-blur-xl border-border/50">
                   <DropdownMenuItem
                     onClick={() => {
                       if (navigator.share) {
@@ -643,7 +643,7 @@ export const NowPlayingBar = ({
                     <Info className="w-4 h-4 mr-3" />
                     Infos de la piste
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/5" />
+                  <DropdownMenuSeparator className="bg-border/30" />
                   <DropdownMenuItem onClick={onNavigateToAlbum}>
                     <Disc3 className="w-4 h-4 mr-3" />
                     Aller à l'album

@@ -57,23 +57,30 @@
        Glassmorphism adapted for light backgrounds
        ═══════════════════════════════════════════════════════════════════════════ */
     
-    /* Glass surfaces - using dark overlays for light mode */
-    --glass-bg: 0 0% 0% / 0.03;
-    --glass-bg-hover: 0 0% 0% / 0.05;
-    --glass-bg-active: 0 0% 0% / 0.08;
-    --glass-border: 0 0% 0% / 0.08;
-    --glass-border-hover: 0 0% 0% / 0.12;
-    --glass-highlight: 0 0% 100% / 0.8;
+    /* Glass surfaces - using white overlays with subtle shadows for light mode */
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-bg-hover: 0 0% 100% / 0.8;
+    --glass-bg-active: 0 0% 100% / 0.9;
+    --glass-border: 0 0% 0% / 0.06;
+    --glass-border-hover: 0 0% 0% / 0.1;
+    --glass-highlight: 0 0% 100% / 0.9;
     
     /* Glass overlay colors for light mode */
-    --glass-overlay: 0 0% 100% / 0.7;
-    --glass-overlay-strong: 0 0% 100% / 0.85;
+    --glass-overlay: 0 0% 100% / 0.85;
+    --glass-overlay-strong: 0 0% 100% / 0.95;
     
     /* Blur intensities */
     --blur-sm: 8px;
     --blur-md: 16px;
     --blur-lg: 32px;
     --blur-xl: 64px;
+    
+    /* Semantic glass components for light mode */
+    --glass-panel: 0 0% 100% / 0.75;
+    --glass-sidebar: 0 0% 98% / 0.9;
+    --glass-bar: 0 0% 100% / 0.85;
+    --glass-item-hover: 0 0% 0% / 0.04;
+    --glass-item-active: 0 0% 0% / 0.08;
     
     /* ═══════════════════════════════════════════════════════════════════════════
        SPATIAL DEPTH TOKENS - LIGHT MODE
@@ -164,6 +171,13 @@
     --glass-highlight: 0 0% 100% / 0.2;
     --glass-overlay: 0 0% 0% / 0.6;
     --glass-overlay-strong: 0 0% 0% / 0.8;
+    
+    /* Semantic glass components for dark mode */
+    --glass-panel: 0 0% 0% / 0.5;
+    --glass-sidebar: 0 0% 0% / 0.6;
+    --glass-bar: 0 0% 0% / 0.7;
+    --glass-item-hover: 0 0% 100% / 0.05;
+    --glass-item-active: 0 0% 100% / 0.1;
     
     /* Shadows - Dark mode */
     --shadow-subtle: 0 2px 8px hsl(0 0% 0% / 0.15);
