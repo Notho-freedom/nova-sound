@@ -406,31 +406,39 @@ export const DownloadsView = () => {
   const failedDownloads = downloads.filter((d) => d.status === "failed");
 
   return (
-    <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            {t("downloadsTitle")}
-          </h1>
+    <div className="p-6 h-full min-h-0 w-full flex flex-col overflow-hidden animate-in fade-in duration-300">
+      {/* Header - Vision Pro style */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 backdrop-blur-xl border border-white/[0.1] flex items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
+              <Download className="w-7 h-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="font-display text-3xl font-bold text-foreground">
+                {t("downloadsTitle")}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {t("downloadsSubtitle")}
+              </p>
+            </div>
+          </div>
           <HelpButton
             title={t("downloadsTitle")}
             description={t("downloadsHelpDescription")}
             size="icon-sm"
           />
         </div>
-        <p className="text-muted-foreground">
-          {t("downloadsSubtitle")}
-        </p>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Vision Pro glassmorphism */}
       <Tabs defaultValue="downloads" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="mb-6 bg-muted/30">
-          <TabsTrigger value="downloads" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+        <TabsList className="mb-6 bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] p-1 rounded-2xl">
+          <TabsTrigger value="downloads" className="gap-2 rounded-xl data-[state=active]:bg-white/[0.1] data-[state=active]:text-foreground data-[state=active]:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
             <Download className="w-4 h-4" />
             {t("downloadsTabDownloads", { count: downloads.length })}
           </TabsTrigger>
-          <TabsTrigger value="uploaded" className="gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+          <TabsTrigger value="uploaded" className="gap-2 rounded-xl data-[state=active]:bg-white/[0.1] data-[state=active]:text-foreground data-[state=active]:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
             <Cloud className="w-4 h-4" />
             {t("downloadsTabUploaded", { count: uploadedFiles.length })}
           </TabsTrigger>
@@ -459,10 +467,10 @@ export const DownloadsView = () => {
             {activeDownloads.map((download) => (
               <div
                 key={download.id}
-                className="p-4 rounded-lg bg-card border border-border"
+                className="p-4 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] shadow-[0_4px_16px_rgba(0,0,0,0.15)] hover:bg-white/[0.05] transition-all duration-300"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 backdrop-blur-xl border border-white/[0.1] flex items-center justify-center">
                     {getFileIcon(download.type)}
                   </div>
                   <div className="flex-1 min-w-0">

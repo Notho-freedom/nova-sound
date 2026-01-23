@@ -298,16 +298,21 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
   }
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <Radio className="w-8 h-8 text-primary" />
-            {t('audioSensesTitle')}
-          </h1>
-          <p className="text-muted-foreground">
-            {t('audioSensesSubtitle')}
-          </p>
+    <div className="p-6 space-y-6 overflow-y-auto h-full animate-in fade-in duration-300">
+      {/* Header - Vision Pro style */}
+      <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 backdrop-blur-xl border border-white/[0.1] flex items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
+            <Radio className="w-7 h-7 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold font-display">
+              {t('audioSensesTitle')}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {t('audioSensesSubtitle')}
+            </p>
+          </div>
         </div>
         <HelpButton
           title={t('audioSensesHelpTitle')}
@@ -318,10 +323,10 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 1. Waveform */}
-        <Card>
+        <Card className="bg-white/[0.03] backdrop-blur-xl border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5" />
+              <Activity className="w-5 h-5 text-primary" />
               {t('audioSensesWaveformTitle')}
               <HelpIcon description={t('audioSensesWaveformHelp')} />
             </CardTitle>
@@ -329,7 +334,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardContent>
             <canvas
               ref={canvasWaveformRef}
-              className="w-full rounded-lg bg-muted"
+              className="w-full rounded-xl bg-white/[0.02] border border-white/[0.05]"
               width={800}
               height={200}
             />
@@ -349,10 +354,10 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
         </Card>
 
         {/* 2. FFT Spectrum */}
-        <Card>
+        <Card className="bg-white/[0.03] backdrop-blur-xl border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <RadioIcon className="w-5 h-5" />
+              <RadioIcon className="w-5 h-5 text-primary" />
               {t('audioSensesFftTitle')}
               <HelpIcon description={t('audioSensesFftHelp')} />
             </CardTitle>
@@ -360,27 +365,27 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardContent>
             <canvas
               ref={canvasFFTRef}
-              className="w-full rounded-lg bg-muted"
+              className="w-full rounded-xl bg-white/[0.02] border border-white/[0.05]"
               width={800}
               height={200}
             />
             <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-red-500">●</span>
+                <span className="text-destructive">●</span>
                 <span className="ml-2">{t('audioSensesFftBass')}</span>
                 <div className="font-mono text-xs mt-1">
                   {Math.round(sensesData.bass)}
                 </div>
               </div>
               <div>
-                <span className="text-blue-500">●</span>
+                <span className="text-primary">●</span>
                 <span className="ml-2">{t('audioSensesFftMid')}</span>
                 <div className="font-mono text-xs mt-1">
                   {Math.round(sensesData.mid)}
                 </div>
               </div>
               <div>
-                <span className="text-purple-500">●</span>
+                <span className="text-accent">●</span>
                 <span className="ml-2">{t('audioSensesFftHigh')}</span>
                 <div className="font-mono text-xs mt-1">
                   {Math.round(sensesData.treble)}
@@ -391,10 +396,10 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
         </Card>
 
         {/* 3. Energy Bands */}
-        <Card>
+        <Card className="bg-white/[0.03] backdrop-blur-xl border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Gauge className="w-5 h-5" />
+              <Gauge className="w-5 h-5 text-primary" />
               {t('audioSensesEnergyTitle')}
               <HelpIcon description={t('audioSensesEnergyHelp')} />
             </CardTitle>
@@ -402,7 +407,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardContent>
             <canvas
               ref={canvasEnergyBandsRef}
-              className="w-full rounded-lg bg-muted"
+              className="w-full rounded-xl bg-white/[0.02] border border-white/[0.05]"
               width={800}
               height={200}
             />
@@ -424,10 +429,10 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
         </Card>
 
         {/* 4. Volume & RMS */}
-        <Card>
+        <Card className="bg-white/[0.03] backdrop-blur-xl border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Volume2 className="w-5 h-5" />
+              <Volume2 className="w-5 h-5 text-primary" />
               {t('audioSensesVolumeTitle')}
               <HelpIcon description={t('audioSensesVolumeHelp')} />
             </CardTitle>
@@ -438,30 +443,30 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
                 <span>{t('audioSensesVolumeLabel')}</span>
                 <span className="font-mono">{(sensesData.volume * 100).toFixed(1)}%</span>
               </div>
-              <Progress value={sensesData.volume * 100} className="h-3" />
+              <Progress value={sensesData.volume * 100} className="h-3 bg-white/[0.05]" />
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span>{t('audioSensesRmsLabel')}</span>
                 <span className="font-mono">{(sensesData.rms * 100).toFixed(1)}%</span>
               </div>
-              <Progress value={sensesData.rms * 100} className="h-3" />
+              <Progress value={sensesData.rms * 100} className="h-3 bg-white/[0.05]" />
             </div>
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span>{t('audioSensesGlobalEnergy')}</span>
                 <span className="font-mono">{Math.round(sensesData.energy)}</span>
               </div>
-              <Progress value={(sensesData.energy / 255) * 100} className="h-3" />
+              <Progress value={(sensesData.energy / 255) * 100} className="h-3 bg-white/[0.05]" />
             </div>
           </CardContent>
         </Card>
 
         {/* 5. Peak Detection */}
-        <Card>
+        <Card className="bg-white/[0.03] backdrop-blur-xl border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5" />
+              <Zap className="w-5 h-5 text-primary" />
               {t('audioSensesPeakTitle')}
               <HelpIcon description={t('audioSensesPeakHelp')} />
             </CardTitle>
@@ -469,7 +474,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardContent>
             <canvas
               ref={canvasPeakHistoryRef}
-              className="w-full rounded-lg bg-muted"
+              className="w-full rounded-xl bg-white/[0.02] border border-white/[0.05]"
               width={800}
               height={200}
             />
@@ -497,10 +502,10 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
         </Card>
 
         {/* 6. Envelope Following */}
-        <Card>
+        <Card className="bg-white/[0.03] backdrop-blur-xl border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
+              <TrendingUp className="w-5 h-5 text-primary" />
               {t('audioSensesEnvelopeTitle')}
               <HelpIcon description={t('audioSensesEnvelopeHelp')} />
             </CardTitle>
@@ -508,7 +513,7 @@ export function AudioSensesView({ audioElement }: AudioSensesViewProps) {
           <CardContent>
             <canvas
               ref={canvasEnvelopeRef}
-              className="w-full rounded-lg bg-muted"
+              className="w-full rounded-xl bg-white/[0.02] border border-white/[0.05]"
               width={800}
               height={200}
             />
