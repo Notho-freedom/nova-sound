@@ -2063,6 +2063,7 @@ export const DesktopApp = () => {
           isMuted={isMuted}
           youtubeDuration={youtubeDuration}
           audioElement={audioRef.current}
+          isInline={true}
           onPlayPause={handlePlayPause}
           onPrevious={handlePrevious}
           onNext={handleNext}
