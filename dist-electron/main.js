@@ -509,7 +509,7 @@ function createWindow() {
     const useProduction = forceProduction || app.isPackaged || (!cliOptions.dev && !isDev);
     if (useProduction) {
         // Production: Load from Vercel
-        const vercelUrl = process.env.VERCEL_URL || 'https://nova-sound-nine.vercel.app';
+        const vercelUrl = `https://nova-sound-nine.vercel.app?v=${Date.now()}`;
         console.log('🌐 Loading production URL:', vercelUrl);
         mainWindow.loadURL(vercelUrl);
         // DevTools désactivés en production

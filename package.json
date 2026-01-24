@@ -1,7 +1,7 @@
 {
   "name": "nexus-audio",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "NEXUS - Futuristic Audio Player",
   "author": "NEXUS Team",
   "license": "MIT",
@@ -313,7 +313,7 @@
       "publish": [
         {
           "provider": "generic",
-          "url": "${env.ELECTRON_UPDATER_URL}",
+          "url": "https://nexus-player.genesis-company.net/updates/win",
           "channel": "latest"
         }
       ]

@@ -465,24 +465,6 @@ export const HeroCarousel = memo(({
         </div>
       )}
 
-      {/* Slide indicators - Dot navigation */}
-      {enhancedSlides.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-          {enhancedSlides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => goToSlide(idx)}
-              className={cn(
-                "transition-all duration-300 rounded-full",
-                idx === currentIndex
-                  ? "w-8 h-2 bg-primary shadow-lg shadow-primary/50"
-                  : "w-2 h-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
-              )}
-              aria-label={`Aller au slide ${idx + 1}`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 });
