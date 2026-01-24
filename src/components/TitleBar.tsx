@@ -302,67 +302,65 @@ const TitleBarComponent = ({
           className="h-11 flex items-center justify-between bg-gradient-to-r from-card/90 via-card/80 to-card/90 backdrop-blur-xl border-b border-white/[0.04] px-3 select-none"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         >
-          <div className="flex items-center gap-3">
+          {/* LEFT SECTION: Logo + Navigation */}
+          <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             <div className="relative group">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-all duration-300 overflow-hidden">
                 <img src="/icon.png" alt="NEXUS" className="w-7 h-7 object-contain" />
               </div>
               <div className="absolute inset-0 rounded-lg bg-primary/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
             </div>
-            <div className="flex items-center gap-2">
-              {!electronEnv && (
-                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-medium tracking-wide">
-                  WEB
-                </span>
-              )}
+
+            {!electronEnv && (
+              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-medium tracking-wide">
+                WEB
+              </span>
+            )}
+
+            <div className="w-px h-5 bg-white/[0.06] mx-1" />
+
+            {/* Navigation buttons */}
+            <div className="flex items-center gap-0.5">
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onGoBack}
+                    disabled={!canGoBack}
+                    className={cn(
+                      "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200",
+                      canGoBack
+                        ? "text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08]"
+                        : "text-muted-foreground/30 cursor-not-allowed"
+                    )}
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Retour</TooltipContent>
+              </Tooltip>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onGoForward}
+                    disabled={!canGoForward}
+                    className={cn(
+                      "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200",
+                      canGoForward
+                        ? "text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08]"
+                        : "text-muted-foreground/30 cursor-not-allowed"
+                    )}
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Suivant</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
-          {/* Navigation buttons + Search bar together */}
-          <div
-            className="flex-0 w-1/2 justify-center flex items-center gap-2 min-w-0"
-            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-          >
-            {/* Navigation buttons - VSCode style (next to search) */}
-            <div className="flex items-center gap-0.5" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onGoBack}
-                  disabled={!canGoBack}
-                  className={cn(
-                    "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200",
-                    canGoBack
-                      ? "text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08]"
-                      : "text-muted-foreground/30 cursor-not-allowed"
-                  )}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Retour</TooltipContent>
-            </Tooltip>
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={onGoForward}
-                  disabled={!canGoForward}
-                  className={cn(
-                    "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-200",
-                    canGoForward
-                      ? "text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08]"
-                      : "text-muted-foreground/30 cursor-not-allowed"
-                  )}
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Suivant</TooltipContent>
-            </Tooltip>
-          </div>
-
+          {/* CENTER SECTION: Search bar */}
           {onSearch && (
-            <div className="flex-0 w-full md:w-1/2 lg:w-2/3 xl:w-3/4 flex items-center gap-0 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <div className="flex-1 max-w-2xl mx-4 flex items-center gap-0 relative" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
               <div
                 className={cn(
                   "relative w-full flex items-center h-7 rounded-md transition-all duration-200",
@@ -539,33 +537,34 @@ const TitleBarComponent = ({
             </div>
           )}
 
-          {/* Files & Folders Button */}
-          <DropdownMenu open={isFilesMenuOpen} onOpenChange={setIsFilesMenuOpen}>
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08] transition-all">
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Ouvrir fichiers/dossiers</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end" className="w-max">
-              <DropdownMenuItem onClick={handleOpenFiles}>
-                <FileText className="w-4 h-4 mr-2" />
-                <span>{t("menuActionOpenFiles")}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleOpenFolders}>
-                <FolderOpen className="w-4 h-4 mr-2" />
-                <span>{t("menuActionOpenFolders")}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          </div>
-
+          {/* RIGHT SECTION: Actions + User */}
           <div className="flex items-center gap-2" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            {/* Files & Folders Button */}
+            <DropdownMenu open={isFilesMenuOpen} onOpenChange={setIsFilesMenuOpen}>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <button className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] active:bg-white/[0.08] transition-all">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Ouvrir fichiers/dossiers</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-max">
+                <DropdownMenuItem onClick={handleOpenFiles}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  <span>{t("menuActionOpenFiles")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleOpenFolders}>
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  <span>{t("menuActionOpenFolders")}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="w-px h-5 bg-white/[0.06]" />
+
             {/* Theme Toggle */}
             <ThemeToggleButton />
             
@@ -664,10 +663,8 @@ const TitleBarComponent = ({
                       setIsSyncPopoverOpen(false)
                       
                       try {
-                        // Synchroniser Firebase d'abord (avec logging complet et comparaison)
                         await firebaseSyncService.forceSyncNow();
                         
-                        // Ensuite, synchroniser Stripe avec Firestore
                         try {
                           const currentUser = firebaseService.getCurrentUser();
                           if (currentUser && !currentUser.isAnonymous) {
@@ -687,7 +684,6 @@ const TitleBarComponent = ({
                             }
                           }
                         } catch (stripeError) {
-                          // Ne pas bloquer la synchronisation Firebase si Stripe échoue
                           console.warn('⚠️ TitleBar: Erreur lors de la synchronisation Stripe (non-bloquant):', stripeError);
                         }
                         
@@ -798,10 +794,10 @@ const TitleBarComponent = ({
               <TooltipContent side="bottom">Paramètres</TooltipContent>
             </Tooltip>
 
-            {electronEnv && <div className="w-px h-5 bg-white/[0.06] mx-1" />}
-
+            {/* Window Controls (Electron only) */}
             {electronEnv && (
               <>
+                <div className="w-px h-5 bg-white/[0.06]" />
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <button onClick={handleMinimize} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.04] transition-all duration-300 group">
@@ -833,6 +829,7 @@ const TitleBarComponent = ({
               </>
             )}
 
+            {/* Web mode indicator */}
             {!electronEnv && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground/60 ml-2">
                 <Sparkles className="w-3 h-3" />
