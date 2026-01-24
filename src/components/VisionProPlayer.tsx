@@ -48,6 +48,8 @@ interface VisionProPlayerProps {
   audioElement?: HTMLAudioElement | null;
   youtubeDuration?: number;
   isInline?: boolean;
+  /** Whether to show video mode (YouTube player is handled by parent) */
+  showVideoMode?: boolean;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -58,6 +60,7 @@ interface VisionProPlayerProps {
   onMuteToggle: () => void;
   onClose: () => void;
   onToggleFavorite?: () => void;
+  onToggleVideoMode?: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -78,6 +81,7 @@ export const VisionProPlayer = ({
   audioElement,
   youtubeDuration,
   isInline = false,
+  showVideoMode = false,
   onPlayPause,
   onPrevious,
   onNext,
@@ -88,9 +92,9 @@ export const VisionProPlayer = ({
   onMuteToggle,
   onClose,
   onToggleFavorite,
+  onToggleVideoMode,
 }: VisionProPlayerProps) => {
   const [showControls, setShowControls] = useState(true);
-  const [showVideo, setShowVideo] = useState(false);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
   const INACTIVITY_DELAY = 4000;
 
@@ -374,18 +378,21 @@ export const VisionProPlayer = ({
          IMMERSIVE BACKGROUND
          ═══════════════════════════════════════════════════════════════════════════ */}
       <div className="absolute inset-0">
-        {/* Video Background or Album Art */}
-        {showVideo && hasVideo ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black">
-            {currentTrack.youtubeVideoId && (
-              <iframe
-                src={`https://www.youtube.com/embed/${currentTrack.youtubeVideoId}?autoplay=1&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&mute=1`}
-                className="w-full h-full object-cover"
-                style={{ transform: 'scale(1.2)' }}
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-            )}
+        {/* Video mode: The YouTube player is rendered by parent (DesktopApp) behind this overlay */}
+        {/* In video mode, we just show a transparent layer over the video with overlays */}
+        {showVideoMode && hasVideo ? (
+          <div className="absolute inset-0">
+            {/* Video is rendered by parent component - this is just an overlay */}
+            {/* Animated border glow around video area */}
+            <motion.div
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-4 rounded-3xl pointer-events-none"
+              style={{
+                border: '1px solid hsl(var(--primary) / 0.3)',
+                boxShadow: '0 0 60px hsl(var(--primary) / 0.2), inset 0 0 60px hsl(var(--primary) / 0.05)',
+              }}
+            />
           </div>
         ) : (
           <>
@@ -532,22 +539,22 @@ export const VisionProPlayer = ({
               <Radio className="w-5 h-5 text-primary" />
             </motion.div>
             <span className="text-xs uppercase tracking-[0.25em] text-white/40 font-medium hidden sm:block">
-              {showVideo ? 'Mode Vidéo' : 'En Lecture'}
+              {showVideoMode ? 'Mode Vidéo' : 'En Lecture'}
             </span>
           </div>
           
           <div className="flex items-center gap-2">
             {/* Video toggle button */}
-            {hasVideo && (
+            {hasVideo && onToggleVideoMode && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={() => setShowVideo(!showVideo)}
+                onClick={onToggleVideoMode}
                 className={cn(
                   "w-12 h-12 rounded-2xl flex items-center justify-center",
                   "backdrop-blur-2xl border transition-all duration-300",
                   "shadow-lg shadow-black/20",
-                  showVideo 
+                  showVideoMode 
                     ? "bg-primary/20 border-primary/40 text-primary" 
                     : "bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20"
                 )}
@@ -576,7 +583,7 @@ export const VisionProPlayer = ({
 
         {/* Center Content */}
         <div className="flex-1 flex items-center justify-center px-8">
-          {!showVideo && (
+          {!showVideoMode && (
             <div className="flex flex-col items-center max-w-2xl w-full">
               
               {/* Album Art with holographic effects */}
