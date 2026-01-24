@@ -384,6 +384,7 @@ export const DesktopApp = () => {
   const [albumToOpen, setAlbumToOpen] = useState<string | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [showVideoMode, setShowVideoMode] = useState(false); // Toggle between audio visualizer and video in fullscreen
   const [playlistToOpen, setPlaylistToOpen] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [recentSearchQuery, setRecentSearchQuery] = useState<string>("");
@@ -2656,6 +2657,7 @@ export const DesktopApp = () => {
             isMuted={isMuted}
             audioElement={audioRef.current}
             youtubeDuration={youtubeDuration}
+            showVideoMode={showVideoMode && Boolean(currentTrack.youtubeVideoId)}
             onPlayPause={handlePlayPause}
             onPrevious={handlePrevious}
             onNext={handleNext}
@@ -2664,9 +2666,13 @@ export const DesktopApp = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={() => setIsMuted(!isMuted)}
-            onClose={() => setIsFullscreen(false)}
+            onClose={() => {
+              setIsFullscreen(false);
+              setShowVideoMode(false); // Reset video mode when closing
+            }}
             isFavorite={isFavorite(currentTrack.id)}
             onToggleFavorite={handleToggleFavorite}
+            onToggleVideoMode={() => setShowVideoMode(!showVideoMode)}
           />
         )}
 
@@ -2933,12 +2939,13 @@ export const DesktopApp = () => {
         )}
 
         {/* YouTube Player persistant en arrière-plan (pour tracks YouTube) */}
-        {/* En mode fullscreen, on le rend visible pour afficher la vidéo */}
+        {/* En mode fullscreen + vidéo, on le rend visible pour afficher la vidéo avec audio synchronisé */}
         {currentTrack && (currentTrack.mediaSource as string) === 'youtube' && currentTrack.youtubeVideoId && (
           <div 
             className={cn(
               "fixed inset-0",
-              isFullscreen
+              // Show video only when fullscreen AND video mode is enabled
+              isFullscreen && showVideoMode
                 ? "z-[9998] pointer-events-auto opacity-100 w-full h-full"
                 : "pointer-events-none z-[-1] opacity-0 w-px h-px overflow-hidden"
             )}
@@ -2948,7 +2955,7 @@ export const DesktopApp = () => {
               ref={youtubePlayerRef}
               videoId={currentTrack?.youtubeVideoId || ''}
               autoPlay={isPlaying}
-              audioOnly={!isFullscreen} // Audio-only en background, vidéo visible en fullscreen
+              audioOnly={!(isFullscreen && showVideoMode)} // Video visible only in fullscreen + video mode
               onEnded={() => {
                 console.log('[DesktopApp] YouTube video ended, moving to next track');
                 // Record playback before moving to next
