@@ -156,7 +156,7 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
   };
 
   return (
-    <div className="w-80 h-full bg-card/95 backdrop-blur-md border-l border-border flex flex-col shadow-2xl">
+    <div className="w-80 h-full flex flex-col overflow-hidden bg-card/80 backdrop-blur-md border-l border-border/50 shadow-2xl shadow-black/20">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
