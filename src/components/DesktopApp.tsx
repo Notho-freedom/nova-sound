@@ -10,7 +10,6 @@ import { Sidebar, ViewType } from "./Sidebar";
 import { useViewNavigation } from "@/hooks/useViewNavigation";
 import { NowPlayingBar } from "./NowPlayingBar";
 import { QueuePanel } from "./QueuePanel";
-import { VisionProPlayer } from "./VisionProPlayer";
 import { LoadingScreen } from "./LoadingScreen";
 import { LyricsDisplay } from "./LyricsDisplay";
 import { NotificationsPanel } from "./NotificationsPanel";
@@ -20,6 +19,7 @@ import { PlayQueueChoiceDialog } from "./PlayQueueChoiceDialog";
 import { UpdateNotification } from "./UpdateNotification";
 import { AssistantPanel } from "./AssistantPanel";
 import { lazy, Suspense } from "react";
+import { FullscreenPlayer } from './FullscreenPlayer';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -161,7 +161,9 @@ export const DesktopApp = () => {
             try { if (t.mediaSource === 'youtube') cacheYouTubeTrack(t); } catch (e) { /* ignore */ }
           });
         }).catch(() => {});
-      } catch {}
+      } catch (err) {
+        console.warn('[DesktopApp] Failed to cache YouTube tracks:', err);
+      }
     };
     
     // Écouter aussi les événements de récupération de tracks (depuis youtube-track-recovery)
@@ -2054,7 +2056,7 @@ export const DesktopApp = () => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
-        <VisionProPlayer
+        <FlullscreenPlayer
           currentTrack={currentTrack}
           isPlaying={isPlaying}
           currentTime={currentTime}
@@ -2647,7 +2649,7 @@ export const DesktopApp = () => {
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
         {/* Fullscreen Player - Vision Pro Style */}
         {isFullscreen && currentTrack && (
-          <VisionProPlayer
+          <FlullscreenPlayer
             currentTrack={currentTrack}
             isPlaying={isPlaying}
             currentTime={currentTime}

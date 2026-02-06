@@ -114,16 +114,6 @@ export const LoadingScreen = ({ onLoadComplete, minDuration = 2000 }: LoadingScr
             "border border-white/[0.1]",
             "shadow-2xl shadow-black/50"
           )}>
-            {/* Rotating gradient border */}
-            <div 
-              className="absolute inset-0 rounded-full animate-spin-slow"
-              style={{ 
-                background: 'conic-gradient(from 0deg, transparent 0%, hsl(var(--primary)) 25%, transparent 50%)',
-                maskImage: 'radial-gradient(circle, transparent 60%, black 61%, black 100%)',
-                WebkitMaskImage: 'radial-gradient(circle, transparent 60%, black 61%, black 100%)',
-                animationDuration: '4s' 
-              }}
-            />
             
             {/* Icon with glow */}
             <div className="relative">
