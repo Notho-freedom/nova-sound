@@ -2056,7 +2056,7 @@ export const DesktopApp = () => {
     // Inline player view
     if (showInlinePlayer && currentTrack) {
       return (
-        <FlullscreenPlayer
+        <FullscreenPlayer
           currentTrack={currentTrack}
           isPlaying={isPlaying}
           currentTime={currentTime}
@@ -2649,7 +2649,7 @@ export const DesktopApp = () => {
       <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
         {/* Fullscreen Player - Vision Pro Style */}
         {isFullscreen && currentTrack && (
-          <FlullscreenPlayer
+          <FullscreenPlayer
             currentTrack={currentTrack}
             isPlaying={isPlaying}
             currentTime={currentTime}
