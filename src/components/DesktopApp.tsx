@@ -2660,6 +2660,7 @@ export const DesktopApp = () => {
             audioElement={audioRef.current}
             youtubeDuration={youtubeDuration}
             showVideoMode={showVideoMode && Boolean(currentTrack.youtubeVideoId)}
+            youtubePlayerRef={youtubePlayerRef}
             onPlayPause={handlePlayPause}
             onPrevious={handlePrevious}
             onNext={handleNext}

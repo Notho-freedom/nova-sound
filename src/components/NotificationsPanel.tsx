@@ -64,7 +64,7 @@ export const NotificationsPanel = ({ className, onClose }: NotificationsPanelPro
   };
 
   return (
-    <div className={cn("h-full flex flex-col bg-card border-l border-border/50", className)}>
+    <div className={cn("h-full flex flex-col bg-card/80 backdrop-blur-md border-l border-border/50 shadow-2xl shadow-black/20", className)}>
       {/* Header */}
       <div className="sticky top-0 z-10 bg-card/80 backdrop-blur-md border-b border-border/50 px-4 py-3">
         <div className="flex items-center justify-between mb-3">

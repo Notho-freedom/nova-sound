@@ -35,6 +35,8 @@ import { useAudioVibes } from "@/hooks/useAudioVibes";
 import { Track } from "@/types/music";
 import { cn } from "@/lib/utils";
 import { getCoverUrl } from "@/lib/audio";
+import { type YouTubePlayerRef } from "./YouTubePlayer";
+import { extractYouTubeVideoId } from "@/lib/youtube";
 
 interface VisionProPlayerProps {
   currentTrack: Track;
@@ -50,6 +52,8 @@ interface VisionProPlayerProps {
   isInline?: boolean;
   /** Whether to show video mode (YouTube player is handled by parent) */
   showVideoMode?: boolean;
+  /** Shared YouTube player ref from DesktopApp */
+  youtubePlayerRef?: React.RefObject<YouTubePlayerRef | null>;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -82,6 +86,7 @@ export const VisionProPlayer = ({
   youtubeDuration,
   isInline = false,
   showVideoMode = false,
+  youtubePlayerRef,
   onPlayPause,
   onPrevious,
   onNext,
@@ -98,14 +103,18 @@ export const VisionProPlayer = ({
   const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
   const INACTIVITY_DELAY = 4000;
 
-  // Audio visualization
-  const vibesData = useAudioVibes(audioElement ?? null, {
+  // Detect YouTube track
+  const isYouTube = currentTrack.mediaSource === 'youtube';
+  const youtubeVideoId = currentTrack.youtubeVideoId || (isYouTube && currentTrack.filePath ? extractYouTubeVideoId(currentTrack.filePath) : null);
+
+  // Audio visualization (only for non-YouTube tracks)
+  const vibesData = useAudioVibes(isYouTube ? null : (audioElement ?? null), {
     fftSize: 512,
     enableBassFilter: false,
   });
 
   // Check if track has video
-  const hasVideo = Boolean(currentTrack.youtubeVideoId);
+  const hasVideo = Boolean(youtubeVideoId);
 
   // Auto-hide controls (only in fullscreen mode)
   const resetInactivityTimer = useCallback(() => {
@@ -133,6 +142,61 @@ export const VisionProPlayer = ({
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     };
   }, [resetInactivityTimer, isInline]);
+
+  // Sync YouTube player controls (same logic as FullscreenPlayer)
+  useEffect(() => {
+    if (isYouTube && youtubePlayerRef?.current && youtubeVideoId) {
+      const player = youtubePlayerRef.current;
+      
+      if (player.duration > 0) {
+        if (isPlaying && !player.isPlaying) {
+          requestAnimationFrame(() => {
+            if (player && typeof player.play === 'function' && !player.isPlaying) {
+              try {
+                player.play();
+              } catch (err) {
+                console.error('[VisionProPlayer] Erreur lors du play YouTube:', err);
+              }
+              
+              window.dispatchEvent(new CustomEvent('youtube-video-played', { 
+                detail: { 
+                  videoId: youtubeVideoId,
+                  trackId: currentTrack.id,
+                  title: currentTrack.title,
+                } 
+              }));
+            }
+          });
+        } else if (!isPlaying && player.isPlaying) {
+          player.pause();
+        }
+      }
+    }
+  }, [isPlaying, isYouTube, youtubeVideoId, currentTrack.id, currentTrack.title, youtubePlayerRef]);
+
+  // Sync volume with YouTube player
+  useEffect(() => {
+    if (isYouTube && youtubePlayerRef?.current) {
+      const currentVol = isMuted ? 0 : volume;
+      const youtubeVol = youtubePlayerRef.current.volume;
+      if (Math.abs(youtubeVol - currentVol) > 1) {
+        youtubePlayerRef.current.setVolume(currentVol);
+      }
+      
+      const youtubeMuted = youtubePlayerRef.current.isMuted;
+      if (youtubeMuted !== isMuted) {
+        youtubePlayerRef.current.toggleMute();
+      }
+    }
+  }, [volume, isMuted, isYouTube, youtubePlayerRef]);
+
+  // Handle seek for YouTube
+  const handleSeek = useCallback((value: number[]) => {
+    if (isYouTube && youtubePlayerRef?.current) {
+      youtubePlayerRef.current.seek(value[0]);
+    }
+    onSeek(value);
+  }, [isYouTube, onSeek, youtubePlayerRef]);
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
   
@@ -366,23 +430,25 @@ export const VisionProPlayer = ({
 
   // ═══════════════════════════════════════════════════════════════════════════
   // FULLSCREEN MODE - With video support and futuristic Apple design
+  // Same blur level as other panels (backdrop-blur-md)
   // ═══════════════════════════════════════════════════════════════════════════
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10000] overflow-hidden bg-black"
+      className={cn(
+        "fixed inset-0 z-[10000] overflow-hidden",
+        isYouTube ? "bg-transparent" : "bg-black"
+      )}
     >
       {/* ═══════════════════════════════════════════════════════════════════════════
          IMMERSIVE BACKGROUND
          ═══════════════════════════════════════════════════════════════════════════ */}
       <div className="absolute inset-0">
-        {/* Video mode: The YouTube player is rendered by parent (DesktopApp) behind this overlay */}
-        {/* In video mode, we just show a transparent layer over the video with overlays */}
+        {/* Video mode: YouTube player is rendered by parent (DesktopApp) behind this */}
         {showVideoMode && hasVideo ? (
           <div className="absolute inset-0">
-            {/* Video is rendered by parent component - this is just an overlay */}
             {/* Animated border glow around video area */}
             <motion.div
               animate={{ opacity: [0.3, 0.6, 0.3] }}
@@ -434,7 +500,7 @@ export const VisionProPlayer = ({
           </>
         )}
         
-        {/* Dark overlays for contrast */}
+        {/* Dark overlays for contrast - same opacity as panels */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40" />
         
@@ -511,7 +577,7 @@ export const VisionProPlayer = ({
             onClick={onClose}
             className={cn(
               "w-12 h-12 rounded-2xl flex items-center justify-center",
-              "bg-white/5 hover:bg-white/15 backdrop-blur-2xl",
+              "bg-white/5 hover:bg-white/15 backdrop-blur-md",
               "border border-white/10 hover:border-white/25",
               "text-white/70 hover:text-white",
               "transition-all duration-300",
@@ -533,7 +599,7 @@ export const VisionProPlayer = ({
               }}
               className={cn(
                 "w-10 h-10 rounded-xl flex items-center justify-center",
-                "bg-primary/20 backdrop-blur-xl border border-primary/30"
+                "bg-primary/20 backdrop-blur-md border border-primary/30"
               )}
             >
               <Radio className="w-5 h-5 text-primary" />
@@ -552,7 +618,7 @@ export const VisionProPlayer = ({
                 onClick={onToggleVideoMode}
                 className={cn(
                   "w-12 h-12 rounded-2xl flex items-center justify-center",
-                  "backdrop-blur-2xl border transition-all duration-300",
+                  "backdrop-blur-md border transition-all duration-300",
                   "shadow-lg shadow-black/20",
                   showVideoMode 
                     ? "bg-primary/20 border-primary/40 text-primary" 
@@ -569,7 +635,7 @@ export const VisionProPlayer = ({
               onClick={onToggleFavorite}
               className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center",
-                "backdrop-blur-2xl border transition-all duration-300",
+                "backdrop-blur-md border transition-all duration-300",
                 "shadow-lg shadow-black/20",
                 isFavorite 
                   ? "bg-rose-500/20 border-rose-500/40 text-rose-400" 
@@ -667,7 +733,7 @@ export const VisionProPlayer = ({
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className={cn(
                       "w-[18%] h-[18%] rounded-full",
-                      "bg-black/95 backdrop-blur-xl",
+                      "bg-black/95 backdrop-blur-md",
                       "border-4 border-white/5",
                       "shadow-inner flex items-center justify-center"
                     )}>
@@ -734,7 +800,7 @@ export const VisionProPlayer = ({
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════════════
-           BOTTOM CONTROLS - Floating glass panel
+           BOTTOM CONTROLS - Floating glass panel (same blur as other panels)
            ═══════════════════════════════════════════════════════════════════════════ */}
         <motion.div 
           initial={{ opacity: 0, y: 60 }}
@@ -745,8 +811,9 @@ export const VisionProPlayer = ({
           transition={{ duration: 0.4, ease: "easeOut" }}
           className={cn(
             "mx-4 sm:mx-8 mb-6 p-5 sm:p-6 rounded-3xl",
-            "bg-white/5 backdrop-blur-3xl",
-            "border border-white/10",
+            // Same blur as other panels (backdrop-blur-md)
+            "bg-card/80 backdrop-blur-md",
+            "border border-border/50",
             "shadow-2xl shadow-black/40"
           )}
         >
@@ -768,7 +835,7 @@ export const VisionProPlayer = ({
                 value={[currentTime]}
                 max={effectiveDuration}
                 step={0.1}
-                onValueChange={onSeek}
+                onValueChange={handleSeek}
                 className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
               />
             </div>
