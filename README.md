@@ -1,35 +1,18 @@
-# NEXUS - Futuristic Audio Player
+# nova-sound
 
-Modern audio player application with futuristic UI, playlist management, and audio visualization.
+Project description and documentation.
 
 ## 🚀 Features
 
-- 🎵 **Audio playback** - Full-featured music player
-- 🎨 **Futuristic UI** - Neon, glass-morphism design system
-- 📊 **Audio visualization** - Real-time frequency visualization
-- 📋 **Playlist management** - Create and manage playlists
-- 🔍 **Search** - Find tracks quickly
-- 🌙 **Dark theme** - Optimized for night listening
+- Modern tech stack
+- Responsive design
+- Production ready
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: TypeScript, Next.js, React
-- **Styling**: Tailwind CSS, custom animations
-- **Audio**: Web Audio API
-- **State**: React hooks and context
-
-## 📁 Project Structure
-
-`
-nova-sound/
-├── app/               # Next.js app router
-├── components/        # UI components
-├── lib/               # Audio and utility functions
-├── public/            # Static assets
-├── docs/              # Documentation
-├── scripts/           # Build scripts
-└── package.json
-`
+- TypeScript, Vite, React
+- Tailwind CSS
+- Supabase
 
 ## 🚀 Installation
 
@@ -44,12 +27,12 @@ npm install
 `ash
 npm run dev
 npm run build
-npm run start
+npm run preview
 `
 
 ## 📊 Status
 
-Active development. Core audio player features implemented.
+Active development.
 
 ## 👤 Author
 
