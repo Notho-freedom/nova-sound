@@ -1,73 +1,60 @@
-# Welcome to your Lovable project
+# NEXUS - Futuristic Audio Player
 
-## Project info
+Modern audio player application with futuristic UI, playlist management, and audio visualization.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Features
 
-## How can I edit this code?
+- 🎵 **Audio playback** - Full-featured music player
+- 🎨 **Futuristic UI** - Neon, glass-morphism design system
+- 📊 **Audio visualization** - Real-time frequency visualization
+- 📋 **Playlist management** - Create and manage playlists
+- 🔍 **Search** - Find tracks quickly
+- 🌙 **Dark theme** - Optimized for night listening
 
-There are several ways of editing your application.
+## 🛠️ Tech Stack
 
-**Use Lovable**
+- **Frontend**: TypeScript, Next.js, React
+- **Styling**: Tailwind CSS, custom animations
+- **Audio**: Web Audio API
+- **State**: React hooks and context
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 📁 Project Structure
 
-Changes made via Lovable will be committed automatically to this repo.
+`
+nova-sound/
+├── app/               # Next.js app router
+├── components/        # UI components
+├── lib/               # Audio and utility functions
+├── public/            # Static assets
+├── docs/              # Documentation
+├── scripts/           # Build scripts
+└── package.json
+`
 
-**Use your preferred IDE**
+## 🚀 Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+`ash
+git clone https://github.com/Notho-freedom/nova-sound.git
+cd nova-sound
+npm install
+`
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🏃 Running
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+`ash
 npm run dev
-```
+npm run build
+npm run start
+`
 
-**Edit a file directly in GitHub**
+## 📊 Status
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Active development. Core audio player features implemented.
 
-**Use GitHub Codespaces**
+## 👤 Author
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+[Notho-freedom](https://github.com/Notho-freedom)
 
-## What technologies are used for this project?
+## 📄 License
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+MIT
